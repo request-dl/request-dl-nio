@@ -56,8 +56,15 @@ extension Internals {
             switch source {
             case .bytes(let bytes):
                 if let password {
+                    // `NIOSSLPassphraseCallback`/`NIOSSLPassphraseSetter` are generic over any
+                    // `Collection<UInt8>`, not hardcoded to `[UInt8]` -- and `SecureBytes` already
+                    // conforms to `RandomAccessCollection` with `Element == UInt8` -- so this can
+                    // hand NIOSSL `password` directly instead of first copying it into a plain
+                    // `Array`, which (unlike `SecureBytes`/`ZeroingBytes`) has no zeroing
+                    // guarantee of its own and would sit in memory unzeroed after use, for
+                    // however long ARC takes to release it.
                     return try .init(bytes: bytes, format: format) {
-                        $0(Array(password))
+                        $0(password)
                     }
                 } else {
                     return try .init(bytes: bytes, format: format)
@@ -66,7 +73,7 @@ extension Internals {
                 do {
                     if let password {
                         return try .init(file: file, format: format) {
-                            $0(Array(password))
+                            $0(password)
                         }
                     } else {
                         return try .init(file: file, format: format)

@@ -905,6 +905,49 @@ extension PayloadTests {
         )
     }
 
+    /// Regression test: nodes run in declaration order, so `PayloadNode.make(_:)` used to decide
+    /// query-vs-body against whatever `requestConfiguration.method` held *at that point* in the
+    /// walk. `Payload` declared before `RequestMethod(.post)`, as here, meant `method` was still
+    /// `nil` when the payload ran -- indistinguishable from "no method configured at all", which
+    /// sends the fields as a query -- even though the method was about to become `POST`. The
+    /// fields must end up in the body regardless of which order these two are declared in.
+    @Test
+    func payload_whenDeclaredBeforeRequestMethodPost_stillSendsAsBodyNotQuery() async throws {
+        // Given
+        let json: [String: Any] = ["foo": "bar"]
+
+        // Then
+        let resolved = try await resolve(
+            TestProperty {
+                Payload(
+                    json,
+                    options: .fragmentsAllowed,
+                    contentType: .formURLEncoded
+                )
+
+                RequestMethod(.post)
+            }
+        )
+
+        let data = try await resolved.requestConfiguration.body?.data()
+
+        // When
+        #expect(resolved.requestConfiguration.queries.isEmpty)
+        #expect(resolved.requestConfiguration.method == "POST")
+
+        #expect(
+            resolved.requestConfiguration.headers["Content-Type"] == [
+                "application/x-www-form-urlencoded; charset=UTF-8"
+            ]
+        )
+
+        #expect(
+            resolved.requestConfiguration.headers["Content-Length"] == (data?.count).map { [String($0)] }
+        )
+
+        #expect(data.flatMap { String(data: $0, encoding: .utf8) } == "foo=bar")
+    }
+
     @Test
     func payload_whenGETInitJSONArrayWithURLEncoded() async throws {
         // Given

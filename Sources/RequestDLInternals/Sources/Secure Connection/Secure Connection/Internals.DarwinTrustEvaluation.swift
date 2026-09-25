@@ -58,6 +58,16 @@ extension Internals {
         package let revocationPolicy: Internals.RevocationPolicy?
         package let observer: (any TrustDecisionObserver)?
 
+        /// Whether `trustRootCertificates` *replace* the system's trusted roots (`TrustRoots`)
+        /// rather than extend them (`AdditionalTrustRoots` alone).
+        ///
+        /// `false` keeps the system roots trusted alongside the configured ones, matching
+        /// NIOSSL's own `additionalTrustRoots` semantics and what plain `.nio` already does.
+        /// Anchoring only on additional roots turned "also trust my corporate CA" into "trust
+        /// nothing else", rejecting every publicly-trusted host on `.urlSession` and on the
+        /// Network.framework/pinned `.nio` paths.
+        package let trustRootsAreExclusive: Bool
+
         // MARK: - Inits
 
         package init(
@@ -65,13 +75,15 @@ extension Internals {
             pins: [ResolvedSPKIPin],
             isStrict: Bool,
             revocationPolicy: Internals.RevocationPolicy? = nil,
-            observer: (any TrustDecisionObserver)? = nil
+            observer: (any TrustDecisionObserver)? = nil,
+            trustRootsAreExclusive: Bool = true
         ) {
             self.trustRootCertificates = trustRootCertificates
             self.pins = pins
             self.isStrict = isStrict
             self.revocationPolicy = revocationPolicy
             self.observer = observer
+            self.trustRootsAreExclusive = trustRootsAreExclusive
         }
 
         // MARK: - Internal methods
@@ -98,30 +110,49 @@ extension Internals {
         /// dropping it, since `SecTrustSetPolicies` replaces the whole array rather than appending
         /// to it.
         package func prepare(_ trust: SecTrust, skipsHostnameVerification: Bool) {
-            if skipsHostnameVerification || revocationPolicy != nil {
-                var policies: [SecPolicy]
+            applyPolicies(trust, skipsHostnameVerification: skipsHostnameVerification)
 
-                if skipsHostnameVerification {
-                    policies = [SecPolicyCreateSSL(true, nil)]
-                } else {
-                    var currentPolicies: CFArray?
-                    policies =
-                        SecTrustCopyPolicies(trust, &currentPolicies) == errSecSuccess
-                        ? (currentPolicies as? [SecPolicy] ?? [])
-                        : []
-                }
+            if !trustRootCertificates.isEmpty {
+                SecTrustSetAnchorCertificates(trust, trustRootCertificates as CFArray)
+                // Must follow `SecTrustSetAnchorCertificates`, which itself turns anchors-only on.
+                SecTrustSetAnchorCertificatesOnly(trust, trustRootsAreExclusive)
+            }
+        }
+
+        private func applyPolicies(_ trust: SecTrust, skipsHostnameVerification: Bool) {
+            if skipsHostnameVerification {
+                var policies = [SecPolicyCreateSSL(true, nil)]
 
                 if let revocationPolicy {
                     policies.append(revocationPolicy.secPolicy)
                 }
 
                 SecTrustSetPolicies(trust, policies as CFArray)
+                return
             }
 
-            if !trustRootCertificates.isEmpty {
-                SecTrustSetAnchorCertificates(trust, trustRootCertificates as CFArray)
-                SecTrustSetAnchorCertificatesOnly(trust, true)
+            guard let revocationPolicy else {
+                return
             }
+
+            // `SecTrustSetPolicies` replaces `trust`'s whole policy array rather than appending
+            // to it, so appending the revocation policy first requires reading back `trust`'s
+            // current array (its default SSL/hostname policy, since `skipsHostnameVerification`
+            // didn't just replace it). If that read fails, this must NOT fall back to an empty/
+            // partial array: doing so would hand `SecTrustSetPolicies` a policy set containing
+            // only the revocation policy, silently dropping chain-of-trust and hostname
+            // validation for this evaluation. Leaving `trust`'s existing, already-correct
+            // policies untouched instead fails safe by giving up only the revocation check,
+            // never the base chain/hostname one.
+            var currentPolicies: CFArray?
+            guard SecTrustCopyPolicies(trust, &currentPolicies) == errSecSuccess,
+                var policies = currentPolicies as? [SecPolicy]
+            else {
+                return
+            }
+
+            policies.append(revocationPolicy.secPolicy)
+            SecTrustSetPolicies(trust, policies as CFArray)
         }
 
         /// The accept/reject decision, given `chainIsTrusted`, the caller's own

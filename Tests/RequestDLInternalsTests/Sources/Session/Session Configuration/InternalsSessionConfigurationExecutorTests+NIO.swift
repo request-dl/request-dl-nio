@@ -122,12 +122,16 @@ extension InternalsSessionConfigurationExecutorTests {
         #endif
     }
 
-    /// Mirrors `resolveExecutor_whenAdditionalTrustRootsSet_resolvesToURLSessionOnDarwin` (main
-    /// file), but for a field that has *no* URLSession-reachable equivalent (no ATS `Info.plist`
-    /// key for a maximum TLS version), so it must fall back away from `.urlSession` instead.
+    /// Regression coverage: `maximumTLSVersion` used to be listed in
+    /// `SecureConnection.urlSessionIncompatibilityReasons()`, pushing resolution away from
+    /// `.urlSession` despite `buildURLSessionConfiguration()` mapping it directly onto
+    /// `URLSessionConfiguration.tlsMaximumSupportedProtocolVersion` -- unlike `applicationProtocols`
+    /// right below, which genuinely has no URLSession-reachable equivalent and must still fall
+    /// back. See `InternalsSecureConnectionTests`'s
+    /// `secureConnection_whenMaximumTLSVersionSet_remainsCompatible`.
     @Test
-    func resolveExecutor_whenMaximumTLSVersionSet_resolvesToNIOTransportServicesOnDarwin() async throws {
-        // Given: fine under NIOTransportServices, unsupported under URLSession
+    func resolveExecutor_whenMaximumTLSVersionSet_resolvesToURLSessionOnDarwin() async throws {
+        // Given: fine under both NIOTransportServices and URLSession
         var configuration = Internals.Session.Configuration()
         configuration.decompression = .enabled(algorithms: [], limit: .none)
 
@@ -140,10 +144,108 @@ extension InternalsSessionConfigurationExecutorTests {
 
         // Then
         #if canImport(Darwin)
-        #expect(sut == .nioTransportServices)
+        #expect(sut == .urlSession)
         #else
         #expect(sut == .nio)
         #endif
+    }
+
+    // MARK: - networkFrameworkIncompatibilityReasons() / clientIdentityWithProxyUnderNetworkFramework
+
+    /// A minimal proxy, reused across this section's tests: only `host`/`port`/`connection`
+    /// matter to `networkFrameworkIncompatibilityReasons()`, which only checks `proxy != nil`.
+    private static func makeProxy() -> Internals.Proxy {
+        Internals.Proxy(host: "proxy.example.com", port: 8080, connection: .http, authorization: nil)
+    }
+
+    /// A minimal client identity (`certificateChain`/`privateKey`), reused across this section's
+    /// tests: the empty byte arrays are never actually parsed here, since none of these tests
+    /// build a `TLSConfiguration`.
+    private static func makeClientIdentitySecureConnection() -> Internals.SecureConnection {
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.certificateChain = .certificates([.init([], format: .pem)])
+        secureConnection.privateKey = .privateKey(.init([], format: .pem))
+        return secureConnection
+    }
+
+    /// Regression coverage for the gap `.clientIdentityWithProxyUnderNetworkFramework` closes:
+    /// `SecureConnection.networkFrameworkIncompatibilityReasons()` alone can't see this, since
+    /// `proxy` lives one level up, on `Internals.Session.Configuration` itself -- confirmed
+    /// end-to-end (real mTLS handshake through a real `CONNECT` tunnel) by
+    /// `DataTaskTests`'s
+    /// `dataTask_whenCAEnabledBehindProxyAndNIOTransportServicesPreferred_fallsBackToNIOAndCompletesHandshake`/
+    /// `..._Required_throwsExecutorRequirementError`.
+    @Test
+    func networkFrameworkIncompatibilityReasons_whenProxyAndClientIdentityBothSet_containsReason() async throws {
+        // Given
+        var configuration = Internals.Session.Configuration()
+        configuration.proxy = Self.makeProxy()
+        configuration.secureConnection = Self.makeClientIdentitySecureConnection()
+
+        // Then
+        let reason = Internals.ExecutorIncompatibilityReason.clientIdentityWithProxyUnderNetworkFramework
+        #expect(configuration.networkFrameworkIncompatibilityReasons().contains(reason))
+    }
+
+    /// Neither half alone is the trigger: only the combination is a problem (a direct
+    /// NIOTransportServices connection presents mTLS fine, and a proxy with no client identity
+    /// has no identity to fail to present in the first place).
+    @Test
+    func networkFrameworkIncompatibilityReasons_whenOnlyProxyOrOnlyClientIdentitySet_doesNotContainReason()
+        async throws
+    {
+        // Given: proxy alone
+        var proxyOnly = Internals.Session.Configuration()
+        proxyOnly.proxy = Self.makeProxy()
+
+        // Given: client identity alone
+        var identityOnly = Internals.Session.Configuration()
+        identityOnly.secureConnection = Self.makeClientIdentitySecureConnection()
+
+        // Then
+        let reason = Internals.ExecutorIncompatibilityReason.clientIdentityWithProxyUnderNetworkFramework
+        #expect(!proxyOnly.networkFrameworkIncompatibilityReasons().contains(reason))
+        #expect(!identityOnly.networkFrameworkIncompatibilityReasons().contains(reason))
+    }
+
+    @Test
+    func resolveExecutor_whenProxyAndClientIdentitySetAndNIOTransportServicesPreferred_fallsBackToNIO() async throws {
+        // Given: compatible with `.urlSession` (mTLS behind a proxy works fine there, via a
+        // Keychain round trip), so an unrelated URLSession-incompatible field also has to be set
+        // to isolate this test to the NIOTransportServices-side fallback specifically -- the same
+        // reason `DataTaskTests`'s end-to-end version of this rules `.urlSession` out via proxy
+        // `connectHeaders` rather than a bare `connection: .http` proxy.
+        var configuration = Internals.Session.Configuration()
+        configuration.httpVersion = .http1Only
+        configuration.preferredExecutor = .nioTransportServices
+        configuration.proxy = Self.makeProxy()
+        configuration.secureConnection = Self.makeClientIdentitySecureConnection()
+
+        // When
+        let sut = configuration.resolveExecutor()
+
+        // Then
+        #expect(sut == .nio)
+    }
+
+    @Test
+    func requireExecutor_whenNIOTransportServicesPinnedWithProxyAndClientIdentity_throwsWithExactReason()
+        async throws
+    {
+        // Given
+        var configuration = Internals.Session.Configuration()
+        configuration.proxy = Self.makeProxy()
+        configuration.secureConnection = Self.makeClientIdentitySecureConnection()
+
+        // When
+        do {
+            try configuration.requireExecutor(.nioTransportServices)
+            Issue.record("Not expecting success")
+        } catch let error as Internals.IncompatibleExecutorConfigurationError {
+            // Then
+            #expect(error.requiredExecutor == .nioTransportServices)
+            #expect(error.reasons == [.clientIdentityWithProxyUnderNetworkFramework])
+        }
     }
 
     // MARK: - resolveExecutor() with preferredExecutor
@@ -372,6 +474,91 @@ extension InternalsSessionConfigurationExecutorTests {
             #expect(error.requiredExecutor == .nioTransportServices)
             #expect(error.reasons == [.cipherSuiteValues])
         }
+    }
+
+    /// Regression coverage for `Internals.ExecutorIncompatibilityReason
+    /// .multipleClientCertificatesUnderNetworkFramework`, proven at the resolution-logic level
+    /// without a live network round trip: `Internals.SecureConnection
+    /// .makeLocalIdentityForNetworkFramework()` only ever builds its `SecIdentity` from a
+    /// `certificateChain`'s first certificate, so a chain of more than one (leaf plus at least
+    /// one intermediate) must steer resolution off `.nioTransportServices` the same way
+    /// `cipherSuiteValues` etc. already do. See `DataTaskTests+NIO`'s
+    /// `dataTask_whenClientCertificateChainHasIntermediateUnderNIORequired_completesHandshake`/
+    /// `dataTask_whenClientCertificateChainHasIntermediateAndNIOTransportServicesRequired_throwsExecutorError`
+    /// for the end-to-end confirmation this unit test only asserts the *decision* for.
+    @Test
+    func requireExecutor_whenNIOTransportServicesPinnedWithMultipleClientCertificates_throwsWithExactReasons()
+        async throws
+    {
+        // Given
+        var configuration = Internals.Session.Configuration()
+
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.certificateChain = .certificates([
+            Internals.Certificate([], format: .der),
+            Internals.Certificate([], format: .der),
+        ])
+        configuration.secureConnection = secureConnection
+
+        // When
+        do {
+            try configuration.requireExecutor(.nioTransportServices)
+            Issue.record("Not expecting success")
+        } catch let error as Internals.IncompatibleExecutorConfigurationError {
+            // Then
+            #expect(error.requiredExecutor == .nioTransportServices)
+            #expect(error.reasons == [.multipleClientCertificatesUnderNetworkFramework])
+        }
+    }
+
+    /// A single-certificate chain (leaf only, no intermediate) is exactly what
+    /// `makeLocalIdentityForNetworkFramework()` already handles fine, so it must not trip this
+    /// reason.
+    @Test
+    func requireExecutor_whenNIOTransportServicesPinnedWithSingleClientCertificate_doesNotThrow() async throws {
+        // Given
+        var configuration = Internals.Session.Configuration()
+
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.certificateChain = .certificates([
+            Internals.Certificate([], format: .der)
+        ])
+        configuration.secureConnection = secureConnection
+
+        // When / Then
+        try configuration.requireExecutor(.nioTransportServices)
+    }
+
+    /// Unlike every other `..._fallsBackToNIO` case above, a multi-certificate chain does *not*
+    /// rule out `.urlSession` -- `URLCredential(identity:certificates:persistence:)` genuinely
+    /// carries supplementary certificates alongside an identity, the same way NIOSSL's own
+    /// `TLSConfiguration.certificateChain` does. So a preference for `.nioTransportServices` the
+    /// configuration can't actually satisfy falls through to `.urlSession` (still ahead of `.nio`
+    /// in the default priority order), not all the way to `.nio`.
+    @Test
+    func resolveExecutor_whenMultipleClientCertificatesSetAndNIOTransportServicesPreferred_fallsBackToURLSession()
+        async throws
+    {
+        // Given
+        var configuration = Internals.Session.Configuration()
+        configuration.preferredExecutor = .nioTransportServices
+
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.certificateChain = .certificates([
+            Internals.Certificate([], format: .der),
+            Internals.Certificate([], format: .der),
+        ])
+        configuration.secureConnection = secureConnection
+
+        // When
+        let sut = configuration.resolveExecutor()
+
+        // Then
+        #if canImport(Darwin)
+        #expect(sut == .urlSession)
+        #else
+        #expect(sut == .nio)
+        #endif
     }
 
     @Test

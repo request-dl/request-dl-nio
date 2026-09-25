@@ -2,6 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Crypto
 import Logging
 import RequestDLInternals
 import SwiftAsyncStream
@@ -715,10 +716,22 @@ public struct DataCache: Sendable, Equatable {
     /// - Note: A `compactMap` rather than `replacingOccurrences(of:with:)`, which is not part of
     /// `FoundationEssentials`. Base64's alphabet makes each of these substitutions a single
     /// character, so a character-by-character rewrite covers the same ground.
+    /// The longest storage key embedded verbatim in a disk record's directory name.
+    ///
+    /// That name is `<base36 date>.<key>.cached`: up to 13 + 1 + key + 7 bytes, and a single path
+    /// component is capped at 255 bytes (`NAME_MAX`). Past this, the directory could not be
+    /// created at all, so a URL longer than roughly 175 bytes (base64 inflates by a third) —
+    /// routine for signed or search URLs — was never cached on disk.
+    private static let maximumVerbatimKeyLength = 200
+
+    /// The storage key for `key`: its base64url encoding, or, when that would be too long for a
+    /// file name, `sha256.` followed by the hex SHA-256 of `key`. The `.` can never appear in
+    /// base64url output, so the two forms cannot collide, and short keys keep exactly the
+    /// names they always had.
     private func base64EncodedKey(_ key: String) -> String {
         let base64 = Data(key.utf8).base64EncodedString()
 
-        return String(
+        let encoded = String(
             base64.compactMap { character -> Character? in
                 switch character {
                 case "+": return "-"
@@ -728,5 +741,16 @@ public struct DataCache: Sendable, Equatable {
                 }
             }
         )
+
+        guard encoded.utf8.count > Self.maximumVerbatimKeyLength else {
+            return encoded
+        }
+
+        let digest = SHA256.hash(data: Data(key.utf8))
+        return "sha256."
+            + digest.map { byte in
+                let hex = String(byte, radix: 16)
+                return hex.count == 1 ? "0" + hex : hex
+            }.joined()
     }
 }

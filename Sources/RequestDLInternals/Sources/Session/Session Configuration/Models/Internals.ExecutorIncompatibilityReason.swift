@@ -41,5 +41,30 @@ extension Internals {
         /// `URLSession` negotiates ALPN automatically and Info.plist has no key to override the
         /// protocol list it offers, so this has no reachable equivalent under URLSession at all.
         case applicationProtocolsUnderURLSession
+        /// A `certificateChain` resolving to more than one certificate (a leaf plus at least one
+        /// intermediate).
+        ///
+        /// `Internals.SecureConnection.makeLocalIdentityForNetworkFramework()` only ever builds
+        /// its `SecIdentity` from the chain's first certificate; AsyncHTTPClient's
+        /// NIOTransportServices bridge has no API to carry supplementary certificates alongside
+        /// it the way `.urlSession` (`URLCredential(identity:certificates:persistence:)`) or
+        /// `.nio` (NIOSSL's own `TLSConfiguration.certificateChain`) do. A server that doesn't
+        /// already have the intermediate in its own trust store can't complete the chain from a
+        /// leaf-only presentation and rejects the handshake with `unknown_ca`.
+        case multipleClientCertificatesUnderNetworkFramework
+        /// A client identity (`certificateChain`/`privateKey`) configured alongside a `proxy`.
+        ///
+        /// Network.framework's own TLS only ever reads the client identity from
+        /// `tlsLocalIdentityNetworkFramework` (see `Internals.SecureConnection
+        /// .makeTLSConfigurationByContext(isCompatibleWithNetworkFramework:)`'s own doc comment
+        /// on why `certificateChain`/`privateKey` are deliberately left off the NIOSSL
+        /// `TLSConfiguration` whenever Network.framework is in play), which is correct for a
+        /// *direct* NIOTransportServices connection. It's wrong once a proxy is configured
+        /// alongside it: AsyncHTTPClient performs TLS for a *proxied* HTTPS connection through
+        /// NIOSSL even on a NIOTransportServices event loop
+        /// (`HTTPConnectionPool+Factory.swift`'s `setupTLSInProxyConnectionIfNeeded`, which reads
+        /// the same NIOSSL `TLSConfiguration` the identity was left off of), so no client
+        /// certificate would ever reach the proxy tunnel's TLS handshake.
+        case clientIdentityWithProxyUnderNetworkFramework
     }
 }

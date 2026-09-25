@@ -30,6 +30,38 @@ struct FlexibleURLTests {
         #expect(resolved.requestConfiguration.url == endpointString)
     }
 
+    /// `RequestConfiguration.url` joins query items as-is, expecting them already percent
+    /// encoded. Reading them back decoded (`URLComponents.queryItems`) turned an escaped
+    /// delimiter into a live one: `%26` split one parameter into two, `%3D` added a second `=`,
+    /// and `%2B` became a `+` a server reads as a space.
+    @Test(
+        arguments: [
+            "https://api.example.com/search?q=a%26b",
+            "https://api.example.com/search?q=1%2B1&lang=en",
+            "https://api.example.com/search?q=a%3Db",
+        ]
+    )
+    func completeURLKeepsPercentEscapedDelimitersEscaped(_ endpointString: String) async throws {
+        // When
+        let resolved = try await resolve(FlexibleURL(endpointString))
+
+        // Then
+        #expect(resolved.requestConfiguration.url == endpointString)
+    }
+
+    @Test func relativeURLKeepsPercentEscapedDelimitersEscaped() async throws {
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL("api.example.com")
+                FlexibleURL("/search?q=a%26b")
+            }
+        )
+
+        // Then
+        #expect(resolved.requestConfiguration.url == "https://api.example.com/search?q=a%26b")
+    }
+
     @Test func completeURLWithPort() async throws {
         // Given
         let endpointString = "http://localhost:8080/api/debug"
@@ -126,6 +158,30 @@ struct FlexibleURLTests {
 
         // Then
         #expect(resolved.requestConfiguration.url == expectedUrl)
+    }
+
+    /// Regression coverage: classification used to search the *entire* normalized string for
+    /// `"://"`, including the query, so an ordinary relative path whose query value happens to
+    /// contain it (a redirect URL, say) was misread as a complete URL. Once parsed, that string
+    /// has no `host`, so `baseURL` stayed untouched, but the path/query still appended with
+    /// `fromStart: true` (the complete-URL branch's behavior) instead of `fromStart: false`,
+    /// prepending "search" ahead of the existing "v1" path instead of after it.
+    @Test func relativePathWithQueryValueContainingSchemeSeparator_appendsAfterExistingPath() async throws {
+        // Given
+        let endpointPath = "/search?redirect=http://evil.example.com"
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL("api.service.com")
+                Path("v1")
+                FlexibleURL(endpointPath)
+            }
+        )
+
+        // Then
+        #expect(resolved.requestConfiguration.baseURL == "https://api.service.com")
+        #expect(resolved.requestConfiguration.pathComponents.joinedAsPath() == "v1/search")
     }
 
     @Test func relativePathAppendedToExistingPath() async throws {

@@ -39,6 +39,31 @@ struct CURLTaskTests {
         }
     }
 
+    private struct DescribeSentinel: Error {}
+
+    private struct ThrowingDescriptor: TaskDescriptor {
+        func describe(_ context: TaskDescriptorContext) async throws -> String {
+            throw DescribeSentinel()
+        }
+    }
+
+    /// `CURLTask` must forward the environment it is handed down to its inner `RawTask`, the same
+    /// way `DataTask` does. Otherwise every environment-borne modifier wrapping it
+    /// (`.description(_:)`, `.logger(_:)`, `.digestAuthentication()`, `.environment(...)`) is
+    /// silently a no-op. The throwing descriptor proves the hook ran: it fails the task before
+    /// any network I/O, whereas a dropped environment would skip the hook and try to connect.
+    @Test
+    func descriptionHookReceivesTheResolvedRequest() async throws {
+        // Given
+        let task = CURLTask("curl http://127.0.0.1:9/never-contacted")
+            .description(ThrowingDescriptor()) { _ in }
+
+        // When / Then
+        await #expect(throws: DescribeSentinel.self) {
+            _ = try await task.result()
+        }
+    }
+
     @Test
     func missingURLSurfacesAsCURLParsingError() async throws {
         // Given

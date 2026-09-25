@@ -36,9 +36,12 @@ import Crypto
 /// - `method` (string, optional): uppercased and passed to ``RequestMethod/init(_:)``.
 /// - `timeout` (int, optional): interpreted as seconds and passed to ``Timeout/init(_:for:)``.
 /// - `headers` (string array, optional): each entry is a colon-separated `"Name: Value"` pair,
-///   collected into a ``HeaderGroup``.
+///   collected into a ``HeaderGroup``. Entries sharing the same name (case-sensitively) collapse
+///   to one, the later entry winning -- a repeated header name (e.g. two `Accept` values) isn't
+///   preserved; declare it directly with ``HeaderGroup/init(content:)`` instead if that matters.
 /// - `queries` (string array, optional): each entry is an equals-separated `"name=value"` pair,
-///   collected into a ``QueryGroup``.
+///   collected into a ``QueryGroup``. Same one-value-per-key limitation as `headers` above: two
+///   entries sharing a key collapse to the later one.
 /// - `authorization` (scoped, optional): passed to ``Authorization``. Reads `authorization.scheme`
 ///   (`"basic"` or `"bearer"`); `"basic"` additionally reads `authorization.username` and
 ///   `authorization.password` (or, absent those, a pre-encoded `authorization.credentials`), while

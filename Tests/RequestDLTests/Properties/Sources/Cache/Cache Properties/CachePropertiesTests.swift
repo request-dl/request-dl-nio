@@ -9,6 +9,8 @@ import Testing
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
+#else
+import struct Foundation.Data
 #endif
 
 @Suite(.serialized)
@@ -32,6 +34,51 @@ struct CachePropertiesTests {
 
         // Then
         #expect(resolved.dataCache == DataCache.shared)
+    }
+
+    /// Every request's resolve builds its cache configuration, and a `DataCache` is shared per
+    /// directory — `.main` is the very same storage as `DataCache.shared`. A request that doesn't
+    /// pass `encryptionKey` must therefore leave whatever key that cache already has alone;
+    /// otherwise any ordinary request silently clears a key set through
+    /// `DataCache.encryptionKey`, and every disk-tier write after it lands in plaintext.
+    @Test
+    func cache_whenEncryptionKeyNotSpecified_preservesTheCachesExistingKey() async throws {
+        // Given
+        let suiteName = "encryption-key-" + String.randomString(length: 16)
+        let encryptionKey = DataCache.EncryptionKey(Data(repeating: 0x2A, count: 32))
+        DataCache(suiteName: suiteName).encryptionKey = encryptionKey
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                EmptyProperty()
+                    .cache(suiteName: suiteName)
+            }
+        )
+
+        // Then
+        #expect(resolved.dataCache.encryptionKey == encryptionKey)
+        #expect(DataCache(suiteName: suiteName).encryptionKey == encryptionKey)
+    }
+
+    @Test
+    func cache_whenEncryptionKeySpecified_replacesTheCachesExistingKey() async throws {
+        // Given
+        let suiteName = "encryption-key-" + String.randomString(length: 16)
+        let previousKey = DataCache.EncryptionKey(Data(repeating: 0x2A, count: 32))
+        let encryptionKey = DataCache.EncryptionKey(Data(repeating: 0x2B, count: 32))
+        DataCache(suiteName: suiteName).encryptionKey = previousKey
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                EmptyProperty()
+                    .cache(suiteName: suiteName, encryptionKey: encryptionKey)
+            }
+        )
+
+        // Then
+        #expect(resolved.dataCache.encryptionKey == encryptionKey)
     }
 
     @Test

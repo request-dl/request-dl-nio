@@ -23,9 +23,14 @@ extension Modifiers {
         /// - Throws: An error if the modification fails.
         ///
         public func body(_ task: Content) async throws -> Input {
-            try await task
-                .environment(\.logger, logger)
-                .result()
+            // Extends the environment `task` was handed rather than wrapping it in a fresh
+            // `.environment(...)` modifier: `.result()` on that wrapper restarts from an empty
+            // `RequestEnvironmentValues()`, silently dropping everything an outer modifier had
+            // already put there (`.digestAuthentication()`'s credential, `.description(...)`'s
+            // hooks, any `.environment(...)` applied further out).
+            var environment = task.environment
+            environment.logger = logger
+            return try await task._result(environment: environment)
         }
     }
 }

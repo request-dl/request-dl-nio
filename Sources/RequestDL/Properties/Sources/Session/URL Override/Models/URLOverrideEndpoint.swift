@@ -9,11 +9,16 @@ import struct Foundation.URL
 import struct Foundation.URLComponents
 #endif
 
-/// The parsed `"scheme://host[/path]"` shape shared by both sides of a `URLOverride` rule.
+/// The parsed `"scheme://host[:port][/path]"` shape shared by both sides of a `URLOverride` rule.
 struct URLOverrideEndpoint: Sendable, Equatable {
 
     let scheme: String
     let host: String
+    /// `nil` when the endpoint carries no explicit port (matches/rewrites regardless of the
+    /// other side's port). Kept distinct from `host` — unlike `URLComponents.host`, which never
+    /// includes it — so a rule origin/destination declaring a non-default port doesn't silently
+    /// match or rewrite to the wrong one. See `init(baseURL:)`.
+    let port: Int?
     let pathComponents: [String]
 }
 
@@ -45,6 +50,7 @@ extension URLOverrideEndpoint {
 
         self.scheme = scheme
         self.host = host
+        self.port = components.port
         self.pathComponents = Array(
             components.path
                 .split(separator: "/")
@@ -76,7 +82,27 @@ extension URLOverrideEndpoint {
         }
 
         let scheme = String(baseURL[..<colonIndex])
-        let host = String(baseURL[baseURL.index(afterColon, offsetBy: 2)...])
+        let hostAndPort = baseURL[baseURL.index(afterColon, offsetBy: 2)...]
+
+        // `FlexibleURLNode.constructBaseURLString` appends `":\(port)"` after the host when one
+        // was specified, so this reverses that: everything after the *last* colon, if it's a
+        // run of digits, is the port; otherwise there's none to split off. Scanning from the end
+        // (rather than the first colon) matters because a bracketed IPv6 host would otherwise
+        // split on one of its own colons instead — this still can't tell an IPv6 host without a
+        // port from one whose brackets got lost, but that ambiguity predates this initializer.
+        let host: String
+        let port: Int?
+
+        if let lastColonIndex = hostAndPort.lastIndex(of: ":"),
+            let parsedPort = Int(hostAndPort[hostAndPort.index(after: lastColonIndex)...]),
+            !hostAndPort[hostAndPort.index(after: lastColonIndex)...].isEmpty
+        {
+            host = String(hostAndPort[..<lastColonIndex])
+            port = parsedPort
+        } else {
+            host = String(hostAndPort)
+            port = nil
+        }
 
         guard !scheme.isEmpty, !host.isEmpty else {
             return nil
@@ -84,6 +110,7 @@ extension URLOverrideEndpoint {
 
         self.scheme = scheme
         self.host = host
+        self.port = port
         self.pathComponents = []
     }
 }

@@ -91,6 +91,14 @@ extension Internals.Decompression: Equatable {
     /// common case (plain `.gzip`/`.deflate`) pooling connections the way it always has, instead
     /// of paying `RedirectConfiguration.strategy`'s "never equal, fresh client every time" cost
     /// for a case that doesn't need it.
+    ///
+    /// - Important: Each algorithm is compared by its `Content-Encoding` value *and* by which
+    /// transport decodes it natively, not by the value alone. `build()` switches NIO's own
+    /// decompressor on or off by `isNativelyDecodedByNIO`, and `Internals.ClientManager` reuses a
+    /// pooled client for any `==` configuration. A custom algorithm that merely shares the built-in
+    /// gzip's `"gzip"` value compared equal to it, so one ran on the other's pooled client: a gzip
+    /// response was then decoded twice (NIO, then manual dispatch) or not at all, since manual
+    /// dispatch is decided per request from the request's own configuration.
     package static func == (_ lhs: Self, _ rhs: Self) -> Bool {
         switch (lhs, rhs) {
         case (.disabled, .disabled):
@@ -101,10 +109,25 @@ extension Internals.Decompression: Equatable {
                 return false
             }
 
-            return Set(lAlgorithms.map(\.contentEncodingValue)) == Set(rAlgorithms.map(\.contentEncodingValue))
+            return Set(lAlgorithms.map(AlgorithmIdentity.init)) == Set(rAlgorithms.map(AlgorithmIdentity.init))
 
         default:
             return false
+        }
+    }
+
+    /// What about an algorithm actually shapes the client built for it.
+    private struct AlgorithmIdentity: Hashable {
+        let contentEncodingValue: String
+        let isNativelyDecodedByNIO: Bool
+        let isNativelyDecodedByURLSession: Bool
+        let requiresURLSession: Bool
+
+        init(_ algorithm: any Internals.DecompressionAlgorithm) {
+            contentEncodingValue = algorithm.contentEncodingValue
+            isNativelyDecodedByNIO = algorithm.isNativelyDecodedByNIO
+            isNativelyDecodedByURLSession = algorithm.isNativelyDecodedByURLSession
+            requiresURLSession = algorithm.requiresURLSession
         }
     }
 }

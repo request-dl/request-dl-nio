@@ -362,6 +362,63 @@ struct RawTaskExecutorDispatchTests {
         }
     }
 
+    #if canImport(NIOCore)
+    /// The `.nio` twin of the test above. `Internals.Client.execute` also starts a watcher `Task`
+    /// that awaits the request's own future (to surface a pre-flight rejection that never drives
+    /// the delegate). That watcher must not keep the request's `TaskSeed` alive: dropping the
+    /// response is the *only* thing that cancels a still-running request, via the seed's
+    /// `deinit`, so a watcher holding the seed until the request finishes on its own made that
+    /// cancellation unreachable — the connection, the operation slot, and any
+    /// `maximumConcurrentConnections` permit stayed held for as long as the server kept the
+    /// response open, forever for an endless stream.
+    @Test
+    func downloadTask_whenResponseDroppedMidFlight_actuallyCancelsTheUnderlyingNIOClient() async throws {
+        try await withPartialResponseServer { port in
+            // Given
+            let content = TestProperty {
+                BaseURL(.http, host: "127.0.0.1:\(port)")
+
+                Session("com.requestdl.tests.nio-drop-cancel.\(UUID())")
+                    .requiredExecutor(.nio)
+
+                // See the identical note on the test above.
+                ReadingMode(length: 4)
+            }
+
+            let resolved = try await resolve(content)
+
+            guard case .nio(let client) = try await resolved.session.resolvedClient() else {
+                Issue.record("Expected .nio")
+                return
+            }
+
+            #expect(!client.isRunning)
+
+            // When
+            var observedRunningMidFlight = false
+
+            try await {
+                let result = try await DownloadTask { content }.result()
+                for try await _ in result.payload {
+                    observedRunningMidFlight = client.isRunning
+                    break
+                }
+            }()
+
+            #expect(observedRunningMidFlight)
+
+            // Then: the release hops onto the request's event loop, so poll briefly.
+            var stillRunning = client.isRunning
+            for _ in 0..<50 where stillRunning {
+                try await _Concurrency.Task.sleep(nanoseconds: 20_000_000)
+                stillRunning = client.isRunning
+            }
+
+            #expect(!stillRunning)
+        }
+    }
+    #endif
+
     /// Companion to `DataTaskTests.dataTask_whenResourceTimeoutAlreadyElapsed_throwsResourceTimeoutError`:
     /// that one proves `Timeout(.resource)` throws `ResourceTimeoutError` at all, but with a
     /// deadline so short it has already elapsed before the request even reaches the network.

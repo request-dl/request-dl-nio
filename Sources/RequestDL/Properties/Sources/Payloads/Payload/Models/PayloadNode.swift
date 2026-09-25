@@ -35,51 +35,51 @@ struct PayloadNode: PropertyNode {
 
         switch output.source {
         case .buffer(let buffer):
-            setBodyWithBuffer(
+            Self.setBodyWithBuffer(
                 buffer: buffer,
-                output: output,
+                contentType: output.contentType,
+                chunkSize: chunkSize,
+                compression: compression,
+                compressionDuplicateHeaderBehavior: compressionDuplicateHeaderBehavior,
+                shouldCompressBodyData: shouldCompressBodyData,
                 make: &make
             )
 
         case .urlEncoded(let queries):
-            guard !sendsFieldsAsQuery(make.requestConfiguration.method) else {
-                removeAnySetHeaders(&make.requestConfiguration.headers)
-                make.requestConfiguration.queries.append(contentsOf: queries)
-                return
-            }
-
-            let buffer = try await Internals.DataBuffer(
-                input.charset.encode(queries.joined())
-            )
-
-            setBodyWithBuffer(
-                buffer: buffer,
-                output: output,
-                make: &make
+            // Deliberately *not* decided here, against `make.requestConfiguration.method` as it
+            // stands at this point in the walk: nodes run in declaration order, so a `Payload`
+            // declared before a `RequestMethod(.post)` in the same property tree would still see
+            // `method == nil` -- indistinguishable from "no method at all", which
+            // `sendsFieldsAsQuery(_:)` treats as query-string -- even though the method is about
+            // to become `POST`. `PendingURLEncodedPayload` stashes everything needed to finish
+            // this decision, and `Resolve` applies it once every node (including whichever
+            // `RequestMethod` wins) has run. See `PendingURLEncodedPayload`'s own doc comment.
+            make.pendingURLEncodedPayloads.append(
+                PendingURLEncodedPayload(
+                    queries: queries,
+                    contentType: output.contentType,
+                    charset: charset,
+                    chunkSize: chunkSize,
+                    compression: compression,
+                    compressionDuplicateHeaderBehavior: compressionDuplicateHeaderBehavior,
+                    shouldCompressBodyData: shouldCompressBodyData
+                )
             )
         }
     }
 
-    // MARK: - Private methods
+    // MARK: - Internal static methods
 
-    /// Whether the encoded fields belong in the URL rather than in a body.
-    ///
-    /// True with no method set, and for the two methods that carry no body.
-    ///
-    /// - Important: Must compare uppercased. HTTP methods are conventionally uppercase but the
-    /// value comes from the caller — without normalizing, `.method("get")` falls through and
-    /// sends the fields as a body instead of as a query.
-    private func sendsFieldsAsQuery(_ method: String?) -> Bool {
-        guard let method = method?.uppercased() else {
-            return true
-        }
-
-        return method == "GET" || method == "HEAD"
-    }
-
-    private func setBodyWithBuffer(
+    /// Shared with `PendingURLEncodedPayload.resolve(into:)`, which reaches this same body-side
+    /// once it has decided (after the whole tree resolves) that its fields belong in the body
+    /// rather than the query string.
+    static func setBodyWithBuffer(
         buffer: Internals.AnyBuffer,
-        output: PayloadOutput,
+        contentType: ContentType,
+        chunkSize: Int?,
+        compression: (any Compressor)?,
+        compressionDuplicateHeaderBehavior: CompressionDuplicateHeaderBehavior,
+        shouldCompressBodyData: (@Sendable (Int) -> Bool)?,
         make: inout Make
     ) {
         // Only fills in a default, never overrides an explicit `RequestMethod`: whichever
@@ -95,7 +95,7 @@ struct PayloadNode: PropertyNode {
 
         make.requestConfiguration.headers.set(
             name: "Content-Type",
-            value: String(output.contentType)
+            value: String(contentType)
         )
 
         let body = RequestBody(
@@ -121,8 +121,18 @@ struct PayloadNode: PropertyNode {
         }
     }
 
-    private func removeAnySetHeaders(_ headers: inout HTTPHeaders) {
-        headers.remove(name: "Content-Type")
-        headers.remove(name: "Content-Length")
+    /// Whether the encoded fields belong in the URL rather than in a body.
+    ///
+    /// True with no method set, and for the two methods that carry no body.
+    ///
+    /// - Important: Must compare uppercased. HTTP methods are conventionally uppercase but the
+    /// value comes from the caller — without normalizing, `.method("get")` falls through and
+    /// sends the fields as a body instead of as a query.
+    static func sendsFieldsAsQuery(_ method: String?) -> Bool {
+        guard let method = method?.uppercased() else {
+            return true
+        }
+
+        return method == "GET" || method == "HEAD"
     }
 }

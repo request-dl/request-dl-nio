@@ -71,6 +71,9 @@ public struct SPKIPinning<Content: Property>: Property {
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
 
+        var inputs = inputs
+        inputs.environment.isInsideSPKIPinning = true
+
         let outputs = try await Content._makeProperty(
             property: property.detach(next: property.content),
             inputs: inputs

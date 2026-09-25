@@ -11,19 +11,6 @@ import struct Foundation.Data
 /// A representation of an Authorization header.
 public struct Authorization: Property {
 
-    private struct Node: PropertyNode {
-
-        let type: TokenType
-        let token: String
-
-        func make(_ make: inout Make) async throws {
-            make.requestConfiguration.headers.set(
-                name: "Authorization",
-                value: "\(type.rawValue) \(token)"
-            )
-        }
-    }
-
     // MARK: - Public properties
 
     /// Returns an exception since `Never` is a type that can never be constructed.
@@ -89,10 +76,17 @@ public struct Authorization: Property {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
+        // A plain `HeaderNode`, not a private node of its own: `HeaderGroup` (and `Form`'s
+        // per-part headers) collect their content by searching for `HeaderNode`, so a private
+        // node was silently dropped there and the request went out unauthenticated.
+        // `HeaderNode` already treats `Authorization` as single-valued, so this still replaces
+        // any earlier value exactly like the old direct `headers.set(...)` did.
         return .leaf(
-            Node(
-                type: property.type,
-                token: property.token
+            HeaderNode(
+                key: "Authorization",
+                value: "\(property.type.rawValue) \(property.token)",
+                strategy: .setting,
+                separator: nil
             )
         )
     }

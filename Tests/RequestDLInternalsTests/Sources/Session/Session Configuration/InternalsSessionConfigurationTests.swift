@@ -28,6 +28,39 @@ import Foundation
 /// `InternalsSessionConfigurationTests+NIO.swift`.
 struct InternalsSessionConfigurationTests {
 
+    /// `Internals.ClientManager` hands a pooled client to any request whose configuration is
+    /// `==` to the one it was built for, and `build()` bakes the proxy's `connectHeaders` into
+    /// that client. `Internals.Proxy.==` deliberately leaves them out (mirroring upstream's own
+    /// `HTTPClient.Configuration.Proxy`), so this is the layer that has to compare them.
+    /// Otherwise two sessions sharing a proxy host but sending different `CONNECT` credentials
+    /// (e.g. one per tenant/account) reuse each other's client, and the second session's
+    /// `CONNECT` goes out with the first session's token.
+    @Test
+    func configuration_whenOnlyProxyConnectHeadersDiffer_shouldNotBeEqual() async throws {
+        // Given
+        func configuration(token: String?) -> Internals.Session.Configuration {
+            var connectHeaders = Internals.HTTPHeaders()
+            if let token {
+                connectHeaders.add(name: "X-Proxy-Token", value: token)
+            }
+
+            var configuration = Internals.Session.Configuration()
+            configuration.proxy = Internals.Proxy(
+                host: "proxy.example.com",
+                port: 8_080,
+                connection: .http,
+                authorization: nil,
+                connectHeaders: connectHeaders
+            )
+            return configuration
+        }
+
+        // Then
+        #expect(configuration(token: "tenant-a") != configuration(token: "tenant-b"))
+        #expect(configuration(token: "tenant-a") != configuration(token: nil))
+        #expect(configuration(token: "tenant-a") == configuration(token: "tenant-a"))
+    }
+
     @Test
     func configuration_whenNetworkPathConstraintsAllNil_shouldBeNil() async throws {
         // Given
@@ -196,6 +229,68 @@ struct InternalsSessionConfigurationTests {
                 == defaultConfiguration.tlsMaximumSupportedProtocolVersion
         )
     }
+
+    /// Regression coverage: `maximumTLSVersion` used to be listed in
+    /// `SecureConnection.urlSessionIncompatibilityReasons()`, which pushed every session that set
+    /// it off `.urlSession` entirely -- making the mapping the previous two tests check permanently
+    /// unreachable in practice, even though it worked correctly in isolation.
+    @Test
+    func secureConnection_whenMaximumTLSVersionSet_staysCompatibleWithURLSession() async throws {
+        // Given
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.maximumTLSVersion = .tlsv12
+
+        // Then
+        #expect(secureConnection.urlSessionIncompatibilityReasons().isEmpty)
+    }
+
+    /// Regression coverage: `connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit` (set via
+    /// `Session.maximumConnectionsPerHost(_:)`) used to have no `.urlSession` counterpart at all,
+    /// so the setting silently did nothing under the executor it's actually reachable from.
+    @Test
+    func configuration_whenConnectionPoolLimitSet_urlSessionConfigurationMatches() async throws {
+        // Given
+        var configuration = Internals.Session.Configuration()
+        configuration.connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit = 3
+
+        // When
+        let urlSessionConfiguration = configuration.buildURLSessionConfiguration()
+
+        // Then
+        #expect(urlSessionConfiguration.httpMaximumConnectionsPerHost == 3)
+    }
+
+    #if os(iOS)
+    /// Regression coverage: `multipathServiceType` (set via `Session.multipathServiceType(_:)`)
+    /// used to have no `.urlSession` counterpart at all -- only `enableMultipath` on the `.nio`
+    /// side -- so the setting silently did nothing under `.urlSession`, the default executor on
+    /// Darwin. `URLSessionConfiguration.multipathServiceType` itself only exists on iOS (which
+    /// Mac Catalyst compiles as) -- not macOS, tvOS, watchOS, or visionOS, confirmed by actual
+    /// compiler diagnostics, not just Apple's docs -- so this is gated the same way the
+    /// production mapping is.
+    @Test(
+        arguments: [
+            (Internals.MultipathServiceType.handover, URLSessionConfiguration.MultipathServiceType.handover),
+            (.interactive, .interactive),
+            (.aggregate, .aggregate),
+            (.none, .none),
+        ] as [(Internals.MultipathServiceType, URLSessionConfiguration.MultipathServiceType)]
+    )
+    func configuration_whenMultipathServiceTypeSet_urlSessionConfigurationMatches(
+        _ multipathServiceType: Internals.MultipathServiceType,
+        _ expected: URLSessionConfiguration.MultipathServiceType
+    ) async throws {
+        // Given
+        var configuration = Internals.Session.Configuration()
+        configuration.multipathServiceType = multipathServiceType
+
+        // When
+        let urlSessionConfiguration = configuration.buildURLSessionConfiguration()
+
+        // Then
+        #expect(urlSessionConfiguration.multipathServiceType == expected)
+    }
+    #endif
     #endif
 }
 

@@ -73,10 +73,18 @@ extension Internals {
                 return nil
             }
             #else
-            guard !tlsPins.isEmpty else {
+            let observer = secureConnection.trustDecisionObserver
+
+            // Mirrors the Darwin branch above: a `trustDecisionObserver` configured with no pins
+            // must still install a portable evaluator, or it silently never fires at all off
+            // Darwin. `makePortableEvaluator` below already calls `observer` unconditionally on
+            // every branch (`.validCertificate`/`.couldNotValidate`), so skipping this guard is
+            // the only thing standing between a caller's audit/observability hook and total
+            // silence — the connection still validates correctly via NIOSSL's native path either
+            // way, so nothing else about the request's success or failure depends on this.
+            guard !tlsPins.isEmpty || observer != nil else {
                 return nil
             }
-            let observer = secureConnection.trustDecisionObserver
             #endif
 
             let isStrict = (secureConnection.tlsPinningPolicy ?? .strict) == .strict
@@ -96,6 +104,7 @@ extension Internals {
                 pins: tlsPins,
                 isStrict: isStrict,
                 trustRootCertificates: trustRootCertificates,
+                trustRootsAreExclusive: secureConnection.trustRootsAreExclusive,
                 skipsHostnameVerification: skipsHostnameVerification,
                 revocationPolicy: revocationPolicy,
                 observer: observer
@@ -105,6 +114,7 @@ extension Internals {
                 pins: tlsPins,
                 isStrict: isStrict,
                 trustRootCertificates: trustRootCertificates,
+                trustRootsAreExclusive: secureConnection.trustRootsAreExclusive,
                 observer: observer
             )
             #endif

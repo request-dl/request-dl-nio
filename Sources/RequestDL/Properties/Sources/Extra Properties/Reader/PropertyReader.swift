@@ -49,9 +49,18 @@ public struct PropertyReader<Source: Property, Content: Property>: Property {
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
 
+        // `namespaceID`/`seedFactory` forwarded explicitly, not left to `Resolve`'s own
+        // top-level defaults: `source` shares this `PropertyReader`'s ambient namespace and seed
+        // bookkeeping with `content` (resolved right below via these same `inputs`), so a
+        // `@StoredObject`-bearing type declared in `source` gets the same identity it would if
+        // there were no `PropertyReader` boundary at all, instead of colliding with an unrelated
+        // sibling that independently starts counting from the same defaults. See `Resolve.init`'s
+        // own doc comment.
         let (source, make) = try await Resolve(
             root: property.source,
-            environment: inputs.environment
+            environment: inputs.environment,
+            namespaceID: inputs.namespaceID,
+            seedFactory: inputs.seedFactory
         ).partiallyBuild()
 
         let context = PropertyContext(make)

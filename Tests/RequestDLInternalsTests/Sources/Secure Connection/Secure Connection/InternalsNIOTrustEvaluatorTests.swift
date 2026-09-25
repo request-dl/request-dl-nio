@@ -12,6 +12,10 @@ import NIOPosix
 import NIOSSL
 import Testing
 
+#if canImport(Darwin)
+import Security
+#endif
+
 @testable import RequestDLInternals
 
 /// Tests `Internals.NIOTrustEvaluator` against a real, `openssl`-generated and
@@ -122,6 +126,101 @@ struct InternalsNIOTrustEvaluatorTests {
 
         #expect(result == .failed)
     }
+
+    #if os(macOS)
+    /// `additionalTrustRoots` alone installs this evaluator's Network.framework closure on
+    /// Darwin (Network.framework has no native way to see them). Those roots are *additional*:
+    /// a chain the system already trusts must keep validating, exactly as it does under plain
+    /// NIOSSL, where `TLSConfiguration.additionalTrustRoots` extends the default store.
+    @Test
+    func tlsCustomVerificationNetworkFramework_whenOnlyAdditionalTrustRoots_stillTrustsSystemRoots() async throws {
+        // Given
+        let pemBytes = try Array(Data(contentsOf: Certificates(.pem).server().certificateURL))
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.additionalTrustRoots = [.certificates([.init(pemBytes, format: .pem)])]
+
+        let evaluator = try #require(try Internals.NIOTrustEvaluator.resolve(from: secureConnection))
+        let trust = try systemTrustedTrust()
+
+        // When
+        let isTrusted = await withCheckedContinuation { continuation in
+            evaluator.tlsCustomVerificationNetworkFramework(trust) { continuation.resume(returning: $0) }
+        }
+
+        // Then
+        #expect(isTrusted)
+    }
+
+    /// `trustRoots`, by contrast, replaces the system roots.
+    @Test
+    func tlsCustomVerificationNetworkFramework_whenTrustRootsConfigured_rejectsSystemRoots() async throws {
+        // Given
+        let pemBytes = try Array(Data(contentsOf: Certificates(.pem).server().certificateURL))
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.trustRoots = .certificates([.init(pemBytes, format: .pem)])
+        secureConnection.revocationPolicy = .disabled
+
+        let evaluator = try #require(try Internals.NIOTrustEvaluator.resolve(from: secureConnection))
+        let trust = try systemTrustedTrust()
+
+        // When
+        let isTrusted = await withCheckedContinuation { continuation in
+            evaluator.tlsCustomVerificationNetworkFramework(trust) { continuation.resume(returning: $0) }
+        }
+
+        // Then
+        #expect(!isTrusted)
+    }
+
+    /// A self-signed system root that evaluates as trusted with no custom anchors, offline.
+    private func systemTrustedTrust() throws -> SecTrust {
+        var anchors: CFArray?
+        try #require(SecTrustCopyAnchorCertificates(&anchors) == errSecSuccess)
+
+        for root in try #require(anchors as? [SecCertificate]) {
+            var probe: SecTrust?
+            guard SecTrustCreateWithCertificates(root, SecPolicyCreateBasicX509(), &probe) == errSecSuccess,
+                let probe
+            else { continue }
+            SecTrustSetNetworkFetchAllowed(probe, false)
+
+            guard SecTrustEvaluateWithError(probe, nil) else { continue }
+
+            var fresh: SecTrust?
+            _ = SecTrustCreateWithCertificates(root, SecPolicyCreateBasicX509(), &fresh)
+            let trust = try #require(fresh)
+            SecTrustSetNetworkFetchAllowed(trust, false)
+            return trust
+        }
+
+        Issue.record("No system root evaluates as trusted offline")
+        throw CancellationError()
+    }
+    #endif
+
+    #if !canImport(Darwin)
+    /// Regression coverage, Linux/other-only: `resolve(from:)`'s portable branch used to guard on
+    /// `!tlsPins.isEmpty` alone, unlike its Darwin sibling above, which also triggers on a
+    /// `trustDecisionObserver` configured with no pins. A caller wiring `.trustDecisionObserver(_:)`
+    /// as an audit/observability hook with no pinning configured got it invoked on every Darwin
+    /// executor but silently never at all off Darwin -- `makePortableEvaluator` already calls
+    /// `observer` unconditionally on every branch, so the only thing missing was ever installing
+    /// the evaluator in the first place. Can't be exercised on this Darwin-only development
+    /// machine (no non-Darwin toolchain or container available here), same constraint prior
+    /// rounds noted for this exact file; verified by close reading and left for CI to run.
+    private final class NoOpTrustDecisionObserver: TrustDecisionObserver, @unchecked Sendable {
+        func callAsFunction(_ decision: TrustDecision) {}
+    }
+
+    @Test
+    func resolve_whenOnlyObserverConfigured_installsEvaluator() throws {
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.trustDecisionObserver = NoOpTrustDecisionObserver()
+
+        // Then
+        #expect(try Internals.NIOTrustEvaluator.resolve(from: secureConnection) != nil)
+    }
+    #endif
 
     @Test
     func tlsCustomVerification_whenPinningLeaf_acceptsChain() async throws {

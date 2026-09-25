@@ -28,21 +28,30 @@ extension Internals {
         private let queue = DispatchQueue(label: "RequestDL.NetworkPathMonitor")
         private let lock = Lock()
 
-        /// Guarded by `lock`.
-        private var _currentPath: NetworkPath
+        /// How long ``resolvedCurrentPath()`` waits for `NWPathMonitor`'s first update before
+        /// falling back to its placeholder. That update normally lands within milliseconds of
+        /// `start()`; this only bounds a pathological case.
+        private static let firstUpdateTimeout: UInt64 = 2_000_000_000
+
+        /// Guarded by `lock`. `nil` until `NWPathMonitor` delivers its first update.
+        ///
+        /// Deliberately not seeded from `monitor.currentPath`: before (and for a few milliseconds
+        /// after) `start()`, that reads an *unsatisfied* placeholder even on a fully connected
+        /// device (confirmed empirically), and the first gated request in the process was judged
+        /// against it, failing with `.noConnection` whenever `waitsForConnectivity` wasn't set.
+        private var _currentPath: NetworkPath?
 
         /// Guarded by `lock`. Keyed by subscription identity so each `updates()` call can
         /// deregister only its own continuation on termination.
         private var _subscribers: [ObjectIdentifier: _Concurrency.AsyncStream<NetworkPath>.Continuation] = [:]
 
         package var currentPath: NetworkPath {
-            lock.withLock { _currentPath }
+            lock.withLock { _currentPath } ?? monitor.currentPath.toNetworkPath
         }
 
         // MARK: - Inits
 
         private init() {
-            _currentPath = monitor.currentPath.toNetworkPath
             monitor.pathUpdateHandler = { [weak self] path in
                 self?.updatePath(path.toNetworkPath)
             }
@@ -51,19 +60,48 @@ extension Internals {
 
         // MARK: - Internal methods
 
+        package func resolvedCurrentPath() async -> NetworkPath {
+            if let path = lock.withLock({ _currentPath }) {
+                return path
+            }
+
+            let firstUpdate = await withTaskGroup(of: NetworkPath?.self) { group in
+                group.addTask { [self] in
+                    for await path in updates() {
+                        return path
+                    }
+                    return nil
+                }
+
+                group.addTask {
+                    try? await _Concurrency.Task.sleep(nanoseconds: Self.firstUpdateTimeout)
+                    return nil
+                }
+
+                let first = await group.next() ?? nil
+                group.cancelAll()
+                return first
+            }
+
+            return firstUpdate ?? currentPath
+        }
+
         package func updates() -> _Concurrency.AsyncStream<NetworkPath> {
             let token = SubscriberToken()
             let id = ObjectIdentifier(token)
 
             return _Concurrency.AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
-                let initialPath = lock.withLock { () -> NetworkPath in
+                let initialPath = lock.withLock { () -> NetworkPath? in
                     _subscribers[id] = continuation
                     return _currentPath
                 }
 
                 // A path that already satisfies by the time a caller subscribes must not wait
-                // for the *next* change to be observed.
-                continuation.yield(initialPath)
+                // for the *next* change to be observed. Before the first update there is nothing
+                // real to replay yet; that update reaches this subscriber through `updatePath`.
+                if let initialPath {
+                    continuation.yield(initialPath)
+                }
 
                 // Fires when this stream's consuming task is cancelled. This is the
                 // cancellation-safety hook `Internals.NetworkPathGate.wait(for:)` relies on: it

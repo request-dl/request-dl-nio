@@ -97,6 +97,42 @@ struct InternalsDecompressionTests {
         #expect(lhs == rhs)
     }
 
+    /// `Internals.ClientManager` reuses a pooled client whenever the session configurations are
+    /// `==`, and `build()` turns NIO's own decompressor on or off by `isNativelyDecodedByNIO`,
+    /// not by `contentEncodingValue`. A custom algorithm that merely *shares* the built-in gzip's
+    /// `Content-Encoding` value must therefore not compare equal to it: otherwise one of them runs
+    /// on the other's pooled client, and a gzip response gets decoded twice (or not at all) while
+    /// manual dispatch, decided per request, assumes the opposite.
+    @Test
+    func decompression_whenCustomAlgorithmSharesContentEncodingWithNativeOne_notEquals() {
+        // Given
+        let native = Internals.Decompression.enabled(algorithms: [MockGzipAlgorithm()], limit: .none)
+        let custom = Internals.Decompression.enabled(
+            algorithms: [MockCustomAlgorithmNamedGzip()],
+            limit: .none
+        )
+
+        // Then
+        #expect(native != custom)
+        #expect(custom != native)
+    }
+
+    @Test
+    func decompression_whenEnabledWithSameAlgorithmsInDifferentOrder_equals() {
+        // Given
+        let lhs = Internals.Decompression.enabled(
+            algorithms: [MockGzipAlgorithm(), MockDeflateAlgorithm()],
+            limit: .none
+        )
+        let rhs = Internals.Decompression.enabled(
+            algorithms: [MockDeflateAlgorithm(), MockGzipAlgorithm()],
+            limit: .none
+        )
+
+        // Then
+        #expect(lhs == rhs)
+    }
+
     @Test
     func decompression_whenEnabledWithDifferentLimit_notEquals() {
         // Given

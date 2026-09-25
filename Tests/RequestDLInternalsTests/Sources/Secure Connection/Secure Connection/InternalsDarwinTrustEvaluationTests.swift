@@ -11,6 +11,7 @@ import Testing
 import FoundationEssentials
 #else
 import struct Foundation.Data
+import class Foundation.JSONDecoder
 #endif
 
 #if canImport(Darwin)
@@ -229,6 +230,108 @@ struct InternalsDarwinTrustEvaluationTests {
 
         #expect(countAfter == countBefore + 1)
     }
+
+    #if os(macOS)
+    /// `AdditionalTrustRoots` means *in addition to* the system roots — NIOSSL's own
+    /// `additionalTrustRoots` semantics, and what plain `.nio` already does. Anchoring only on
+    /// them (`SecTrustSetAnchorCertificatesOnly(true)`) turned "also trust my corporate CA" into
+    /// "trust nothing else", rejecting every publicly-trusted host on `.urlSession` and on the
+    /// Network.framework/pinned `.nio` paths.
+    @Test
+    func prepare_whenTrustRootsAreNotExclusive_stillTrustsTheSystemRoots() throws {
+        // Given: a chain the system itself trusts, plus one unrelated extra anchor.
+        let sut = try Self.systemTrustedTrust()
+        let evaluation = Internals.DarwinTrustEvaluation(
+            trustRootCertificates: try Self.selfSignedCertificate(Certificates(.der).server()),
+            pins: [],
+            isStrict: true,
+            trustRootsAreExclusive: false
+        )
+
+        // When
+        evaluation.prepare(sut, skipsHostnameVerification: false)
+
+        // Then
+        #expect(SecTrustEvaluateWithError(sut, nil))
+    }
+
+    /// `TrustRoots`, by contrast, replaces the system roots outright.
+    @Test
+    func prepare_whenTrustRootsAreExclusive_noLongerTrustsTheSystemRoots() throws {
+        // Given
+        let sut = try Self.systemTrustedTrust()
+        let evaluation = Internals.DarwinTrustEvaluation(
+            trustRootCertificates: try Self.selfSignedCertificate(Certificates(.der).server()),
+            pins: [],
+            isStrict: true,
+            trustRootsAreExclusive: true
+        )
+
+        // When
+        evaluation.prepare(sut, skipsHostnameVerification: false)
+
+        // Then
+        #expect(!SecTrustEvaluateWithError(sut, nil))
+    }
+
+    @Test
+    func serverTrustPolicy_whenOnlyAdditionalTrustRootsConfigured_isNotExclusiveAndPersistsThat() throws {
+        // Given
+        let pemBytes = try Array(Data(contentsOf: Certificates(.pem).server().certificateURL))
+
+        var additionalOnly = Internals.SecureConnection()
+        additionalOnly.additionalTrustRoots = [.certificates([.init(pemBytes, format: .pem)])]
+
+        var exclusive = Internals.SecureConnection()
+        exclusive.trustRoots = .certificates([.init(pemBytes, format: .pem)])
+
+        // When
+        let additionalOnlyDescriptor = try Internals.ServerTrustPolicy.resolve(from: additionalOnly).descriptor()
+        let exclusiveDescriptor = try Internals.ServerTrustPolicy.resolve(from: exclusive).descriptor()
+
+        // Then
+        #expect(additionalOnlyDescriptor.trustedRootsAreExclusive == false)
+        #expect(exclusiveDescriptor.trustedRootsAreExclusive == true)
+
+        // A descriptor persisted before this field existed decodes as exclusive, exactly how it
+        // was evaluated when it was written.
+        let legacyJSON = Data(#"{"trustedRootCertificatesDER":[],"verification":"fullVerification"}"#.utf8)
+        let legacy = try JSONDecoder().decode(Internals.ServerTrustPolicy.Descriptor.self, from: legacyJSON)
+        #expect(legacy.trustedRootsAreExclusive == nil)
+    }
+
+    /// A self-signed root from the system's own trust store, wrapped in a `SecTrust` that
+    /// evaluates as trusted with no custom anchors at all. Offline: network fetching is disabled
+    /// so the result never depends on AIA/OCSP reachability.
+    private static func systemTrustedTrust() throws -> SecTrust {
+        var anchors: CFArray?
+        try #require(SecTrustCopyAnchorCertificates(&anchors) == errSecSuccess)
+        let systemRoots = try #require(anchors as? [SecCertificate])
+
+        for root in systemRoots {
+            var trust: SecTrust?
+            guard
+                SecTrustCreateWithCertificates(root, SecPolicyCreateBasicX509(), &trust) == errSecSuccess,
+                let trust
+            else { continue }
+
+            SecTrustSetNetworkFetchAllowed(trust, false)
+
+            if SecTrustEvaluateWithError(trust, nil) {
+                // A fresh `SecTrust` for the same certificate: evaluation caches its result.
+                var freshTrust: SecTrust?
+                _ = SecTrustCreateWithCertificates(root, SecPolicyCreateBasicX509(), &freshTrust)
+                let fresh = try #require(freshTrust)
+                SecTrustSetNetworkFetchAllowed(fresh, false)
+                return fresh
+            }
+        }
+
+        throw SystemRootUnavailable()
+    }
+
+    private struct SystemRootUnavailable: Error {}
+    #endif
 
     // MARK: - Private methods
 

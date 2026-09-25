@@ -208,10 +208,29 @@ extension Internals.Session.Configuration {
 
     package var isCompatibleWithNetworkFramework: Bool {
         if enableNetworkFramework {
-            return secureConnection?.isCompatibleWithNetworkFramework ?? true
+            return networkFrameworkIncompatibilityReasons().isEmpty
         }
 
         return false
+    }
+
+    /// The mirror image of `urlSessionIncompatibilityReasons()`: fields that keep a configuration
+    /// off `.nioTransportServices` (Network.framework) instead of off `.urlSession`.
+    ///
+    /// Starts from `secureConnection?.networkFrameworkIncompatibilityReasons()` (the fields
+    /// `SecureConnection` alone already knows are Network.framework-incompatible), then adds
+    /// `.clientIdentityWithProxyUnderNetworkFramework` when both a `proxy` and a client identity
+    /// (`certificateChain`/`privateKey`) are configured together -- something `SecureConnection`
+    /// can't see on its own, since `proxy` lives here, one level up. See that reason's own doc
+    /// comment for why the combination doesn't work.
+    package func networkFrameworkIncompatibilityReasons() -> [Internals.ExecutorIncompatibilityReason] {
+        var reasons = secureConnection?.networkFrameworkIncompatibilityReasons() ?? []
+
+        if proxy != nil, secureConnection?.certificateChain != nil || secureConnection?.privateKey != nil {
+            reasons.append(.clientIdentityWithProxyUnderNetworkFramework)
+        }
+
+        return reasons
     }
 
     /// The bucket-D fields that keep a configuration off `.urlSession` regardless of what
@@ -296,6 +315,12 @@ extension Internals.Session.Configuration: Equatable {
             && lhs.timeout == rhs.timeout
             && lhs.connectionPool == rhs.connectionPool
             && lhs.proxy == rhs.proxy
+            // `Proxy.==` leaves `connectHeaders` out (mirroring upstream's own
+            // `HTTPClient.Configuration.Proxy`), but `build()` bakes them into the pooled client
+            // this `==` is the cache key for. Without comparing them here, two sessions sharing a
+            // proxy host but sending different `CONNECT` credentials reuse each other's client,
+            // and the second session's `CONNECT` goes out carrying the first one's token.
+            && Self.proxyConnectHeadersEqual(lhs.proxy, rhs.proxy)
             && lhs.ignoreUncleanSSLShutdown == rhs.ignoreUncleanSSLShutdown
             && lhs.decompression == rhs.decompression
             && lhs.dnsOverride == rhs.dnsOverride
@@ -317,6 +342,14 @@ extension Internals.Session.Configuration: Equatable {
             && lhs.preferredExecutor == rhs.preferredExecutor
             && lhs.requiredExecutor == rhs.requiredExecutor
     }
+
+    /// Field line by field line, in order: exactly what `Proxy.build()` sends on `CONNECT`.
+    private static func proxyConnectHeadersEqual(_ lhs: Internals.Proxy?, _ rhs: Internals.Proxy?) -> Bool {
+        let lhsPairs = lhs?.connectHeaders.pairs ?? []
+        let rhsPairs = rhs?.connectHeaders.pairs ?? []
+
+        return lhsPairs.elementsEqual(rhsPairs) { $0.name == $1.name && $0.value == $1.value }
+    }
 }
 
 extension Internals.Session.Configuration {
@@ -327,7 +360,7 @@ extension Internals.Session.Configuration {
     /// ATS, HTTP/3 maturity), then NIOTransportServices, then plain NIO as the universal
     /// fallback. `.urlSession` and `.nioTransportServices` are independent capability checks, not
     /// a hierarchy: a field can be reachable on one and not the other (see
-    /// `urlSessionIncompatibilityReasons()`/`SecureConnection.networkFrameworkIncompatibilityReasons()`).
+    /// `urlSessionIncompatibilityReasons()`/`networkFrameworkIncompatibilityReasons()`).
     /// This is a default ordering, not a fixed law: `preferredExecutor`/`requiredExecutor`
     /// (public API) let a caller override it.
     ///
@@ -373,7 +406,7 @@ extension Internals.Session.Configuration {
         #if canImport(Darwin)
         #if canImport(NIOCore)
         let isURLSessionCompatible = urlSessionIncompatibilityReasons().isEmpty
-        let isNetworkFrameworkCompatible = secureConnection?.networkFrameworkIncompatibilityReasons().isEmpty ?? true
+        let isNetworkFrameworkCompatible = networkFrameworkIncompatibilityReasons().isEmpty
 
         let effectivePreferredExecutor = preferredExecutor ?? (enableNetworkFramework ? .nioTransportServices : nil)
 
@@ -431,9 +464,7 @@ extension Internals.Session.Configuration {
             reasons = urlSessionIncompatibilityReasons()
         #if canImport(NIOCore)
         case .nioTransportServices:
-            reasons =
-                (secureConnection?.networkFrameworkIncompatibilityReasons() ?? [])
-                + nonURLSessionExecutorIncompatibilityReasons()
+            reasons = networkFrameworkIncompatibilityReasons() + nonURLSessionExecutorIncompatibilityReasons()
         case .nio:
             reasons = nonURLSessionExecutorIncompatibilityReasons()
         #endif
@@ -526,8 +557,45 @@ extension Internals.Session.Configuration {
         }
         #endif
 
+        // `concurrentHTTP1ConnectionsPerHostSoftLimit`'s direct counterpart under
+        // `.nio`/`.nioTransportServices` (see `build()` above and `Internals.ConnectionPool
+        // .build()`). Has a real `URLSessionConfiguration` equivalent, so it isn't listed in
+        // `urlSessionIncompatibilityReasons()`; without mapping it here too, a caller's
+        // `Session.maximumConnectionsPerHost(_:)` would silently do nothing under `.urlSession`,
+        // the *default* executor on Darwin.
+        configuration.httpMaximumConnectionsPerHost = connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit
+
+        // Same reasoning for `multipathServiceType`'s `enableMultipath` counterpart, but
+        // `URLSessionConfiguration.multipathServiceType` itself is only available on iOS (which
+        // Mac Catalyst compiles as, via `targetEnvironment(macCatalyst)`) -- confirmed by the
+        // actual compiler diagnostics, not just Apple's platform-availability docs, which list a
+        // broader iOS/tvOS/watchOS/visionOS/Catalyst set: `'multipathServiceType' is unavailable
+        // in tvOS` (and the same for watchOS/visionOS) is what CI actually reported for the wider
+        // `#if !os(macOS)` gate this originally shipped with. `HTTPClient.Configuration`'s
+        // `enableMultipath`, by contrast, is available everywhere. `Session.multipathServiceType(_:)`
+        // itself carries no platform gate, so a caller setting it on any platform other than iOS
+        // must keep silently doing nothing under `.urlSession` there specifically -- there is no
+        // API to map onto.
+        #if os(iOS)
+        configuration.multipathServiceType = multipathServiceType.urlSessionServiceType
+        #endif
+
         return configuration
     }
 }
+
+#if os(iOS)
+extension Internals.MultipathServiceType {
+
+    fileprivate var urlSessionServiceType: URLSessionConfiguration.MultipathServiceType {
+        switch self {
+        case .none: return .none
+        case .handover: return .handover
+        case .interactive: return .interactive
+        case .aggregate: return .aggregate
+        }
+    }
+}
+#endif
 
 #endif

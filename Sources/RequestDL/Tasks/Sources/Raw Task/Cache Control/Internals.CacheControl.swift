@@ -304,7 +304,14 @@ extension Internals {
 
             if head.status.code == 304 {
                 logger?.log(level: .info, "Cache validated (304 Not Modified), reusing cached data")
-                return cachedData.response.headers
+                // The fresh 304 response's own headers, not the stale cached ones: a 304 is
+                // exactly where the server sends an updated `Cache-Control`/`Expires` to extend
+                // freshness (RFC 9111 §4.3.4), and `updateCacheHeaders` below only ever refreshes
+                // a directive from what this method returns. Returning the cached headers here
+                // made the two sides of that comparison identical, so `validateCachedData` always
+                // saw "no change" and never refreshed `CachedResponse.date` -- revalidation could
+                // never actually extend an already-stale entry's life, the one case it exists for.
+                return RequestDL.HTTPHeaders(head.headers.map { ($0.name, $0.value) })
             }
 
             // Both sides defaulted before comparing. `response.headers[name]` is optional and
@@ -398,6 +405,19 @@ extension Internals {
             )
         }
 
+        /// Whether a response with this status may be stored at all: RFC 9110 §15.1's
+        /// heuristically cacheable set (the codes RFC 9111 §4.2.2 lets a cache store without
+        /// explicit freshness information).
+        ///
+        /// Storing anything else was actively harmful here: an entry with no `max-age`/`Expires`
+        /// is treated as valid indefinitely (`isCachedDataValid`), so one transient `503` was
+        /// replayed by `.returnCachedDataElseLoad` on every later request, without ever asking
+        /// the network again. `206 Partial Content` is excluded the same way: it would serve a
+        /// byte range to a later request for the whole resource.
+        private static func isCacheableByDefault(statusCode: UInt) -> Bool {
+            [200, 203, 204, 300, 301, 308, 404, 405, 410, 414, 501].contains(statusCode)
+        }
+
         private func cacheIfNeeded(
             dataCache: DataCache,
             requestConfiguration: RequestConfiguration
@@ -410,6 +430,7 @@ extension Internals {
                 let headHeaders = RequestDL.HTTPHeaders(head.headers.map { ($0.name, $0.value) })
 
                 guard
+                    Self.isCacheableByDefault(statusCode: head.status.code),
                     !containsNoCache(headers: headHeaders["Cache-Control"] ?? []),
                     !requestForbidsStoring,
                     !requestCarriesCredentials

@@ -56,11 +56,22 @@ public struct HeaderGroup<Content: Property>: Property {
         // directly — `Proxy`'s `connectHeaders`, `Form`'s per-part headers — need each header
         // to still be structurally discoverable. A single combined leaf hid them from that
         // search entirely, silently dropping every header composed through `HeaderGroup` in
-        // those contexts.
+        // those contexts. This is also a deliberate filter, not just a flattening: unrelated
+        // content nested inside a `HeaderGroup` (e.g. `Timeout`) is meant to be dropped, not
+        // carried through -- see `ResolveTests`'s "should be eliminated" case.
         var children = ChildrenNode()
 
         for header in outputs.node.search(for: HeaderNode.self) {
             children.append(header)
+        }
+
+        // `DigestAuthentication` can't be one of the `HeaderNode`s above: unlike `Authorization`
+        // (a precomputed, static value), its `Authorization` header is only ever known once
+        // `make(_:)` actually runs, from live `credential.challenge`/request-URI state. Searched
+        // for by its own node type instead, for the same reason `HeaderNode` itself is searched
+        // for above rather than relying on ordinary top-level graph traversal.
+        for digest in outputs.node.search(for: DigestAuthentication.Node.self) {
+            children.append(digest)
         }
 
         return .children(children)
@@ -88,9 +99,7 @@ extension HeaderGroup where Content == PropertyForEach<[String: String], String,
     public init(_ dictionary: [String: Any]) {
         let dictionary =
             (dictionary as? [String: String])
-            ?? dictionary.mapValues {
-                "\($0)"
-            }
+            ?? dictionary.mapValues(Self.describing)
 
         self.init {
             PropertyForEach(dictionary, id: \.key) {
@@ -100,5 +109,25 @@ extension HeaderGroup where Content == PropertyForEach<[String: String], String,
                 )
             }
         }
+    }
+
+    /// `"\(value)"` alone renders an `Any` box wrapping an `Optional` (e.g. an `Int?`/`String?`
+    /// value the caller's `[String: Any]` happened to carry) as `"Optional(5)"`/
+    /// `"Optional(\"foo\")"` instead of `"5"`/`"foo"` -- `String`'s interpolation has no static
+    /// type to unwrap against once boxed in `Any`, so it falls back to `String(describing:)`'s
+    /// generic, wrapper-preserving behavior. Going through `Mirror` first unwraps that specific
+    /// case before it ever reaches interpolation.
+    private static func describing(_ value: Any) -> String {
+        let mirror = Mirror(reflecting: value)
+
+        guard mirror.displayStyle == .optional else {
+            return "\(value)"
+        }
+
+        guard let unwrapped = mirror.children.first?.value else {
+            return ""
+        }
+
+        return "\(unwrapped)"
     }
 }

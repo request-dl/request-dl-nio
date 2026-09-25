@@ -97,7 +97,17 @@ public actor RDLImageLoader {
             return try await existing.value.image
         }
 
-        let newTask = Task<SendableImage, Error> {
+        // `.detached`, not a plain `Task { ... }`: created from this actor-isolated method, a
+        // plain `Task` would inherit `RDLImageLoader`'s own executor, running the synchronous,
+        // CPU-bound `PlatformImage(data:)` decode below on it. That decode doesn't touch any
+        // actor state -- it only needs `task`, a local, `Sendable` value -- so nothing about it
+        // requires the actor at all, but running there anyway would monopolize the one serial
+        // executor this loader's dedupe bookkeeping (`tasks[id]`) also relies on: a screenful of
+        // concurrently loading thumbnails would have every decode queue up behind whichever one
+        // is currently running, and block brand-new, unrelated `load()` calls from even reaching
+        // their `tasks[id]` lookup in the meantime, instead of spreading decode work across cores
+        // the way the concurrent downloads already do.
+        let newTask = Task.detached {
             let result = try await task.result()
 
             guard let image = PlatformImage(data: result.payload) else {

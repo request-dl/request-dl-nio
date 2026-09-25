@@ -235,8 +235,13 @@ extension Internals {
 
                 _dispatch(.success(dataBuffer))
 
-                buffer.moveReaderIndex(to: .zero)
-                buffer.moveWriterIndex(to: .zero)
+                // `clear()`, not a bare cursor reset: this same accumulation `buffer` is reused
+                // for every chunk over the whole life of the download/stream, so merely moving
+                // the cursors back to zero leaves the store's allocation pinned at whatever size
+                // it grew to for its single largest chunk -- e.g. one unusually large `.length`
+                // window, or one long line before a `.separator` -- for the connection's entire
+                // remaining lifetime. `clear()` actually releases that capacity between chunks.
+                await buffer.clear()
             }
 
             private func _close() async {

@@ -233,11 +233,35 @@ extension BackgroundDownloads {
                 return
             }
 
+            // URLSession calls this for *any* HTTP status, so without this an error page would
+            // replace the file already at `destination` and be reported as `.completed`. Checked
+            // before touching `destination` at all; URLSession removes `location` itself once
+            // this returns.
+            if let statusCode = (downloadTask.response as? HTTPURLResponse)?.statusCode,
+                !(200..<300).contains(statusCode)
+            {
+                onEvent?(
+                    .failed(
+                        id: id,
+                        destination: destination,
+                        error: BackgroundDownloadStatusCodeError(statusCode: statusCode)
+                    )
+                )
+                return
+            }
+
             do {
-                // Best-effort: a destination that doesn't already exist is the common case, and
-                // `moveItem` below is what actually needs to succeed.
-                try? FileManager.default.removeItem(at: destination)
-                try FileManager.default.moveItem(at: location, to: destination)
+                // `replaceItemAt`, not a `removeItem` + `moveItem` pair: those are two separate
+                // steps, so a `moveItem` failure after the `removeItem` already succeeded (full
+                // disk, a permissions change, ...) would leave `destination` empty, permanently
+                // losing whatever was already downloaded there before this attempt even though
+                // the failure was transient. `replaceItemAt` swaps the two atomically, leaving
+                // the original file untouched if the replacement can't complete.
+                if FileManager.default.fileExists(atPath: destination.path) {
+                    _ = try FileManager.default.replaceItemAt(destination, withItemAt: location)
+                } else {
+                    try FileManager.default.moveItem(at: location, to: destination)
+                }
                 onEvent?(.completed(id: id, destination: destination))
             } catch {
                 onEvent?(.failed(id: id, destination: destination, error: error))

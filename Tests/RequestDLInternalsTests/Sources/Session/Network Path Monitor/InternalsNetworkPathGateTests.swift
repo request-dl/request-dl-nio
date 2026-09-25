@@ -6,6 +6,26 @@ import Testing
 
 @testable import RequestDLInternals
 
+#if canImport(Darwin)
+import Dispatch
+import Foundation
+import Network
+
+/// Resumes a continuation exactly once from a callback that may fire repeatedly.
+private final class OnceFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var isClaimed = false
+
+    func claim() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !isClaimed else { return false }
+        isClaimed = true
+        return true
+    }
+}
+#endif
+
 private struct FakeNetworkPathObserver: Internals.NetworkPathObserving {
 
     let currentPath: Internals.NetworkPath
@@ -68,7 +88,100 @@ private let disconnectedPath = Internals.NetworkPath(
     isConstrained: false
 )
 
+/// Models `NWPathMonitor` right after `start()`: `currentPath` still reads its unsatisfied
+/// placeholder (confirmed empirically — it only turns satisfied once the first update lands,
+/// a few milliseconds later), while the first real path is already on its way.
+private struct NotYetResolvedNetworkPathObserver: Internals.NetworkPathObserving {
+
+    let resolvedPath: Internals.NetworkPath
+
+    var currentPath: Internals.NetworkPath {
+        disconnectedPath
+    }
+
+    func resolvedCurrentPath() async -> Internals.NetworkPath {
+        try? await Task.sleep(nanoseconds: 5_000_000)
+        return resolvedPath
+    }
+
+    func updates() -> _Concurrency.AsyncStream<Internals.NetworkPath> {
+        let resolvedPath = resolvedPath
+        return _Concurrency.AsyncStream { continuation in
+            continuation.yield(resolvedPath)
+        }
+    }
+}
+
 struct InternalsNetworkPathGateTests {
+
+    /// The first gated request in a process used to judge the path from `NWPathMonitor`'s
+    /// pre-first-update placeholder, and so failed with `.noConnection` on a fully connected
+    /// device whenever `waitsForConnectivity` wasn't also set.
+    @Test
+    func gate_whenFirstPathNotYetDelivered_judgesTheResolvedPathNotThePlaceholder() async throws {
+        // Given
+        let observer = NotYetResolvedNetworkPathObserver(resolvedPath: satisfiedPath)
+        let constraints = Internals.NetworkPathGate.Constraints(
+            allowsCellularAccess: false,
+            allowsExpensiveNetworkAccess: nil,
+            allowsConstrainedNetworkAccess: nil,
+            waitsForConnectivity: nil
+        )
+
+        // When / Then
+        try await Internals.NetworkPathGate.wait(for: constraints, observer: observer)
+    }
+
+    @Test
+    func gate_whenFirstResolvedPathViolatesConstraint_stillThrowsItsReason() async throws {
+        // Given
+        let observer = NotYetResolvedNetworkPathObserver(resolvedPath: cellularPath)
+        let constraints = Internals.NetworkPathGate.Constraints(
+            allowsCellularAccess: false,
+            allowsExpensiveNetworkAccess: nil,
+            allowsConstrainedNetworkAccess: nil,
+            waitsForConnectivity: nil
+        )
+
+        // When / Then
+        await #expect {
+            try await Internals.NetworkPathGate.wait(for: constraints, observer: observer)
+        } throws: { error in
+            (error as? Internals.NetworkPathUnsatisfiedError)?.reason == .cellularNotAllowed
+        }
+    }
+
+    #if canImport(Darwin)
+    /// The real monitor's resolved path must be an actual `NWPathMonitor` update, not the
+    /// placeholder `currentPath` reads before one arrives: compared against an independent
+    /// monitor's own first update, so this holds whether or not the machine is online.
+    @Test
+    func monitor_resolvedCurrentPath_matchesAFreshMonitorsFirstUpdate() async throws {
+        // Given
+        let reference = await Self.firstUpdateOfAFreshMonitor()
+
+        // When
+        let resolved = await Internals.NetworkPathMonitor.shared.resolvedCurrentPath()
+
+        // Then
+        #expect(resolved.isSatisfied == reference)
+    }
+
+    private static func firstUpdateOfAFreshMonitor() async -> Bool {
+        let monitor = NWPathMonitor()
+        defer { monitor.cancel() }
+
+        return await withCheckedContinuation { continuation in
+            let once = OnceFlag()
+            monitor.pathUpdateHandler = { path in
+                if once.claim() {
+                    continuation.resume(returning: path.status == .satisfied)
+                }
+            }
+            monitor.start(queue: DispatchQueue(label: "InternalsNetworkPathGateTests.reference"))
+        }
+    }
+    #endif
 
     @Test
     func gate_whenPathAlreadySatisfies_shouldReturnImmediately() async throws {
