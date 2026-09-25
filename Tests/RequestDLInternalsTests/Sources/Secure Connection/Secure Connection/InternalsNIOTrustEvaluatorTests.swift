@@ -17,6 +17,13 @@ import Security
 #endif
 
 @testable import RequestDLInternals
+@testable import RequestDLTestSupport
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.Data
+#endif
 
 /// Tests `Internals.NIOTrustEvaluator` against a real, `openssl`-generated and
 /// `openssl verify`-checked three-level certificate chain (root CA -> intermediate CA -> leaf),
