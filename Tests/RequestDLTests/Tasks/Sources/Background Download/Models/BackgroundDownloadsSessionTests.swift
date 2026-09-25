@@ -253,15 +253,37 @@ struct BackgroundDownloadsSessionTests {
         let descriptor = try #require(try Internals.ClientIdentityDescriptor.resolve(from: secureConnection))
         let session = BackgroundDownloads.Session()
 
-        // When
-        let first = try #require(session.resolvedIdentity(for: descriptor))
-        let second = try #require(session.resolvedIdentity(for: descriptor))
+        // When / Then
+        //
+        // `resolvedIdentity(for:)`'s cache hit is only observable once its first call has
+        // something to hit: `makeIdentity()`'s own Keychain round trip genuinely succeeds on real
+        // macOS (confirmed, not assumed -- see `InternalsClientIdentityDescriptorTests
+        // .rebuiltIdentity_whenPresentedToServerRequiringClientCertificate_completesHandshake`'s
+        // own doc comment), but every other Apple platform's Simulator, reached only via
+        // `xcodebuild test` against SwiftPM's auto-generated scheme, has no `.entitlements` file
+        // to add Keychain Sharing to at all, so `SecItemAdd` fails with `errSecMissingEntitlement`
+        // before identity pairing is ever reached -- the same still-open gap that test documents,
+        // not a regression this one introduces.
+        func verify() throws {
+            let first = try #require(session.resolvedIdentity(for: descriptor))
+            let second = try #require(session.resolvedIdentity(for: descriptor))
 
-        // Then: the exact same `Internals.IdentityHandle` instance, not merely two handles
-        // wrapping an equivalent `SecIdentity` -- proving the second call skipped
-        // `makeIdentity()`'s own Keychain round trip entirely rather than happening to land on
-        // the same Keychain item again.
-        #expect(first.handle === second.handle)
+            // Then: the exact same `Internals.IdentityHandle` instance, not merely two handles
+            // wrapping an equivalent `SecIdentity` -- proving the second call skipped
+            // `makeIdentity()`'s own Keychain round trip entirely rather than happening to land on
+            // the same Keychain item again.
+            #expect(first.handle === second.handle)
+        }
+
+        #if os(macOS)
+        try verify()
+        #else
+        withKnownIssue(
+            "no Keychain Sharing entitlement on this platform's SwiftPM-generated Xcode scheme; see InternalsClientIdentityDescriptorTests's own doc comment"
+        ) {
+            try verify()
+        }
+        #endif
     }
 
     // MARK: - firstTask(matching:in:)
