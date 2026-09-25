@@ -35,8 +35,16 @@ extension Internals {
 
         // MARK: - Internal methods
 
+        /// - Important: Strips embedded CR/LF from both `name` and `value`. These pairs feed
+        /// `Internals.Proxy.connectHeaders` (a CONNECT tunnel's header block) and
+        /// `Internals.RedirectRequest.headers` (replayed verbatim on the request that follows a
+        /// redirect), so a value that traces back to attacker-influenced input -- e.g. a header
+        /// copied by a custom `RedirectStrategy` from the redirect target's own response --
+        /// must never reach the wire with an embedded `\r\n`: left unstripped, it could end the
+        /// field line early and splice extra header lines into the outgoing request. This mirrors
+        /// the equivalent stripping in `RequestDL.HTTPHeaders`.
         package mutating func add(name: String, value: String) {
-            pairs.append((name: name, value: value))
+            pairs.append((name: Self.strippingCRLF(name), value: Self.strippingCRLF(value)))
         }
 
         /// The first value stored under `name`, compared case insensitively per RFC 9110 (same
@@ -62,6 +70,25 @@ extension Internals {
 
         private static func asciiLowercased(_ byte: UInt8) -> UInt8 {
             byte >= UInt8(ascii: "A") && byte <= UInt8(ascii: "Z") ? byte + 32 : byte
+        }
+
+        /// Drops every CR/LF `Unicode.Scalar` from `value`, walking scalars rather than
+        /// `Character`s: a literal CRLF pair is a single extended grapheme cluster in Swift, so
+        /// matching against the `Character` values `"\r"`/`"\n"` would miss it and let the pair
+        /// through unstripped.
+        private static func strippingCRLF(_ value: String) -> String {
+            guard value.unicodeScalars.contains(where: { $0 == "\r" || $0 == "\n" }) else {
+                return value
+            }
+
+            var stripped = String.UnicodeScalarView()
+            stripped.reserveCapacity(value.unicodeScalars.count)
+
+            for scalar in value.unicodeScalars where scalar != "\r" && scalar != "\n" {
+                stripped.append(scalar)
+            }
+
+            return String(stripped)
         }
     }
 }

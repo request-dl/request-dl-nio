@@ -294,8 +294,32 @@ extension Internals {
 
                 switch options {
                 case .newFile(let replaceExisting, let permissions):
-                    guard replaceExisting || !exists else {
-                        throw FileAlreadyExistsError(path: path.string)
+                    guard replaceExisting else {
+                        // `fileExists` + a separate `createFile` below is a check-then-act pair:
+                        // two callers racing to create the same path could both pass that check
+                        // and both call `createFile`, and since `createFile` overwrites
+                        // unconditionally regardless of what the check saw, the loser would
+                        // silently clobber the winner's just-written content instead of the
+                        // `FileAlreadyExistsError` this case documents. `O_CREAT | O_EXCL` makes
+                        // the create-if-absent decision and the creation itself one atomic
+                        // syscall, so this returns straight from the exclusively-opened
+                        // descriptor rather than falling through to the shared `FileHandle
+                        // (forWritingAtPath:)` open below, which takes a path back to a second,
+                        // ordinary (non-exclusive) open.
+                        do {
+                            let descriptor = try FileDescriptor.open(
+                                path,
+                                .writeOnly,
+                                options: [.create, .exclusiveCreate],
+                                permissions: permissions
+                            )
+
+                            return WriteHandle(
+                                fileHandle: FileHandle(fileDescriptor: descriptor.rawValue, closeOnDealloc: true)
+                            )
+                        } catch Errno.fileExists {
+                            throw FileAlreadyExistsError(path: path.string)
+                        }
                     }
 
                     guard
