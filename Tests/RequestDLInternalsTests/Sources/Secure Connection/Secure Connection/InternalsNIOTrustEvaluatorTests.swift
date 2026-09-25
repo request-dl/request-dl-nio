@@ -75,29 +75,42 @@ struct InternalsNIOTrustEvaluatorTests {
         // Then
         #expect(try Internals.NIOTrustEvaluator.resolve(from: secureConnection) != nil)
     }
+    #endif
 
-    /// Regression coverage for `NIOTrustEvaluator+Darwin`'s plain (non-Network.framework)
-    /// `tlsCustomVerification` closure: it used to build its from-scratch `SecTrust` with
-    /// `SecPolicyCreateBasicX509()`, a bare chain-of-trust policy with no purpose/EKU checks at
-    /// all. Because this closure always passes `skipsHostnameVerification: false` to
-    /// `DarwinTrustEvaluation.prepare`, that method's own policy swap to a real SSL policy never
-    /// triggered here (its `skipsHostnameVerification` branch never runs, and its
-    /// `revocationPolicy` branch only *appends* to the existing, still-EKU-less array) — so a
-    /// certificate lacking the server-auth `extendedKeyUsage` was silently accepted whenever this
-    /// evaluator was installed (e.g. by SPKI pinning), unlike the equivalent
-    /// `.urlSession`/Network.framework paths. See `InternalsDarwinTrustEvaluationTests`'s
-    /// `prepare_whenSkipsHostnameVerification_stillEnforcesServerAuthExtendedKeyUsage`, which
-    /// documents the same fix having already been made for the Network.framework closure.
+    /// Regression coverage for the server-auth `extendedKeyUsage` check, on whichever platform
+    /// evaluator this compiles against:
+    ///
+    /// - On Darwin, `NIOTrustEvaluator+Darwin`'s plain (non-Network.framework)
+    ///   `tlsCustomVerification` closure used to build its from-scratch `SecTrust` with
+    ///   `SecPolicyCreateBasicX509()`, a bare chain-of-trust policy with no purpose/EKU checks at
+    ///   all. Because that closure always passes `skipsHostnameVerification: false` to
+    ///   `DarwinTrustEvaluation.prepare`, that method's own policy swap to a real SSL policy
+    ///   never triggered there (its `skipsHostnameVerification` branch never runs, and its
+    ///   `revocationPolicy` branch only *appends* to the existing, still-EKU-less array) — so a
+    ///   certificate lacking the server-auth `extendedKeyUsage` was silently accepted whenever
+    ///   this evaluator was installed (e.g. by SPKI pinning), unlike the equivalent
+    ///   `.urlSession`/Network.framework paths. See `InternalsDarwinTrustEvaluationTests`'s
+    ///   `prepare_whenSkipsHostnameVerification_stillEnforcesServerAuthExtendedKeyUsage`, which
+    ///   documents the same fix having already been made for the Network.framework closure.
+    /// - Off Darwin, `NIOTrustEvaluator+Portable`'s `tlsCustomVerification` closure validates
+    ///   with `swift-certificates`' `RFC5280Policy` alone, which deliberately doesn't check
+    ///   purpose/EKU either (chain building, signature, validity period, basic constraints only)
+    ///   — installing this evaluator replaces BoringSSL's own default verification, which does
+    ///   enforce the `ssl_server` purpose, so the same gap existed there until
+    ///   `ServerAuthExtendedKeyUsagePolicy` was composed alongside `RFC5280Policy`.
     @Test
     func tlsCustomVerification_whenLeafLacksServerAuthExtendedKeyUsage_rejects() async throws {
-        // Given: a self-signed certificate with `extendedKeyUsage=clientAuth` only (no
-        // `serverAuth`) — the same fixture proven elsewhere to be accepted by a bare X.509 policy
-        // but rejected by a real SSL server policy. Self-signed, so it's also its own trust
-        // anchor: only a purpose/EKU check can still fail this chain.
-        let pemBytes = try Array(Data(contentsOf: Certificates(.pem).client().certificateURL))
-
+        // Given: `Self.ekuClientOnlyLeafPEM`, chaining to (not self-signed as) `Self.ekuRootPEM`
+        // — deliberately not this file's shared self-signed `rootPEM`/`Certificates(.pem)
+        // .client()`-style single-node fixture. `BasicConstraintsPolicy` special-cases a
+        // self-signed cert presented as the end-entity: it requires that cert to be marked as a
+        // CA, which would reject it before this test's own `ServerAuthExtendedKeyUsagePolicy`
+        // check is ever reached, making the test pass for the wrong reason (confirmed by
+        // reverting the fix under test: it still failed on that unrelated ground). A real
+        // two-level chain sidesteps that special case entirely, isolating this test to the EKU
+        // check alone.
         var secureConnection = Internals.SecureConnection()
-        secureConnection.trustRoots = .certificates([.init(pemBytes, format: .pem)])
+        secureConnection.trustRoots = .certificates([.init(Array(Self.ekuRootPEM.utf8), format: .pem)])
         // An unrelated pin under `.audit` installs the evaluator without making the outcome
         // depend on a pin match (already covered by `tlsCustomVerification_whenPinMismatch...`
         // above) or on network-dependent revocation checking, isolating this test to the EKU
@@ -106,7 +119,7 @@ struct InternalsNIOTrustEvaluatorTests {
         secureConnection.tlsPinningPolicy = .audit
 
         let evaluator = try #require(try Internals.NIOTrustEvaluator.resolve(from: secureConnection))
-        let certificate = try NIOSSLCertificate(bytes: pemBytes, format: .pem)
+        let certificate = try NIOSSLCertificate(bytes: Array(Self.ekuClientOnlyLeafPEM.utf8), format: .pem)
 
         let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         let promise = group.next().makePromise(of: NIOSSLVerificationResult.self)
@@ -190,7 +203,6 @@ struct InternalsNIOTrustEvaluatorTests {
         Issue.record("No system root evaluates as trusted offline")
         throw CancellationError()
     }
-    #endif
     #endif
 
     #if !canImport(Darwin)
@@ -338,6 +350,40 @@ struct InternalsNIOTrustEvaluatorTests {
 
     /// `openssl rand -base64 32`, doesn't match any certificate in the chain, on purpose.
     private static let unrelatedPinBase64 = "tH0BF9jVlk3y2e1huTk41UtsPgrhf4cFbJLczhAfH3g="
+
+    // A second, independent two-level chain for
+    // `tlsCustomVerification_whenLeafLacksServerAuthExtendedKeyUsage_rejects` alone: a
+    // `basicConstraints=critical,CA:TRUE` self-signed root, and a
+    // `basicConstraints=critical,CA:FALSE` leaf it signs with `extendedKeyUsage=clientAuth`
+    // (deliberately not `serverAuth`). Generated with openssl and confirmed with
+    // `openssl verify -CAfile root.crt leaf.crt` before being pasted in here.
+
+    private static let ekuRootPEM = """
+        -----BEGIN CERTIFICATE-----
+        MIIBZDCCAQqgAwIBAgIJAPJmiONULL1OMAoGCCqGSM49BAMCMCUxIzAhBgNVBAMM
+        GlJlcXVlc3RETCBUZXN0IEVLVSBSb290IENBMB4XDTI2MDkyMzE0MjMzNVoXDTM2
+        MDkyMDE0MjMzNVowJTEjMCEGA1UEAwwaUmVxdWVzdERMIFRlc3QgRUtVIFJvb3Qg
+        Q0EwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAARA1dC+sqsGD8uabeMd9r6xLM9P
+        zxJaMyHyQukggULwH++Ogp3uO1SS8BUK2aLFEWhSoGHkjKeu9RCG1JVji/QkoyMw
+        ITAPBgNVHRMBAf8EBTADAQH/MA4GA1UdDwEB/wQEAwIBBjAKBggqhkjOPQQDAgNI
+        ADBFAiEA4lBoNdR9O3UAVeom67HRsrFtFvuTiaHgLnndEejSymECICVqoKZY9CAQ
+        RQcuRbUoMLU5gDggALPnsIlXDokO4arb
+        -----END CERTIFICATE-----
+        """
+
+    private static let ekuClientOnlyLeafPEM = """
+        -----BEGIN CERTIFICATE-----
+        MIIBhzCCAS2gAwIBAgIJAJXNMtWKYP9CMAoGCCqGSM49BAMCMCUxIzAhBgNVBAMM
+        GlJlcXVlc3RETCBUZXN0IEVLVSBSb290IENBMB4XDTI2MDkyMzE0MjMzNVoXDTI4
+        MTIwMTE0MjMzNVowIjEgMB4GA1UEAwwXY2xpZW50LW9ubHkuZXhhbXBsZS5jb20w
+        WTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAATkaTT1ciPvQcY77iN2rtuD6EkPKFu2
+        cx9b8SzOXNMuAmc/pQGEQrYCEHFsgrxJHCTnheAdr77qPcTm2lrVL5Ggo0kwRzAM
+        BgNVHRMBAf8EAjAAMBMGA1UdJQQMMAoGCCsGAQUFBwMCMCIGA1UdEQQbMBmCF2Ns
+        aWVudC1vbmx5LmV4YW1wbGUuY29tMAoGCCqGSM49BAMCA0gAMEUCIEF/90QC8apa
+        HtZTdqMxrZqvN+AyDa9ZIeflhtDJJJZ4AiEAvDg5+E1C1Fg71ALA6yAHq1X77p8P
+        19Y+QOg1bs6Gvhg=
+        -----END CERTIFICATE-----
+        """
 }
 
 #endif

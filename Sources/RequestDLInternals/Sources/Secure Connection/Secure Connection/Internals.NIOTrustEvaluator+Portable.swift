@@ -15,14 +15,62 @@ import FoundationEssentials
 import Foundation
 #endif
 
+/// A minimal `VerifierPolicy` covering the one category of check `RFC5280Policy` deliberately
+/// leaves to its caller: that the leaf is actually meant to serve as a *TLS server* certificate.
+///
+/// Installing `tlsCustomVerification` replaces BoringSSL's own default verification outright,
+/// which does enforce the `ssl_server` purpose -- so without this, a certificate whose
+/// `ExtendedKeyUsage` names `clientAuth` only (but chains to a trusted, or even pinned, CA and
+/// whose SAN matches the host) would be accepted as a server certificate. This mirrors the
+/// Darwin-side fix in `Internals.NIOTrustEvaluator+Darwin.swift`, which builds its `SecTrust`
+/// with `SecPolicyCreateSSL(true, nil)` (a real SSL server policy) instead of
+/// `SecPolicyCreateBasicX509()` for the same reason -- see
+/// `InternalsNIOTrustEvaluatorTests.tlsCustomVerification_whenLeafLacksServerAuthExtendedKeyUsage_rejects`.
+@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
+private struct ServerAuthExtendedKeyUsagePolicy: VerifierPolicy {
+    var verifyingCriticalExtensions: [ASN1ObjectIdentifier] {
+        [.X509ExtensionID.extendedKeyUsage]
+    }
+
+    mutating func chainMeetsPolicyRequirements(chain: UnverifiedCertificateChain) async -> PolicyEvaluationResult {
+        let extendedKeyUsage: ExtendedKeyUsage?
+        do {
+            extendedKeyUsage = try chain.leaf.extensions.extendedKeyUsage
+        } catch {
+            // Present but undecodable: fail closed rather than silently letting an
+            // unparseable purpose restriction through.
+            return .failsToMeetPolicy(
+                reason: "leaf certificate's extendedKeyUsage extension could not be parsed: \(error)"
+            )
+        }
+
+        guard let extendedKeyUsage else {
+            // No EKU extension at all leaves the certificate's purpose unrestricted per RFC
+            // 5280 §4.2.1.12, matching both `RFC5280Policy` and the Darwin-side
+            // `SecPolicyCreateSSL(true, nil)` behavior.
+            return .meetsPolicy
+        }
+
+        guard extendedKeyUsage.contains(.serverAuth) || extendedKeyUsage.contains(.any) else {
+            return .failsToMeetPolicy(
+                reason: "leaf certificate's extendedKeyUsage (\(extendedKeyUsage)) does not include serverAuth"
+            )
+        }
+
+        return .meetsPolicy
+    }
+}
+
 extension Internals.NIOTrustEvaluator {
 
     /// Off Darwin there's no `Security.framework` to hand chain-of-trust validation off to, so
     /// this replicates it with `swift-certificates`, using `RFC5280Policy` for the same category
     /// of checks NIOSSL's own BoringSSL-backed default path performs (chain building, signature,
-    /// validity period, basic constraints), run *separately* from the SPKI pin check below, so a
-    /// pin mismatch under `.audit` can be told apart from an actual broken chain, which must
-    /// always reject regardless of policy.
+    /// validity period, basic constraints), plus `ServerAuthExtendedKeyUsagePolicy` for the
+    /// server-auth purpose check NIOSSL's own default verification would otherwise have
+    /// enforced, run *separately* from the SPKI pin check below, so a pin mismatch under
+    /// `.audit` can be told apart from an actual broken chain, which must always reject
+    /// regardless of policy.
     static func makePortableEvaluator(
         pins: [Internals.SPKIHash],
         isStrict: Bool,
@@ -81,6 +129,7 @@ extension Internals.NIOTrustEvaluator {
                 Task {
                     var verifier = Verifier(rootCertificates: rootStore) {
                         RFC5280Policy()
+                        ServerAuthExtendedKeyUsagePolicy()
                     }
 
                     switch await verifier.validate(leaf: leaf, intermediates: intermediateStore) {
