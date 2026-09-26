@@ -320,9 +320,12 @@ extension Internals {
         /// - Parameter flowControl: Meters `stream` so its producer can be paused rather than run
         ///   arbitrarily far ahead of the reader. Only worth passing where the producer can
         ///   actually honour it -- today that is `Internals.ClientResponseReceiver`, whose NIO
-        ///   delegate contract has a way to say "not yet". A producer that ignores the window
-        ///   (the cached-response replay, the mocked task, the `URLSession` delegate) gains
-        ///   nothing from one and keeps the previous, unmetered behaviour by passing `nil`.
+        ///   delegate contract has a way to say "not yet", and
+        ///   `Internals.URLSessionClient.pumpResponseBody`, which pulls from a
+        ///   `URLSession.AsyncBytes` only while there is room. A producer that ignores the window
+        ///   (the cached-response replay, the mocked task, the `URLSession` `didReceive data:`
+        ///   delegate behind the non-`SessionTask` overloads) gains nothing from one and keeps the
+        ///   previous, unmetered behaviour by passing `nil`.
         package init(
             readingMode: Internals.DownloadStep.ReadingMode,
             flowControl: Internals.FlowControlWindow? = nil

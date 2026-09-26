@@ -37,7 +37,8 @@ extension Internals {
     /// reader going away -- calls ``release()``, which is terminal: every waiter resumes, and
     /// nothing waits again. See `Internals.ClientResponseReceiver` and
     /// `Internals.Client.execute(request:url:readingMode:uploadingBytes:decompression:cache:logger:)`
-    /// for which event maps to which call.
+    /// for which event maps to which call on the `.nio` path, and
+    /// `Internals.URLSessionClient.executeSessionTask` on the `.urlSession` one.
     package final class FlowControlWindow: @unchecked Sendable {
 
         // MARK: - Internal static properties
