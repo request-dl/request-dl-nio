@@ -134,9 +134,10 @@ extension Internals.ManualDecompressionDispatch {
 extension Internals.AsyncStream where Element == Internals.DataBuffer {
 
     /// Feeds every chunk `source` produces through a fresh decoder, one per response, forwarding
-    /// whatever comes back. `[UInt8]` decoding chunks may be empty, and empty chunks are simply
-    /// not forwarded, since a `DecompressorStream` is explicitly allowed to buffer internally and
-    /// emit nothing for a given call.
+    /// whatever comes back, no further ahead of the returned stream's reader than `source`'s own
+    /// flow control window allows (when it has one). `[UInt8]` decoding chunks may be empty, and
+    /// empty chunks are simply not forwarded, since a `DecompressorStream` is explicitly allowed
+    /// to buffer internally and emit nothing for a given call.
     ///
     /// `finish()` runs once `source` ends, flushing whatever the decoder is still holding before
     /// this stream itself closes.
@@ -160,7 +161,22 @@ extension Internals.AsyncStream where Element == Internals.DataBuffer {
         // `.brotli` fallback under `.nio`, or any custom `Decompressor`) meant the entire
         // decompressed body stayed resident in memory even after being read, defeating the
         // point of streaming it in the first place.
-        let output = Internals.AsyncStream<Internals.DataBuffer>(bufferingPolicy: .untilFirstIteration)
+        //
+        // Metered by a window of its own whenever `source` is. This task is `source`'s reader,
+        // so it is what credits `source`'s window, and it reads as fast as it can decode: left
+        // unmetered, it would drain a source that is holding the network back into an output
+        // nobody is holding back at all, and the body would pile up here instead, decoded and
+        // so larger. A window of its own, with the same watermarks, lets it stop pulling from
+        // `source` until the real reader catches up, which is what lets that reader's pace
+        // reach all the way back to the network.
+        //
+        // Counted in decoded bytes, not in `source`'s: a decoder can expand its input by orders
+        // of magnitude, so a bound on the compressed backlog alone would bound very little.
+        let flowControl = source.flowControlWindow.map {
+            Internals.FlowControlWindow(highWatermark: $0.highWatermark, lowWatermark: $0.lowWatermark)
+        }
+
+        let output = Internals.AsyncStream<Internals.DataBuffer>(flowControl: flowControl)
 
         // Captures this untouched `output` -- not the token-carrying copy returned below -- so
         // this task's own reference never keeps that token alive by itself. See
@@ -179,6 +195,22 @@ extension Internals.AsyncStream where Element == Internals.DataBuffer {
 
                     if !decoded.isEmpty {
                         output.append(.success(await Internals.DataBuffer(decoded)))
+                    }
+
+                    // Before pulling the next chunk, not before appending this one: what's
+                    // already decoded has nowhere to go but `output`, and holding it here instead
+                    // would only move the same bytes somewhere the window can't see them.
+                    //
+                    // Cancellation is this task's only way to learn nobody will ever read
+                    // `output` (see the termination token below), and nothing else would credit
+                    // the window then, so it releases the window rather than leaving this wait
+                    // suspended for good. `output`'s own reader going away releases it too.
+                    if let flowControl {
+                        await withTaskCancellationHandler {
+                            await flowControl.waitUntilWritable()
+                        } onCancel: {
+                            flowControl.release()
+                        }
                     }
                 }
 
