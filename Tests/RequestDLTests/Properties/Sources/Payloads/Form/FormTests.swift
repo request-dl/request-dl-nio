@@ -1660,6 +1660,54 @@ struct FormTests {
         )
     }
 
+    /// Regression test: unlike a top-level request header, a `Form` part's header line is
+    /// written straight into the raw body bytes (`FormGroupBuilder.buildHeadersBuffer`), with
+    /// nothing downstream validating it again. A `headers:` closure can carry
+    /// attacker-influenced values (e.g. reflecting per-user metadata as a custom header), so an
+    /// embedded CR/LF there used to end the header line early and inject an arbitrary extra
+    /// header line into the part — this asserts it's stripped instead.
+    @Test
+    func form_whenCustomHeaderValueContainsCRLF_stripsItInsteadOfInjectingALine() async throws {
+        // Given
+        let name = "foo"
+        let data = await Data.randomData(length: 64)
+        let injectedValue = "en-US\r\nX-Injected: evil"
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                Form(
+                    name: name,
+                    data: data,
+                    headers: {
+                        CustomHeader(name: "Accept-Language", value: injectedValue)
+                    }
+                )
+            }
+        )
+
+        let parser = try await MultipartFormParser(resolved.requestConfiguration)
+        let parsed = try await parser.parse()
+
+        // Then: no standalone `X-Injected` header snuck onto the wire as its own header line.
+        #expect(parsed.items.count == 1)
+        #expect(parsed.items.first?.headers["X-Injected"] == nil)
+
+        #expect(
+            parsed.items == [
+                PartForm(
+                    headers: HTTPHeaders([
+                        ("Content-Disposition", "form-data; name=\"\(name)\""),
+                        ("Content-Type", "application/octet-stream"),
+                        ("Content-Length", String(data.count)),
+                        ("Accept-Language", "en-USX-Injected: evil"),
+                    ]),
+                    contents: data
+                )
+            ]
+        )
+    }
+
     @Test
     func form_whenBodyCalled_shouldBeNever() async throws {
         // Given

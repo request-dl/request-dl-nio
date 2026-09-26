@@ -31,6 +31,13 @@ extension Internals {
             operationQueue.isRunning
         }
 
+        /// Mirrors `Internals.ClientOperationQueue.generation`, read by
+        /// `Internals.ClientManager`'s idle-cleanup sweep and ceiling eviction alongside
+        /// `isRunning` -- see that property's own doc comment.
+        package var operationGeneration: UInt64 {
+            operationQueue.generation
+        }
+
         // MARK: - Private properties
 
         private let session: URLSession
@@ -142,14 +149,21 @@ extension Internals {
             request: URLRequest,
             delegate: URLSessionTaskDelegate? = nil
         ) async throws -> (head: Internals.ResponseHead, body: Data) {
+            // Registered before the throttle wait below, not after: `Internals.ClientManager`'s
+            // idle-cleanup sweep and its ceiling eviction path both treat `isRunning == false` as
+            // "safe to shut down," and this client has no ARC-based fallback the way `.nio`'s
+            // pooled entry does (its `shutdown()` invalidates the live `URLSession` outright). A
+            // caller queued behind `throttledExecutor.acquire()` for longer than the pool's
+            // lifetime must still count as busy, or the sweep can invalidate the session out from
+            // under it the moment it's finally let through.
+            let operation = operationQueue.operation()
+            defer { operation.complete() }
+
             // Waited on before anything else, mirroring `Internals.Client.execute`: a session
             // configured with a limit must never let more requests than that reach the network,
             // whether the cap is enforced by the NIO or the URLSession executor.
             let release = await throttledExecutor.acquire()
             defer { release() }
-
-            let operation = operationQueue.operation()
-            defer { operation.complete() }
 
             let tlsDelegate = identityPolicy.flatMap { policy in
                 request.url?.host.map { TLSDelegate(host: $0, policy: policy) }
@@ -211,11 +225,14 @@ extension Internals {
             existingUploadFile: URL? = nil,
             onUploadProgress: (@Sendable (Int, Int) -> Void)? = nil
         ) async throws -> (head: Internals.ResponseHead, body: Data) where Body.Element == Internals.Bytes {
-            let release = await throttledExecutor.acquire()
-            defer { release() }
-
+            // See the equivalent comment in `execute(request:delegate:)`: registered before the
+            // throttle wait so this client counts as busy for as long as a caller is queued on
+            // it, not just once it starts sending.
             let operation = operationQueue.operation()
             defer { operation.complete() }
+
+            let release = await throttledExecutor.acquire()
+            defer { release() }
 
             let materialized: Internals.URLSessionUploadFile.Materialized
             if let existingUploadFile {
@@ -296,8 +313,11 @@ extension Internals {
             readingMode: Internals.DownloadStep.ReadingMode,
             delegate: URLSessionTaskDelegate? = nil
         ) async throws -> Internals.DownloadStep {
-            let release = await throttledExecutor.acquire()
+            // See the equivalent comment in `execute(request:delegate:)`: registered before the
+            // throttle wait so this client counts as busy for as long as a caller is queued on
+            // it, not just once it starts sending.
             let operation = operationQueue.operation()
+            let release = await throttledExecutor.acquire()
 
             let tlsDelegate = identityPolicy.flatMap { policy in
                 request.url?.host.map { TLSDelegate(host: $0, policy: policy) }
@@ -438,8 +458,11 @@ extension Internals {
             forwarding delegate: URLSessionTaskDelegate?,
             makeUploadBody: (@Sendable () async throws -> Internals.URLSessionUploadFile.Materialized)?
         ) async throws -> SessionTask {
-            let release = await throttledExecutor.acquire()
+            // See the equivalent comment in `execute(request:delegate:)`: registered before the
+            // throttle wait so this client counts as busy for as long as a caller is queued on
+            // it, not just once it starts sending.
             let operation = operationQueue.operation()
+            let release = await throttledExecutor.acquire()
 
             // CFNetwork's transparent `Content-Encoding` decoding can only be switched off by
             // taking over `Accept-Encoding` ourselves, and doing so suppresses it entirely, for
@@ -901,7 +924,18 @@ extension Internals.URLSessionClient {
                 return
             }
 
-            if let tlsDelegate {
+            // `tlsDelegate`/`identityPolicy` hold the trust configuration (pinning, custom trust
+            // roots, revocation) resolved for the *destination* host, and are deliberately still
+            // consulted for a redirect target (a different destination host) -- see
+            // `URLSessionIdentityPolicy.handle`'s own doc comment. A proxy challenge is not that:
+            // when the configured proxy terminates TLS itself (an HTTPS-inspecting forward proxy),
+            // URLSession delivers a server-trust challenge for the *proxy's* own certificate, with
+            // `isProxy() == true`. Routing that to the destination's pinning policy would either
+            // reject a legitimate proxy outright under strict pinning, or, under `.audit`, silently
+            // skip meaningful validation of the proxy's certificate. Proxy challenges besides the
+            // HTTPBasic one just handled must fall through to `forwardingDelegate`/default handling
+            // instead.
+            if let tlsDelegate, !challenge.protectionSpace.isProxy() {
                 tlsDelegate.urlSession(session, task: task, didReceive: challenge, completionHandler: completionHandler)
                 return
             }

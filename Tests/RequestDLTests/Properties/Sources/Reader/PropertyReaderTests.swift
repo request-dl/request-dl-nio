@@ -173,6 +173,47 @@ struct PropertyReaderTests {
         #expect(resolved.session.configuration.proxy?.host == "default-proxy.local")
     }
 
+    /// Regression coverage: `PropertyReader._makeProperty` used to resolve `source` through a
+    /// brand-new `Resolve(root:environment:)`, which always mints a fresh `SeedFactory` and
+    /// hardcodes `namespaceID: .global` -- never the caller's own `inputs.namespaceID`/
+    /// `.seedFactory`. Two sibling `PropertyReader`s each wrapping the same `@StoredObject`-bearing
+    /// type as `source` therefore both independently computed seed `.zero` for `.global`,
+    /// colliding on the identical `Internals.Storage` entry and silently sharing one
+    /// `MemoryReference` instance instead of each getting its own -- exactly the "intermittent
+    /// `StoredObject`-identity flake" the `#if DEBUG` diagnostic in `Internals.Storage` exists to
+    /// chase. `ReferenceMemoryProperty`'s `@StoredObject` only constructs a fresh `MemoryReference`
+    /// (stamped with the next value off a shared, monotonically increasing counter) the first time
+    /// its identity is resolved, so two independent identities show up here as two *different*
+    /// counter values embedded in each sibling's own resolved `source` URL.
+    @Test
+    func propertyReader_whenTwoSiblingsDeclareSameStoredObjectSourceType_getIndependentInstances() async throws {
+        // Given / When
+        let resolved = try await resolve(
+            TestProperty {
+                PropertyReader(ReferenceMemoryProperty()) { context in
+                    Query(name: "first", value: context.requestConfiguration.url)
+                }
+                PropertyReader(ReferenceMemoryProperty()) { context in
+                    Query(name: "second", value: context.requestConfiguration.url)
+                }
+            }
+        )
+
+        // Then
+        let url = resolved.requestConfiguration.url
+
+        func rawQueryValue(_ name: String) -> Substring? {
+            guard let range = url.range(of: "\(name)=") else { return nil }
+            let rest = url[range.upperBound...]
+            return rest.prefix(while: { $0 != "&" })
+        }
+
+        let firstValue = try #require(rawQueryValue("first"))
+        let secondValue = try #require(rawQueryValue("second"))
+
+        #expect(firstValue != secondValue)
+    }
+
     @Test func neverBody() async throws {
         // Given
         let property = PropertyReader(EmptyProperty()) { _ in EmptyProperty() }

@@ -4,7 +4,7 @@
 
 import Testing
 
-@testable import RequestDLInternals
+@_spi(Testing) @testable import RequestDLInternals
 
 struct InternalsThrottledExecutorTests {
 
@@ -14,6 +14,39 @@ struct InternalsThrottledExecutorTests {
         let throttledExecutor = Internals.ThrottledExecutor(maximumConcurrentConnections: nil)
 
         // When / Then
+        let release = await throttledExecutor.acquire()
+        release()
+    }
+
+    /// `maximumConcurrentConnections` reaches this unvalidated from
+    /// `Session.maximumConcurrentConnections(_:)` and from `Configured`'s config-file reader. A
+    /// zero-permit semaphore can never be acquired, so every request through the session would
+    /// wait forever: a non-positive limit is treated as "no limit" instead.
+    @Test
+    func acquire_whenLimitIsZero_isTreatedAsUnlimited() async throws {
+        // Given
+        let throttledExecutor = Internals.ThrottledExecutor(maximumConcurrentConnections: 0)
+
+        // Then
+        // `#require`, not `#expect`: a zero-permit semaphore would hang `acquire()` below forever.
+        try #require(throttledExecutor.semaphoreForTesting == nil)
+
+        let release = await throttledExecutor.acquire()
+        release()
+    }
+
+    /// `AsyncSemaphore.init(permits:)` preconditions on a non-negative count, which traps even
+    /// in release builds: a negative limit used to crash the process the first time a client
+    /// was built for the session.
+    @Test
+    func acquire_whenLimitIsNegative_isTreatedAsUnlimitedInsteadOfTrapping() async throws {
+        // Given
+        let throttledExecutor = Internals.ThrottledExecutor(maximumConcurrentConnections: -1)
+
+        // Then
+        // `#require`, not `#expect`: a zero-permit semaphore would hang `acquire()` below forever.
+        try #require(throttledExecutor.semaphoreForTesting == nil)
+
         let release = await throttledExecutor.acquire()
         release()
     }

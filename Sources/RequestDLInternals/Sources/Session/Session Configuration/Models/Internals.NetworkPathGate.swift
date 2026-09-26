@@ -52,13 +52,18 @@ extension Internals {
         ) async throws {
             try Task.checkCancellation()
 
-            if reason(for: observer.currentPath, constraints) == nil {
+            // `resolvedCurrentPath()`, not `currentPath`: the very first request to touch the
+            // shared monitor would otherwise be judged against `NWPathMonitor`'s pre-first-update
+            // placeholder, which reads unsatisfied even on a fully connected device.
+            let initialPath = await observer.resolvedCurrentPath()
+
+            guard let initialReason = reason(for: initialPath, constraints) else {
                 return
             }
 
             guard constraints.waitsForConnectivity == true else {
                 throw NetworkPathUnsatisfiedError(
-                    reason: reason(for: observer.currentPath, constraints) ?? .noConnection,
+                    reason: initialReason,
                     waitedForConnectivity: false
                 )
             }

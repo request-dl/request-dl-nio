@@ -21,8 +21,12 @@ struct InternalsNetworkPathMonitorTests {
 
     @Test
     func monitor_updates_shouldYieldCurrentSnapshotImmediatelyOnSubscribe() async throws {
-        // Given
+        // Given: a real path already observed. Before `NWPathMonitor`'s first update there is no
+        // snapshot to replay at all — only its unsatisfied placeholder, which `updates()`
+        // deliberately never yields (see `InternalsNetworkPathGateTests`'
+        // `gate_whenFirstPathNotYetDelivered_judgesTheResolvedPathNotThePlaceholder`).
         let monitor = Internals.NetworkPathMonitor.shared
+        _ = await monitor.resolvedCurrentPath()
         let expectedPath = monitor.currentPath
 
         // When

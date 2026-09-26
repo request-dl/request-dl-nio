@@ -97,22 +97,40 @@ struct InternalsDecompressionTests {
         #expect(lhs == rhs)
     }
 
-    /// Regression coverage for a pooled-client cache collision: equality used to compare only the
-    /// set of `Content-Encoding` values, which is exactly the check
-    /// `Internals.DecompressionAlgorithm` documents as *not* being what decides behavior. A
-    /// custom algorithm declaring `"gzip"` needs `build()` to leave
-    /// `NIOHTTPResponseDecompressor` off so manual dispatch actually runs it; the built-in
-    /// placeholder needs it on. `Internals.ClientManager` keys pooled clients on
-    /// `Internals.Session.Configuration.==`, and `build()`'s answer is baked into the
-    /// `HTTPClient`, so the two must not compare equal.
+    /// `Internals.ClientManager` reuses a pooled client whenever the session configurations are
+    /// `==`, and `build()` turns NIO's own decompressor on or off by `isNativelyDecodedByNIO`,
+    /// not by `contentEncodingValue`. A custom algorithm that merely *shares* the built-in gzip's
+    /// `Content-Encoding` value must therefore not compare equal to it: otherwise one of them runs
+    /// on the other's pooled client, and a gzip response gets decoded twice (or not at all) while
+    /// manual dispatch, decided per request, assumes the opposite.
     @Test
-    func decompression_whenCustomAlgorithmSharesGzipContentEncoding_notEqualToNativeGzip() {
+    func decompression_whenCustomAlgorithmSharesContentEncodingWithNativeOne_notEquals() {
         // Given
-        let lhs = Internals.Decompression.enabled(algorithms: [MockGzipAlgorithm()], limit: .none)
-        let rhs = Internals.Decompression.enabled(algorithms: [MockCustomAlgorithmNamedGzip()], limit: .none)
+        let native = Internals.Decompression.enabled(algorithms: [MockGzipAlgorithm()], limit: .none)
+        let custom = Internals.Decompression.enabled(
+            algorithms: [MockCustomAlgorithmNamedGzip()],
+            limit: .none
+        )
 
         // Then
-        #expect(lhs != rhs)
+        #expect(native != custom)
+        #expect(custom != native)
+    }
+
+    @Test
+    func decompression_whenEnabledWithSameAlgorithmsInDifferentOrder_equals() {
+        // Given
+        let lhs = Internals.Decompression.enabled(
+            algorithms: [MockGzipAlgorithm(), MockDeflateAlgorithm()],
+            limit: .none
+        )
+        let rhs = Internals.Decompression.enabled(
+            algorithms: [MockDeflateAlgorithm(), MockGzipAlgorithm()],
+            limit: .none
+        )
+
+        // Then
+        #expect(lhs == rhs)
     }
 
     @Test

@@ -155,21 +155,19 @@ extension InternalsSecureConnectionTests {
         #expect(secureConnection.urlSessionIncompatibilityReasons().isEmpty)
     }
 
-    /// Regression coverage: `maximumTLSVersion` used to be flagged as incompatible with
-    /// `.urlSession`, on the premise that ATS has no maximum-version key and therefore nothing
-    /// could carry it. The premise was wrong: `URLSessionConfiguration
-    /// .tlsMaximumSupportedProtocolVersion` carries it, and
-    /// `buildURLSessionConfiguration()` has always set it, it was simply unreachable because this
-    /// very flag steered every configuration carrying the field away from `.urlSession` first.
-    /// Flagging it silently switched transports (losing ATS integration, HTTP/3 and background
-    /// transfers) and made `requiredExecutor(.urlSession)` throw over a combination that works.
+    /// `buildURLSessionConfiguration()` maps `maximumTLSVersion` straight onto
+    /// `URLSessionConfiguration.tlsMaximumSupportedProtocolVersion`, so flagging it here would
+    /// force every such session onto NIO despite `.urlSession` handling it natively -- the same
+    /// class of bug already ruled out for `minimumTLSVersion` right below. A prior version of
+    /// this check incorrectly did flag it, making that mapping permanently unreachable.
     @Test
-    func secureConnection_whenMaximumTLSVersionSet_remainsCompatibleWithURLSession() async throws {
+    func secureConnection_whenMaximumTLSVersionSet_remainsCompatible() async throws {
         // Given
         var secureConnection = Internals.SecureConnection()
         secureConnection.maximumTLSVersion = .tlsv12
 
         // Then
+        #expect(!secureConnection.urlSessionIncompatibilityReasons().contains(.maximumTLSVersionUnderURLSession))
         #expect(secureConnection.urlSessionIncompatibilityReasons().isEmpty)
     }
 
@@ -195,5 +193,26 @@ extension InternalsSecureConnectionTests {
 
         // Then
         #expect(secureConnection.urlSessionIncompatibilityReasons().isEmpty)
+    }
+
+    /// What `==` decides is whether `Internals.ClientManager` hands a pooled client back for a
+    /// configuration it was not built for, so every field that changes the TLS handshake has to
+    /// be in it.
+    ///
+    /// Constructed directly rather than through the `Property` layer on purpose: no public path
+    /// can currently set `useDefaultTrustRoots` apart from `trustRoots`, which is exactly why
+    /// leaving it out of `==` went unnoticed. This pins the invariant before a path that can
+    /// arrives.
+    @Test
+    func secureConnection_whenOnlyUseDefaultTrustRootsDiffers_shouldNotCompareEqual() async throws {
+        // Given
+        let withoutDefaultTrustRoots = Internals.SecureConnection()
+
+        var withDefaultTrustRoots = Internals.SecureConnection()
+        withDefaultTrustRoots.useDefaultTrustRoots = true
+
+        // Then
+        #expect(withoutDefaultTrustRoots != withDefaultTrustRoots)
+        #expect(withoutDefaultTrustRoots == Internals.SecureConnection())
     }
 }

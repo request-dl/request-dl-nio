@@ -419,9 +419,10 @@ extension InternalsSecureConnectionTests {
             { (secureConnection: inout Internals.SecureConnection) in
                 secureConnection.cipherSuites = "DEFAULT"
             },
-            // `maximumTLSVersion` deliberately absent: it *is* reachable under URLSession, via
-            // `URLSessionConfiguration.tlsMaximumSupportedProtocolVersion`. See
-            // `secureConnection_whenMaximumTLSVersionSet_remainsCompatibleWithURLSession`.
+            // `maximumTLSVersion` deliberately not included here: it has a direct
+            // URLSession-reachable equivalent (`tlsMaximumSupportedProtocolVersion`) and stays
+            // compatible. See `InternalsSecureConnectionTests`'s
+            // `secureConnection_whenMaximumTLSVersionSet_remainsCompatible`.
             { (secureConnection: inout Internals.SecureConnection) in
                 secureConnection.applicationProtocols = ["h2"]
             },

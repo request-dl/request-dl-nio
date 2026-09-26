@@ -100,6 +100,31 @@ struct InternalsHashTableTests {
         #expect(table[CollidingKey(id: 3)] == nil)
     }
 
+    /// `Int.min` is a valid (if astronomically unlikely) `Hashable.hashValue` for any hashable
+    /// key, and `abs(Int.min)` traps — `-Int.min` cannot be represented as a positive `Int`.
+    /// `_index(forKey:)` must use `.magnitude`, not `abs(_:)`, to stay safe against it.
+    private struct MinHashValueKey: Hashable {
+        static func == (_ lhs: Self, _ rhs: Self) -> Bool { true }
+
+        func hash(into hasher: inout Hasher) {
+            hasher.combine(Int.min)
+        }
+
+        var hashValue: Int { .min }
+    }
+
+    @Test
+    func settingAndGettingAKeyWithMinIntHashValueDoesNotTrap() {
+        // Given
+        var table = Internals.HashTable<MinHashValueKey, Int>(capacity: 4)
+
+        // When
+        table[MinHashValueKey()] = 1
+
+        // Then
+        #expect(table[MinHashValueKey()] == 1)
+    }
+
     @Test
     func growingPastTheLoadFactorResizesWithoutLosingEntries() {
         // Given

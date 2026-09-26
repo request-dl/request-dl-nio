@@ -4,6 +4,8 @@
 
 #if canImport(Darwin) && canImport(CFNetwork)
 
+import SwiftAsyncStream
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
@@ -100,35 +102,74 @@ extension Internals {
                 return entry.proxy
             }
 
+            let task: _Concurrency.Task<Internals.Proxy?, Never>
+
             if let inFlightTask = inFlight[key] {
-                return await inFlightTask.value
-            }
+                task = inFlightTask
+            } else {
+                evaluationCount += 1
 
-            evaluationCount += 1
+                let newTask = _Concurrency.Task<Internals.Proxy?, Never> {
+                    do {
+                        return try await Internals.PACEvaluator.evaluate(
+                            scriptURL: scriptURL,
+                            targetURL: targetURL,
+                            timeout: Self.evaluationTimeout
+                        )
+                    } catch {
+                        return nil
+                    }
+                }
+                inFlight[key] = newTask
+                task = newTask
 
-            let task = _Concurrency.Task<Internals.Proxy?, Never> {
-                do {
-                    return try await Internals.PACEvaluator.evaluate(
-                        scriptURL: scriptURL,
-                        targetURL: targetURL,
-                        timeout: Self.evaluationTimeout
-                    )
-                } catch {
-                    return nil
+                // Detached from any one caller's lifetime on purpose: this records the result
+                // for whoever asks next (this key's cache entry, and any other concurrent
+                // caller sharing `inFlight[key]`) regardless of whether the specific call that
+                // started the evaluation is itself still being awaited below -- it may have
+                // already returned early after its own task was cancelled.
+                _Concurrency.Task { [weak self] in
+                    let resolved = await newTask.value
+                    await self?.finishEvaluation(key: key, resolved: resolved)
                 }
             }
-            inFlight[key] = task
 
-            let resolved = await task.value
+            // `await task.value` alone does not observe *this call's own* task cancellation --
+            // an unstructured `Task`'s `.value` runs to completion regardless of what the
+            // awaiting side does, so a caller cancelled while `PACEvaluator`'s up-to-30s timeout
+            // is still running would otherwise stay suspended for the rest of it, exactly the
+            // hang this cache exists to bound to once per `lifetime` window, not once per
+            // caller. Racing it against cancellation lets a cancelled caller fail safe to
+            // direct (`nil`) immediately instead, without disturbing the shared evaluation
+            // other, still-live callers for the same key are waiting on.
+            return await Self.awaitingCancellably(task)
+        }
 
+        private func finishEvaluation(key: Key, resolved: Internals.Proxy?) {
             inFlight[key] = nil
             storage[key] = Entry(
                 proxy: resolved,
                 readAt: DispatchTime.now().uptimeNanoseconds
             )
             evictIfNeeded()
+        }
 
-            return resolved
+        private static func awaitingCancellably(
+            _ task: _Concurrency.Task<Internals.Proxy?, Never>
+        ) async -> Internals.Proxy? {
+            let box = PACCacheAwaitBox()
+
+            return await withTaskCancellationHandler {
+                await withCheckedContinuation { (continuation: CheckedContinuation<Internals.Proxy?, Never>) in
+                    box.attach(continuation)
+
+                    _Concurrency.Task {
+                        box.resolve(returning: await task.value)
+                    }
+                }
+            } onCancel: {
+                box.cancel()
+            }
         }
 
         // MARK: - Private methods
@@ -175,6 +216,67 @@ extension Internals {
             // way.
             let readAt: UInt64
         }
+    }
+}
+
+/// Lets `PACProxyCache.awaitingCancellably(_:)` race an unstructured `Task`'s completion against
+/// the *awaiting* task's own cancellation, resuming with `nil` (fail safe to direct, same as any
+/// other unresolvable proxy-list entry) on whichever happens first. Exactly one of
+/// `attach`/`resolve`/`cancel` ever wins the resume; the others become no-ops.
+private final class PACCacheAwaitBox: @unchecked Sendable {
+
+    // MARK: - Private properties
+
+    private let lock = Lock()
+    private var continuation: CheckedContinuation<Internals.Proxy?, Never>?
+    private var isCancelled = false
+    private var isResumed = false
+
+    // MARK: - Internal methods
+
+    /// Registers `continuation` as the one `resolve`/`cancel` should answer, unless `cancel()`
+    /// already ran -- in which case this resumes it immediately instead, since there is nothing
+    /// left to wait on.
+    func attach(_ continuation: CheckedContinuation<Internals.Proxy?, Never>) {
+        let resumeNow: Bool = lock.withLock {
+            guard !isResumed else { return false }
+
+            if isCancelled {
+                isResumed = true
+                return true
+            }
+
+            self.continuation = continuation
+            return false
+        }
+
+        if resumeNow {
+            continuation.resume(returning: nil)
+        }
+    }
+
+    func resolve(returning value: Internals.Proxy?) {
+        let toResume: CheckedContinuation<Internals.Proxy?, Never>? = lock.withLock {
+            guard !isResumed, let continuation else { return nil }
+            isResumed = true
+            self.continuation = nil
+            return continuation
+        }
+
+        toResume?.resume(returning: value)
+    }
+
+    func cancel() {
+        let toResume: CheckedContinuation<Internals.Proxy?, Never>? = lock.withLock {
+            isCancelled = true
+
+            guard !isResumed, let continuation else { return nil }
+            isResumed = true
+            self.continuation = nil
+            return continuation
+        }
+
+        toResume?.resume(returning: nil)
     }
 }
 

@@ -23,6 +23,7 @@ extension LocalServer {
         static let ok = HTTPStatus(code: 200, reasonPhrase: "OK")
         static let found = HTTPStatus(code: 302, reasonPhrase: "Found")
         static let notModified = HTTPStatus(code: 304, reasonPhrase: "Not Modified")
+        static let serviceUnavailable = HTTPStatus(code: 503, reasonPhrase: "Service Unavailable")
     }
 }
 

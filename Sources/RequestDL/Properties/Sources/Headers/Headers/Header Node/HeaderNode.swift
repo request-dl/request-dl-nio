@@ -64,8 +64,8 @@ struct HeaderNode: PropertyNode {
     /// a list. `Authorization`, `Content-Type`, and `Content-Length` are each exactly one
     /// credentials/media-type/byte-count value.
     ///
-    /// `Payload`/`Authorization`/`DigestAuthentication` already write them via a direct
-    /// `headers.set(...)`, bypassing `HeaderNode` entirely, but that only stops those *specific*
+    /// `Payload`/`DigestAuthentication` already write them via a direct `headers.set(...)`,
+    /// bypassing `HeaderNode` entirely, but that only stops those *specific*
     /// properties from duplicating themselves. It does nothing to stop an unrelated
     /// `CustomHeader` that happens to case-insensitively collide with one of these names (e.g.
     /// `CustomHeader(name: "content-type", ...)` after a `Payload`) from appending onto it via

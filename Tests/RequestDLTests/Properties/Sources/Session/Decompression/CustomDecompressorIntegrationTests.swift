@@ -240,6 +240,77 @@ struct CustomDecompressorIntegrationTests {
         // Then
         #expect(String(data: data, encoding: .utf8) == original)
     }
+
+    /// The *mixed* half of the bug above, which the earlier fix didn't reach.
+    ///
+    /// `Internals.Decompression.build()` enables `NIOHTTPResponseDecompressor` as soon as any one
+    /// algorithm is natively decoded, so with `[.gzip, RLEDecompressor()]` a gzip response is
+    /// already decoded by the time it arrives — and, since the handler forwards the head
+    /// unmodified, still labelled `Content-Encoding: gzip`. Manual dispatch was handed the full
+    /// list, matched gzip a second time, and ran the decoder over plain text.
+    @Test
+    func decompressionAlgorithms_whenNativeAndCustomAreMixed_doesNotDecodeNativeTwiceUnderNIO() async throws {
+        // Given
+        let server = try RawHTTPServer()
+        let original = String(repeating: "mixed native and custom algorithms in one list. ", count: 200)
+        let encoded = try Self.gzipCompress(original)
+
+        let headers = """
+            HTTP/1.1 200 OK\r
+            Content-Encoding: gzip\r
+            Content-Length: \(encoded.count)\r
+            Connection: close\r
+            \r
+
+            """
+        server.respondOnce(headers: headers, body: encoded)
+
+        // When
+        let data = try await DataTask {
+            BaseURL(.http, host: "127.0.0.1:\(server.port)")
+            Session()
+                .decompressionAlgorithms([.gzip, RLEDecompressor()])
+                .requiredExecutor(.nio)
+        }
+        .extractPayload()
+        .result()
+
+        // Then: decoded exactly once, by NIO, and passed through untouched from there.
+        #expect(String(data: data, encoding: .utf8) == original)
+    }
+
+    /// The other side of the same list: the custom algorithm still has to work, so the native
+    /// passthrough above can't have been written as "skip manual dispatch entirely".
+    @Test
+    func decompressionAlgorithms_whenNativeAndCustomAreMixed_stillDecodesTheCustomOneUnderNIO() async throws {
+        // Given
+        let server = try RawHTTPServer()
+        let original = "aaaaabbbbbbbbccccccccccccddddddddddddd"
+        let encoded = Self.rleEncode(original)
+
+        let headers = """
+            HTTP/1.1 200 OK\r
+            Content-Encoding: rle\r
+            Content-Length: \(encoded.count)\r
+            Connection: close\r
+            \r
+
+            """
+        server.respondOnce(headers: headers, body: encoded)
+
+        // When
+        let data = try await DataTask {
+            BaseURL(.http, host: "127.0.0.1:\(server.port)")
+            Session()
+                .decompressionAlgorithms([.gzip, RLEDecompressor()])
+                .requiredExecutor(.nio)
+        }
+        .extractPayload()
+        .result()
+
+        // Then
+        #expect(String(data: data, encoding: .utf8) == original)
+    }
     #endif
 
     @Test

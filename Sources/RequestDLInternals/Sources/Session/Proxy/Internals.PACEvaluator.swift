@@ -65,17 +65,94 @@ extension Internals {
             targetURL: URL,
             timeout: Double
         ) async throws -> Internals.Proxy? {
-            try await withCheckedThrowingContinuation { continuation in
-                let box = PACContinuationBox(continuation)
+            // Neither a bare `withCheckedThrowingContinuation` nor the `Task` awaiting it observe
+            // cancellation on their own: without this, a caller cancelled while `timeout` (up to
+            // 30s) is still running stays suspended for the rest of it regardless, and the
+            // dedicated thread keeps pumping its run loop the whole time too. `state` bridges
+            // `onCancel` (which can fire before, during, or after the continuation/box below even
+            // exist) to whichever of those is currently true. See `PACCancellationState`.
+            let state = PACCancellationState()
 
-                let thread = Thread {
-                    box.run(scriptURL: scriptURL, targetURL: targetURL, timeout: timeout)
+            return try await withTaskCancellationHandler {
+                try await withCheckedThrowingContinuation {
+                    (continuation: CheckedContinuation<Internals.Proxy?, Swift.Error>) in
+                    let box = PACContinuationBox(continuation)
+
+                    guard !state.attach(box) else {
+                        // Already cancelled before this closure even ran: answer immediately,
+                        // never spinning up the thread at all.
+                        box.cancel()
+                        return
+                    }
+
+                    let thread = Thread {
+                        box.run(scriptURL: scriptURL, targetURL: targetURL, timeout: timeout)
+                    }
+                    thread.name = "RequestDL.PACEvaluator"
+                    thread.stackSize = 256 * 1_024
+                    thread.start()
                 }
-                thread.name = "RequestDL.PACEvaluator"
-                thread.stackSize = 256 * 1_024
-                thread.start()
+            } onCancel: {
+                state.cancel()
             }
         }
+
+        /// The error to answer `evaluate(scriptURL:targetURL:timeout:)`'s continuation with when
+        /// `CFRunLoopRunInMode` returns `result` without CFNetwork having called back.
+        ///
+        /// Every outcome maps to *something*. Only `.timedOut` and `.stopped` used to be
+        /// considered, and a run loop that returned `.finished` (it ran out of sources) or
+        /// `.handledSource` (`returnAfterSourceHandled` is `false`, so it should not happen, but
+        /// the type allows it) left the caller suspended on a continuation nobody would ever
+        /// answer — and so did any case a future SDK might add.
+        ///
+        /// `.stopped` gets an error here too, rather than being excluded. It is the success path:
+        /// `pacEvaluationCallback` resumes and only then stops the loop, so by the time the loop
+        /// returns, the continuation is already answered and the box's idempotent `resume` turns
+        /// this into a no-op. It is only ever used if something *other* than that callback
+        /// stopped the loop, which is exactly the case that must not hang either.
+        package static func fallbackError(forRunLoopResult result: CFRunLoopRunResult) -> Error {
+            result == .timedOut
+                ? .timedOut
+                : .executionFailed(
+                    "PAC evaluation ended without a result (CFRunLoopRunInMode returned \(result.rawValue))"
+                )
+        }
+    }
+}
+
+/// Bridges `withTaskCancellationHandler`'s `onCancel` (which can run before, during, or after
+/// `evaluate(...)`'s `PACContinuationBox` exists — `onCancel` fires synchronously and
+/// immediately if the task is already cancelled by the time the handler is installed) to that
+/// box, whichever of those turns out to be true.
+private final class PACCancellationState: @unchecked Sendable {
+
+    // MARK: - Private properties
+
+    private let lock = Lock()
+    private var box: PACContinuationBox?
+    private var isCancelled = false
+
+    // MARK: - Internal methods
+
+    /// Registers `box` as the one to cancel, unless cancellation already happened -- in which
+    /// case it returns `true` and leaves `box` unregistered, since `evaluate(...)` is about to
+    /// cancel it directly instead of ever starting its thread.
+    func attach(_ box: PACContinuationBox) -> Bool {
+        lock.withLock {
+            guard !isCancelled else { return true }
+            self.box = box
+            return false
+        }
+    }
+
+    func cancel() {
+        let boxToCancel: PACContinuationBox? = lock.withLock {
+            isCancelled = true
+            return box
+        }
+
+        boxToCancel?.cancel()
     }
 }
 
@@ -87,6 +164,9 @@ private final class PACContinuationBox: @unchecked Sendable {
 
     private let lock = Lock()
     private var isResumed = false
+    /// Set once `run(...)` starts, from whichever thread that happens to be, so `cancel()` --
+    /// called from an arbitrary task's cancellation, on no particular thread -- can stop it.
+    private var runLoop: CFRunLoop?
     private let continuation: CheckedContinuation<Internals.Proxy?, Swift.Error>
 
     // MARK: - Inits
@@ -102,6 +182,14 @@ private final class PACContinuationBox: @unchecked Sendable {
     /// has been called exactly once, one way or another.
     func run(scriptURL: URL, targetURL: URL, timeout: Double) {
         let runLoop = CFRunLoopGetCurrent()
+
+        let alreadyCancelled = lock.withLock {
+            self.runLoop = runLoop
+            return isResumed
+        }
+
+        // `cancel()` won by the time this thread got scheduled: never touch CFNetwork at all.
+        guard !alreadyCancelled else { return }
 
         var context = CFStreamClientContext(
             version: 0,
@@ -126,9 +214,12 @@ private final class PACContinuationBox: @unchecked Sendable {
         // run loop happens to service, which need not be the PAC one.
         let result = CFRunLoopRunInMode(.defaultMode, timeout, false)
 
-        if result == .timedOut {
-            resume(throwing: Internals.PACEvaluator.Error.timedOut)
-        }
+        // Unconditional, for every outcome rather than only `.timedOut`: this thread is about to
+        // go away, and whatever the run loop returned, a continuation left unanswered suspends
+        // `evaluate(...)`'s caller for good. `resume` is idempotent, so on the success path
+        // (`.stopped`, where `pacEvaluationCallback` has already answered) this is a no-op.
+        // See `fallbackError(forRunLoopResult:)`.
+        resume(throwing: Internals.PACEvaluator.fallbackError(forRunLoopResult: result))
     }
 
     func resume(returning proxy: Internals.Proxy?) {
@@ -144,6 +235,24 @@ private final class PACContinuationBox: @unchecked Sendable {
             guard !isResumed else { return }
             isResumed = true
             continuation.resume(throwing: error)
+        }
+    }
+
+    /// Called from whatever task noticed the cancellation, on no particular thread. Stops the
+    /// dedicated evaluation thread's run loop immediately (if it's already pumping one -- if
+    /// `run(...)` hasn't started yet, its own `alreadyCancelled` check catches this instead once
+    /// it does) and resumes right away rather than leaving the caller suspended for the rest of
+    /// `timeout`.
+    func cancel() {
+        let runLoopToStop: CFRunLoop? = lock.withLock {
+            guard !isResumed else { return nil }
+            isResumed = true
+            continuation.resume(throwing: CancellationError())
+            return runLoop
+        }
+
+        if let runLoopToStop {
+            CFRunLoopStop(runLoopToStop)
         }
     }
 }

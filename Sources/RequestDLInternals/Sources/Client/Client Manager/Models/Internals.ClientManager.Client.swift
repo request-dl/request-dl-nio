@@ -34,6 +34,36 @@ extension Internals.ClientManager {
             }
         }
 
+        /// Mirrors the concrete client's own `operationGeneration` -- see
+        /// `Internals.ClientOperationQueue.generation`'s doc comment.
+        package var operationGeneration: UInt64 {
+            switch self {
+            #if canImport(NIOCore)
+            case .nio(let client):
+                return client.operationGeneration
+            #endif
+            #if canImport(Darwin)
+            case .urlSession(let client):
+                return client.operationGeneration
+            #endif
+            }
+        }
+
+        /// The identity of the concrete client behind this case, so two enum values holding the
+        /// very same client can be told apart from two holding equivalent ones.
+        package var objectIdentifier: ObjectIdentifier {
+            switch self {
+            #if canImport(NIOCore)
+            case .nio(let client):
+                return ObjectIdentifier(client)
+            #endif
+            #if canImport(Darwin)
+            case .urlSession(let client):
+                return ObjectIdentifier(client)
+            #endif
+            }
+        }
+
         // MARK: - Internal methods
 
         package func shutdown() async throws -> Bool {

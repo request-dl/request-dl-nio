@@ -260,6 +260,56 @@ struct BackgroundDownloadsSessionDelegateTests {
         #expect(!secondCalled.wasCalled)
     }
 
+    /// URLSession hands a download task's body to `didFinishDownloadingTo` whatever the HTTP
+    /// status, so a `404`'s error page used to replace the file already at `destination` and be
+    /// reported as `.completed`. Driven end to end through a real (non-background) `URLSession`
+    /// whose delegate is `BackgroundDownloads.Session` itself, with a `URLProtocol` stub serving
+    /// the error response, so `downloadTask.response` is a genuine `HTTPURLResponse`.
+    @Test
+    func didFinishDownloadingTo_whenServerAnswersWithErrorStatus_reportsFailedAndKeepsExistingFile() async throws {
+        try await withTemporaryFileURL("destination.bin") { destination in
+            // Given
+            try Data("previous good content".utf8).write(to: destination)
+
+            let session = BackgroundDownloads.Session()
+            let terminal = AsyncSignalBox()
+            let events = EventBox()
+            session.onEvent = { event in
+                events.append(event)
+                if case .progress = event { return }
+                terminal.fire()
+            }
+
+            let configuration = URLSessionConfiguration.ephemeral
+            configuration.protocolClasses = [NotFoundURLProtocol.self]
+            let urlSession = URLSession(configuration: configuration, delegate: session, delegateQueue: nil)
+            defer { urlSession.invalidateAndCancel() }
+
+            let task = urlSession.downloadTask(with: try #require(URL(string: "https://example.invalid/file.bin")))
+            task.taskDescription = BackgroundDownloads.Session.encode(id: "episode-404", destination: destination)
+
+            // When
+            task.resume()
+            await terminal.wait()
+
+            // Then
+            #expect(try Data(contentsOf: destination) == Data("previous good content".utf8))
+
+            let terminalEvents = events.all.filter {
+                if case .progress = $0 { return false }
+                return true
+            }
+            #expect(terminalEvents.count == 1)
+
+            guard case .failed(let id, _, let error) = try #require(terminalEvents.first) else {
+                Issue.record("Expected .failed, got \(String(describing: terminalEvents.first))")
+                return
+            }
+            #expect(id == "episode-404")
+            #expect((error as? BackgroundDownloadStatusCodeError)?.statusCode == 404)
+        }
+    }
+
     @Test
     func handleEvents_whenIdentifierDoesNotMatch_neverStoresHandler() async throws {
         // Given
@@ -282,6 +332,60 @@ struct BackgroundDownloadsSessionDelegateTests {
 /// Both helpers below are plain, lock-backed classes, not actors. Every callback under test
 /// (`onEvent`, `handleEvents`'s `completionHandler`) is synchronous by contract, so an `actor`
 /// would force an `await` onto assertions that need to run immediately, not after a hop.
+/// Serves a `404` with an HTML body for every request, so a download task finishes with a
+/// real, non-success `HTTPURLResponse` and no network access.
+private final class NotFoundURLProtocol: URLProtocol, @unchecked Sendable {
+
+    override class func canInit(with request: URLRequest) -> Bool { true }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        guard
+            let url = request.url,
+            let response = HTTPURLResponse(url: url, statusCode: 404, httpVersion: "HTTP/1.1", headerFields: nil)
+        else {
+            client?.urlProtocol(self, didFailWithError: URLError(.badURL))
+            return
+        }
+
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data("<html>Not Found</html>".utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
+}
+
+/// Fires once; a waiter arriving after that returns immediately.
+private final class AsyncSignalBox: @unchecked Sendable {
+
+    private let lock = Lock()
+    private var isFired = false
+    private var continuation: CheckedContinuation<Void, Never>?
+
+    func fire() {
+        let continuation = lock.withLock { () -> CheckedContinuation<Void, Never>? in
+            guard !isFired else { return nil }
+            isFired = true
+            defer { self.continuation = nil }
+            return self.continuation
+        }
+        continuation?.resume()
+    }
+
+    func wait() async {
+        await withCheckedContinuation { continuation in
+            let resumeNow = lock.withLock { () -> Bool in
+                if isFired { return true }
+                self.continuation = continuation
+                return false
+            }
+            if resumeNow { continuation.resume() }
+        }
+    }
+}
+
 private final class EventBox: @unchecked Sendable {
 
     private let lock = Lock()

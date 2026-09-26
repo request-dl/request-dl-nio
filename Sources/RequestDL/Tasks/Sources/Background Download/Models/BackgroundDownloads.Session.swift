@@ -39,6 +39,30 @@ extension BackgroundDownloads {
         /// guard is unit-tested directly against this exact value, rather than duplicating it.
         static let identifier = "\(Bundle.main.bundleIdentifier ?? "RequestDL").BackgroundDownloadTask"
 
+        // MARK: - Private types
+
+        /// A `ClientIdentityDescriptor`'s already-built identity, kept for the rest of this
+        /// process's lifetime once challenged once, so a redirect chain -- or several downloads
+        /// sharing one client certificate -- doesn't pay `ClientIdentityDescriptor.makeIdentity()`'s
+        /// full Keychain round trip (two `SecItemAdd` calls, then a `kSecMatchLimitAll` scan of
+        /// the *entire* keychain, since `kSecClassIdentity` supports no label-based query) again
+        /// on every single challenge. `Internals.IdentityManager`'s own weak-reference
+        /// deduplication can't do this on its own: `handleClientCertificateChallenge`'s handle is
+        /// deliberately not retained past the completion handler it answers, so the weak
+        /// reference is already gone before the *next* challenge in the same chain arrives.
+        private struct CachedIdentity {
+            let descriptor: Internals.ClientIdentityDescriptor
+            let handle: Internals.IdentityHandle
+            let intermediates: [SecCertificate]
+        }
+
+        /// A ceiling, not a working limit: a real app is expected to configure one, or a small
+        /// handful of, distinct client identities across every background download it ever
+        /// schedules, so this is never expected to fill up. It exists only so a pathological
+        /// workload minting many distinct one-off identities can't grow this without bound for
+        /// the rest of the process's lifetime.
+        private static let maximumCachedIdentities = 4
+
         // MARK: - Private properties
 
         private let lock = Lock()
@@ -48,6 +72,7 @@ extension BackgroundDownloads {
         private var _urlSession: URLSession?
         private var _pendingCompletionHandler: (@Sendable () -> Void)?
         private var _onEvent: (@Sendable (BackgroundDownloads.Event) -> Void)?
+        private var _cachedIdentities: [CachedIdentity] = []
 
         // MARK: - Internal properties
 
@@ -70,7 +95,11 @@ extension BackgroundDownloads {
                 id: id,
                 destination: destination,
                 serverTrust: serverTrust,
-                clientIdentity: clientIdentity
+                clientIdentity: clientIdentity,
+                // The single host this download was actually configured for. A background session
+                // follows redirects on its own, and the challenge callback below has no other way
+                // to tell the originally-requested host apart from one a redirect pointed it at.
+                clientIdentityHost: clientIdentity == nil ? nil : request.url?.host
             )
             task.resume()
         }
@@ -156,7 +185,11 @@ extension BackgroundDownloads {
             completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
         ) {
             if challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodClientCertificate {
-                handleClientCertificateChallenge(task: task, completionHandler: completionHandler)
+                handleClientCertificateChallenge(
+                    task: task,
+                    challengedHost: challenge.protectionSpace.host,
+                    completionHandler: completionHandler
+                )
                 return
             }
 
@@ -169,29 +202,35 @@ extension BackgroundDownloads {
                 .handle(challenge: challenge, completionHandler: completionHandler)
         }
 
-        /// Rebuilds the identity fresh from disk for this one challenge. No identity is cached
-        /// across calls, so there's nothing to invalidate if the same task is challenged again
-        /// later (a redirect to a new host, for instance): it's simply rebuilt again, from the
-        /// same file, the same way.
+        /// Reuses this exact descriptor's already-built identity when this same task (or another
+        /// one sharing the same client certificate) was challenged before in this process -- see
+        /// `CachedIdentity`'s own doc comment for why that's worth doing -- rebuilding fresh from
+        /// disk only on the first challenge for a given descriptor.
         ///
-        /// `handle` isn't retained past this method, so it deinitializes right after
-        /// `completionHandler` returns, removing the Keychain items backing it unless some other
-        /// live `Internals.IdentityHandle` shares this exact certificate/key pair.
+        /// Gated on `challengedHost`, which is how a challenge from a redirect target is turned
+        /// away. See `decodeClientIdentity(_:challengedBy:)` for why.
         ///
-        /// That's safe even then: once `SecItemCopyMatching` has handed back a `SecIdentity`, the
-        /// in-memory object doesn't stop working just because the Keychain entry backing it is
-        /// deleted afterward, the same assumption `Internals.URLSessionIdentityPolicy` already
-        /// relies on, just at a smaller grain here.
+        /// The cached `handle` outliving any single challenge is safe the same way a freshly
+        /// built, unretained one already was: once `SecItemCopyMatching` has handed back a
+        /// `SecIdentity`, the in-memory object doesn't stop working just because the Keychain
+        /// entry backing it is later deleted (e.g. once every cached reference to this
+        /// certificate/key pair finally goes away at process exit).
         private func handleClientCertificateChallenge(
             task: URLSessionTask,
+            challengedHost: String,
             completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
         ) {
-            guard let descriptor = Self.decodeClientIdentity(task.taskDescription) else {
+            guard
+                let descriptor = Self.decodeClientIdentity(
+                    task.taskDescription,
+                    challengedBy: challengedHost
+                )
+            else {
                 completionHandler(.performDefaultHandling, nil)
                 return
             }
 
-            guard let (handle, intermediates) = try? descriptor.makeIdentity() else {
+            guard let (handle, intermediates) = resolvedIdentity(for: descriptor) else {
                 completionHandler(.performDefaultHandling, nil)
                 return
             }
@@ -206,6 +245,42 @@ extension BackgroundDownloads {
             )
         }
 
+        /// The identity for `descriptor`, from `_cachedIdentities` if this exact descriptor was
+        /// already resolved before in this process, or freshly built (and then cached) otherwise.
+        ///
+        /// `descriptor.makeIdentity()`'s own Keychain round trip runs while `lock` is held, same
+        /// as every other access to this instance's state -- serializing it against a
+        /// concurrently-arriving challenge for a different descriptor is an acceptable cost here,
+        /// not a new one this introduces: `Internals.IdentityManager.shared`'s own lock already
+        /// serializes every identity build process-wide, cache or no cache.
+        ///
+        /// Not `private`: unit-tested directly (`@testable import`), the same reasoning `encode`/
+        /// `decode` above give for their own visibility -- this lets a test confirm a repeat
+        /// resolution reuses the exact same `Internals.IdentityHandle` instance without needing a
+        /// real, entitled background session or a genuine `URLAuthenticationChallenge` round trip.
+        func resolvedIdentity(
+            for descriptor: Internals.ClientIdentityDescriptor
+        ) -> (handle: Internals.IdentityHandle, intermediates: [SecCertificate])? {
+            lock.withLock {
+                if let cached = _cachedIdentities.first(where: { $0.descriptor == descriptor }) {
+                    return (cached.handle, cached.intermediates)
+                }
+
+                guard let (handle, intermediates) = try? descriptor.makeIdentity() else {
+                    return nil
+                }
+
+                if _cachedIdentities.count >= Self.maximumCachedIdentities {
+                    _cachedIdentities.removeFirst()
+                }
+                _cachedIdentities.append(
+                    CachedIdentity(descriptor: descriptor, handle: handle, intermediates: intermediates)
+                )
+
+                return (handle, intermediates)
+            }
+        }
+
         // MARK: - URLSessionDownloadDelegate
 
         func urlSession(
@@ -217,11 +292,35 @@ extension BackgroundDownloads {
                 return
             }
 
+            // URLSession calls this for *any* HTTP status, so without this an error page would
+            // replace the file already at `destination` and be reported as `.completed`. Checked
+            // before touching `destination` at all; URLSession removes `location` itself once
+            // this returns.
+            if let statusCode = (downloadTask.response as? HTTPURLResponse)?.statusCode,
+                !(200..<300).contains(statusCode)
+            {
+                onEvent?(
+                    .failed(
+                        id: id,
+                        destination: destination,
+                        error: BackgroundDownloadStatusCodeError(statusCode: statusCode)
+                    )
+                )
+                return
+            }
+
             do {
-                // Best-effort: a destination that doesn't already exist is the common case, and
-                // `moveItem` below is what actually needs to succeed.
-                try? FileManager.default.removeItem(at: destination)
-                try FileManager.default.moveItem(at: location, to: destination)
+                // `replaceItemAt`, not a `removeItem` + `moveItem` pair: those are two separate
+                // steps, so a `moveItem` failure after the `removeItem` already succeeded (full
+                // disk, a permissions change, ...) would leave `destination` empty, permanently
+                // losing whatever was already downloaded there before this attempt even though
+                // the failure was transient. `replaceItemAt` swaps the two atomically, leaving
+                // the original file untouched if the replacement can't complete.
+                if FileManager.default.fileExists(atPath: destination.path) {
+                    _ = try FileManager.default.replaceItemAt(destination, withItemAt: location)
+                } else {
+                    try FileManager.default.moveItem(at: location, to: destination)
+                }
                 onEvent?(.completed(id: id, destination: destination))
             } catch {
                 onEvent?(.failed(id: id, destination: destination, error: error))
@@ -284,6 +383,12 @@ extension BackgroundDownloads {
             let destination: URL
             let serverTrust: Internals.ServerTrustPolicy.Descriptor?
             let clientIdentity: Internals.ClientIdentityDescriptor?
+
+            /// Optional so a `taskDescription` persisted by an older version of this package still
+            /// decodes after an app upgrade. `nil` never matches a challenge's host, so such a
+            /// task falls back to default handling rather than presenting the identity blind,
+            /// which is the right way for this particular field to fail.
+            let clientIdentityHost: String?
         }
 
         // Not `private`: unit-tested directly (`@testable import`) independent of any real
@@ -293,7 +398,8 @@ extension BackgroundDownloads {
             id: String,
             destination: URL,
             serverTrust: Internals.ServerTrustPolicy.Descriptor? = nil,
-            clientIdentity: Internals.ClientIdentityDescriptor? = nil
+            clientIdentity: Internals.ClientIdentityDescriptor? = nil,
+            clientIdentityHost: String? = nil
         ) -> String? {
             guard
                 let data = try? JSONEncoder().encode(
@@ -301,7 +407,8 @@ extension BackgroundDownloads {
                         id: id,
                         destination: destination,
                         serverTrust: serverTrust,
-                        clientIdentity: clientIdentity
+                        clientIdentity: clientIdentity,
+                        clientIdentityHost: clientIdentityHost
                     )
                 )
             else {
@@ -326,11 +433,35 @@ extension BackgroundDownloads {
             Self.decodeDescriptor(taskDescription)?.serverTrust
         }
 
-        /// `nil` both when `taskDescription` isn't one this type encoded at all, and when it is
-        /// but carries no `clientIdentity` (no mTLS configured). Either way, the caller's only
-        /// correct response is the same: defer to the system's default handling.
-        static func decodeClientIdentity(_ taskDescription: String?) -> Internals.ClientIdentityDescriptor? {
-            Self.decodeDescriptor(taskDescription)?.clientIdentity
+        /// The persisted client identity, but only when `challengedHost` is the host this download
+        /// was originally scheduled against.
+        ///
+        /// A background session follows redirects by itself, and a client certificate identifies
+        /// *us* to whoever receives it. Answering a redirect target's challenge with it would hand
+        /// the caller's identity to whoever controls that redirect, so the identity is bound to
+        /// one host at schedule time and checked here — the same gate
+        /// `Internals.URLSessionIdentityPolicy` applies on the foreground executor, and for the
+        /// same reason.
+        ///
+        /// Server-trust handling deliberately stays host-independent (see that type's own doc
+        /// comment): pinning has to survive a redirect, whereas an identity must not.
+        ///
+        /// `nil` therefore covers four cases that all deserve the same response — defer to the
+        /// system's default handling — a `taskDescription` this type didn't encode, one carrying
+        /// no `clientIdentity` (no mTLS configured, the common case), one persisted before this
+        /// package recorded a host at all, and one whose host simply isn't the one now asking.
+        static func decodeClientIdentity(
+            _ taskDescription: String?,
+            challengedBy challengedHost: String
+        ) -> Internals.ClientIdentityDescriptor? {
+            guard
+                let descriptor = Self.decodeDescriptor(taskDescription),
+                descriptor.clientIdentityHost == challengedHost
+            else {
+                return nil
+            }
+
+            return descriptor.clientIdentity
         }
 
         private static func decodeDescriptor(_ taskDescription: String?) -> Descriptor? {

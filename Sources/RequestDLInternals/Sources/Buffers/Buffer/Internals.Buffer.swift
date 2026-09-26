@@ -500,13 +500,18 @@ extension Internals {
         /// brand new `Storage`'s very first size stat against a write it has no way to already
         /// know about, and under heavy concurrent disk contention that stat has been caught
         /// reporting zero for a file the other `Storage` had already finished writing and closed.
-        /// A short, bounded retry closes that window; it costs nothing extra for the legitimately
-        /// empty case beyond however many attempts it takes to exhaust the budget, once, since a
-        /// non-zero result short circuits it immediately.
-        package init(addressing url: Stream.URL) async {
+        /// A short, bounded retry closes that window.
+        ///
+        /// - Parameter retryingEmptyContent: Whether a zero-byte answer from the first size stat
+        /// is worth retrying. `true` (the default) is the reopen case above, where zero is
+        /// probably that flake. A caller that is opening this address in order to *write* it,
+        /// knowing nothing has been written yet, passes `false`: for it, zero is the correct and
+        /// only possible answer, so the retry can never do anything but exhaust its full budget
+        /// -- ~290ms of sleeping in front of every single fresh cache write.
+        package init(addressing url: Stream.URL, retryingEmptyContent: Bool = true) async {
             let storage = Storage(url)
 
-            let attempts = 30
+            let attempts = retryingEmptyContent ? 30 : 1
             let retryDelay: UInt64 = 10_000_000
 
             var writtenBytes = await storage.writtenBytes

@@ -62,7 +62,15 @@ extension Internals {
 
             dataCache.memoryCapacity = Self.resolve(memoryCapacity, default: dataCache.memoryCapacity)
             dataCache.diskCapacity = Self.resolve(diskCapacity, default: dataCache.diskCapacity)
-            dataCache.encryptionKey = encryptionKey
+
+            // Only when this request actually supplied one. `build()` runs on every request's
+            // resolve, cache modifier or not, and the storage behind a `DataCache` is shared per
+            // directory (`.main` *is* `DataCache.shared`'s). Assigning `nil` here cleared a key
+            // set through `DataCache.encryptionKey` the moment any ordinary request resolved,
+            // and every disk-tier write after that landed in plaintext.
+            if let encryptionKey {
+                dataCache.encryptionKey = encryptionKey
+            }
 
             return dataCache
         }

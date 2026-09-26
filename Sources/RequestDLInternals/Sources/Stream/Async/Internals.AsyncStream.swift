@@ -22,6 +22,32 @@ public struct AlreadyConsumedError: Error, CustomStringConvertible {
     package init() {}
 }
 
+/// Runs `onAbandoned` exactly once, when the last reference to whichever `Internals.AsyncStream`
+/// (or `Internals.AsyncStream.AsyncIterator`) copy is currently carrying this token gets released.
+///
+/// Exists so a stream built by spawning a background producer task (`Internals.AsyncStream
+/// .decompressing(_:using:)` is the one caller today) can be told "nobody is ever going to read
+/// this" and cancel that task, instead of it running to completion -- and, since `.untilFirstIteration`
+/// buffers everything until read -- growing without bound -- for a response body nobody asked
+/// for. See `Internals.AsyncStream.withTerminationToken(_:)`'s own doc comment for how a token
+/// actually ends up attached to only the right copies.
+private final class AsyncStreamTerminationToken: @unchecked Sendable {
+
+    // MARK: - Private properties
+
+    private let onAbandoned: @Sendable () -> Void
+
+    // MARK: - Inits
+
+    init(_ onAbandoned: @escaping @Sendable () -> Void) {
+        self.onAbandoned = onAbandoned
+    }
+
+    deinit {
+        onAbandoned()
+    }
+}
+
 extension Internals {
 
     /// A replaying broadcast stream of values, terminated by completion or by an error.
@@ -72,6 +98,20 @@ extension Internals {
 
             fileprivate var state: State
 
+            /// Its own strong reference to whichever token the `Internals.AsyncStream` that
+            /// created this iterator was carrying (see `makeAsyncIterator()`), not merely
+            /// whatever's left of that stream value's own reference. That distinction matters:
+            /// `for try await` guarantees its own iterator variable stays alive across every call
+            /// to `next()`, since it's `mutating` and has to persist between them -- but the
+            /// *stream* value itself has no such guarantee. The compiler is free to release a
+            /// `for`/`for await` loop's sequence expression as soon as `makeAsyncIterator()`
+            /// returns, once nothing else still references it, and a token that only the
+            /// original stream value held would then fire mid-read, cancelling a producer that
+            /// is, in fact, still being consumed. Holding its own reference here means this
+            /// iterator's own lifetime -- not whatever happens to the stream value that produced
+            /// it -- is what the token's deinit actually answers to from this point on.
+            fileprivate var terminationToken: AsyncStreamTerminationToken?
+
             // MARK: - Internal methods
 
             package mutating func next() async throws -> Element? {
@@ -108,6 +148,12 @@ extension Internals {
         private let subject: ReplaySubject<Value>
         private let identity: Identity
 
+        /// Not part of this stream's identity (see `==`/`hash(into:)`, both `identity`-only):
+        /// two copies of "the same" stream can disagree on whether they carry a token at all,
+        /// which is exactly what `withTerminationToken(_:)` relies on. `nil` for every stream
+        /// this doesn't opt into one.
+        private var terminationToken: AsyncStreamTerminationToken?
+
         // MARK: - Inits
 
         /// Creates a new stream.
@@ -117,6 +163,7 @@ extension Internals {
         package init(bufferingPolicy: SubjectBufferingPolicy = .unbounded) {
             subject = .init(bufferingPolicy: bufferingPolicy)
             identity = .init()
+            terminationToken = nil
         }
 
         // MARK: - Internal static methods
@@ -147,6 +194,29 @@ extension Internals {
 
         // MARK: - Internal methods
 
+        /// A copy of this stream that cancels whatever `onAbandoned` runs once nobody could ever
+        /// read from it again -- either because this copy (or whatever `AsyncIterator`
+        /// `makeAsyncIterator()` later derives from it) is released without the stream ever being
+        /// read to completion, or without ever being read from at all.
+        ///
+        /// Built for exactly one caller today, `Internals.AsyncStream.decompressing(_:using:)`'s
+        /// background producer task: without this, a caller that inspects only a response's head
+        /// and discards its body stream unread left that task running to completion regardless,
+        /// decoding and buffering (under `.untilFirstIteration`, without bound, since nothing
+        /// ever reads it) a body nobody asked for.
+        ///
+        /// - Important: Call this on the copy about to be *returned* to whoever might not read
+        /// it, after any producer has already captured its own copy of `self` to append/close
+        /// through. A producer that captured *this* returned copy instead -- carrying the token
+        /// itself -- would have the token's own strong reference keep it alive for exactly as
+        /// long as the producer keeps running, which is the one thing this exists to detect the
+        /// absence of.
+        package func withTerminationToken(_ onAbandoned: @escaping @Sendable () -> Void) -> Self {
+            var copy = self
+            copy.terminationToken = AsyncStreamTerminationToken(onAbandoned)
+            return copy
+        }
+
         package func append(_ value: Result<Element, Error>) {
             switch value {
             case .success(let element):
@@ -165,11 +235,16 @@ extension Internals {
         }
 
         package func makeAsyncIterator() -> AsyncIterator {
+            // Handed its own strong reference to `terminationToken`, alongside whatever this
+            // stream value's own copy still is: once the iterator exists, it -- not this stream
+            // value, which a caller may have no further reason to keep around -- is what
+            // `for try await` guarantees stays alive for the rest of the read. See `AsyncIterator
+            // .terminationToken`'s own doc comment.
             guard let iterator = subject.makeIteratorIfAvailable() else {
-                return .init(state: .failed(AlreadyConsumedError()))
+                return .init(state: .failed(AlreadyConsumedError()), terminationToken: terminationToken)
             }
 
-            return .init(state: .iterating(iterator))
+            return .init(state: .iterating(iterator), terminationToken: terminationToken)
         }
 
         package func hash(into hasher: inout Hasher) {

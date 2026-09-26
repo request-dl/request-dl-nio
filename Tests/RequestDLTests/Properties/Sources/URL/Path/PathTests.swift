@@ -148,6 +148,23 @@ struct PathTests {
         )
     }
 
+    /// Same contract as `FlexibleURL`: an embedded query is already percent encoded, and
+    /// `RequestConfiguration.url` joins it as-is, so decoding it on the way in would turn `%26`
+    /// back into a live `&` and split one parameter into two.
+    @Test
+    func pathWithEmbeddedQueryKeepsPercentEscapedDelimitersEscaped() async throws {
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL("google.com")
+                Path("search?q=a%26b&n=1%2B1")
+            }
+        )
+
+        // Then
+        #expect(resolved.requestConfiguration.url == "https://google.com/search?q=a%26b&n=1%2B1")
+    }
+
     @Test
     func pathWithEmbeddedQueryCombinedWithExplicitQuery() async throws {
         // Given

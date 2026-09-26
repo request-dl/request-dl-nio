@@ -88,6 +88,16 @@ public struct SPKIHash<Algorithm: HashFunction>: Property {
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
 
+        guard inputs.environment.isInsideSPKIPinning else {
+            #if DEBUG
+            Internals.Log.cantCreateSPKIHashOutsideSPKIPinning().log(
+                level: .warning,
+                logger: inputs.environment.logger
+            )
+            #endif
+            return .empty
+        }
+
         let hash = Internals.SPKIHash(
             source: property.source,
             algorithm: Algorithm.self

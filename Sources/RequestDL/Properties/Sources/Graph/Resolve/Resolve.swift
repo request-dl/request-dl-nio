@@ -10,35 +10,90 @@ struct Resolve<Root: Property>: Sendable {
 
     private let root: _GraphValue<_Root>
     private let environment: RequestEnvironmentValues
+    private let namespaceID: PropertyNamespace.ID
+    private let seedFactory: SeedFactory
 
     // MARK: - Inits
 
+    /// - Parameters:
+    ///   - namespaceID: The `@StoredObject`/`@PropertyNamespace` namespace this resolution runs
+    ///   under. Defaults to `.global`, correct for every top-level resolution (`RawTask`,
+    ///   `BackgroundDownloadTask`, `PropertyMockedTask`, ...), which have no enclosing namespace
+    ///   to inherit.
+    ///   - seedFactory: Hands out per-namespace `@StoredObject` identity seeds. Defaults to a
+    ///   fresh instance for the same reason `namespaceID` defaults to `.global`: a top-level
+    ///   resolution starts counting from zero.
+    ///
+    ///   - Important: `PropertyReader._makeProperty` is the one caller that must pass its own
+    ///   `inputs.namespaceID`/`inputs.seedFactory` explicitly, rather than accepting these
+    ///   defaults, when resolving its `source` subtree. `source` is logically still part of the
+    ///   ambient tree (its `PropertyContext` result feeds `content`, resolved right after with
+    ///   those same `inputs`); minting a fresh `SeedFactory` for it here would let a `source`
+    ///   under one `PropertyReader` and a `source` under a sibling `PropertyReader` (or the
+    ///   top-level tree) each independently compute seed `.zero` for `.global`, colliding on the
+    ///   same `Internals.Storage` entry for any `@StoredObject`-bearing type they happen to share,
+    ///   instead of getting independent instances.
     init(
         root: Root,
-        environment: RequestEnvironmentValues
+        environment: RequestEnvironmentValues,
+        namespaceID: PropertyNamespace.ID = .global,
+        seedFactory: SeedFactory = SeedFactory()
     ) {
         self.root = .root(.init(body: root))
         self.environment = environment
+        self.namespaceID = namespaceID
+        self.seedFactory = seedFactory
     }
 
     // MARK: - Internal methods
 
     func build() async throws -> Resolved {
+        try await buildBoundedByResourceDeadline().resolved
+    }
+
+    /// ``build()``, also handing back the deadline ``Timeout/Source/resource`` establishes for
+    /// this request — taken partway *through* resolution rather than after it.
+    ///
+    /// `sessionConfiguration(for:)` below can resolve a system proxy, which on Darwin means
+    /// fetching and running a PAC script over the network. That is unbounded, remote work, and
+    /// exactly the kind of thing a resource budget is supposed to cover; a deadline created only
+    /// once `build()` has returned starts counting after it, so a hung PAC lookup outlasts any
+    /// `.resource` the caller configured.
+    ///
+    /// Resolution can't be bounded any earlier than this: the budget itself is declared by a
+    /// `Timeout` property, so it isn't known until `partiallyBuild()` has walked the graph. That
+    /// half is pure, in-process tree building with nothing remote in it, which is what makes the
+    /// split safe to draw here.
+    func buildBoundedByResourceDeadline() async throws -> (
+        resolved: Resolved,
+        deadline: Internals.ResourceDeadline
+    ) {
         var (_, make) = try await partiallyBuild()
         applyingURLOverride(&make)
 
-        let session = Internals.Session(
-            provider: make.provider ?? .shared,
-            configuration: await sessionConfiguration(for: make)
+        let deadline = Internals.ResourceDeadline(
+            nanoseconds: make.sessionConfiguration.timeout.resource
         )
 
-        return Resolved(
+        let resolvedMake = make
+        let configuration = try await deadline.race {
+            await sessionConfiguration(for: resolvedMake)
+        }
+
+        let session = Internals.Session(
+            provider: resolvedMake.provider ?? .shared,
+            configuration: configuration
+        )
+
+        let resolved = Resolved(
             session: session,
-            requestConfiguration: make.requestConfiguration,
-            dataCache: make.cacheConfiguration.build(
+            requestConfiguration: resolvedMake.requestConfiguration,
+            dataCache: resolvedMake.cacheConfiguration.build(
                 logger: environment.logger
             )
         )
+
+        return (resolved, deadline)
     }
 
     func partiallyBuild() async throws -> (_PropertyOutputs, Make) {
@@ -50,6 +105,7 @@ struct Resolve<Root: Property>: Sendable {
         )
 
         try await output.node._make(&make)
+        try await resolvingPendingURLEncodedPayloads(&make)
         return (output, make)
     }
 
@@ -93,8 +149,9 @@ struct Resolve<Root: Property>: Sendable {
         return configuration
     }
 
-    /// Rewrites `baseURL`/`pathComponents` per the last-declared `URLOverride` rule whose origin
-    /// (scheme + host + optional path prefix) matches the final resolved request.
+    /// Rewrites `baseURL`/`pathComponents` per the most specific `URLOverride` rule (then the
+    /// last declared) whose origin (scheme + host + optional path prefix) matches the final
+    /// resolved request.
     ///
     /// Done here rather than inside `URLOverride`'s node for the same reason system-proxy
     /// resolution is: matching needs the final `baseURL`/`pathComponents`, complete only once
@@ -116,33 +173,63 @@ struct Resolve<Root: Property>: Sendable {
                 .map(String.init)
         )
 
-        var match: (destination: URLOverrideEndpoint, remainder: [String])?
+        // The most specific (longest) matching origin path wins; among equally specific ones,
+        // the last declared. Specificity has to come first: `URLOverride([String: String])`
+        // declares its rules in `Dictionary` order, which varies between launches, so "last
+        // matching rule wins" alone picked a different destination from one launch to the next
+        // for the documented whole-host-plus-path-scoped example.
+        var match: (destination: URLOverrideEndpoint, remainder: [String], specificity: Int)?
 
         for rule in make.urlOverrides {
             guard
                 rule.origin.scheme == origin.scheme,
                 rule.origin.host == origin.host,
+                rule.origin.port == origin.port,
                 pathComponents.starts(with: rule.origin.pathComponents)
             else {
                 continue
             }
 
-            match = (rule.destination, Array(pathComponents.dropFirst(rule.origin.pathComponents.count)))
+            let specificity = rule.origin.pathComponents.count
+
+            if let match, match.specificity > specificity {
+                continue
+            }
+
+            match = (rule.destination, Array(pathComponents.dropFirst(specificity)), specificity)
         }
 
-        guard let (destination, remainder) = match else {
+        guard let (destination, remainder, _) = match else {
             return
         }
 
-        make.requestConfiguration.baseURL = "\(destination.scheme)://\(destination.host)"
+        let destinationHost = destination.port.map { "\(destination.host):\($0)" } ?? destination.host
+        make.requestConfiguration.baseURL = "\(destination.scheme)://\(destinationHost)"
         make.requestConfiguration.pathComponents = destination.pathComponents + remainder
+    }
+
+    /// Resolves every `Payload`-contributed url-encoded field set accumulated during the walk,
+    /// in declaration order, now that the tree has finished and `make.requestConfiguration
+    /// .method` reflects whichever `RequestMethod` (if any) ultimately won.
+    ///
+    /// Done here rather than inside `PayloadNode`'s own node, for the same reason
+    /// `applyingURLOverride(_:)`/`sessionConfiguration(for:)` are: the decision needs the final
+    /// state, complete only once every property has contributed. See
+    /// `PendingURLEncodedPayload`'s own doc comment.
+    private func resolvingPendingURLEncodedPayloads(_ make: inout Make) async throws {
+        let pending = make.pendingURLEncodedPayloads
+        make.pendingURLEncodedPayloads = []
+
+        for payload in pending {
+            try await payload.resolve(into: &make)
+        }
     }
 
     private func inputs() -> _PropertyInputs {
         .init(
             environment: environment,
-            namespaceID: .global,
-            seedFactory: .init()
+            namespaceID: namespaceID,
+            seedFactory: seedFactory
         )
     }
 

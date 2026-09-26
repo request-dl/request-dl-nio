@@ -59,20 +59,26 @@ extension Internals.ClientManager {
 
             // `withLock` rather than a manual lock and unlock pair with a return in the
             // middle of it, which balances today and stops balancing on the next edit.
-            if case .nio(let client) = tableLock.withLock({
-                _reusableItem(id: sessionProviderID, sessionConfiguration: sessionConfiguration)
-            }) {
+            //
+            // Skipped outright for a configuration that can never match a pooled one: the scan
+            // is linear, and for such a configuration it is guaranteed to walk the whole list and
+            // find nothing, every single time.
+            if sessionConfiguration.isPoolable,
+                case .nio(let client) = tableLock.withLock({
+                    _reusableItem(id: sessionProviderID, sessionConfiguration: sessionConfiguration)
+                })
+            {
                 return client
             }
 
-            let eventLoopGroup = await Internals.EventLoopGroupManager.shared.provider(
+            let eventLoopGroupToken = await Internals.EventLoopGroupManager.shared.provider(
                 provider,
                 with: options
             )
 
             return try _createNewClient(
                 id: sessionProviderID,
-                eventLoopGroup: eventLoopGroup,
+                eventLoopGroupToken: eventLoopGroupToken,
                 sessionConfiguration: sessionConfiguration,
                 isCompatibleWithNetworkFramework: isCompatibleWithNetworkFramework
             )
@@ -82,29 +88,44 @@ extension Internals.ClientManager {
     /// - Warning: Lockless with respect to `tableLock`, which it takes itself.
     fileprivate func _createNewClient(
         id: String,
-        eventLoopGroup: EventLoopGroup,
+        eventLoopGroupToken: Internals.EventLoopGroupToken,
         sessionConfiguration: Internals.Session.Configuration,
         isCompatibleWithNetworkFramework: Bool
     ) throws -> Internals.Client {
         let output = try sessionConfiguration.build(
             isCompatibleWithNetworkFramework: isCompatibleWithNetworkFramework
         )
+        // The token, not just the group: `.shared(_:)` means the client doesn't own the group,
+        // and `Internals.EventLoopGroupManager`'s table can drop its own reference at any point.
+        // Holding the token is what keeps the loops alive for as long as this client needs them.
         #if canImport(Darwin)
         let client = Internals.Client(
-            eventLoopGroupProvider: .shared(eventLoopGroup),
+            eventLoopGroupProvider: .shared(eventLoopGroupToken.group),
             configuration: output.httpClientConfiguration,
             localIdentityHandle: output.localIdentityHandle,
-            maximumConcurrentConnections: sessionConfiguration.maximumConcurrentConnections
+            maximumConcurrentConnections: sessionConfiguration.maximumConcurrentConnections,
+            eventLoopGroupToken: eventLoopGroupToken
         )
         #else
         let client = Internals.Client(
-            eventLoopGroupProvider: .shared(eventLoopGroup),
+            eventLoopGroupProvider: .shared(eventLoopGroupToken.group),
             configuration: output.httpClientConfiguration,
-            maximumConcurrentConnections: sessionConfiguration.maximumConcurrentConnections
+            maximumConcurrentConnections: sessionConfiguration.maximumConcurrentConnections,
+            eventLoopGroupToken: eventLoopGroupToken
         )
         #endif
 
-        tableLock.withLock {
+        // Tracked even when `isPoolable` is `false` and nothing will ever match this entry
+        // again. The table is not only a reuse cache, it is also what owns a client for its
+        // lifetime: `Internals.Client.deinit` shuts the underlying `HTTPClient` down, and the
+        // caller's reference does not outlive the call that handed it out — it returns as soon
+        // as the response head arrives, with the body still streaming. Dropping the entry here
+        // therefore tore down the connection out from under the response that was using it.
+        //
+        // Skipping the *scan* is what removes this configuration's real cost (see
+        // `client(provider:sessionConfiguration:)`); `maximumCount`'s eviction is what keeps the
+        // entries it leaves behind from accumulating without bound.
+        let evicted = tableLock.withLock {
             var items = _table[id] ?? []
 
             items.append(
@@ -115,7 +136,11 @@ extension Internals.ClientManager {
             )
 
             _table[id] = items
+
+            return _evictIfNeeded(protecting: .nio(client))
         }
+
+        Internals.ClientManager.shutdownDetached(evicted)
 
         return client
     }

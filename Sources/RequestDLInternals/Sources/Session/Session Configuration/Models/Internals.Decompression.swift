@@ -45,15 +45,18 @@ extension Internals {
 
         // MARK: - Internal methods
 
-        /// `async-http-client`'s own native gzip/deflate decoder strips `Content-Encoding` once it
-        /// successfully decodes a response (see `NIOHTTPResponseDecompressor`), so enabling it
-        /// whenever a natively-decoded algorithm is anywhere in the configured list is always safe:
-        /// whatever it leaves untouched (a custom algorithm, or nothing at all) is exactly what
-        /// manual dispatch downstream is for.
+        /// `NIOHTTPResponseDecompressor` only ever reacts to a `Content-Encoding: gzip`/`deflate`
+        /// response, so enabling it whenever a natively-decoded algorithm is anywhere in the
+        /// configured list is safe: whatever it leaves untouched (a custom algorithm, or nothing
+        /// at all) is exactly what manual dispatch downstream is for. Unlike `.urlSession`, there
+        /// is no all-or-nothing constraint here.
         ///
-        /// Unlike `.urlSession`, there is no all-or-nothing constraint here. `NIOHTTPResponseDecompressor`
-        /// only ever reacts to a `Content-Encoding: gzip`/`deflate` response, so it can stay on
-        /// alongside manual dispatch for anything else.
+        /// - Important: It forwards the response head **unmodified**, `Content-Encoding` included
+        /// (`fireChannelRead(NIOAny(part))` in the vendored `swift-nio-extras` source this package
+        /// actually ships), so nothing downstream can tell an already-decoded response from a
+        /// still-encoded one by looking at the header. `Internals.Client.execute` therefore tells
+        /// manual dispatch which encodings this handler has taken, via
+        /// `ManualDecompressionDispatch.dispatch(algorithms:nativelyDecoded:)`.
         ///
         /// - Important: Gated on `isNativelyDecodedByNIO`, not `contentEncodingValue`, since
         /// `NIOHTTPResponseDecompressor` is a single switch triggered purely by the response's own
@@ -82,28 +85,19 @@ extension Internals.Decompression: Equatable {
     /// `any Internals.DecompressionAlgorithm` has no equality of its own, so this compares what
     /// actually drives observable behavior rather than instance identity.
     ///
-    /// `contentEncodingValue` alone is *not* that. `isNativelyDecodedByNIO`/
-    /// `isNativelyDecodedByURLSession`/`requiresURLSession` are deliberately per-conformer
-    /// answers rather than checks against the wire value (see `Internals.DecompressionAlgorithm`),
-    /// precisely so a genuinely custom algorithm declaring `contentEncodingValue == "gzip"` is
-    /// told apart from the built-in `GzipAlgorithm` placeholder that shares that string. Those
-    /// three are what `build()`/`requiresManualURLSessionHandling`/
-    /// `Internals.Session.Configuration.nonURLSessionExecutorIncompatibilityReasons()` read, so
-    /// they belong in this comparison too.
+    /// Two configurations with the same set produce byte-identical
+    /// `HTTPClient.Configuration`/`Accept-Encoding` output, so treating them as equal keeps the
+    /// common case (plain `.gzip`/`.deflate`) pooling connections the way it always has, instead
+    /// of paying `RedirectConfiguration.strategy`'s "never equal, fresh client every time" cost
+    /// for a case that doesn't need it.
     ///
-    /// That matters here and not only in the abstract: `Internals.ClientManager` keys its pooled
-    /// clients on `Internals.Session.Configuration.==`, and `build()`'s answer is baked into the
-    /// `HTTPClient` at construction time. Comparing only the wire value let a session configured
-    /// with a custom "gzip" algorithm reuse a pooled client built with
-    /// `NIOHTTPResponseDecompressor` switched on (or the reverse). Neither direction is benign:
-    /// `async-http-client` decodes the body without stripping `Content-Encoding`, so manual
-    /// dispatch would then run the custom algorithm a second time over already-decoded bytes,
-    /// while the reverse leaves a natively-decoded session's body compressed with nothing left to
-    /// decode it.
-    ///
-    /// Two configurations agreeing on all four still compare equal, so the common case (plain
-    /// `.gzip`/`.deflate`) keeps pooling connections the way it always has, instead of paying
-    /// `RedirectConfiguration.strategy`'s "never equal, fresh client every time" cost.
+    /// - Important: Each algorithm is compared by its `Content-Encoding` value *and* by which
+    /// transport decodes it natively, not by the value alone. `build()` switches NIO's own
+    /// decompressor on or off by `isNativelyDecodedByNIO`, and `Internals.ClientManager` reuses a
+    /// pooled client for any `==` configuration. A custom algorithm that merely shares the built-in
+    /// gzip's `"gzip"` value compared equal to it, so one ran on the other's pooled client: a gzip
+    /// response was then decoded twice (NIO, then manual dispatch) or not at all, since manual
+    /// dispatch is decided per request from the request's own configuration.
     package static func == (_ lhs: Self, _ rhs: Self) -> Bool {
         switch (lhs, rhs) {
         case (.disabled, .disabled):
@@ -120,24 +114,19 @@ extension Internals.Decompression: Equatable {
             return false
         }
     }
-}
 
-extension Internals.Decompression {
-
-    /// Everything about one algorithm that actually changes what this package does with a
-    /// response, and therefore everything `==` above has to take into account.
-    fileprivate struct AlgorithmIdentity: Hashable {
-
+    /// What about an algorithm actually shapes the client built for it.
+    private struct AlgorithmIdentity: Hashable {
         let contentEncodingValue: String
-        let requiresURLSession: Bool
-        let isNativelyDecodedByURLSession: Bool
         let isNativelyDecodedByNIO: Bool
+        let isNativelyDecodedByURLSession: Bool
+        let requiresURLSession: Bool
 
         init(_ algorithm: any Internals.DecompressionAlgorithm) {
             contentEncodingValue = algorithm.contentEncodingValue
-            requiresURLSession = algorithm.requiresURLSession
-            isNativelyDecodedByURLSession = algorithm.isNativelyDecodedByURLSession
             isNativelyDecodedByNIO = algorithm.isNativelyDecodedByNIO
+            isNativelyDecodedByURLSession = algorithm.isNativelyDecodedByURLSession
+            requiresURLSession = algorithm.requiresURLSession
         }
     }
 }

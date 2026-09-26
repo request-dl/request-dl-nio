@@ -23,6 +23,15 @@ extension Modifiers {
         public func body(_ task: Content) async throws -> Input {
             do {
                 return try await task.result()
+            } catch is CancellationError {
+                // Never handed to `transform`, mirroring `Modifiers.Retry`'s own carve-out: a
+                // cancelled task's failure is the caller giving up, not a condition to recover
+                // from. A `transform` written as a general "fall back to a safe default on any
+                // failure" catch-all would otherwise turn a cancelled `.task(id:)`/structured
+                // scope into an apparent success, masking the cancellation from the very
+                // structured-concurrency machinery (SwiftUI's own cancellation handling
+                // included) that needs to see it to avoid acting on a torn-down view/scope.
+                throw CancellationError()
             } catch {
                 return try await transform(error)
             }

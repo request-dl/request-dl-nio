@@ -28,6 +28,39 @@ import Foundation
 /// `InternalsSessionConfigurationTests+NIO.swift`.
 struct InternalsSessionConfigurationTests {
 
+    /// `Internals.ClientManager` hands a pooled client to any request whose configuration is
+    /// `==` to the one it was built for, and `build()` bakes the proxy's `connectHeaders` into
+    /// that client. `Internals.Proxy.==` deliberately leaves them out (mirroring upstream's own
+    /// `HTTPClient.Configuration.Proxy`), so this is the layer that has to compare them.
+    /// Otherwise two sessions sharing a proxy host but sending different `CONNECT` credentials
+    /// (e.g. one per tenant/account) reuse each other's client, and the second session's
+    /// `CONNECT` goes out with the first session's token.
+    @Test
+    func configuration_whenOnlyProxyConnectHeadersDiffer_shouldNotBeEqual() async throws {
+        // Given
+        func configuration(token: String?) -> Internals.Session.Configuration {
+            var connectHeaders = Internals.HTTPHeaders()
+            if let token {
+                connectHeaders.add(name: "X-Proxy-Token", value: token)
+            }
+
+            var configuration = Internals.Session.Configuration()
+            configuration.proxy = Internals.Proxy(
+                host: "proxy.example.com",
+                port: 8_080,
+                connection: .http,
+                authorization: nil,
+                connectHeaders: connectHeaders
+            )
+            return configuration
+        }
+
+        // Then
+        #expect(configuration(token: "tenant-a") != configuration(token: "tenant-b"))
+        #expect(configuration(token: "tenant-a") != configuration(token: nil))
+        #expect(configuration(token: "tenant-a") == configuration(token: "tenant-a"))
+    }
+
     @Test
     func configuration_whenNetworkPathConstraintsAllNil_shouldBeNil() async throws {
         // Given
@@ -231,50 +264,35 @@ struct InternalsSessionConfigurationTests {
         )
     }
 
-    #if os(iOS) || os(visionOS)
-    /// Regression coverage: `Session.multipathServiceType(_:)` documents itself as mirroring
-    /// `URLSessionConfiguration.multipathServiceType`, and carries all four cases precisely so the
-    /// handover/interactive/aggregate distinction survives, yet `.urlSession` never set the
-    /// property at all. Only the NIO executors honored it (collapsed onto `enableMultipath`),
-    /// which inverts the capability: `.urlSession` is the one transport that can express the
-    /// distinction in full.
-    @Test
-    func configuration_whenMultipathServiceTypeSet_urlSessionConfigurationMatches() async throws {
+    #if os(iOS)
+    /// Regression coverage: `multipathServiceType` (set via `Session.multipathServiceType(_:)`)
+    /// used to have no `.urlSession` counterpart at all -- only `enableMultipath` on the `.nio`
+    /// side -- so the setting silently did nothing under `.urlSession`, the default executor on
+    /// Darwin. `URLSessionConfiguration.multipathServiceType` itself only exists on iOS (which
+    /// Mac Catalyst compiles as) -- not macOS, tvOS, watchOS, or visionOS, confirmed by actual
+    /// compiler diagnostics, not just Apple's docs -- so this is gated the same way the
+    /// production mapping is.
+    @Test(
+        arguments: [
+            (Internals.MultipathServiceType.handover, URLSessionConfiguration.MultipathServiceType.handover),
+            (.interactive, .interactive),
+            (.aggregate, .aggregate),
+            (.none, .none),
+        ] as [(Internals.MultipathServiceType, URLSessionConfiguration.MultipathServiceType)]
+    )
+    func configuration_whenMultipathServiceTypeSet_urlSessionConfigurationMatches(
+        _ multipathServiceType: Internals.MultipathServiceType,
+        _ expected: URLSessionConfiguration.MultipathServiceType
+    ) async throws {
         // Given
         var configuration = Internals.Session.Configuration()
-        configuration.multipathServiceType = .handover
-
-        // When
-        let urlSessionConfiguration = configuration.buildURLSessionConfiguration()
-
-        // Then: the specific case, not merely "something other than .none"
-        #expect(urlSessionConfiguration.multipathServiceType == .handover)
-    }
-
-    @Test
-    func configuration_whenMultipathServiceTypeInteractive_urlSessionConfigurationMatches() async throws {
-        // Given
-        var configuration = Internals.Session.Configuration()
-        configuration.multipathServiceType = .interactive
+        configuration.multipathServiceType = multipathServiceType
 
         // When
         let urlSessionConfiguration = configuration.buildURLSessionConfiguration()
 
         // Then
-        #expect(urlSessionConfiguration.multipathServiceType == .interactive)
-    }
-
-    @Test
-    func configuration_whenMultipathServiceTypeNone_urlSessionConfigurationKeepsSystemDefault() async throws {
-        // Given
-        let configuration = Internals.Session.Configuration()
-        let defaultConfiguration = URLSessionConfiguration.ephemeral
-
-        // When
-        let urlSessionConfiguration = configuration.buildURLSessionConfiguration()
-
-        // Then
-        #expect(urlSessionConfiguration.multipathServiceType == defaultConfiguration.multipathServiceType)
+        #expect(urlSessionConfiguration.multipathServiceType == expected)
     }
     #endif
     #endif

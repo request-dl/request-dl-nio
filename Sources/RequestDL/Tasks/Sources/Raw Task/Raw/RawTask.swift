@@ -20,26 +20,14 @@ struct RawTask<Content: Property>: RequestTask {
     // MARK: - Internal methods
 
     func _result(environment: RequestEnvironmentValues) async throws -> AsyncResponse {
-        let resolved = try await Resolve(
-            root: content,
-            environment: environment
-        ).build()
-
-        try await notifyDescriptorHooks(resolved: resolved, environment: environment)
-
-        // Checked before anything else touches `resolved`: a hard-pinned executor this
-        // configuration can't actually run on must fail loudly, not after paying for a
-        // logger/client/cache setup nobody will get to use.
-        try validateRequiredExecutor(resolved: resolved)
-
-        let deadline = Internals.ResourceDeadline(nanoseconds: resolved.session.configuration.timeout.resource)
-
-        do {
-            try await deadline.race {
-                try await waitForNetworkPath(resolved: resolved)
-            }
-        } catch is Internals.ResourceTimeoutError {
-            throw ResourceTimeoutError()
+        // Resolution hands back its own deadline rather than one built from the result: system
+        // proxy/PAC resolution happens inside it, and a deadline created afterwards could not
+        // cover it. See `Resolve.buildBoundedByResourceDeadline()`.
+        let (resolved, deadline) = try await surfacingResourceTimeout {
+            try await Resolve(
+                root: content,
+                environment: environment
+            ).buildBoundedByResourceDeadline()
         }
 
         let logger = Internals.TaskLogger(
@@ -48,7 +36,33 @@ struct RawTask<Content: Property>: RequestTask {
             logger: environment.logger
         )
 
-        let (client, isURLSessionExecutor) = try await resolveClient(resolved: resolved)
+        // Every step from here to the request itself is raced against the same budget. Each one
+        // can block for an unbounded stretch on something the caller can't see -- a descriptor
+        // hook doing its own I/O, a client cache entry whose `AsyncLock` is held by a slow
+        // neighbour, a TLS identity read off disk -- and a `.resource` timeout that only started
+        // counting once all of that was already done would have promised a bound it never had.
+        let (client, isURLSessionExecutor) = try await surfacingResourceTimeout {
+            try await deadline.race {
+                try await notifyDescriptorHooks(resolved: resolved, environment: environment)
+            }
+
+            // Checked before anything else touches `resolved`: a hard-pinned executor this
+            // configuration can't actually run on must fail loudly, not after paying for a
+            // logger/client/cache setup nobody will get to use.
+            try validateRequiredExecutor(resolved: resolved)
+
+            try await deadline.race {
+                try await waitForNetworkPath(resolved: resolved)
+            }
+
+            // - Note: `Internals.ClientManager`'s `AsyncLock` is not cancellation aware, so the
+            // lock acquisition inside this cannot itself be interrupted. Racing it from out here
+            // is still what the caller was promised: the deadline fires and they get their
+            // timeout on schedule, rather than waiting on the lock indefinitely.
+            return try await deadline.race {
+                try await resolveClient(resolved: resolved)
+            }
+        }
 
         let cacheControl = Internals.CacheControl(
             requestConfiguration: resolved.requestConfiguration,
@@ -74,6 +88,20 @@ struct RawTask<Content: Property>: RequestTask {
     }
 
     // MARK: - Private methods, setup
+
+    /// Replaces the internal resource-timeout marker with this package's public error.
+    ///
+    /// Every phase raced against the `.resource` budget funnels through here, so a blown budget
+    /// reads the same to a caller regardless of which phase blew it.
+    private func surfacingResourceTimeout<T>(
+        _ operation: () async throws -> T
+    ) async throws -> T {
+        do {
+            return try await operation()
+        } catch is Internals.ResourceTimeoutError {
+            throw ResourceTimeoutError()
+        }
+    }
 
     /// Hands the exact configuration this request is about to send to every
     /// `description(_:enabled:onDescribe:)` hook queued on `environment`, before anything
@@ -206,7 +234,7 @@ struct RawTask<Content: Property>: RequestTask {
             }
         }
 
-        do {
+        return try await surfacingResourceTimeout {
             if let serviceContext = resolved.requestConfiguration.serviceContext {
                 return try await deadline.race {
                     try await ServiceContext.$current.withValue(serviceContext) {
@@ -216,8 +244,6 @@ struct RawTask<Content: Property>: RequestTask {
             } else {
                 return try await deadline.race(executeSessionTask)
             }
-        } catch is Internals.ResourceTimeoutError {
-            throw ResourceTimeoutError()
         }
     }
 
@@ -277,7 +303,10 @@ struct RawTask<Content: Property>: RequestTask {
     /// Starts the request span, sets its request-side attributes, and injects it into
     /// `configuration.headers` as W3C trace headers: everything the span needs before the
     /// request actually goes out on the wire.
-    private static func startRequestSpan(
+    ///
+    /// Not `private`: unit-tested directly against a recording tracer, since the only other way
+    /// to reach it is a live request with a real tracer configured.
+    static func startRequestSpan(
         tracer: any Tracer,
         configuration: inout RequestConfiguration
     ) -> any Span {
@@ -285,7 +314,11 @@ struct RawTask<Content: Property>: RequestTask {
         let span = tracer.startSpan(method, ofKind: .client)
 
         span.attributes["http.request.method"] = SpanAttribute.string(method)
-        span.attributes["url.full"] = SpanAttribute.string(configuration.url)
+
+        if let redactedURL = redactedURL(configuration.url) {
+            span.attributes["url.full"] = SpanAttribute.string(redactedURL)
+        }
+
         setURLAttributes(on: span, url: configuration.url)
 
         if let body = configuration.body {
@@ -294,6 +327,29 @@ struct RawTask<Content: Property>: RequestTask {
 
         tracer.inject(span.context, into: &configuration.headers, using: HTTPHeadersInjector())
         return span
+    }
+
+    /// The value `url.full` carries on the span: the request URL with its query string and any
+    /// userinfo removed.
+    ///
+    /// Same reasoning as `setURLAttributes` leaving `url.query` out — query strings routinely
+    /// carry tokens and PII, and `user`/`password` always do. Emitting the whole URL verbatim
+    /// under a different attribute name would make that omission meaningless, since the span
+    /// would still carry the query string in full.
+    ///
+    /// A URL `URLComponents` can't parse gets no `url.full` at all rather than an unredacted one:
+    /// what can't be taken apart can't be redacted, and a span attribute is worth less than the
+    /// secret it would otherwise leak.
+    private static func redactedURL(_ url: String) -> String? {
+        guard var components = URLComponents(string: url) else {
+            return nil
+        }
+
+        components.query = nil
+        components.user = nil
+        components.password = nil
+
+        return components.string
     }
 
     /// Mirrors what async-http-client's own built-in tracing sets on the request span as of
@@ -391,9 +447,16 @@ extension RawTask {
     }
 }
 
+/// Carries the started span into the outgoing request's headers.
+///
+/// `set`, not `add`: a caller forwarding an upstream request's own `traceparent` through
+/// ``HeaderGroup``/``CustomHeader`` would otherwise leave two `traceparent` field lines on the
+/// wire, and the W3C Trace Context spec requires a receiver to treat that as invalid and discard
+/// it — losing the trace entirely. The span this injector was handed is the one that describes
+/// *this* request, so it replaces whatever was declared rather than joining it.
 private struct HTTPHeadersInjector: Injector {
 
     func inject(_ value: String, forKey key: String, into headers: inout HTTPHeaders) {
-        headers.add(name: key, value: value)
+        headers.set(name: key, value: value)
     }
 }

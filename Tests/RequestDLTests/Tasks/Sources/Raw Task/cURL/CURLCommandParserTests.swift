@@ -164,6 +164,39 @@ struct CURLCommandParserTests {
         #expect(try await bodyString(configuration) == "raw")
     }
 
+    /// `curlShellQuote` (what `.description(.cURL)` emits) writes every byte of a non-ASCII value
+    /// as its own `\xHH` escape inside `$'...'`. Those escapes are UTF-8 bytes, so a run of them
+    /// must be decoded as one UTF-8 sequence, not as one Latin-1 scalar per byte (which turned
+    /// `é`, `\xc3\xa9`, into the two characters `Ã©` and double-encoded the body on the wire).
+    @Test
+    func ansiCHexEscapesAreDecodedAsUTF8() async throws {
+        // Given / When
+        let configuration = try await CURLCommandParser.parse(
+            #"curl --data-raw $'caf\xc3\xa9 \xe2\x9c\x93' https://example.com"#
+        )
+
+        // Then
+        let body = try #require(configuration.body)
+        #expect(try await drain(body) == Data("café ✓".utf8))
+    }
+
+    @Test
+    func descriptionOfANonASCIIPayloadRoundTripsThroughTheParser() async throws {
+        // Given
+        let command = try await DataTask {
+            BaseURL("example.com")
+            RequestMethod(.post)
+            Payload(verbatim: "José, 東京", contentType: .text)
+        }
+        .description(.cURL)
+
+        // When
+        let configuration = try await CURLCommandParser.parse(command)
+
+        // Then
+        #expect(try await bodyString(configuration) == "José, 東京")
+    }
+
     // MARK: - -G / --get
 
     @Test

@@ -184,7 +184,20 @@ extension Internals {
                 .map(\.readableBytes)
                 .reduce(.zero, +)
 
-            self.chunkSize = chunkSize ?? Self.defaultChunkSize(totalSize: totalSize)
+            // A non-positive explicit `chunkSize` (`payloadChunkSize(0)`, or a caller-computed
+            // value that can legitimately evaluate to `0`/negative) used to be taken as-is here,
+            // bypassing `defaultChunkSize`'s clamping. `AsyncIterator.next()` then yields no
+            // chunks at all (`guard chunkSize > .zero`), silently sending an empty body while
+            // `totalSize`/`RequestBody.knownWireSize` still declare the real, non-zero length —
+            // surfacing downstream as an opaque body/length-mismatch error with no indication the
+            // actual cause was an invalid `chunkSize`. Treated the same as `nil` now, mirroring
+            // how a non-positive `maximumConcurrentConnections` is treated as "no limit" rather
+            // than left to misbehave.
+            if let chunkSize, chunkSize > .zero {
+                self.chunkSize = chunkSize
+            } else {
+                self.chunkSize = Self.defaultChunkSize(totalSize: totalSize)
+            }
             self.totalSize = totalSize
             self.buffers = buffers
         }

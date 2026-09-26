@@ -92,12 +92,29 @@ struct ZeroingBytesTests {
 
     @Test
     func zeroingBytes_whenBothEmpty_areEqual() async throws {
-        // Given: `baseAddress` is `nil` for both, the one case `==`'s `memcmp` fast path can't
-        // pass straight into `memcmp` itself.
+        // Given: an empty `buffer` on both sides, the one case where `zip`'s accumulation loop
+        // in `==` runs zero iterations and falls straight through to `difference == 0`.
         let lhs = ZeroingBytes([UInt8]())
         let rhs = ZeroingBytes([UInt8]())
 
         // Then
         #expect(lhs == rhs)
+    }
+
+    /// Regression coverage: `==` used to delegate to `memcmp`, which short-circuits on the first
+    /// mismatched byte -- a timing side channel already fixed once for SPKI pin matching
+    /// (`Internals.SPKIHash.matchesSPKI`). `ZeroingBytes.==` backs `PrivateKey`'s password
+    /// comparison on every `Internals.ClientManager` pool lookup, so the same class of bug applied
+    /// here too. This can't assert on timing directly (too flaky), but confirms `==` still agrees
+    /// with `memcmp` on where the *first* mismatch falls, not just whether the two are equal
+    /// overall -- the one case an XOR-accumulate rewrite could plausibly get wrong.
+    @Test
+    func zeroingBytes_whenFirstByteDiffers_stillComparesEveryByte() async throws {
+        // Given
+        let lhs = ZeroingBytes([0xFF, 20, 30])
+        let rhs = ZeroingBytes([0x00, 20, 30])
+
+        // Then
+        #expect(lhs != rhs)
     }
 }

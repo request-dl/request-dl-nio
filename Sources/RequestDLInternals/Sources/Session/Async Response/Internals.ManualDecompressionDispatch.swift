@@ -26,7 +26,29 @@ extension Internals {
     /// present" without risking a second, corrupting decode pass over already-decoded bytes.
     package enum ManualDecompressionDispatch: Sendable {
         case skip
-        case dispatch(algorithms: [any Internals.DecompressionAlgorithm])
+
+        /// - Parameter nativelyDecoded: Lowercased `Content-Encoding` values the transport has
+        ///   *already* decoded before handing these bytes over, and which must therefore be
+        ///   passed straight through rather than matched against `algorithms`.
+        ///
+        ///   Neither transport strips `Content-Encoding` after decoding natively, so the header
+        ///   alone can't tell the two apart; this is the only thing that can. Empty for
+        ///   `.urlSession`, which suppresses CFNetwork's transparent decoding outright whenever
+        ///   it dispatches at all, and non-empty only for `.nio`'s mixed case, where
+        ///   `NIOHTTPResponseDecompressor` handles the gzip/deflate half of a list while manual
+        ///   dispatch handles the rest.
+        case dispatch(
+            algorithms: [any Internals.DecompressionAlgorithm],
+            nativelyDecoded: Set<String>
+        )
+
+        /// The common case: nothing was decoded on the way in, so every configured algorithm is
+        /// this package's to apply.
+        package static func dispatch(
+            algorithms: [any Internals.DecompressionAlgorithm]
+        ) -> Self {
+            .dispatch(algorithms: algorithms, nativelyDecoded: [])
+        }
     }
 
     /// Internals-layer counterpart to `RequestDL.UnsupportedContentEncodingError`, caught where
@@ -56,23 +78,53 @@ extension Internals.ManualDecompressionDispatch {
         for head: Internals.ResponseHead,
         source: Internals.AsyncStream<Internals.DataBuffer>
     ) throws -> Internals.AsyncStream<Internals.DataBuffer> {
-        guard case .dispatch(let algorithms) = self else {
+        guard case .dispatch(let algorithms, let nativelyDecoded) = self else {
             return source
         }
 
-        guard
-            let contentEncoding = head.headerValues(named: "Content-Encoding").first,
-            contentEncoding.lowercased() != "identity"
-        else {
+        // Every `Content-Encoding` field line, comma-split and joined into one list. RFC 9110
+        // §5.2 makes several field lines of the same name exactly equivalent to one comma-joined
+        // line, so a server is free to send either — and taking only `.first` of either shape
+        // means a body compressed twice is decoded once and handed back still compressed, with
+        // `Internals.CacheControl` storing those wrong bytes on the way past.
+        //
+        // `identity` is dropped rather than counted: it stands for "no transformation", so it
+        // never changes what has to be undone.
+        //
+        // Trimming goes through the package's own `trimming(where:)`, not
+        // `trimmingCharacters(in: .whitespaces)`: that needs `Foundation.CharacterSet`, which
+        // this file has no import for. Same as `Internals.CacheControl.directives(_:)`.
+        let encodings =
+            head
+            .headerValues(named: "Content-Encoding")
+            .flatMap { $0.split(separator: ",") }
+            .map { $0.trimming(where: \.isWhitespace).lowercased() }
+            .filter { !$0.isEmpty && $0 != "identity" }
+
+        guard let normalized = encodings.first else {
+            return source
+        }
+
+        // Stacked encodings have to be undone in reverse order, and the second layer's algorithm
+        // can't be known to match anything configured. Decoding only the outermost would return
+        // bytes that are still compressed while claiming they aren't, so this reports the
+        // mismatch instead, the same way an unrecognised single encoding already does.
+        guard encodings.count == 1 else {
+            throw Internals.UnsupportedContentEncodingError(value: encodings.joined(separator: ", "))
+        }
+
+        // Already decoded on the way in; the transport simply didn't strip the header on its way
+        // back out. Decoding again here is how a perfectly good response gets corrupted.
+        guard !nativelyDecoded.contains(normalized) else {
             return source
         }
 
         guard
             let algorithm = algorithms.first(where: {
-                $0.contentEncodingValue.lowercased() == contentEncoding.lowercased()
+                $0.contentEncodingValue.lowercased() == normalized
             })
         else {
-            throw Internals.UnsupportedContentEncodingError(value: contentEncoding)
+            throw Internals.UnsupportedContentEncodingError(value: normalized)
         }
 
         return Internals.AsyncStream.decompressing(source, using: algorithm)
@@ -88,6 +140,15 @@ extension Internals.AsyncStream where Element == Internals.DataBuffer {
     ///
     /// `finish()` runs once `source` ends, flushing whatever the decoder is still holding before
     /// this stream itself closes.
+    ///
+    /// - Important: The background task this spawns is otherwise unstructured and its handle
+    /// discarded, so nothing would ever stop it if the caller inspected only the response head
+    /// and discarded the returned stream unread, or abandoned it mid-read: the task would run to
+    /// completion regardless, decoding and, under `.untilFirstIteration`'s "buffer until the
+    /// first read" contract, buffering without bound a body nobody asked for. The returned stream
+    /// carries a termination token for exactly this reason -- see `Internals.AsyncStream
+    /// .withTerminationToken(_:)`'s own doc comment -- so releasing it unread (or abandoning it
+    /// partway through) cancels this task instead.
     fileprivate static func decompressing(
         _ source: Internals.AsyncStream<Internals.DataBuffer>,
         using algorithm: any Internals.DecompressionAlgorithm
@@ -101,10 +162,16 @@ extension Internals.AsyncStream where Element == Internals.DataBuffer {
         // point of streaming it in the first place.
         let output = Internals.AsyncStream<Internals.DataBuffer>(bufferingPolicy: .untilFirstIteration)
 
-        _Concurrency.Task {
+        // Captures this untouched `output` -- not the token-carrying copy returned below -- so
+        // this task's own reference never keeps that token alive by itself. See
+        // `Internals.AsyncStream.withTerminationToken(_:)`'s own "Important" note.
+        let task = _Concurrency.Task {
             do {
                 var stream = try algorithm()
 
+                // `source`'s own iterator (`SubjectAsyncIterator.next()`) already ends the
+                // sequence once this task is cancelled, so no separate `Task.isCancelled` check
+                // is needed here for the loop to actually stop.
                 for try await chunk in source {
                     var chunk = chunk
                     let data = await chunk.readData(chunk.readableBytes) ?? Data()
@@ -127,6 +194,6 @@ extension Internals.AsyncStream where Element == Internals.DataBuffer {
             }
         }
 
-        return output
+        return output.withTerminationToken { task.cancel() }
     }
 }

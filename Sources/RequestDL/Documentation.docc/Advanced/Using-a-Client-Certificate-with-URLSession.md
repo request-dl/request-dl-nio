@@ -62,8 +62,8 @@ Validated end to end (Keychain round-trip + a real mTLS-shaped request through `
 Not yet separately validated, treat with more caution until confirmed:
 
 - **tvOS / watchOS** — same Keychain model as iOS (single data-protection keychain, same entitlement requirement), so this is expected to behave identically, but hasn't been physically tested.
-- **macOS, sandboxed (Mac App Store) apps** — expected to need the same Keychain Sharing capability as iOS.
-- **macOS, non-sandboxed apps** (plain command-line tools, non-App-Store apps) — confirmed broken, not just uncertain: an unsigned command-line process reliably hits `SecItemCopyMatching(kSecClassIdentity)` returning zero results (`errSecItemNotFound`) after `SecItemAdd` succeeds for the certificate and key individually. This is separate from, and not fixed by, the entitlement issue this article addresses — the process has no `keychain-access-groups` entitlement to add in the first place, being a bare CLI binary. Don't assume this works on non-sandboxed macOS.
+- **macOS, sandboxed (Mac App Store) apps** — expected to need the same Keychain Sharing capability as iOS; a properly entitled app also unlocks EC client certificates (see the note below), which a bare command-line tool cannot.
+- **macOS, non-sandboxed apps** (plain command-line tools, non-App-Store apps) — RSA client certificates are confirmed working end to end, including in an unsigned process with no entitlements at all (bare `swift test`/CLI): RequestDL falls back to the legacy, non-data-protection Keychain for exactly this case. **EC (P-256/P-384/P-521) client certificates do not work here**, and adding Keychain Sharing will not fix it: the legacy Keychain rejects an *imported* EC key (`SecItemAdd` fails with `-25304`/`errSecInvalidItemRef`) even though it accepts the identical import for RSA, or an EC key it generates itself. A signed, Keychain-Sharing-entitled macOS app avoids this entirely by using the modern Keychain instead — RequestDL tries that first on macOS and only falls back to the legacy one when the entitlement is missing.
 
 ## Troubleshooting
 

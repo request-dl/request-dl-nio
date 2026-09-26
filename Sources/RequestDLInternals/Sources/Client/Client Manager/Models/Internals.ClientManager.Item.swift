@@ -27,6 +27,15 @@ extension Internals.ClientManager {
         package let readAt: ContinuousClock.Instant
         #endif
 
+        /// `client.operationGeneration` as of `readAt`. Compared back against the client's
+        /// *current* generation by the idle-cleanup sweep and ceiling eviction: a mismatch means
+        /// an operation has completed since this item was last touched -- e.g. between two
+        /// sequential calls on the same resolved client -- so the client was genuinely active
+        /// more recently than `readAt` alone would suggest, even though nothing is running on it
+        /// at this exact instant. See `Internals.ClientOperationQueue.generation`'s own doc
+        /// comment for the full rationale.
+        package let lastKnownOperationGeneration: UInt64
+
         // MARK: - Internal static methods
 
         package static func createNew(
@@ -42,7 +51,8 @@ extension Internals.ClientManager {
                     #else
                     ContinuousClock.now
                     #endif
-                }()
+                }(),
+                lastKnownOperationGeneration: client.operationGeneration
             )
         }
 
@@ -58,7 +68,8 @@ extension Internals.ClientManager {
                     #else
                     ContinuousClock.now
                     #endif
-                }()
+                }(),
+                lastKnownOperationGeneration: client.operationGeneration
             )
         }
     }

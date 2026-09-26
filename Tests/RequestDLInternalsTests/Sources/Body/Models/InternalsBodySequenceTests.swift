@@ -158,6 +158,30 @@ struct InternalsBodySequenceTests {
         #expect(sequence.count == 2)
     }
 
+    /// Regression test: an explicit non-positive `chunkSize` used to be taken as-is instead of
+    /// falling back to `defaultChunkSize`, so `AsyncIterator.next()`'s `guard chunkSize > .zero`
+    /// yielded no chunks at all — an empty body sent under a non-empty declared `totalSize`.
+    @Test
+    func bodySequence_whenChunkSizeIsZeroOrNegative_fallsBackToDefaultPolicy() async throws {
+        // Given
+        let length = 100
+        let data = await Data.randomData(length: length)
+
+        for invalidChunkSize in [0, -1, -100] {
+            let bodySequence = await makeBodySequence(
+                chunkSize: invalidChunkSize,
+                [Internals.DataBuffer(data)]
+            )
+
+            // When
+            let sequence = try await Array(bodySequence).resolveData()
+
+            // Then
+            #expect(bodySequence.chunkSize > .zero)
+            #expect(Data(sequence.joined()) == data)
+        }
+    }
+
     /// Regression test for a fatal crash.
     ///
     /// The crash (`Internals.assertionFailure` at `Internals.BodySequence.swift:75`) never came

@@ -85,14 +85,42 @@ struct FormGroupBuilder: Sendable {
     // MARK: - Private methods
 
     /// The part headers, terminated by the blank line that separates them from the content.
+    ///
+    /// - Important: Unlike a top-level request header, a part header line here is written
+    /// straight into the body's raw bytes, with nothing downstream ever validating it again.
+    /// `name`/`value` must therefore have any embedded CR/LF stripped first: a `Form`'s
+    /// `headers:` closure can carry attacker-influenced values (see `FormItem.makeHeader`'s
+    /// `additionalHeaders`), and a bare CR or LF there would end this header line early and let
+    /// the rest of its content inject extra header lines, or content, into the part.
     private func buildHeadersBuffer(_ headers: HTTPHeaders) async -> Internals.AnyBuffer {
         var buffer = await Internals.DataBuffer()
 
         for (name, value) in headers {
+            let name = Self.strippingCRLF(name)
+            let value = Self.strippingCRLF(value)
             await buffer.writeBytes("\(name): \(value)\(eol)".utf8)
         }
 
         await buffer.writeBytes(eol.utf8)
         return buffer
+    }
+
+    /// Drops every CR/LF `Unicode.Scalar` from `value`, walking scalars rather than
+    /// `Character`s: a literal CRLF pair is a single extended grapheme cluster in Swift, so
+    /// matching against the `Character` values `"\r"`/`"\n"` would miss it and let the pair
+    /// through unstripped.
+    private static func strippingCRLF(_ value: String) -> String {
+        guard value.unicodeScalars.contains(where: { $0 == "\r" || $0 == "\n" }) else {
+            return value
+        }
+
+        var stripped = String.UnicodeScalarView()
+        stripped.reserveCapacity(value.unicodeScalars.count)
+
+        for scalar in value.unicodeScalars where scalar != "\r" && scalar != "\n" {
+            stripped.append(scalar)
+        }
+
+        return String(stripped)
     }
 }

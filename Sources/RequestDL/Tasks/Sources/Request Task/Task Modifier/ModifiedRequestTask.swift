@@ -23,6 +23,10 @@ public struct ModifiedRequestTask<Modifier: RequestTaskModifier>: RequestTask {
     /// This method is used internally and should not be called directly.
     @_spi(Private)
     public func _result(environment: RequestEnvironmentValues) async throws -> Element {
+        for child in DynamicValueMirror(modifier)() {
+            (child.value as? DynamicEnvironment)?.update(environment)
+        }
+
         let scoped = Modifier.Content(task.task, environment: environment)
         return try await modifier.body(scoped)
     }

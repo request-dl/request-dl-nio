@@ -77,4 +77,50 @@ struct InterceptedRequestTaskTests {
         // Then
         #expect(interceptedFailure.wrappedValue)
     }
+
+    fileprivate struct FlagKey: RequestEnvironmentKey {
+        static let defaultValue = false
+    }
+
+    fileprivate struct FlagReadingInterceptor<Element: Sendable>: RequestTaskInterceptor {
+
+        @RequestEnvironment(\.interceptorFlag) var flag
+
+        let callback: @Sendable (Bool) -> Void
+
+        func output(_ result: Result<Element, Error>) {
+            callback(flag)
+        }
+    }
+
+    @Test
+    func interceptor_readsEnvironmentSetOnTheSameChain() async throws {
+        // Given: the environment is set on the same task chain as the interceptor itself --
+        // `InterceptedRequestTask._result(environment:)` only threaded `environment` into the
+        // wrapped task, never into the interceptor's own `@RequestEnvironment` properties.
+        let observedFlag = InlineProperty(wrappedValue: false)
+
+        // When
+        _ = try await MockedTask {
+            BaseURL("localhost")
+        }
+        .interceptor(
+            FlagReadingInterceptor {
+                observedFlag.wrappedValue = $0
+            }
+        )
+        .environment(\.interceptorFlag, true)
+        .result()
+
+        // Then
+        #expect(observedFlag.wrappedValue)
+    }
+}
+
+extension RequestEnvironmentValues {
+
+    fileprivate var interceptorFlag: Bool {
+        get { self[InterceptedRequestTaskTests.FlagKey.self] }
+        set { self[InterceptedRequestTaskTests.FlagKey.self] = newValue }
+    }
 }

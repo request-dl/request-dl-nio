@@ -8,6 +8,7 @@ import RequestDLInternals
 import Testing
 
 @testable import RequestDL
+@testable import RequestDLTestSupport
 
 import Foundation
 
@@ -98,9 +99,13 @@ struct BackgroundDownloadsSessionTests {
         let encoded = BackgroundDownloads.Session.encode(
             id: "episode-42",
             destination: URL(fileURLWithPath: "/tmp/episode-42.mp3"),
-            clientIdentity: descriptor
+            clientIdentity: descriptor,
+            clientIdentityHost: "configured.example.com"
         )
-        let decoded = BackgroundDownloads.Session.decodeClientIdentity(encoded)
+        let decoded = BackgroundDownloads.Session.decodeClientIdentity(
+            encoded,
+            challengedBy: "configured.example.com"
+        )
 
         // Then
         #expect(decoded == descriptor)
@@ -115,12 +120,77 @@ struct BackgroundDownloadsSessionTests {
         )
 
         // When / Then
-        #expect(BackgroundDownloads.Session.decodeClientIdentity(encoded) == nil)
+        #expect(
+            BackgroundDownloads.Session.decodeClientIdentity(
+                encoded,
+                challengedBy: "configured.example.com"
+            ) == nil
+        )
     }
 
     @Test
     func decodeClientIdentity_whenTaskDescriptionIsNotEncodedByThisType_returnsNil() async throws {
-        #expect(BackgroundDownloads.Session.decodeClientIdentity("not a descriptor") == nil)
+        #expect(
+            BackgroundDownloads.Session.decodeClientIdentity(
+                "not a descriptor",
+                challengedBy: "configured.example.com"
+            ) == nil
+        )
+    }
+
+    /// The regression this gate exists for: a background session follows redirects on its own, so
+    /// the host challenging us for a client certificate is not necessarily the host the download
+    /// was scheduled against. Presenting the identity anyway would hand it to whoever controls
+    /// the redirect.
+    @Test
+    func decodeClientIdentity_whenChallengedByADifferentHost_returnsNil() async throws {
+        // Given: an mTLS download scheduled against one host...
+        let encoded = BackgroundDownloads.Session.encode(
+            id: "episode-42",
+            destination: URL(fileURLWithPath: "/tmp/episode-42.mp3"),
+            clientIdentity: Internals.ClientIdentityDescriptor(
+                certificateChainFilePath: "/tmp/client.pem",
+                privateKeyFilePath: "/tmp/client.key",
+                privateKeyFormat: .pem
+            ),
+            clientIdentityHost: "configured.example.com"
+        )
+
+        // When / Then: ...is not offered to another one, however it was reached.
+        #expect(
+            BackgroundDownloads.Session.decodeClientIdentity(
+                encoded,
+                challengedBy: "attacker.example.com"
+            ) == nil
+        )
+    }
+
+    /// A `taskDescription` written by a version of this package that predates the host gate: it
+    /// has to keep decoding (the download itself is still valid and still running), but it can't
+    /// prove which host it was scheduled for, so the identity is withheld rather than guessed at.
+    @Test
+    func decodeClientIdentity_whenNoHostWasRecorded_returnsNil() async throws {
+        // Given
+        let encoded = BackgroundDownloads.Session.encode(
+            id: "episode-42",
+            destination: URL(fileURLWithPath: "/tmp/episode-42.mp3"),
+            clientIdentity: Internals.ClientIdentityDescriptor(
+                certificateChainFilePath: "/tmp/client.pem",
+                privateKeyFilePath: "/tmp/client.key",
+                privateKeyFormat: .pem
+            )
+        )
+
+        // When / Then: `id`/`destination` still decode, so the download keeps working...
+        #expect(BackgroundDownloads.Session.decode(encoded)?.id == "episode-42")
+
+        // ...but no host can match a missing one.
+        #expect(
+            BackgroundDownloads.Session.decodeClientIdentity(
+                encoded,
+                challengedBy: "configured.example.com"
+            ) == nil
+        )
     }
 
     @Test
@@ -141,12 +211,79 @@ struct BackgroundDownloadsSessionTests {
             id: "episode-42",
             destination: URL(fileURLWithPath: "/tmp/episode-42.mp3"),
             serverTrust: serverTrust,
-            clientIdentity: clientIdentity
+            clientIdentity: clientIdentity,
+            clientIdentityHost: "configured.example.com"
         )
 
         // Then
         #expect(BackgroundDownloads.Session.decodeServerTrust(encoded) == serverTrust)
-        #expect(BackgroundDownloads.Session.decodeClientIdentity(encoded) == clientIdentity)
+        #expect(
+            BackgroundDownloads.Session.decodeClientIdentity(
+                encoded,
+                challengedBy: "configured.example.com"
+            ) == clientIdentity
+        )
+    }
+
+    // MARK: - clientIdentity caching
+
+    /// Regression coverage: every client-certificate challenge used to call
+    /// `Internals.ClientIdentityDescriptor.makeIdentity()` fresh, paying its full Keychain round
+    /// trip (two `SecItemAdd` calls, then a `kSecMatchLimitAll` scan of the *entire* keychain,
+    /// since `kSecClassIdentity` supports no label-based query) again even for a redirect chain,
+    /// or several downloads sharing one client certificate, within the same process --
+    /// `Internals.IdentityManager`'s own weak-reference deduplication can't help, since nothing
+    /// retained the previous challenge's handle past answering it. See `resolvedIdentity(for:)`'s
+    /// own doc comment for why this is tested directly rather than through a real challenge.
+    ///
+    /// The Keychain round trip this needs genuinely succeeds on real macOS (bare `swift test`),
+    /// the same platform/entitlement caveat `InternalsClientIdentityDescriptorTests`'s own
+    /// `rebuiltIdentity_...` test documents.
+    @Test
+    func resolvedIdentity_whenCalledTwiceForTheSameDescriptor_reusesTheSameHandle() async throws {
+        // Given
+        let client = Certificates().client()
+
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.certificateChain = .file(client.certificateURL.absolutePath(percentEncoded: false))
+        secureConnection.privateKey = .privateKey(
+            .init(client.privateKeyURL.absolutePath(percentEncoded: false), format: .pem)
+        )
+
+        let descriptor = try #require(try Internals.ClientIdentityDescriptor.resolve(from: secureConnection))
+        let session = BackgroundDownloads.Session()
+
+        // When / Then
+        //
+        // `resolvedIdentity(for:)`'s cache hit is only observable once its first call has
+        // something to hit: `makeIdentity()`'s own Keychain round trip genuinely succeeds on real
+        // macOS (confirmed, not assumed -- see `InternalsClientIdentityDescriptorTests
+        // .rebuiltIdentity_whenPresentedToServerRequiringClientCertificate_completesHandshake`'s
+        // own doc comment), but every other Apple platform's Simulator, reached only via
+        // `xcodebuild test` against SwiftPM's auto-generated scheme, has no `.entitlements` file
+        // to add Keychain Sharing to at all, so `SecItemAdd` fails with `errSecMissingEntitlement`
+        // before identity pairing is ever reached -- the same still-open gap that test documents,
+        // not a regression this one introduces.
+        func verify() throws {
+            let first = try #require(session.resolvedIdentity(for: descriptor))
+            let second = try #require(session.resolvedIdentity(for: descriptor))
+
+            // Then: the exact same `Internals.IdentityHandle` instance, not merely two handles
+            // wrapping an equivalent `SecIdentity` -- proving the second call skipped
+            // `makeIdentity()`'s own Keychain round trip entirely rather than happening to land on
+            // the same Keychain item again.
+            #expect(first.handle === second.handle)
+        }
+
+        #if os(macOS)
+        try verify()
+        #else
+        withKnownIssue(
+            "no Keychain Sharing entitlement on this platform's SwiftPM-generated Xcode scheme; see InternalsClientIdentityDescriptorTests's own doc comment"
+        ) {
+            try verify()
+        }
+        #endif
     }
 
     // MARK: - firstTask(matching:in:)
