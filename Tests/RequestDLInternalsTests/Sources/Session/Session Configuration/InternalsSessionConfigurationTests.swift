@@ -230,25 +230,13 @@ struct InternalsSessionConfigurationTests {
         )
     }
 
-    /// Regression coverage: `maximumTLSVersion` used to be listed in
-    /// `SecureConnection.urlSessionIncompatibilityReasons()`, which pushed every session that set
-    /// it off `.urlSession` entirely -- making the mapping the previous two tests check permanently
-    /// unreachable in practice, even though it worked correctly in isolation.
+    /// Regression coverage, same bug class as the TLS-version pair above:
+    /// `Session.maximumConnectionsPerHost(_:)` reached AsyncHTTPClient's
+    /// `concurrentHTTP1ConnectionsPerHostSoftLimit` but was silently dropped under `.urlSession`,
+    /// despite `httpMaximumConnectionsPerHost` being an exact counterpart. Since `.urlSession` is
+    /// the default executor on Darwin, the modifier did nothing at all for most callers.
     @Test
-    func secureConnection_whenMaximumTLSVersionSet_staysCompatibleWithURLSession() async throws {
-        // Given
-        var secureConnection = Internals.SecureConnection()
-        secureConnection.maximumTLSVersion = .tlsv12
-
-        // Then
-        #expect(secureConnection.urlSessionIncompatibilityReasons().isEmpty)
-    }
-
-    /// Regression coverage: `connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit` (set via
-    /// `Session.maximumConnectionsPerHost(_:)`) used to have no `.urlSession` counterpart at all,
-    /// so the setting silently did nothing under the executor it's actually reachable from.
-    @Test
-    func configuration_whenConnectionPoolLimitSet_urlSessionConfigurationMatches() async throws {
+    func configuration_whenMaximumConnectionsPerHostSet_urlSessionConfigurationMatches() async throws {
         // Given
         var configuration = Internals.Session.Configuration()
         configuration.connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit = 3
@@ -258,6 +246,22 @@ struct InternalsSessionConfigurationTests {
 
         // Then
         #expect(urlSessionConfiguration.httpMaximumConnectionsPerHost == 3)
+    }
+
+    @Test
+    func configuration_whenMaximumConnectionsPerHostOmitted_urlSessionConfigurationKeepsSystemDefault() async throws {
+        // Given: absence must stay absence, not get retuned to AsyncHTTPClient's own default
+        let configuration = Internals.Session.Configuration()
+        let defaultConfiguration = URLSessionConfiguration.ephemeral
+
+        // When
+        let urlSessionConfiguration = configuration.buildURLSessionConfiguration()
+
+        // Then
+        #expect(
+            urlSessionConfiguration.httpMaximumConnectionsPerHost
+                == defaultConfiguration.httpMaximumConnectionsPerHost
+        )
     }
 
     #if os(iOS)

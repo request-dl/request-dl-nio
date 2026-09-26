@@ -182,9 +182,9 @@ extension InternalsSecureConnectionTests {
     }
 
     /// `minimumTLSVersion` is deliberately excluded from `urlSessionIncompatibilityReasons()`,
-    /// unlike its sibling `maximumTLSVersion` above. It has a real, reachable equivalent under
-    /// URLSession (an ATS `NSExceptionMinimumTLSVersion` entry in the app's Info.plist), so it
-    /// must never force a fallback away from `.urlSession` or trip `requiredExecutor(.urlSession)`.
+    /// like its sibling `maximumTLSVersion` above. It is carried under `.urlSession` by
+    /// `URLSessionConfiguration.tlsMinimumSupportedProtocolVersion`, so it must never force a
+    /// fallback away from `.urlSession` or trip `requiredExecutor(.urlSession)`.
     @Test
     func secureConnection_whenMinimumTLSVersionSet_remainsCompatibleWithURLSession() async throws {
         // Given

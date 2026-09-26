@@ -22,7 +22,15 @@ extension Internals {
         /// `AsyncHTTPClient` directly.
         package var idleTimeout: Int64 = 60_000_000_000
 
-        package var concurrentHTTP1ConnectionsPerHostSoftLimit: Int = 8
+        /// `nil` means untouched: each transport keeps its own native default (AsyncHTTPClient's
+        /// 8, `URLSessionConfiguration`'s 6) rather than having one of them imposed on the other.
+        ///
+        /// Optional, unlike the other fields here, specifically so `.urlSession` can tell an
+        /// explicit `Session.maximumConnectionsPerHost(_:)` apart from a caller who never asked:
+        /// `URLSessionConfiguration.httpMaximumConnectionsPerHost` is a plain `Int` with no
+        /// "unset" value of its own, so writing this out unconditionally would silently retune
+        /// every session that never set it.
+        package var concurrentHTTP1ConnectionsPerHostSoftLimit: Int?
 
         package var retryConnectionEstablishment: Bool = true
 
@@ -38,7 +46,9 @@ extension Internals {
         package func build() -> HTTPClient.Configuration.ConnectionPool {
             var pool = HTTPClient.Configuration.ConnectionPool()
             pool.idleTimeout = .nanoseconds(idleTimeout)
-            pool.concurrentHTTP1ConnectionsPerHostSoftLimit = concurrentHTTP1ConnectionsPerHostSoftLimit
+            if let concurrentHTTP1ConnectionsPerHostSoftLimit {
+                pool.concurrentHTTP1ConnectionsPerHostSoftLimit = concurrentHTTP1ConnectionsPerHostSoftLimit
+            }
             pool.retryConnectionEstablishment = retryConnectionEstablishment
             pool.preWarmedHTTP1ConnectionCount = preWarmedHTTP1ConnectionCount
             return pool

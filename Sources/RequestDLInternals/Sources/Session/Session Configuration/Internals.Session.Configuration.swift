@@ -36,8 +36,10 @@ extension Internals.Session {
         /// silently traced just because some other part of the process bootstrapped a tracer via
         /// `InstrumentationSystem` for unrelated reasons.
         ///
-        /// Excluded from `Equatable`: `any Tracer` isn't `Equatable`, same reasoning as
-        /// `Internals.Proxy.connectHeaders` being excluded from `Hashable`.
+        /// Excluded from `Equatable`: `any Tracer` isn't `Equatable`, and unlike
+        /// `Internals.Proxy.connectHeaders` (which carries session-specific secrets and does
+        /// factor into `==`), two sessions differing only in tracer are fine sharing a pooled
+        /// client -- a tracer is an observability sink, not a transport-affecting credential.
         package var tracer: any Tracer = NoOpTracer()
 
         /// Off by default on every platform: decompression is opt-in, matching the fact that
@@ -507,8 +509,21 @@ extension Internals.Session.Configuration {
     /// `tlsMaximumSupportedProtocolVersion`, the one other `SecureConnection` field with a
     /// direct `URLSessionConfiguration` counterpart.
     ///
+    /// `connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit` maps onto
+    /// `httpMaximumConnectionsPerHost`, and `multipathServiceType` onto `multipathServiceType`,
+    /// the two other fields with direct `URLSessionConfiguration` counterparts. Both are only
+    /// written when actually configured, so a session that never touched them keeps
+    /// `URLSession`'s own defaults; the per-host limit is a soft limit on the NIO side and a hard
+    /// one here, the closest either transport can get to the other. `multipathServiceType` is the
+    /// rare case where `.urlSession` is the *more* capable executor: `HTTPClient.Configuration`
+    /// only has an on/off `enableMultipath`, so the handover/interactive/aggregate distinction
+    /// survives here and collapses there. `URLSessionConfiguration.multipathServiceType` exists
+    /// only on iOS (including Mac Catalyst, via `targetEnvironment(macCatalyst)`) -- confirmed by
+    /// actual compiler diagnostics, not just Apple's platform-availability docs, which list a
+    /// broader iOS/tvOS/watchOS/visionOS/Catalyst set.
+    ///
     /// Every other field this configuration could carry that has no `URLSessionConfiguration`
-    /// counterpart (`connectionPool`, `ignoreUncleanSSLShutdown`,
+    /// counterpart (the rest of `connectionPool`, `ignoreUncleanSSLShutdown`,
     /// `networkFrameworkWaitForConnectivity`) is either NIO/NIOTS-specific with nothing to
     /// translate to, or, for the fields that matter, like `dnsOverride`/`httpVersion ==
     /// .http1Only`/`proxy.connectHeaders`/`.socks`/`.bearer`/`decompression == .disabled`,
@@ -562,8 +577,12 @@ extension Internals.Session.Configuration {
         // .build()`). Has a real `URLSessionConfiguration` equivalent, so it isn't listed in
         // `urlSessionIncompatibilityReasons()`; without mapping it here too, a caller's
         // `Session.maximumConnectionsPerHost(_:)` would silently do nothing under `.urlSession`,
-        // the *default* executor on Darwin.
-        configuration.httpMaximumConnectionsPerHost = connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit
+        // the *default* executor on Darwin. Only written when actually configured -- absence must
+        // stay absence, not get retuned to `Internals.ConnectionPool`'s own default (8), which
+        // differs from `URLSessionConfiguration`'s (6).
+        if let concurrentHTTP1ConnectionsPerHostSoftLimit = connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit {
+            configuration.httpMaximumConnectionsPerHost = concurrentHTTP1ConnectionsPerHostSoftLimit
+        }
 
         // Same reasoning for `multipathServiceType`'s `enableMultipath` counterpart, but
         // `URLSessionConfiguration.multipathServiceType` itself is only available on iOS (which

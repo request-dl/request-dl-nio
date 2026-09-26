@@ -150,6 +150,23 @@ extension InternalsSessionConfigurationExecutorTests {
         #endif
     }
 
+    /// The companion guarantee to the above: a hard pin to `.urlSession` must not throw over a
+    /// maximum TLS version either.
+    @Test
+    func requireExecutor_whenMaximumTLSVersionSetAndURLSessionRequired_doesNotThrow() async throws {
+        // Given
+        var configuration = Internals.Session.Configuration()
+
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.maximumTLSVersion = .tlsv12
+        configuration.secureConnection = secureConnection
+
+        // Then
+        #expect(throws: Never.self) {
+            try configuration.requireExecutor(.urlSession)
+        }
+    }
+
     // MARK: - networkFrameworkIncompatibilityReasons() / clientIdentityWithProxyUnderNetworkFramework
 
     /// A minimal proxy, reused across this section's tests: only `host`/`port`/`connection`

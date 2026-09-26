@@ -83,8 +83,7 @@ extension Internals {
 extension Internals.Decompression: Equatable {
 
     /// `any Internals.DecompressionAlgorithm` has no equality of its own, so this compares what
-    /// actually drives observable behavior (the set of `Content-Encoding` values configured,
-    /// plus the limit) rather than instance identity.
+    /// actually drives observable behavior rather than instance identity.
     ///
     /// Two configurations with the same set produce byte-identical
     /// `HTTPClient.Configuration`/`Accept-Encoding` output, so treating them as equal keeps the
