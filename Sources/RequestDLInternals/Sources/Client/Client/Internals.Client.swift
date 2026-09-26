@@ -164,8 +164,8 @@ extension Internals {
         package func execute(
             request: HTTPClient.Request,
             logger: TaskLogger?
-        ) async -> UnsafeTask<ResponseAccumulator.Response> {
-            await execute(
+        ) async throws -> UnsafeTask<ResponseAccumulator.Response> {
+            try await execute(
                 request: request,
                 delegate: ResponseAccumulator(request: request),
                 logger: logger
@@ -176,10 +176,21 @@ extension Internals {
             request: HTTPClient.Request,
             delegate: Delegate,
             logger: TaskLogger?
-        ) async -> UnsafeTask<Delegate.Response> {
+        ) async throws -> UnsafeTask<Delegate.Response> {
             // Waited on before anything else, so a session configured with a limit never opens
             // more connections than that, whether or not one is free to reuse.
             let release = await throttledExecutor.acquire()
+
+            // `AsyncSemaphore.wait()` (backing `acquire()` above) is documented as "cancellation
+            // transparent": a waiter cancelled while queued still takes its turn once a slot
+            // frees up, rather than being skipped. Without this check, a caller whose own `Task`
+            // was cancelled while queued here still had its request dispatched onto the wire the
+            // moment `acquire()` returned. The slot is handed back first, since it was already
+            // claimed and nothing past this point will release it otherwise.
+            guard !Task.isCancelled else {
+                release()
+                throw CancellationError()
+            }
 
             // Registered before the request goes out, so the client counts as busy from the
             // moment it is asked to do anything.
@@ -282,6 +293,7 @@ extension Internals {
                 head: head,
                 download: download,
                 cache: cache,
+                decompressionDispatch: decompressionDispatch,
                 logger: logger
             )
 
@@ -294,7 +306,7 @@ extension Internals {
                 download: download.stream
             )
 
-            let unsafeTask = await execute(
+            let unsafeTask = try await execute(
                 request: request,
                 delegate: delegate,
                 logger: logger
