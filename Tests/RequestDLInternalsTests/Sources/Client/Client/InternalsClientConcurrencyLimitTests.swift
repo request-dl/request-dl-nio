@@ -38,7 +38,7 @@ struct InternalsClientConcurrencyLimitTests {
                 for _ in 0..<requestCount {
                     taskGroup.addTask {
                         let request = try HTTPClient.Request(url: "http://127.0.0.1:\(port)/")
-                        let task = await client.execute(request: request, logger: nil)
+                        let task = try await client.execute(request: request, logger: nil)
                         await startedCounter.increment()
 
                         // Holds the permit until the assertion below has observed the queue,

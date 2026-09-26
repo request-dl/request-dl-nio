@@ -165,6 +165,13 @@ extension Internals {
             let release = await throttledExecutor.acquire()
             defer { release() }
 
+            // `AsyncSemaphore.wait()` (backing `acquire()` above) is documented as "cancellation
+            // transparent": a waiter cancelled while queued still takes its turn once a slot
+            // frees up, rather than being skipped. Without this check, a caller whose own `Task`
+            // was cancelled while queued here still had its request dispatched onto the wire the
+            // moment `acquire()` returned.
+            try Task.checkCancellation()
+
             let tlsDelegate = identityPolicy.flatMap { policy in
                 request.url?.host.map { TLSDelegate(host: $0, policy: policy) }
             }
@@ -233,6 +240,11 @@ extension Internals {
 
             let release = await throttledExecutor.acquire()
             defer { release() }
+
+            // See the equivalent comment in `execute(request:delegate:)`: a cancelled caller
+            // must not have its request dispatched once a slot frees up, since the semaphore
+            // itself is "cancellation transparent" and would otherwise let it through anyway.
+            try Task.checkCancellation()
 
             let materialized: Internals.URLSessionUploadFile.Materialized
             if let existingUploadFile {
@@ -318,6 +330,17 @@ extension Internals {
             // it, not just once it starts sending.
             let operation = operationQueue.operation()
             let release = await throttledExecutor.acquire()
+
+            // See the equivalent comment in `execute(request:delegate:)`: a cancelled caller
+            // must not have its request dispatched once a slot frees up. Both the operation slot
+            // and the throttle permit are handed back here, since neither overload's usual
+            // release path (`onDownloadComplete`, wired up below) ever runs when the request is
+            // never actually dispatched.
+            guard !Task.isCancelled else {
+                release()
+                operation.complete()
+                throw CancellationError()
+            }
 
             let tlsDelegate = identityPolicy.flatMap { policy in
                 request.url?.host.map { TLSDelegate(host: $0, policy: policy) }
@@ -464,6 +487,17 @@ extension Internals {
             let operation = operationQueue.operation()
             let release = await throttledExecutor.acquire()
 
+            // See the equivalent comment in `execute(request:delegate:)`: a cancelled caller
+            // must not have its request dispatched once a slot frees up. Both the operation slot
+            // and the throttle permit are handed back here, since neither is tied to a `defer`
+            // in this overload -- their usual release path (`onDownloadComplete`, wired up
+            // below) never runs when the request is never actually dispatched.
+            guard !Task.isCancelled else {
+                release()
+                operation.complete()
+                throw CancellationError()
+            }
+
             // CFNetwork's transparent `Content-Encoding` decoding can only be switched off by
             // taking over `Accept-Encoding` ourselves, and doing so suppresses it entirely, for
             // every encoding, not just the one added. So this is all-or-nothing: either every
@@ -476,7 +510,16 @@ extension Internals {
 
             switch decompression {
             case .disabled:
-                request.setValue("identity", forHTTPHeaderField: "Accept-Encoding")
+                // Only when the caller hasn't already set their own: `.disabled` means this
+                // package leaves `Content-Encoding` handling alone entirely, and a caller who set
+                // `Accept-Encoding` explicitly (e.g. `AcceptEncodingHeader`, documented as usable
+                // exactly when the caller intends to decode the body itself) is relying on that
+                // value reaching the wire unchanged, the same way it does under `.nio`. Without
+                // this guard, `.urlSession` silently overwrote it with `identity` regardless,
+                // defeating that configuration only under this executor.
+                if request.value(forHTTPHeaderField: "Accept-Encoding") == nil {
+                    request.setValue("identity", forHTTPHeaderField: "Accept-Encoding")
+                }
                 decompressionDispatch = .skip
 
             case .enabled(let algorithms, _) where decompression.requiresManualURLSessionHandling:
@@ -544,7 +587,16 @@ extension Internals {
                     // Attached before `head` is ever read from: ordered against every future
                     // `downloadBuffer.append(_:)` by `Internals.DownloadBuffer`'s own queue, the
                     // same guarantee `Internals.ClientResponseReceiver.didReceiveHead` relies on.
-                    if let cacheStream = cache?(step.head) {
+                    //
+                    // Skipped whenever this response still needs this package's own
+                    // decompression: the tee below captures wire bytes upstream of that step, so
+                    // caching here would persist the still-compressed body under a cached head
+                    // that (on replay, which never re-runs decompression) claims it's already
+                    // decoded. See `Internals.ManualDecompressionDispatch.requiresManualDecoding
+                    // (for:)`.
+                    if !decompressionDispatch.requiresManualDecoding(for: step.head),
+                        let cacheStream = cache?(step.head)
+                    {
                         downloadBuffer.cacheStream(cacheStream)
                     }
                     head.append(.success(step.head))

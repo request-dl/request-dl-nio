@@ -149,6 +149,17 @@ extension Internals.NIOTrustEvaluator {
                             return
                         }
 
+                        // `pins.isEmpty` means nothing is configured to pin against, so chain
+                        // validity (already established above) is the whole check then, mirroring
+                        // the Darwin evaluator's own `guard !pins.isEmpty` short-circuit -- without
+                        // it, `matched` is vacuously `false` over an empty pin set and every chain
+                        // is rejected under the default `isStrict` policy.
+                        guard !pins.isEmpty else {
+                            observer?(TrustDecision(isTrusted: true, pinsMatched: nil))
+                            promise.succeed(.certificateVerified)
+                            return
+                        }
+
                         let matched = chain.contains { certificate in
                             var serializer = DER.Serializer()
                             guard (try? certificate.publicKey.serialize(into: &serializer)) != nil else {

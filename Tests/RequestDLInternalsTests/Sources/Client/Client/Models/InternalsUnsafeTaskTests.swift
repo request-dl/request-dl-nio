@@ -25,7 +25,7 @@ struct InternalsUnsafeTaskTests {
             )
 
             let request = try HTTPClient.Request(url: "http://127.0.0.1:\(port)/")
-            let unsafeTask = await client.execute(request: request, logger: nil)
+            let unsafeTask = try await client.execute(request: request, logger: nil)
 
             let responseTask = _Concurrency.Task {
                 try await unsafeTask.response()
@@ -56,8 +56,8 @@ struct InternalsUnsafeTaskTests {
             )
 
             let request = try HTTPClient.Request(url: "http://127.0.0.1:\(port)/")
-            let first = await client.execute(request: request, logger: nil)
-            let second = await client.execute(request: request, logger: nil)
+            let first = try await client.execute(request: request, logger: nil)
+            let second = try await client.execute(request: request, logger: nil)
             let firstCopy = first
 
             // Then

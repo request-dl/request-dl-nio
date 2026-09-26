@@ -29,6 +29,7 @@ extension Internals {
         private let head: Internals.AsyncStream<ResponseHead>
         private let download: DownloadBuffer
         private let cache: ((ResponseHead) -> Internals.AsyncStream<DataBuffer>?)?
+        private let decompressionDispatch: Internals.ManualDecompressionDispatch
 
         private let logger: Internals.TaskLogger?
 
@@ -46,6 +47,7 @@ extension Internals {
             head: Internals.AsyncStream<ResponseHead>,
             download: DownloadBuffer,
             cache: ((ResponseHead) -> Internals.AsyncStream<DataBuffer>?)?,
+            decompressionDispatch: Internals.ManualDecompressionDispatch,
             logger: Internals.TaskLogger?
         ) {
             self.url = url
@@ -53,6 +55,7 @@ extension Internals {
             self.head = head
             self.download = download
             self.cache = cache
+            self.decompressionDispatch = decompressionDispatch
             self.logger = logger
         }
 
@@ -121,7 +124,17 @@ extension Internals {
                     {
                         // The cache factory allocates a buffer and starts a task, so it is
                         // caller supplied work that has no business running under the lock.
-                        guard let cacheStream = self.cache?(responseHead) else {
+                        //
+                        // Skipped whenever this response still needs this package's own
+                        // decompression: the tee below captures wire bytes upstream of that
+                        // step, so caching here would persist the still-compressed body under a
+                        // cached head that (on replay, which never re-runs decompression) claims
+                        // it's already decoded. See `Internals.ManualDecompressionDispatch
+                        // .requiresManualDecoding(for:)`.
+                        guard
+                            !self.decompressionDispatch.requiresManualDecoding(for: responseHead),
+                            let cacheStream = self.cache?(responseHead)
+                        else {
                             return
                         }
 
