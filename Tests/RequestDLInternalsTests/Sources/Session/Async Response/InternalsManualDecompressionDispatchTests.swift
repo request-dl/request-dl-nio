@@ -50,6 +50,16 @@ struct InternalsManualDecompressionDispatchTests {
         responseHead(contentEncodings: contentEncoding)
     }
 
+    private func responseHeadWithNoContentEncoding() -> Internals.ResponseHead {
+        .init(
+            url: "https://example.com",
+            status: .init(code: 200, reason: "OK"),
+            version: .init(minor: 1, major: 1),
+            headers: [],
+            isKeepAlive: true
+        )
+    }
+
     @Test
     func resolvedStream_whenDispatching_decodesEveryChunk() async throws {
         // Given
@@ -381,5 +391,62 @@ struct InternalsManualDecompressionDispatchTests {
 
         // Then
         #expect(output.flowControlWindow == nil)
+    }
+
+    // MARK: - requiresManualDecoding(for:)
+
+    /// `.skip` never requires this package's own decoding: either decompression is disabled, or
+    /// every configured algorithm was already decoded natively before these bytes were observed.
+    /// Either way there is nothing left for `requiresManualDecoding(for:)` to say yes to.
+    @Test
+    func requiresManualDecoding_whenSkipping_isAlwaysFalse() {
+        #expect(
+            !Internals.ManualDecompressionDispatch.skip.requiresManualDecoding(
+                for: responseHead(contentEncoding: "gzip")
+            )
+        )
+        #expect(
+            !Internals.ManualDecompressionDispatch.skip.requiresManualDecoding(for: responseHeadWithNoContentEncoding())
+        )
+    }
+
+    /// Regression guard: this is the exact check `Internals.ClientResponseReceiver` (`.nio`) and
+    /// `Internals.URLSessionClient`'s `runExchange` (`.urlSession`) both gate their cache tee on,
+    /// so a caching response this package still has to decode itself is never persisted still
+    /// compressed. Both executors were found, independently, to have lost this gate while being
+    /// rewritten -- once during the twelfth audit's original fix, once merging the `.nio` and
+    /// `.urlSession` back-pressure fixes together -- because nothing exercised this function
+    /// directly. See `InternalsClientSessionTaskTests`/`InternalsURLSessionClientSessionTaskTests`
+    /// for the executor-level regression tests this one complements.
+    @Test
+    func requiresManualDecoding_whenDispatchingARealEncoding_isTrue() {
+        let dispatch = Internals.ManualDecompressionDispatch.dispatch(algorithms: [MockIdentityAlgorithm()])
+        #expect(dispatch.requiresManualDecoding(for: responseHead(contentEncoding: "gzip")))
+    }
+
+    @Test
+    func requiresManualDecoding_whenNoContentEncodingHeader_isFalse() {
+        let dispatch = Internals.ManualDecompressionDispatch.dispatch(algorithms: [MockIdentityAlgorithm()])
+        #expect(!dispatch.requiresManualDecoding(for: responseHeadWithNoContentEncoding()))
+    }
+
+    /// `identity` stands for "no transformation": nothing to decode, so nothing to cache-gate
+    /// against either.
+    @Test
+    func requiresManualDecoding_whenContentEncodingIsIdentity_isFalse() {
+        let dispatch = Internals.ManualDecompressionDispatch.dispatch(algorithms: [MockIdentityAlgorithm()])
+        #expect(!dispatch.requiresManualDecoding(for: responseHead(contentEncoding: "identity")))
+    }
+
+    /// A transport that already decoded this specific encoding natively (`nativelyDecoded`) has
+    /// already handed over plain bytes by the time the cache tee would see them, even though this
+    /// dispatch is `.dispatch` for the request as a whole (a mixed list under `.nio`, say).
+    @Test
+    func requiresManualDecoding_whenEncodingIsAlreadyNativelyDecoded_isFalse() {
+        let dispatch = Internals.ManualDecompressionDispatch.dispatch(
+            algorithms: [MockIdentityAlgorithm()],
+            nativelyDecoded: ["gzip"]
+        )
+        #expect(!dispatch.requiresManualDecoding(for: responseHead(contentEncoding: "gzip")))
     }
 }
