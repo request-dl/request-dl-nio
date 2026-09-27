@@ -86,7 +86,7 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/apple/swift-crypto.git",
-            from: "4.5.2"
+            from: "5.0.0"
         ),
         .package(
             url: "https://github.com/apple/swift-certificates.git",
