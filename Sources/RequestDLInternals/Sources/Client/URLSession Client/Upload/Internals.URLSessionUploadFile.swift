@@ -11,10 +11,15 @@
 // Foundation's own concrete, singular `InputStream(data:)` class ever completes.
 //
 // The earlier `Internals.URLSessionUploadStream` (an `InputStream` subclass) hit exactly that
-// bug and is gone; this replaces it with two different `URLSession` code paths:
-// `uploadTask(with:from:)` for a body small enough to just hold in memory, and
-// `uploadTask(with:fromFile:)` for everything else. Neither touches
-// `InputStream`/`needNewBodyStream` at all, so neither is affected.
+// bug and is gone; this replaces it with two different shapes of body: in memory for a body
+// small enough to just hold, and a file for everything else. The buffered-response overloads
+// upload those through `uploadTask(with:from:)`/`uploadTask(with:fromFile:)`, which never touch
+// `InputStream` at all. The `SessionTask` overloads, whose response is read through
+// `URLSession.bytes(for:delegate:)` (which has no upload-task counterpart), attach them to the
+// request instead: `httpBody`, or an `httpBodyStream` from Foundation's own `InputStream(url:)`,
+// which, unlike the custom streams above, CFNetwork does see the end of (verified fixed-length,
+// chunked, and resent across 307/308 redirects via `needNewBodyStream`). See
+// `Internals.URLSessionClient.attachUploadBody(_:to:)`.
 
 #if canImport(Darwin)
 
