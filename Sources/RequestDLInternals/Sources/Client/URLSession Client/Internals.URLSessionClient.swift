@@ -695,13 +695,34 @@ extension Internals {
             var isHeadResolved = false
 
             do {
-                let (bytes, response) = try await withTaskCancellationHandler {
-                    try await session.bytes(for: request, delegate: taskDelegate)
-                } onCancel: {
-                    box.cancel()
+                // Ordinarily just one request. Loops only when `TaskDelegate` deferred a redirect
+                // to here instead of handing it back to `URLSession` -- see
+                // `completeRedirect(with:_:)`'s doc comment for why (a file-backed body resend
+                // `URLSession` itself won't reliably carry out, observed directly on watchOS).
+                // Each pass is a genuinely new task, sharing `taskDelegate` so redirect counting,
+                // history and error state keep accumulating exactly as they would across
+                // `URLSession`'s own automatic follows.
+                func resolveExchange() async throws -> (URLSession.AsyncBytes, URLResponse) {
+                    var currentRequest = request
+
+                    while true {
+                        let (bytes, response) = try await withTaskCancellationHandler {
+                            try await session.bytes(for: currentRequest, delegate: taskDelegate)
+                        } onCancel: {
+                            box.cancel()
+                        }
+
+                        box.task = bytes.task
+
+                        guard let manualRedirect = try taskDelegate.takePendingManualBodyRedirect() else {
+                            return (bytes, response)
+                        }
+
+                        currentRequest = manualRedirect
+                    }
                 }
 
-                box.task = bytes.task
+                let (bytes, response) = try await resolveExchange()
 
                 let responseHead: Internals.ResponseHead
                 do {
@@ -944,6 +965,11 @@ extension Internals.URLSessionClient {
         /// All visited URLs, starting with the request's own. Mirrors `RedirectState.visited`.
         private var _visited: [String]
         private var _redirectError: Error?
+        /// A redirect `willPerformHTTPRedirection` decided to follow but refused to hand back to
+        /// `URLSession` itself, because this task's body is file-backed (`bodyFileURL` set): see
+        /// that method's own doc comment for why. `runExchange` takes this, attaches a fresh
+        /// stream, and reissues the request itself as a new `bytes(for:delegate:)` call.
+        private var _pendingManualBodyRedirect: URLRequest?
         /// Set once the proxy has rejected the configured credentials and the challenge was
         /// cancelled; reported in place of the `NSURLErrorCancelled` that cancelling produces. See
         /// `substitutingRecordedError(for:)`.
@@ -1078,7 +1104,7 @@ extension Internals.URLSessionClient {
                         _history.append(entry)
                         _lastRequest = sanitizedRequest
                     }
-                    completionHandler(sanitizedRequest)
+                    completeRedirect(with: sanitizedRequest, completionHandler)
                 case .failure(let error):
                     lock.withLock { _redirectError = error }
                     completionHandler(nil)
@@ -1116,12 +1142,41 @@ extension Internals.URLSessionClient {
                         _lastRequest = newRequest
                         _strategyRedirectCount += 1
                     }
-                    completionHandler(newRequest)
+                    completeRedirect(with: newRequest, completionHandler)
                 }
             }
         }
 
         // MARK: - Private methods
+
+        /// Hands `request` to `URLSession` to follow automatically, unless this task's body is
+        /// file-backed and `request` still carries one (i.e. its method wasn't downgraded to
+        /// `GET`/`HEAD`) -- observed directly, on watchOS specifically: `URLSession` there
+        /// neither calls `needNewBodyStream` for such a resend nor honours a stream attached to
+        /// the request returned from this very delegate method, and instead silently resends the
+        /// *original* request's stream, already exhausted by the first send. Every other tested
+        /// platform (macOS, iOS, iPadOS, tvOS, Catalyst) does call `needNewBodyStream` here on
+        /// its own and sends the body correctly.
+        ///
+        /// So for this one combination, this refuses the automatic follow (`completionHandler(nil)`,
+        /// same as `.disallow`) and defers to `runExchange`, which takes `request` from
+        /// `takePendingManualBodyRedirect()`, attaches a fresh stream itself, and reissues it as a
+        /// brand new `bytes(for:delegate:)` call -- a genuinely new task, not a continuation of
+        /// the redirected one, so the platform quirk above (specific to *resending* a stream on
+        /// the same continuing exchange) never applies to it.
+        private func completeRedirect(with request: URLRequest, _ completionHandler: (URLRequest?) -> Void) {
+            guard
+                bodyFileURL != nil,
+                let method = request.httpMethod,
+                !["GET", "HEAD"].contains(method.uppercased())
+            else {
+                completionHandler(request)
+                return
+            }
+
+            lock.withLock { _pendingManualBodyRedirect = request }
+            completionHandler(nil)
+        }
 
         /// The request that produced `response`, per `_lastRequest`: the request one hop
         /// before `request` in `urlSession(_:task:willPerformHTTPRedirection:newRequest:completionHandler:)`.
@@ -1255,6 +1310,41 @@ extension Internals.URLSessionClient {
         /// and `executeSessionTask`'s `runExchange` for the `bytes(for:delegate:)` one.
         func substitutingRecordedError(for error: Error) -> Error {
             lock.withLock { _proxyAuthenticationError } ?? error
+        }
+
+        /// The redirect `willPerformHTTPRedirection` deferred to `runExchange` (see
+        /// `_pendingManualBodyRedirect`'s own doc comment), with a fresh stream over
+        /// `bodyFileURL` already attached and ready to send -- `nil` when there's nothing
+        /// pending. Cleared so it's only ever taken once.
+        ///
+        /// - Throws: if `bodyFileURL`'s file is gone by the time of the resend, the same
+        /// failure `attachUploadBody(_:to:)` raises for the initial request, rather than
+        /// silently sending an empty or wrong body.
+        func takePendingManualBodyRedirect() throws -> URLRequest? {
+            guard
+                let pending = lock.withLock({
+                    defer { _pendingManualBodyRedirect = nil }
+                    return _pendingManualBodyRedirect
+                })
+            else {
+                return nil
+            }
+
+            guard
+                let bodyFileURL,
+                let size = try? FileManager.default.attributesOfItem(atPath: bodyFileURL.path)[.size] as? NSNumber,
+                let stream = InputStream(url: bodyFileURL)
+            else {
+                throw URLError(
+                    .cannotOpenFile,
+                    userInfo: bodyFileURL.map { [NSURLErrorFailingURLErrorKey: $0] } ?? [:]
+                )
+            }
+
+            var request = pending
+            request.httpBodyStream = stream
+            request.setValue(String(size.int64Value), forHTTPHeaderField: "Content-Length")
+            return request
         }
 
         /// The response head for `executeSessionTask`, which gets `response` from
