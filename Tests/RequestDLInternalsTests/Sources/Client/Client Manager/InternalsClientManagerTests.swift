@@ -260,7 +260,7 @@ struct InternalsClientManagerTests {
                 // The server accepts and then says nothing, so this stays in flight for the rest
                 // of the test rather than racing it.
                 inFlight.append(
-                    await client.execute(
+                    try await client.execute(
                         request: try HTTPClient.Request(url: "http://127.0.0.1:\(port)/"),
                         logger: nil
                     )

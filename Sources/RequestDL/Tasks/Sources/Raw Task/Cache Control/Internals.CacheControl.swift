@@ -318,6 +318,17 @@ extension Internals {
             // the cached side had `?? []` applied, so a server that sends neither header
             // compared `nil` against `[]`, which is not equal, and every such response
             // invalidated a cache entry that was in fact unchanged.
+            //
+            // `hasValidatorEvidence` tracks whether at least one of the two validators was
+            // actually present (not just equal) to compare. Without it, a non-304 response
+            // carrying neither `ETag` nor `Last-Modified` compared `[] == []` on every iteration
+            // -- vacuously "matching" -- and this treated the cached entry as still valid even
+            // though there was nothing behind that conclusion: a HEAD answered with 404, 410, or
+            // 503 (or a plain 200 the server chose not to make conditional) means the origin
+            // itself did not say "unchanged", and the absence of validators leaves nothing else
+            // that could.
+            var hasValidatorEvidence = false
+
             for name in ["Last-Modified", "ETag"] {
                 let fresh = head.headerValues(named: name)
                 let cached = cachedData.response.headers[name] ?? []
@@ -329,6 +340,18 @@ extension Internals {
                     )
                     return nil
                 }
+
+                if !fresh.isEmpty {
+                    hasValidatorEvidence = true
+                }
+            }
+
+            guard hasValidatorEvidence else {
+                logger?.log(
+                    level: .info,
+                    "Cache invalidated (status: \(head.status.code), no validators to compare), will fetch fresh data"
+                )
+                return nil
             }
 
             return RequestDL.HTTPHeaders(head.headers.map { ($0.name, $0.value) })
