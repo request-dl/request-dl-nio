@@ -37,11 +37,11 @@ let package = Package(
     dependencies: [
         .package(
             url: "https://github.com/request-dl/async-http-client",
-            from: "1.38.1"
+            from: "1.38.2"
         ),
         .package(
             url: "https://github.com/apple/swift-nio",
-            from: "2.102.0"
+            from: "2.103.0"
         ),
         .package(
             url: "https://github.com/apple/swift-nio-extras",
@@ -49,7 +49,7 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/apple/swift-nio-ssl",
-            from: "2.37.4"
+            from: "2.37.5"
         ),
         .package(
             url: "https://github.com/apple/swift-nio-transport-services",
@@ -57,11 +57,11 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/apple/swift-log",
-            from: "1.15.0"
+            from: "1.15.1"
         ),
         .package(
             url: "https://github.com/apple/swift-collections",
-            from: "1.6.0"
+            from: "1.7.1"
         ),
         .package(
             url: "https://github.com/o-nnerb/swift-async-stream",
@@ -69,7 +69,7 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/apple/swift-async-algorithms",
-            from: "1.1.5"
+            from: "1.1.6"
         ),
         .package(
             url: "https://github.com/apple/swift-system",
@@ -77,11 +77,11 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/apple/swift-distributed-tracing",
-            from: "1.4.1"
+            from: "1.5.0"
         ),
         .package(
             url: "https://github.com/apple/swift-configuration",
-            from: "1.2.0",
+            from: "1.2.1",
             traits: []
         ),
         .package(
@@ -90,7 +90,7 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/apple/swift-certificates.git",
-            from: "1.20.0"
+            from: "1.21.0"
         ),
     ],
     targets: [
