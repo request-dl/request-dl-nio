@@ -75,7 +75,8 @@ extension Internals {
             uploadingBytes: Int,
             decompression: Internals.Decompression = .disabled,
             cache: ((Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
-            logger: Internals.TaskLogger?
+            logger: Internals.TaskLogger?,
+            flowControl: Internals.FlowControlWindow = .init()
         ) async throws -> SessionTask {
             try await client.execute(
                 request: request,
@@ -84,7 +85,8 @@ extension Internals {
                 uploadingBytes: uploadingBytes,
                 decompression: decompression,
                 cache: cache,
-                logger: logger
+                logger: logger,
+                flowControl: flowControl
             )
         }
         #endif

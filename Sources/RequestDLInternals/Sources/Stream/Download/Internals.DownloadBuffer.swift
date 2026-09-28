@@ -13,6 +13,7 @@ extension Internals {
             // MARK: - Internal properties
 
             package let stream: Internals.AsyncStream<DataBuffer>
+            package let flowControl: Internals.FlowControlWindow?
 
             // MARK: - Private properties
 
@@ -50,9 +51,13 @@ extension Internals {
 
             // MARK: - Inits
 
-            package init(readingMode: Internals.DownloadStep.ReadingMode) async {
+            package init(
+                readingMode: Internals.DownloadStep.ReadingMode,
+                flowControl: Internals.FlowControlWindow?
+            ) async {
                 self._buffer = await DataBuffer()
                 self.readingMode = readingMode
+                self.flowControl = flowControl
 
                 if case .separator(let separator) = readingMode {
                     self.separatorLPS = Self.computeLPS(separator)
@@ -65,7 +70,10 @@ extension Internals {
                 // the cached path, where the whole body is dumped before the response object
                 // even exists. From the first read on, only the gap between producer and reader
                 // stays in memory instead of the entire download.
-                self.stream = .init(bufferingPolicy: .untilFirstIteration)
+                //
+                // That gap is only bounded when there is a `flowControl` window, and only by
+                // a producer that honours it; see `append(_:)`.
+                self.stream = .init(flowControl: flowControl)
             }
 
             // MARK: - Internal methods
@@ -80,9 +88,27 @@ extension Internals {
                 }
             }
 
+            /// Queues `incomeBytes` for re-chunking.
+            ///
+            /// With a `flowControl` window, the bytes are charged right here, synchronously, and
+            /// not only once they reach `stream`. The queue is a buffer in its own right: it
+            /// runs on a task that can lag arbitrarily far behind the event loop feeding it, and
+            /// a producer that only saw what had already reached `stream` could keep going
+            /// while its backlog piled up in the queue instead.
+            ///
+            /// They are credited back once `_append` has run, by which point every one of them
+            /// has either been dispatched into `stream` (charged again there, as it went in) or
+            /// absorbed into `_buffer` to wait for the rest of its chunk. The latter must not
+            /// stay counted: a chunk that only completes with more input would otherwise hold
+            /// the window shut against exactly the input it needs, forever. See
+            /// `Internals.FlowControlWindow`'s "Liveness" section.
             package func append(_ incomeBytes: Internals.AnyBuffer) {
+                let queuedBytes = incomeBytes.readableBytes
+                flowControl?.charge(queuedBytes)
+
                 queue.addOperation {
                     await self._append(incomeBytes)
+                    self.flowControl?.credit(queuedBytes)
                 }
             }
 
@@ -279,14 +305,32 @@ extension Internals {
             storage.stream
         }
 
+        /// The window metering `stream`, which the producer feeding `append(_:)` consults to
+        /// know when to stop. `nil` unless one was passed in at construction.
+        package var flowControl: Internals.FlowControlWindow? {
+            storage.flowControl
+        }
+
         // MARK: - Private properties
 
         private let storage: Storage
 
         // MARK: - Inits
 
-        package init(readingMode: Internals.DownloadStep.ReadingMode) async {
-            self.storage = await .init(readingMode: readingMode)
+        /// - Parameter flowControl: Meters `stream` so its producer can be paused rather than run
+        ///   arbitrarily far ahead of the reader. Only worth passing where the producer can
+        ///   actually honour it -- today that is `Internals.ClientResponseReceiver`, whose NIO
+        ///   delegate contract has a way to say "not yet", and
+        ///   `Internals.URLSessionClient.pumpResponseBody`, which pulls from a
+        ///   `URLSession.AsyncBytes` only while there is room. A producer that ignores the window
+        ///   (the cached-response replay, the mocked task, the `URLSession` `didReceive data:`
+        ///   delegate behind the non-`SessionTask` overloads) gains nothing from one and keeps the
+        ///   previous, unmetered behaviour by passing `nil`.
+        package init(
+            readingMode: Internals.DownloadStep.ReadingMode,
+            flowControl: Internals.FlowControlWindow? = nil
+        ) async {
+            self.storage = await .init(readingMode: readingMode, flowControl: flowControl)
         }
 
         // MARK: - Internal methods

@@ -174,10 +174,41 @@ extension Internals {
                 return [{ self.download.append(dataBuffer) }]
             }
 
-            return task.eventLoop.makeSucceededVoidFuture()
+            // The returned future is AsyncHTTPClient's back pressure: it reads nothing more from
+            // this connection until it completes. Completing it unconditionally, as this used
+            // to, let the network run arbitrarily far ahead of the reader, with the whole
+            // difference held in memory.
+            //
+            // So it only completes once `download`'s window has room again, and that window is
+            // drained by whoever finally reads the body -- through any decompression stage in
+            // between, which meters its own output the same way -- not by `download`'s own
+            // queue catching up, which is an in-memory copy and would throttle nothing.
+            //
+            // Checked after `decide`, whose effects already ran `download.append` and so
+            // already charged this part. Waiting here never blocks the event loop's thread; it
+            // only stops this one request from reading. Every way this exchange can end without
+            // the reader draining the window releases it instead: `didReceiveError`,
+            // `didFinishRequest`, the reader's iterator going away, and the request being
+            // cancelled or dropped (see `Internals.Client.execute(request:url:...)`).
+            guard let flowControl = download.flowControl, !flowControl.isWritable else {
+                return task.eventLoop.makeSucceededVoidFuture()
+            }
+
+            let promise = task.eventLoop.makePromise(of: Void.self)
+
+            flowControl.whenWritable {
+                promise.succeed(())
+            }
+
+            return promise.futureResult
         }
 
         package func didFinishRequest(task: HTTPClient.Task<Response>) throws -> Response {
+            // Nothing can be waiting on the window by now -- AsyncHTTPClient only finishes once
+            // the last part's future completed -- but nothing will be produced into it again
+            // either, so there is no reason to leave it able to pause.
+            download.flowControl?.release()
+
             decide {
                 guard [.head, .downloading, .end].contains(_state) && _phase == .download else {
                     _unexpectedStateOrPhase()
@@ -196,6 +227,16 @@ extension Internals {
         }
 
         package func didReceiveError(task: HTTPClient.Task<Response>, _ error: Error) {
+            // First, unconditionally, and outside the state machine: whatever state this error
+            // lands in, including the `.end`/`.failure` ones that otherwise do nothing, a
+            // `didReceiveBodyPart` future still waiting on the window must complete. Left
+            // pending, it is an `EventLoopPromise` nobody will ever fulfil.
+            //
+            // Safe to fulfil synchronously, here on the event loop: AsyncHTTPClient moves its own
+            // state to finished before calling this, so the continuation that runs inline only
+            // finds that out and returns.
+            download.flowControl?.release()
+
             decide {
                 var effects = [Effect]()
 

@@ -5,7 +5,8 @@
 import SwiftAsyncStream
 import Testing
 
-@testable import RequestDLInternals
+@testable @_spi(Testing) import RequestDLInternals
+@testable import RequestDLTestSupport
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -47,6 +48,16 @@ struct InternalsManualDecompressionDispatchTests {
 
     private func responseHead(contentEncoding: String) -> Internals.ResponseHead {
         responseHead(contentEncodings: contentEncoding)
+    }
+
+    private func responseHeadWithNoContentEncoding() -> Internals.ResponseHead {
+        .init(
+            url: "https://example.com",
+            status: .init(code: 200, reason: "OK"),
+            version: .init(minor: 1, major: 1),
+            headers: [],
+            isKeepAlive: true
+        )
     }
 
     @Test
@@ -278,5 +289,164 @@ struct InternalsManualDecompressionDispatchTests {
 
         // Then
         #expect(collected == Data("hello world".utf8))
+    }
+
+    // MARK: - Flow control
+
+    /// Deterministic, position-dependent bytes, so a reassembled body that dropped, repeated or
+    /// reordered anything cannot compare equal by accident.
+    private func pattern(_ range: Range<Int>) -> Data {
+        Data(range.map { UInt8(truncatingIfNeeded: $0 % 251) })
+    }
+
+    /// A metered source whose decoded stream nobody is reading yet, with 16 KiB already waiting
+    /// in it: sixteen times what either window lets through before pausing.
+    private func meteredSource() async -> (Internals.AsyncStream<Internals.DataBuffer>, Internals.FlowControlWindow) {
+        let window = Internals.FlowControlWindow(highWatermark: 1_024, lowWatermark: 512)
+        let source = Internals.AsyncStream<Internals.DataBuffer>(flowControl: window)
+
+        for offset in stride(from: 0, to: 16_384, by: 1_024) {
+            source.append(.success(await Internals.DataBuffer(pattern(offset..<offset + 1_024))))
+        }
+
+        source.close()
+        return (source, window)
+    }
+
+    /// The decoding task is its source's reader, so it is what credits the source's window. Left
+    /// unmetered, it drained a source that was holding the network back into an output nobody was
+    /// holding back, which moved the unbounded backlog one stage downstream instead of removing
+    /// it: the source's window never filled, and the network was never paused.
+    ///
+    /// With its output metered too, it stops pulling as soon as its own output is full, so the
+    /// rest stays in the source, counted, where it keeps the producer upstream paused.
+    @Test
+    func resolvedStream_whenSourceIsMetered_stopsPullingOnceItsOwnOutputIsFull() async throws {
+        // Given
+        let (source, sourceWindow) = await meteredSource()
+        let dispatch = Internals.ManualDecompressionDispatch.dispatch(algorithms: [MockIdentityAlgorithm()])
+
+        // When
+        let output = try dispatch.resolvedStream(for: responseHead(contentEncoding: "gzip"), source: source)
+        let outputWindow = try #require(output.flowControlWindow)
+
+        // Then: the decoder pulls two chunks -- the second takes its output past the high
+        // watermark -- and parks, leaving the other fourteen counted against the source.
+        try await eventually { outputWindow.waitingCountForTesting == 1 }
+
+        #expect(outputWindow.bufferedBytesForTesting == 2_048)
+        #expect(sourceWindow.bufferedBytesForTesting == 14_336)
+        #expect(!sourceWindow.isWritable)
+
+        // Reading the output is what lets it go on, all the way through, intact.
+        var collected = Data()
+        for try await chunk in Internals.AsyncBytes(logger: nil, totalSize: .zero, stream: output) {
+            collected += chunk
+        }
+
+        #expect(collected == pattern(0..<16_384))
+        #expect(outputWindow.peakBufferedBytesForTesting <= 2_048)
+        #expect(sourceWindow.bufferedBytesForTesting == 0)
+    }
+
+    /// Discarding the decoded stream unread cancels the decoding task (see
+    /// `resolvedStream_whenNeverRead_cancelsTheDecompressionTaskInsteadOfRunningForever`). While
+    /// parked on its own full output, that task has to be woken for the cancellation to mean
+    /// anything, and once it is gone the source's window has to be released with it: nothing
+    /// will ever credit it again, and upstream, on the NIO path, a whole connection would stay
+    /// paused waiting for that.
+    @Test
+    func resolvedStream_whenDiscardedWhileParked_releasesTheSourceWindow() async throws {
+        // Given
+        let (source, sourceWindow) = await meteredSource()
+        let dispatch = Internals.ManualDecompressionDispatch.dispatch(algorithms: [MockIdentityAlgorithm()])
+
+        let outputWindow: Internals.FlowControlWindow
+
+        do {
+            let output = try dispatch.resolvedStream(for: responseHead(contentEncoding: "gzip"), source: source)
+            outputWindow = try #require(output.flowControlWindow)
+
+            try await eventually { outputWindow.waitingCountForTesting == 1 }
+            #expect(!sourceWindow.isReleasedForTesting)
+        }
+
+        // Then
+        try await eventually { sourceWindow.isReleasedForTesting }
+        #expect(outputWindow.waitingCountForTesting == 0)
+    }
+
+    /// An unmetered source keeps the previous, unmetered behaviour end to end: nothing upstream
+    /// could honour a window anyway (the cached-response replay, the `URLSession` delegate).
+    @Test
+    func resolvedStream_whenSourceIsNotMetered_leavesTheOutputUnmetered() async throws {
+        // Given
+        let source = Internals.AsyncStream<Internals.DataBuffer>()
+        source.close()
+
+        let dispatch = Internals.ManualDecompressionDispatch.dispatch(algorithms: [MockIdentityAlgorithm()])
+
+        // When
+        let output = try dispatch.resolvedStream(for: responseHead(contentEncoding: "gzip"), source: source)
+
+        // Then
+        #expect(output.flowControlWindow == nil)
+    }
+
+    // MARK: - requiresManualDecoding(for:)
+
+    /// `.skip` never requires this package's own decoding: either decompression is disabled, or
+    /// every configured algorithm was already decoded natively before these bytes were observed.
+    /// Either way there is nothing left for `requiresManualDecoding(for:)` to say yes to.
+    @Test
+    func requiresManualDecoding_whenSkipping_isAlwaysFalse() {
+        #expect(
+            !Internals.ManualDecompressionDispatch.skip.requiresManualDecoding(
+                for: responseHead(contentEncoding: "gzip")
+            )
+        )
+        #expect(
+            !Internals.ManualDecompressionDispatch.skip.requiresManualDecoding(for: responseHeadWithNoContentEncoding())
+        )
+    }
+
+    /// Regression guard: this is the exact check `Internals.ClientResponseReceiver` (`.nio`) and
+    /// `Internals.URLSessionClient`'s `runExchange` (`.urlSession`) both gate their cache tee on,
+    /// so a caching response this package still has to decode itself is never persisted still
+    /// compressed. Both executors were found, independently, to have lost this gate while being
+    /// rewritten -- once during the twelfth audit's original fix, once merging the `.nio` and
+    /// `.urlSession` back-pressure fixes together -- because nothing exercised this function
+    /// directly. See `InternalsClientSessionTaskTests`/`InternalsURLSessionClientSessionTaskTests`
+    /// for the executor-level regression tests this one complements.
+    @Test
+    func requiresManualDecoding_whenDispatchingARealEncoding_isTrue() {
+        let dispatch = Internals.ManualDecompressionDispatch.dispatch(algorithms: [MockIdentityAlgorithm()])
+        #expect(dispatch.requiresManualDecoding(for: responseHead(contentEncoding: "gzip")))
+    }
+
+    @Test
+    func requiresManualDecoding_whenNoContentEncodingHeader_isFalse() {
+        let dispatch = Internals.ManualDecompressionDispatch.dispatch(algorithms: [MockIdentityAlgorithm()])
+        #expect(!dispatch.requiresManualDecoding(for: responseHeadWithNoContentEncoding()))
+    }
+
+    /// `identity` stands for "no transformation": nothing to decode, so nothing to cache-gate
+    /// against either.
+    @Test
+    func requiresManualDecoding_whenContentEncodingIsIdentity_isFalse() {
+        let dispatch = Internals.ManualDecompressionDispatch.dispatch(algorithms: [MockIdentityAlgorithm()])
+        #expect(!dispatch.requiresManualDecoding(for: responseHead(contentEncoding: "identity")))
+    }
+
+    /// A transport that already decoded this specific encoding natively (`nativelyDecoded`) has
+    /// already handed over plain bytes by the time the cache tee would see them, even though this
+    /// dispatch is `.dispatch` for the request as a whole (a mixed list under `.nio`, say).
+    @Test
+    func requiresManualDecoding_whenEncodingIsAlreadyNativelyDecoded_isFalse() {
+        let dispatch = Internals.ManualDecompressionDispatch.dispatch(
+            algorithms: [MockIdentityAlgorithm()],
+            nativelyDecoded: ["gzip"]
+        )
+        #expect(!dispatch.requiresManualDecoding(for: responseHead(contentEncoding: "gzip")))
     }
 }

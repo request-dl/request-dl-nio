@@ -230,6 +230,12 @@ extension Internals {
         /// duplicating this body, so its three existing direct callers (`SessionExecutionTests`,
         /// `LocalServerConcurrencyTests`, `InternalsClientResponseReceiverTests`) keep working
         /// unmodified.
+        ///
+        /// - Parameter flowControl: What `delegate` consults before letting AsyncHTTPClient read
+        ///   more of the body, so the network can't run arbitrarily far ahead of whoever is
+        ///   reading. See `Internals.ClientResponseReceiver.didReceiveBodyPart(task:_:)`. A fresh
+        ///   window with the default watermarks per request; only tests pass their own, to pin
+        ///   the pause down to an exact byte.
         package func execute(
             request: HTTPClient.Request,
             url: String,
@@ -237,11 +243,12 @@ extension Internals {
             uploadingBytes: Int,
             decompression: Internals.Decompression,
             cache: ((Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
-            logger: TaskLogger?
+            logger: TaskLogger?,
+            flowControl: Internals.FlowControlWindow = .init()
         ) async throws -> SessionTask {
             let upload = Internals.AsyncStream<Int>()
             let head = Internals.AsyncStream<Internals.ResponseHead>()
-            let download = await Internals.DownloadBuffer(readingMode: readingMode)
+            let download = await Internals.DownloadBuffer(readingMode: readingMode, flowControl: flowControl)
 
             // No all-or-nothing constraint on this executor, unlike `.urlSession`: manual
             // dispatch only has to activate for algorithms `NIOHTTPResponseDecompressor` (added
@@ -329,8 +336,43 @@ extension Internals {
                 delegate.failIfNotStarted(error)
             }
 
+            // Cancelling or dropping the response has to release `flowControl` itself, and not
+            // rely on the cancellation reaching `delegate.didReceiveError` to do it.
+            //
+            // AsyncHTTPClient only reports a failure straight away while it still has more of
+            // the body to read. Once the response's end has already arrived -- sitting in its
+            // own buffer behind a body part whose future is waiting on this window -- a
+            // cancellation only discards that buffer and records the error, to be delivered
+            // after that future completes (`RequestBag.StateMachine.fail(_:)`, the
+            // `.buffering(_, next: .eof)` case). With a reader that is gone, or that stopped for
+            // good, that future never would: the `HTTPClient.Task` would never complete, and the
+            // request, its delegate and whatever it buffered would stay reachable from the pending
+            // promise's own callbacks indefinitely. Observed directly, not inferred; see
+            // `InternalsClientResponseReceiverBackPressureTests
+            // .requestCancelledAfterTheEndAlreadyArrived_stillReleasesThePausedPart`.
+            //
+            // The order relative to the request's own seed doesn't matter. Releasing lets
+            // AsyncHTTPClient resume consuming whatever it had buffered, which is harmless either
+            // way: at worst the request finishes normally a moment before the cancellation lands,
+            // and `UnsafeTask` orders those two on the event loop.
+            let requestSeed = unsafeTask()
+
+            let seed = Internals.TaskSeed(
+                cancel: {
+                    requestSeed()
+                    flowControl.release()
+                },
+                release: {
+                    // `requestSeed`'s own `deinit`, which is what cancels a dropped request, runs
+                    // once this closure -- its last owner -- goes away with the seed wrapping it.
+                    withExtendedLifetime(requestSeed) {
+                        flowControl.release()
+                    }
+                }
+            )
+
             return SessionTask(
-                seed: unsafeTask(),
+                seed: seed,
                 response: response
             )
         }

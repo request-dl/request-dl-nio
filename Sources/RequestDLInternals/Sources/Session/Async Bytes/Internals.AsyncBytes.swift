@@ -103,3 +103,16 @@ extension Internals {
         }
     }
 }
+
+// MARK: - Testing
+
+@_spi(Testing)
+extension Internals.AsyncBytes {
+
+    /// The window metering the stream these bytes are read from: the one the network producer
+    /// pauses on (`Internals.ClientResponseReceiver`), or, behind manual decompression, the
+    /// decoder's own. `nil` for every other source.
+    public var flowControlWindowForTesting: Internals.FlowControlWindow? {
+        asyncBuffers.flowControlWindow
+    }
+}
