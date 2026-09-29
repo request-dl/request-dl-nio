@@ -261,13 +261,50 @@ toggled suspend/resume every few milliseconds, all complete intact (run repeated
 
 ---
 
-## 4. Open questions for the public-API task
+## 4. Open questions for the public-API task, with proposed answers
 
-- Should every request be suspendable (then the bound-pair upload path becomes the default
-  `.urlSession` upload path, not just the opted-in one), or only requests that opt in?
-- How to present the bounded pause duration: surface `timeoutIntervalForRequest` /
-  `Timeout.read` interaction, raise them while suspended, or document "a long pause may fail
-  and, for downloads, reconnect"?
-- Should `Range` reconnection be on by default for eligible downloads, and with what budget?
-- Where partial bodies live for cross-launch resume (DownloadTask-to-file only?).
-- Which resumable-upload protocol(s), if any (section 1.2).
+Each question below carries a *proposed* answer, informed by what comparable clients do
+(`URLSession`/`URLSessionTask`, Alamofire, OkHttp, Android `DownloadManager`, browsers). The
+market comparison is from general knowledge of those APIs and was not re-verified against their
+current documentation for this document; check it before the answers are treated as decided.
+These are recommendations for the public-API task, not commitments made by this branch.
+
+1. **Should every request be suspendable, or only requests that opt in?**
+   Market: `URLSession` and Alamofire expose `suspend()`/`resume()` on every request; OkHttp
+   has no pause at all.
+   Proposal: make `suspend()`/`resume()` available on every request, but keep the bound-pair
+   `.urlSession` upload path (section 1.1) tied to a request that actually has a
+   `TransferControl`, rather than making it the default upload path. It costs an extra pump and
+   a copy of the body, and `.nio` pauses uploads without any of that.
+
+2. **How to present the bounded pause duration (`timeoutIntervalForRequest` / `Timeout.read`)?**
+   Market: none of the comparable clients solves this; a long pause simply may hit the idle
+   timeout. This is the least settled of the five.
+   Proposal: document it instead of masking it. A suspended download that outlives the
+   connection reconnects on resume through `Range` (section 2, "resumption"); a suspended
+   `.urlSession` upload cannot, and fails with `URLError.timedOut` (section 3), which the public
+   API should state explicitly rather than raising timeouts while suspended.
+
+3. **Should `Range` reconnection be on by default, and with what budget?**
+   Market: `downloadTask(withResumeData:)` and Alamofire's resume data are explicit, app-driven
+   steps; browsers resume on their own, and only against a strong validator.
+   Proposal: on by default only for idempotent (`GET`) downloads whose response carries a
+   strong `ETag` or strong `Last-Modified` -- the same eligibility this branch already enforces
+   -- with a small finite budget of attempts without progress (for example three), and a way to
+   turn it off.
+
+4. **Where do partial bodies live for cross-launch resume?**
+   Market: `URLSession` hands the app an opaque resume-data blob and leaves persistence to it;
+   Alamofire does the same.
+   Proposal: support it for `DownloadTask` to a file only, with the partial file next to the
+   destination and `Internals.RangeResumptionPlan` (URL, validator, offset, length) persisted
+   with it. Do not persist a `DataTask`'s partial body: it only ever lives in memory.
+
+5. **Which resumable-upload protocol(s), if any (section 1.2)?**
+   Market: tus 1.0, vendor protocols (GCS resumable uploads, S3 multipart) and the IETF
+   `resumable-upload` draft coexist; `URLSession` implements the IETF draft on its own, without
+   exposing it through `bytes(for:delegate:)`.
+   Proposal: defer. Ship pause/resume and download resumption first and take resumable uploads
+   as a separate feature once there is demand; when it comes, start from the IETF draft
+   (the likeliest to become the standard), behind an explicit, app-selected protocol as
+   recommended in section 1.2.
