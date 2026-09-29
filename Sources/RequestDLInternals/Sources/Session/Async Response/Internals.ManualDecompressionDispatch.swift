@@ -82,24 +82,7 @@ extension Internals.ManualDecompressionDispatch {
             return source
         }
 
-        // Every `Content-Encoding` field line, comma-split and joined into one list. RFC 9110
-        // §5.2 makes several field lines of the same name exactly equivalent to one comma-joined
-        // line, so a server is free to send either — and taking only `.first` of either shape
-        // means a body compressed twice is decoded once and handed back still compressed, with
-        // `Internals.CacheControl` storing those wrong bytes on the way past.
-        //
-        // `identity` is dropped rather than counted: it stands for "no transformation", so it
-        // never changes what has to be undone.
-        //
-        // Trimming goes through the package's own `trimming(where:)`, not
-        // `trimmingCharacters(in: .whitespaces)`: that needs `Foundation.CharacterSet`, which
-        // this file has no import for. Same as `Internals.CacheControl.directives(_:)`.
-        let encodings =
-            head
-            .headerValues(named: "Content-Encoding")
-            .flatMap { $0.split(separator: ",") }
-            .map { $0.trimming(where: \.isWhitespace).lowercased() }
-            .filter { !$0.isEmpty && $0 != "identity" }
+        let encodings = Self.normalizedContentEncodings(for: head)
 
         guard let normalized = encodings.first else {
             return source
@@ -128,6 +111,54 @@ extension Internals.ManualDecompressionDispatch {
         }
 
         return Internals.AsyncStream.decompressing(source, using: algorithm)
+    }
+
+    /// Whether reading this specific response's body will actually run this package's own
+    /// decompression over the wire bytes, rather than passing them through unchanged.
+    ///
+    /// `.skip` never does (either decompression is disabled, or a transport already decoded the
+    /// body natively before these bytes were observed). `.dispatch` only does when the response's
+    /// own `Content-Encoding` names something beyond what's already natively decoded -- an absent
+    /// or `identity` header, or one `resolvedStream(for:source:)` will itself pass straight
+    /// through, answers `false` here too, for the same reason.
+    ///
+    /// `Internals.CacheControl`'s write-side tee attaches at the wire-byte level, upstream of
+    /// `resolvedStream(for:source:)` -- so wherever this answers `true`, whatever the tee would
+    /// capture is still compressed, not the plain bytes a cache replay (which never re-runs
+    /// decompression) would need. Callers use this to skip caching such a response outright
+    /// rather than silently persisting the still-compressed body as if it were already decoded.
+    package func requiresManualDecoding(for head: Internals.ResponseHead) -> Bool {
+        guard case .dispatch(_, let nativelyDecoded) = self else {
+            return false
+        }
+
+        let encodings = Self.normalizedContentEncodings(for: head)
+
+        guard let normalized = encodings.first else {
+            return false
+        }
+
+        return !nativelyDecoded.contains(normalized)
+    }
+
+    /// Every `Content-Encoding` field line, comma-split and joined into one list. RFC 9110 §5.2
+    /// makes several field lines of the same name exactly equivalent to one comma-joined line, so
+    /// a server is free to send either — and taking only `.first` of either shape means a body
+    /// compressed twice is decoded once and handed back still compressed, with
+    /// `Internals.CacheControl` storing those wrong bytes on the way past.
+    ///
+    /// `identity` is dropped rather than counted: it stands for "no transformation", so it never
+    /// changes what has to be undone.
+    ///
+    /// Trimming goes through the package's own `trimming(where:)`, not
+    /// `trimmingCharacters(in: .whitespaces)`: that needs `Foundation.CharacterSet`, which this
+    /// file has no import for. Same as `Internals.CacheControl.directives(_:)`.
+    private static func normalizedContentEncodings(for head: Internals.ResponseHead) -> [String] {
+        head
+            .headerValues(named: "Content-Encoding")
+            .flatMap { $0.split(separator: ",") }
+            .map { $0.trimming(where: \.isWhitespace).lowercased() }
+            .filter { !$0.isEmpty && $0 != "identity" }
     }
 }
 

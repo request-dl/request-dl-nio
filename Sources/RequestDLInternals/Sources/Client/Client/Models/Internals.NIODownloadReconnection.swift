@@ -238,11 +238,19 @@ extension Internals {
                 reconnection: self
             )
 
-            let unsafeTask = await client.execute(
-                request: continuation,
-                delegate: receiver,
-                logger: logger
-            )
+            // `execute` now throws when the request is rejected before dispatch; that ends this
+            // attempt the same way a failure of the task itself would.
+            let unsafeTask: Internals.UnsafeTask<Void>
+            do {
+                unsafeTask = try await client.execute(
+                    request: continuation,
+                    delegate: receiver,
+                    logger: logger
+                )
+            } catch {
+                receiver.failIfNotStarted(error)
+                return
+            }
 
             unsafeTask.whenFailure { error in
                 receiver.failIfNotStarted(error)

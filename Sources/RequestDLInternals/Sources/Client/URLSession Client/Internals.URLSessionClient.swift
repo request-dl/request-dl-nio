@@ -165,6 +165,13 @@ extension Internals {
             let release = await throttledExecutor.acquire()
             defer { release() }
 
+            // `AsyncSemaphore.wait()` (backing `acquire()` above) is documented as "cancellation
+            // transparent": a waiter cancelled while queued still takes its turn once a slot
+            // frees up, rather than being skipped. Without this check, a caller whose own `Task`
+            // was cancelled while queued here still had its request dispatched onto the wire the
+            // moment `acquire()` returned.
+            try Task.checkCancellation()
+
             let tlsDelegate = identityPolicy.flatMap { policy in
                 request.url?.host.map { TLSDelegate(host: $0, policy: policy) }
             }
@@ -233,6 +240,11 @@ extension Internals {
 
             let release = await throttledExecutor.acquire()
             defer { release() }
+
+            // See the equivalent comment in `execute(request:delegate:)`: a cancelled caller
+            // must not have its request dispatched once a slot frees up, since the semaphore
+            // itself is "cancellation transparent" and would otherwise let it through anyway.
+            try Task.checkCancellation()
 
             let materialized: Internals.URLSessionUploadFile.Materialized
             if let existingUploadFile {
@@ -318,6 +330,17 @@ extension Internals {
             // it, not just once it starts sending.
             let operation = operationQueue.operation()
             let release = await throttledExecutor.acquire()
+
+            // See the equivalent comment in `execute(request:delegate:)`: a cancelled caller
+            // must not have its request dispatched once a slot frees up. Both the operation slot
+            // and the throttle permit are handed back here, since neither overload's usual
+            // release path (`onDownloadComplete`, wired up below) ever runs when the request is
+            // never actually dispatched.
+            guard !Task.isCancelled else {
+                release()
+                operation.complete()
+                throw CancellationError()
+            }
 
             let tlsDelegate = identityPolicy.flatMap { policy in
                 request.url?.host.map { TLSDelegate(host: $0, policy: policy) }
@@ -524,6 +547,17 @@ extension Internals {
             let operation = operationQueue.operation()
             let release = await throttledExecutor.acquire()
 
+            // See the equivalent comment in `execute(request:delegate:)`: a cancelled caller
+            // must not have its request dispatched once a slot frees up. Both the operation slot
+            // and the throttle permit are handed back here, since neither is tied to a `defer`
+            // in this overload -- their usual release path (`onDownloadComplete`, wired up
+            // below) never runs when the request is never actually dispatched.
+            guard !Task.isCancelled else {
+                release()
+                operation.complete()
+                throw CancellationError()
+            }
+
             // CFNetwork's transparent `Content-Encoding` decoding can only be switched off by
             // taking over `Accept-Encoding` ourselves, and doing so suppresses it entirely, for
             // every encoding, not just the one added. So this is all-or-nothing: either every
@@ -536,7 +570,16 @@ extension Internals {
 
             switch decompression {
             case .disabled:
-                request.setValue("identity", forHTTPHeaderField: "Accept-Encoding")
+                // Only when the caller hasn't already set their own: `.disabled` means this
+                // package leaves `Content-Encoding` handling alone entirely, and a caller who set
+                // `Accept-Encoding` explicitly (e.g. `AcceptEncodingHeader`, documented as usable
+                // exactly when the caller intends to decode the body itself) is relying on that
+                // value reaching the wire unchanged, the same way it does under `.nio`. Without
+                // this guard, `.urlSession` silently overwrote it with `identity` regardless,
+                // defeating that configuration only under this executor.
+                if request.value(forHTTPHeaderField: "Accept-Encoding") == nil {
+                    request.setValue("identity", forHTTPHeaderField: "Accept-Encoding")
+                }
                 decompressionDispatch = .skip
 
             case .enabled(let algorithms, _) where decompression.requiresManualURLSessionHandling:
@@ -639,6 +682,7 @@ extension Internals {
                     box: box,
                     readingMode: readingMode,
                     cache: cache,
+                    decompressionDispatch: decompressionDispatch,
                     upload: upload,
                     head: head,
                     downloadBuffer: downloadBuffer,
@@ -703,6 +747,7 @@ extension Internals {
             box: CancellableTaskBox,
             readingMode: Internals.DownloadStep.ReadingMode,
             cache: (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
+            decompressionDispatch: Internals.ManualDecompressionDispatch,
             upload: Internals.AsyncStream<Int>,
             head: Internals.AsyncStream<Internals.ResponseHead>,
             downloadBuffer: Internals.DownloadBuffer,
@@ -723,13 +768,34 @@ extension Internals {
             var isHeadResolved = false
 
             do {
-                let (bytes, response) = try await withTaskCancellationHandler {
-                    try await session.bytes(for: request, delegate: taskDelegate)
-                } onCancel: {
-                    box.cancel()
+                // Ordinarily just one request. Loops only when `TaskDelegate` deferred a redirect
+                // to here instead of handing it back to `URLSession` -- see
+                // `completeRedirect(with:_:)`'s doc comment for why (a file-backed body resend
+                // `URLSession` itself won't reliably carry out, observed directly on watchOS).
+                // Each pass is a genuinely new task, sharing `taskDelegate` so redirect counting,
+                // history and error state keep accumulating exactly as they would across
+                // `URLSession`'s own automatic follows.
+                func resolveExchange() async throws -> (URLSession.AsyncBytes, URLResponse) {
+                    var currentRequest = request
+
+                    while true {
+                        let (bytes, response) = try await withTaskCancellationHandler {
+                            try await session.bytes(for: currentRequest, delegate: taskDelegate)
+                        } onCancel: {
+                            box.cancel()
+                        }
+
+                        box.task = bytes.task
+
+                        guard let manualRedirect = try taskDelegate.takePendingManualBodyRedirect() else {
+                            return (bytes, response)
+                        }
+
+                        currentRequest = manualRedirect
+                    }
                 }
 
-                box.task = bytes.task
+                let (bytes, response) = try await resolveExchange()
 
                 let responseHead: Internals.ResponseHead
                 do {
@@ -751,7 +817,15 @@ extension Internals {
                 // ordered against every `downloadBuffer.append(_:)` by
                 // `Internals.DownloadBuffer`'s own queue, the same guarantee
                 // `Internals.ClientResponseReceiver.didReceiveHead` relies on.
-                if let cacheStream = cache?(responseHead) {
+                //
+                // Skipped whenever this response still needs this package's own decompression:
+                // the tee here captures wire bytes upstream of that step, so caching would
+                // persist the still-compressed body under a cached head that (on replay, which
+                // never re-runs decompression) claims it's already decoded. See
+                // `Internals.ManualDecompressionDispatch.requiresManualDecoding(for:)`.
+                if !decompressionDispatch.requiresManualDecoding(for: responseHead),
+                    let cacheStream = cache?(responseHead)
+                {
                     downloadBuffer.cacheStream(cacheStream)
                 }
 
@@ -1114,6 +1188,8 @@ extension Internals.URLSessionClient {
         /// `Internals.URLSessionUploadBodyPump` for a suspendable one. What `needNewBodyStream`
         /// answers with.
         private let makeBodyStream: (@Sendable () -> InputStream?)?
+        /// The initial request's `Content-Length`, which a manual redirect resend reattaches.
+        private let bodyLength: String?
         private let lock = Lock()
 
         // MARK: - Unsafe properties
@@ -1121,6 +1197,11 @@ extension Internals.URLSessionClient {
         /// All visited URLs, starting with the request's own. Mirrors `RedirectState.visited`.
         private var _visited: [String]
         private var _redirectError: Error?
+        /// A redirect `willPerformHTTPRedirection` decided to follow but refused to hand back to
+        /// `URLSession` itself, because this task's body is file-backed (`makeBodyStream` set): see
+        /// that method's own doc comment for why. `runExchange` takes this, attaches a fresh
+        /// stream, and reissues the request itself as a new `bytes(for:delegate:)` call.
+        private var _pendingManualBodyRedirect: URLRequest?
         /// Set once the proxy has rejected the configured credentials and the challenge was
         /// cancelled; reported in place of the `NSURLErrorCancelled` that cancelling produces. See
         /// `substitutingRecordedError(for:)`.
@@ -1190,6 +1271,7 @@ extension Internals.URLSessionClient {
             self.downloadBuffer = downloadBuffer
             self.onDownloadComplete = onDownloadComplete
             self.makeBodyStream = makeBodyStream
+            self.bodyLength = initialRequest.value(forHTTPHeaderField: "Content-Length")
             self._lastRequest = initialRequest
             self._visited = [initialRequest.url?.absoluteString ?? ""]
             self._responseData = Data()
@@ -1255,7 +1337,7 @@ extension Internals.URLSessionClient {
                         _history.append(entry)
                         _lastRequest = sanitizedRequest
                     }
-                    completionHandler(sanitizedRequest)
+                    completeRedirect(with: sanitizedRequest, completionHandler)
                 case .failure(let error):
                     lock.withLock { _redirectError = error }
                     completionHandler(nil)
@@ -1293,12 +1375,41 @@ extension Internals.URLSessionClient {
                         _lastRequest = newRequest
                         _strategyRedirectCount += 1
                     }
-                    completionHandler(newRequest)
+                    completeRedirect(with: newRequest, completionHandler)
                 }
             }
         }
 
         // MARK: - Private methods
+
+        /// Hands `request` to `URLSession` to follow automatically, unless this task's body is
+        /// file-backed and `request` still carries one (i.e. its method wasn't downgraded to
+        /// `GET`/`HEAD`) -- observed directly, on watchOS specifically: `URLSession` there
+        /// neither calls `needNewBodyStream` for such a resend nor honours a stream attached to
+        /// the request returned from this very delegate method, and instead silently resends the
+        /// *original* request's stream, already exhausted by the first send. Every other tested
+        /// platform (macOS, iOS, iPadOS, tvOS, Catalyst) does call `needNewBodyStream` here on
+        /// its own and sends the body correctly.
+        ///
+        /// So for this one combination, this refuses the automatic follow (`completionHandler(nil)`,
+        /// same as `.disallow`) and defers to `runExchange`, which takes `request` from
+        /// `takePendingManualBodyRedirect()`, attaches a fresh stream itself, and reissues it as a
+        /// brand new `bytes(for:delegate:)` call -- a genuinely new task, not a continuation of
+        /// the redirected one, so the platform quirk above (specific to *resending* a stream on
+        /// the same continuing exchange) never applies to it.
+        private func completeRedirect(with request: URLRequest, _ completionHandler: (URLRequest?) -> Void) {
+            guard
+                makeBodyStream != nil,
+                let method = request.httpMethod,
+                !["GET", "HEAD"].contains(method.uppercased())
+            else {
+                completionHandler(request)
+                return
+            }
+
+            lock.withLock { _pendingManualBodyRedirect = request }
+            completionHandler(nil)
+        }
 
         /// The request that produced `response`, per `_lastRequest`: the request one hop
         /// before `request` in `urlSession(_:task:willPerformHTTPRedirection:newRequest:completionHandler:)`.
@@ -1432,6 +1543,38 @@ extension Internals.URLSessionClient {
         /// and `executeSessionTask`'s `runExchange` for the `bytes(for:delegate:)` one.
         func substitutingRecordedError(for error: Error) -> Error {
             lock.withLock { _proxyAuthenticationError } ?? error
+        }
+
+        /// The redirect `willPerformHTTPRedirection` deferred to `runExchange` (see
+        /// `_pendingManualBodyRedirect`'s own doc comment), with a fresh stream over
+        /// `makeBodyStream`'s stream already attached and ready to send -- `nil` when there's nothing
+        /// pending. Cleared so it's only ever taken once.
+        ///
+        /// - Throws: if the body's file is gone by the time of the resend, the same
+        /// failure `attachUploadBody(_:to:)` raises for the initial request, rather than
+        /// silently sending an empty or wrong body.
+        func takePendingManualBodyRedirect() throws -> URLRequest? {
+            guard
+                let pending = lock.withLock({
+                    defer { _pendingManualBodyRedirect = nil }
+                    return _pendingManualBodyRedirect
+                })
+            else {
+                return nil
+            }
+
+            guard let stream = makeBodyStream?() else {
+                throw URLError(.cannotOpenFile)
+            }
+
+            var request = pending
+            request.httpBodyStream = stream
+
+            if let bodyLength {
+                request.setValue(bodyLength, forHTTPHeaderField: "Content-Length")
+            }
+
+            return request
         }
 
         /// The response head for `executeSessionTask`, which gets `response` from

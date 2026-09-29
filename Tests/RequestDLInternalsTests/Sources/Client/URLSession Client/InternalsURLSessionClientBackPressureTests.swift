@@ -650,9 +650,17 @@ struct InternalsURLSessionClientBackPressureTests {
     }
 
     /// A `Payload(url:)` body is uploaded straight from the caller's own file. A 307 redirect
-    /// makes `URLSession` send the body again, which it can only do by asking `TaskDelegate` for a
-    /// fresh stream over the same file (`needNewBodyStream`): the destination has to get all of
-    /// it, and the caller's file has to be left alone afterwards.
+    /// makes the request go out again with the same body: the destination has to get all of it,
+    /// and the caller's file has to be left alone afterwards.
+    ///
+    /// Handled entirely by `TaskDelegate.completeRedirect(with:_:)`/`takePendingManualBodyRedirect()`
+    /// -- a manual resend with a fresh stream over `bodyFileURL`, not `URLSession`'s own
+    /// `needNewBodyStream`. Verified directly, on watchOS specifically: `URLSession` there calls
+    /// neither `needNewBodyStream` for this resend nor honours a stream attached to the request
+    /// returned from `willPerformHTTPRedirection`, and instead resends the *original* request's
+    /// already-exhausted stream, silently sending an empty body. Every other platform tested
+    /// (macOS, iOS, iPadOS, tvOS, Catalyst) does call `needNewBodyStream` correctly on its own --
+    /// this test would still pass either way, since the manual path runs uniformly regardless.
     @Test
     func existingFileUpload_resentOnA307_arrivesWholeAtTheDestination() async throws {
         let payload = Data((0..<3_000_001).map { UInt8(truncatingIfNeeded: $0 &* 13) })

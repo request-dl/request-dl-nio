@@ -35,6 +35,14 @@ extension AsyncBytes {
             data.append(slice)
         }
 
+        // The underlying stream's own iterator ends the sequence cleanly (no error) when *this*
+        // task is the one that got cancelled, the same "cancellation transparent" contract
+        // `AsyncResponse.collect()` already guards against. Without this check, a body read cut
+        // short by the caller's own cancellation looks identical to one that ended because the
+        // server closed the connection normally, and `data` -- silently truncated -- is returned
+        // as if it were the complete response.
+        try Task.checkCancellation()
+
         log(data: data)
         return data
     }
@@ -47,6 +55,11 @@ extension AsyncBytes {
             log(receivedBytes: bytes)
             data.append(bytes)
         }
+
+        // See the identical check in the overload above: without it, this task's own
+        // cancellation ends the stream with no error, and a truncated body comes back as if it
+        // were a complete, successful response.
+        try Task.checkCancellation()
 
         log(data: data)
         return data

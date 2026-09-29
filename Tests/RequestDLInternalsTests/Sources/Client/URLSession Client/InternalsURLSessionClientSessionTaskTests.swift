@@ -140,6 +140,71 @@ struct InternalsURLSessionClientSessionTaskTests {
         #expect(!assembledCache.isEmpty)
     }
 
+    /// Regression guard for the gate `Internals.CacheControl`'s manual-decompression fix added:
+    /// caching a response this package still has to decode itself would persist the still-
+    /// compressed wire bytes under a cached head that (on replay, which never re-runs
+    /// decompression) claims they're already decoded. So whenever
+    /// `Internals.ManualDecompressionDispatch.requiresManualDecoding(for:)` answers `true` for a
+    /// response, the cache tee must never attach at all.
+    ///
+    /// Verified by temporarily dropping `decompressionDispatch` from `runExchange`'s parameter
+    /// list and its `requiresManualDecoding` guard, mirroring the exact regression this test is
+    /// named after: that fix was lost, silently, while merging this executor's `bytes(for:
+    /// delegate:)` rewrite with the NIO executor's own copy of the same fix. This test then
+    /// fails, since `cache` is invoked and `cacheStream` receives the (still identity-"encoded")
+    /// body instead of closing empty.
+    @Test
+    func sessionTask_whenCacheProvidedAndManualDecompressionRequired_skipsTheCacheTee() async throws {
+        // Given
+        let localServer = try await LocalServer(.standard)
+        let uri = "/" + UUID().uuidString
+        let output = String(repeating: "the quick brown fox jumps over the lazy dog ", count: 500)
+
+        let response = try LocalServer.ResponseConfiguration(
+            headers: ["Content-Encoding": IdentityTestAlgorithm.contentEncoding],
+            jsonObject: output
+        )
+
+        localServer.cleanup(at: uri)
+        localServer.insert(response, at: uri)
+        defer { localServer.cleanup(at: uri) }
+
+        let url = try #require(URL(string: "https://\(localServer.baseURL)\(uri)"))
+        let client = try Internals.URLSessionClient(configuration: .ephemeral)
+
+        let cacheInvoked = CacheInvocationFlag()
+        let cacheStream = Internals.AsyncStream<Internals.DataBuffer>()
+
+        // When
+        let sessionTask = try await client.execute(
+            request: URLRequest(url: url),
+            readingMode: .length(2_048),
+            uploadingBytes: .zero,
+            decompression: .enabled(algorithms: [IdentityTestAlgorithm()], limit: .none),
+            cache: { _ in
+                cacheInvoked.markInvoked()
+                return cacheStream
+            },
+            logger: nil,
+            delegate: AcceptAnyServerTrustDelegate()
+        )
+
+        var downloadedChunks: [Data] = []
+
+        for try await step in sessionTask.response {
+            guard case .download(let downloadStep) = step else { continue }
+            for try await chunk in downloadStep.bytes {
+                downloadedChunks.append(chunk)
+            }
+        }
+
+        // Then: the download itself still succeeds (manual decoding runs on the live path
+        // regardless of caching), but nothing was ever handed to the cache.
+        let decoded = try HTTPResult<String>(downloadedChunks.reduce(Data(), +))
+        #expect(decoded.response == output)
+        #expect(!cacheInvoked.invoked)
+    }
+
     @Test
     func sessionTask_whenCancelledMidDownload_stopsRunningSoonAfter() async throws {
         // Given: large enough that cancelling after the first chunk still leaves real work
@@ -339,6 +404,40 @@ private final class AcceptAnyServerTrustDelegate: NSObject, URLSessionTaskDelega
         }
 
         completionHandler(.useCredential, URLCredential(trust: serverTrust))
+    }
+}
+
+/// The identity function, registered under a `Content-Encoding` CFNetwork doesn't decode
+/// natively, so `Internals.ManualDecompressionDispatch` always takes the `.dispatch` branch for
+/// it -- the one condition `requiresManualDecoding(for:)` answers `true` for.
+private struct IdentityTestAlgorithm: Internals.DecompressionAlgorithm {
+
+    static let contentEncoding = "x-requestdl-identity-test"
+
+    struct Stream: Internals.DecompressorStream {
+        mutating func callAsFunction(decompressing bytes: Data) throws -> Data { bytes }
+        mutating func finish() throws -> Data { Data() }
+    }
+
+    var contentEncodingValue: String { Self.contentEncoding }
+
+    func callAsFunction() throws -> any Internals.DecompressorStream { Stream() }
+}
+
+/// Whether the `@Sendable` `cache` closure `Internals.URLSessionClient.execute` takes was ever
+/// called, observed from outside it. A plain captured `var` can't be mutated from inside a
+/// `@Sendable` closure; this is the smallest thing that can.
+private final class CacheInvocationFlag: @unchecked Sendable {
+
+    private let lock = NSLock()
+    private var _invoked = false
+
+    var invoked: Bool {
+        lock.withLock { _invoked }
+    }
+
+    func markInvoked() {
+        lock.withLock { _invoked = true }
     }
 }
 
