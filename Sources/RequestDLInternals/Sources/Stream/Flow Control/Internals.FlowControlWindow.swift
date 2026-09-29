@@ -39,6 +39,25 @@ extension Internals {
     /// `Internals.Client.execute(request:url:readingMode:uploadingBytes:decompression:cache:logger:)`
     /// for which event maps to which call on the `.nio` path, and
     /// `Internals.URLSessionClient.executeSessionTask` on the `.urlSession` one.
+    ///
+    /// ## Suspension
+    ///
+    /// ``suspend()`` shuts the window deliberately, regardless of how much is buffered, until
+    /// ``resume()``: the incidental pause above, generalized to one the application asked for and
+    /// that may last arbitrarily long. See `Internals.TransferControl`, which is what suspends and
+    /// resumes windows as a unit.
+    ///
+    /// That is not a hole in the liveness argument, and the reason matters for anything built on
+    /// top: a suspended window withholds input the reader may well be waiting for -- that is the
+    /// point -- but the wait is never *unbounded by construction*. It ends when the application
+    /// resumes, or when the exchange ends for any other reason, because ``release()`` overrides a
+    /// suspension exactly like it overrides a full window. So every path that already releases
+    /// the window (cancellation, the response being dropped, the reader going away, the exchange
+    /// failing or finishing) also frees a producer parked by a suspension, and a producer can
+    /// never be left waiting for a ``resume()`` nobody will ever call.
+    ///
+    /// Suspension only stops the producer. Bytes already counted keep flowing to the reader,
+    /// and crediting them never wakes the producer while suspended.
     package final class FlowControlWindow: @unchecked Sendable {
 
         // MARK: - Internal static properties
@@ -63,6 +82,12 @@ extension Internals {
             lock.withLock { _isWritable }
         }
 
+        /// Whether ``suspend()`` is in effect. Stays `true` after ``release()`` if it was, even
+        /// though a released window no longer holds anything back.
+        package var isSuspended: Bool {
+            lock.withLock { _isSuspended }
+        }
+
         // MARK: - Private properties
 
         private let lock = Lock()
@@ -77,10 +102,11 @@ extension Internals {
         private var _bufferedBytes = 0
         private var _peakBufferedBytes = 0
         private var _isReleased = false
+        private var _isSuspended = false
         private var _waiters: [@Sendable () -> Void] = []
 
         private var _isWritable: Bool {
-            _isReleased || _bufferedBytes <= highWatermark
+            _isReleased || (!_isSuspended && _bufferedBytes <= highWatermark)
         }
 
         // MARK: - Inits
@@ -133,7 +159,9 @@ extension Internals {
             let waiters = lock.withLock { () -> [@Sendable () -> Void] in
                 _bufferedBytes -= bytes
 
-                guard _bufferedBytes <= lowWatermark else {
+                // A suspended window stays shut however far the reader drains it; `resume()`
+                // decides then whether the backlog is small enough to let the producer go.
+                guard !_isSuspended, _bufferedBytes <= lowWatermark else {
                     return []
                 }
 
@@ -178,6 +206,37 @@ extension Internals {
                 whenWritable {
                     continuation.resume()
                 }
+            }
+        }
+
+        /// Shuts the window regardless of the backlog, until ``resume()`` (or ``release()``).
+        ///
+        /// Takes effect the next time the producer checks ``isWritable`` or registers a waiter:
+        /// a producer never gets interrupted mid-chunk, so whatever it is producing right now
+        /// still goes through. Idempotent; a no-op on a released window.
+        package func suspend() {
+            lock.withLock {
+                _isSuspended = true
+            }
+        }
+
+        /// Lifts ``suspend()``. A waiting producer resumes right away if the backlog is within
+        /// ``highWatermark`` -- the same test a producer that had not been suspended would have
+        /// passed -- and otherwise once readers drain it to ``lowWatermark``, as usual.
+        /// Idempotent.
+        package func resume() {
+            let waiters = lock.withLock { () -> [@Sendable () -> Void] in
+                _isSuspended = false
+
+                guard _isWritable else {
+                    return []
+                }
+
+                return _drainWaiters()
+            }
+
+            for waiter in waiters {
+                waiter()
             }
         }
 

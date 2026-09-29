@@ -225,6 +225,12 @@ extension Internals {
         ///   reading. See `Internals.ClientResponseReceiver.didReceiveBodyPart(task:_:)`. A fresh
         ///   window with the default watermarks per request; only tests pass their own, to pin
         ///   the pause down to an exact byte.
+        /// - Parameter transferControl: Suspends and resumes this execution, and reconnects its
+        ///   download if the connection is lost (see `Internals.TransferControl`). `nil` behaves
+        ///   exactly as before it existed. Suspending the *request body* additionally needs
+        ///   `request`'s body to stream through `Internals.StreamWriterSequence` with this
+        ///   control's `gate` (see `RequestBody.build(eventLoop:gate:)`): the body is built
+        ///   before it gets here.
         package func execute(
             request: HTTPClient.Request,
             url: String,
@@ -233,11 +239,38 @@ extension Internals {
             decompression: Internals.Decompression,
             cache: ((Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
             logger: TaskLogger?,
-            flowControl: Internals.FlowControlWindow = .init()
+            flowControl: Internals.FlowControlWindow = .init(),
+            transferControl: Internals.TransferControl? = nil
         ) async throws -> SessionTask {
+            // Before anything can be produced into the window, so a suspension that came first
+            // already holds.
+            transferControl?.attach(flowControl)
+
             let upload = Internals.AsyncStream<Int>()
             let head = Internals.AsyncStream<Internals.ResponseHead>()
             let download = await Internals.DownloadBuffer(readingMode: readingMode, flowControl: flowControl)
+
+            // Only a bodyless request can be continued with `Range` (and only a `GET`, which
+            // `Internals.RangeResumptionPlan` checks once the head is in): a streamed body can't
+            // be sent again.
+            let reconnection = transferControl.flatMap { transferControl in
+                transferControl.resumption.flatMap { policy -> NIODownloadReconnection? in
+                    guard request.body == nil else {
+                        return nil
+                    }
+
+                    return NIODownloadReconnection(
+                        client: self,
+                        request: request,
+                        url: url,
+                        download: download,
+                        flowControl: flowControl,
+                        transferControl: transferControl,
+                        policy: policy,
+                        logger: logger
+                    )
+                }
+            }
 
             // No all-or-nothing constraint on this executor, unlike `.urlSession`: manual
             // dispatch only has to activate for algorithms `NIOHTTPResponseDecompressor` (added
@@ -289,7 +322,9 @@ extension Internals {
                 head: head,
                 download: download,
                 cache: cache,
-                logger: logger
+                logger: logger,
+                transferControl: transferControl,
+                reconnection: reconnection
             )
 
             let response = Internals.AsyncResponse(
@@ -343,18 +378,26 @@ extension Internals {
             // AsyncHTTPClient resume consuming whatever it had buffered, which is harmless either
             // way: at worst the request finishes normally a moment before the cancellation lands,
             // and `UnsafeTask` orders those two on the event loop.
+            //
+            // A suspension is released the same way (`transferControl`'s gate), and so is a
+            // download continuing on another exchange: `reconnection` cancels whichever
+            // continuation is running, or ends the body if it's between two.
             let requestSeed = unsafeTask()
 
             let seed = Internals.TaskSeed(
                 cancel: {
                     requestSeed()
+                    reconnection?.cancel()
                     flowControl.release()
+                    transferControl?.release()
                 },
                 release: {
                     // `requestSeed`'s own `deinit`, which is what cancels a dropped request, runs
                     // once this closure -- its last owner -- goes away with the seed wrapping it.
                     withExtendedLifetime(requestSeed) {
+                        reconnection?.cancel()
                         flowControl.release()
+                        transferControl?.release()
                     }
                 }
             )
@@ -363,6 +406,17 @@ extension Internals {
                 seed: seed,
                 response: response
             )
+        }
+
+        /// Counts this client as busy until the returned operation completes (or is released),
+        /// independently of any request actually being on the wire.
+        ///
+        /// For a download waiting to reconnect (`Internals.NIODownloadReconnection`): between
+        /// two exchanges nothing is in flight, possibly for as long as the execution stays
+        /// suspended, and `Internals.ClientManager`'s idle sweep would otherwise be free to shut
+        /// this client down under the reconnection about to use it.
+        package func holdOperation() -> Internals.ClientOperation {
+            manager.operation()
         }
 
         package func shutdown() async throws -> Bool {

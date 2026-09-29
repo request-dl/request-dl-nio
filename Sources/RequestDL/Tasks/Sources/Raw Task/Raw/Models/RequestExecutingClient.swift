@@ -32,11 +32,19 @@ package protocol RequestExecutingClient: Sendable {
     /// creation time, via `Internals.Session.Configuration.build()`. Both thread it into
     /// `Internals.AsyncResponse` for the manual-dispatch decode this package's own code performs
     /// for whatever the native handling on that executor leaves untouched.
+    ///
+    /// - Parameter transferControl: Suspends and resumes this execution in both directions, and
+    /// reconnects its download after a lost connection when it's resumable (see
+    /// `Internals.TransferControl`). Every conformance must honour it the same way: the request
+    /// body paused between pieces, the response body paused at the connection, a continuation
+    /// only ever spliced onto the same representation. `nil` behaves exactly as before it
+    /// existed. Nothing passes one yet; it's the seam a public suspend/resume API plugs into.
     func execute(
         configuration: RequestConfiguration,
         decompression: Internals.Decompression,
         cache: (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
-        logger: Internals.TaskLogger?
+        logger: Internals.TaskLogger?,
+        transferControl: Internals.TransferControl?
     ) async throws -> SessionTask
 
     /// Runs `configuration` and returns just the response head: what
@@ -47,4 +55,23 @@ package protocol RequestExecutingClient: Sendable {
         configuration: RequestConfiguration,
         logger: Internals.TaskLogger?
     ) async throws -> Internals.ResponseHead
+}
+
+extension RequestExecutingClient {
+
+    /// An execution that can't be suspended or reconnected: every call site today.
+    func execute(
+        configuration: RequestConfiguration,
+        decompression: Internals.Decompression,
+        cache: (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
+        logger: Internals.TaskLogger?
+    ) async throws -> SessionTask {
+        try await execute(
+            configuration: configuration,
+            decompression: decompression,
+            cache: cache,
+            logger: logger,
+            transferControl: nil
+        )
+    }
 }

@@ -20,11 +20,15 @@ import RequestDLInternals
 /// that logic; this conformance only forwards the hint.
 extension Internals.URLSessionClient: RequestExecutingClient {
 
+    /// With a `transferControl`, the materialized body reaches the wire through
+    /// `Internals.URLSessionUploadBodyPump` rather than `httpBody`/a file stream, which is what
+    /// lets a suspension pause it; everything else is `Internals.URLSessionClient`'s own business.
     package func execute(
         configuration: RequestConfiguration,
         decompression: Internals.Decompression,
         cache: (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
-        logger: Internals.TaskLogger?
+        logger: Internals.TaskLogger?,
+        transferControl: Internals.TransferControl?
     ) async throws -> SessionTask {
         if let body = configuration.body {
             return try await execute(
@@ -35,7 +39,8 @@ extension Internals.URLSessionClient: RequestExecutingClient {
                 decompression: decompression,
                 cache: cache,
                 logger: logger,
-                existingUploadFile: body.wholeFileURL
+                existingUploadFile: body.wholeFileURL,
+                transferControl: transferControl
             )
         }
 
@@ -45,7 +50,8 @@ extension Internals.URLSessionClient: RequestExecutingClient {
             uploadingBytes: .zero,
             decompression: decompression,
             cache: cache,
-            logger: logger
+            logger: logger,
+            transferControl: transferControl
         )
     }
 
