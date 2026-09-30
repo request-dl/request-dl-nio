@@ -2,6 +2,8 @@
 
 Explore how to monitor your requests and track the progress of each operation precisely.
 
+> Important: The `progress` modifiers described here are deprecated. Use ``RequestMonitor`` instead, which works with every task and measures progress on the network. See <doc:Monitoring-requests>, including how to migrate.
+
 ## Overview
 
 The way SwiftNIO and AsyncHTTPClient send and receive data from the server allows for implementing a range of interesting features to handle the raw bytes involved in the operation.
