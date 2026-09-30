@@ -209,6 +209,11 @@ struct TransferHarness: Sendable {
     private func nioClient() async throws -> (Internals.Session, Internals.Client) {
         var configuration = Internals.Session.Configuration()
 
+        // Above the most transfers any test runs at once (the stress test's twelve), so the pool's
+        // default of eight never makes one wait, past its acquisition timeout on a slow runner,
+        // for a connection another suspended transfer is holding.
+        configuration.connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit = 32
+
         if let idleTimeout {
             configuration.timeout.read = Int64(idleTimeout * 1_000_000_000)
         }
