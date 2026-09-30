@@ -127,6 +127,10 @@ struct ControlledGroupTaskTests {
 
             // Then: the free request's whole body goes out while the other is still held short of
             // its own, so what the server wrote is one body and a bit, never two.
+            //
+            // Waits for that whole body first: `settled` alone returns after a quiet half second,
+            // which a slow start of the free request can produce before its body is out.
+            try await eventually(timeout: 60) { server.bodyBytesWritten >= Self.length }
             let stalledAt = try await server.settled { server.bodyBytesWritten }
 
             #expect(stalledAt >= Self.length)
