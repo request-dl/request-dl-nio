@@ -40,6 +40,24 @@ enum TransferTestExecutor: Sendable, CaseIterable, CustomTestStringConvertible {
         }
     }
 
+    /// Whether this is one of the SwiftNIO executors, as opposed to `URLSession`.
+    var isNIO: Bool {
+        switch self {
+        #if canImport(NIOCore)
+        case .nio:
+            return true
+        #endif
+        #if canImport(NIOCore) && canImport(Darwin)
+        case .nioTransportServices:
+            return true
+        #endif
+        #if canImport(Darwin)
+        case .urlSession:
+            return false
+        #endif
+        }
+    }
+
     /// A session that can only run on this executor: a request that would fall back to another one
     /// fails instead of passing for the wrong reason.
     var session: Session {

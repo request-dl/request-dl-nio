@@ -61,7 +61,7 @@ struct ChunkedTruncationTests {
     }
 
     /// Cut on a chunk boundary: the NIO executors fail the download.
-    @Test(arguments: Executor.allCases.filter { $0 != .urlSession })
+    @Test(arguments: Executor.allCases.filter(\.isNIO))
     private func cutOnAChunkBoundary_failsOnTheNIOExecutors(_ executor: Executor) async throws {
         try await withTransferServer(.init(length: Self.length, isChunked: true)) { server in
             server.dropPlan = [Self.cutOnAChunkBoundary]
