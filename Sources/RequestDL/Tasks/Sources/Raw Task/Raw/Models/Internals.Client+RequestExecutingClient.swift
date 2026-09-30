@@ -26,7 +26,7 @@ extension Internals.Client: RequestExecutingClient {
         try await execute(
             request: try configuration.build(
                 eventLoop: eventLoopGroup.any(),
-                uploadGate: transferControl?.gate
+                uploadGate: transferControl?.uploadGate
             ),
             url: configuration.url,
             readingMode: configuration.readingMode,

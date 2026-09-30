@@ -123,17 +123,24 @@ struct RawTask<Content: Property>: RequestTask {
     }
 
     /// A control for this one execution, attached to every `RequestController` queued on
-    /// `environment`; `nil` when there is none, which keeps an execution nobody controls exactly
-    /// as it was: no control to create, and no change to how a `.urlSession` upload sends its body.
+    /// `environment` and carrying its download resumption policy; `nil` when it has neither, which
+    /// keeps an execution nobody controls exactly as it was: no control to create, and no change
+    /// to how a `.urlSession` upload sends its body.
+    ///
+    /// An execution that only reconnects a lost download (no controller) is created unable to be
+    /// suspended, so asking for resumption alone never changes how a request body is sent.
     private func makeTransferControl(environment: RequestEnvironmentValues) -> Internals.TransferControl? {
         let controllers = environment.requestControllers
+        let resumption = environment.downloadResumptionPolicy.resumption
 
-        guard !controllers.isEmpty else {
+        guard !controllers.isEmpty || resumption != nil else {
             return nil
         }
 
-        let control = Internals.TransferControl()
-
+        let control = Internals.TransferControl(
+            resumption: resumption,
+            allowsSuspension: !controllers.isEmpty
+        )
         for controller in controllers {
             controller.attach(control)
         }
