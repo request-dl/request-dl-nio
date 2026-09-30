@@ -1,11 +1,15 @@
 # Suspend/resume: feasibility and internal design
 
-Status: internal plumbing only. No public API is added by this work; the public
-suspend/resume surface is a separate, later task that should start from this document.
+Status: the internal mechanism (sections 1-3) landed with `suspend-resume-feasibility`, which
+adds no public API. The public surface (section 4) is built on top of it in
+`suspend-resume-public-api`: `RequestController` with `.controller(_:)`, and
+`.resumingDownloads(_:)` with `DownloadResumptionPolicy`. User-facing documentation is the
+DocC article "Suspending and resuming requests". Resumable uploads and cross-launch resume are
+not built (section 4.5, and 4.3 respectively).
 
-Branch: `suspend-resume-feasibility`, built on `urlsession-backpressure-redesign`
+Branches: `suspend-resume-feasibility`, built on `urlsession-backpressure-redesign`
 (`Internals.FlowControlWindow`, the `.nio` delegate back pressure and the `.urlSession`
-`bytes(for:delegate:)` redesign).
+`bytes(for:delegate:)` redesign); then `suspend-resume-public-api`, built on it.
 
 ---
 
@@ -156,8 +160,8 @@ Built (internal, `package` visibility, opt-in, zero behaviour change when not op
 2. `Range`/`If-Range` **download reconnection** after the connection is gone, on both
    executors, sharing one executor-agnostic plan/validation type.
 
-Deferred: upload reconnection (product decision above), cross-launch persistence (public API),
-the public API itself.
+Deferred: upload reconnection (product decision above) and cross-launch persistence. The
+public API is `suspend-resume-public-api` (section 4).
 
 ---
 
@@ -263,8 +267,8 @@ toggled suspend/resume every few milliseconds, all complete intact (run repeated
 
 ## 4. Public-API decisions
 
-Decided in review for the public-API task (branch `suspend-resume-public-api`). Where the
-earlier proposal changed, the change is noted.
+Decided in review, and implemented in `suspend-resume-public-api` except where noted below.
+Where the earlier proposal changed, the change is noted.
 
 ### 4.1 Public surface: `RequestController`
 
@@ -308,6 +312,12 @@ first release, default reconsidered later. When enabled:
   byte of the continuation reaches the reader.
 
 `.disabled` remains available.
+
+Implemented as the task modifier `.resumingDownloads(_ policy: DownloadResumptionPolicy = .enabled())`,
+with `DownloadResumptionPolicy.enabled(maximumAttemptsWithoutProgress:delay:)` and `.disabled`. It
+travels through the environment like `.controller(_:)`, and the modifier closest to the task wins.
+Asking for resumption alone creates a `TransferControl` that cannot be suspended
+(`allowsSuspension: false`), so it never changes how a request body is sent.
 
 ### 4.3 Partial bodies
 
