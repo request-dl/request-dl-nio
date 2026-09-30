@@ -17,41 +17,7 @@ struct ControlledRequestTaskTests {
     /// that stalls well short of it can only have been stopped by the suspension.
     private static let largeBody = 64 * 1_048_576
 
-    private enum Executor: Sendable, CaseIterable, CustomTestStringConvertible {
-        #if canImport(NIOCore)
-        case nio
-        #endif
-
-        #if canImport(Darwin)
-        case urlSession
-        #endif
-
-        var testDescription: String {
-            switch self {
-            #if canImport(NIOCore)
-            case .nio:
-                return "nio"
-            #endif
-            #if canImport(Darwin)
-            case .urlSession:
-                return "urlSession"
-            #endif
-            }
-        }
-
-        var session: Session {
-            switch self {
-            #if canImport(NIOCore)
-            case .nio:
-                return Session().requiredExecutor(.nio)
-            #endif
-            #if canImport(Darwin)
-            case .urlSession:
-                return Session().requiredExecutor(.urlSession)
-            #endif
-            }
-        }
-    }
+    private typealias Executor = TransferTestExecutor
 
     // MARK: - Tests
 
