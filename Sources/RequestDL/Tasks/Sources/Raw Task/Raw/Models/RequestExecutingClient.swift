@@ -19,6 +19,16 @@ import RequestDLInternals
 /// `Internals.ClientManager` manages those directly, this protocol's callers never do.
 package protocol RequestExecutingClient: Sendable {
 
+    /// Runs `configuration` without a `transferControl`: shorthand for the requirement below with
+    /// `nil`. Kept as a requirement, not just an extension, so the pre-suspend/resume signature
+    /// remains part of the package API.
+    func execute(
+        configuration: RequestConfiguration,
+        decompression: Internals.Decompression,
+        cache: (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
+        logger: Internals.TaskLogger?
+    ) async throws -> SessionTask
+
     /// Runs `configuration`, returning a `SessionTask` whose response streams upload progress,
     /// the response head, and the body. `cache`, when non-`nil`, is teed a copy of every
     /// downloaded chunk as it arrives, the same way the NIO backend's own cache write-through
@@ -60,7 +70,7 @@ package protocol RequestExecutingClient: Sendable {
 extension RequestExecutingClient {
 
     /// An execution that can't be suspended or reconnected: every call site today.
-    func execute(
+    package func execute(
         configuration: RequestConfiguration,
         decompression: Internals.Decompression,
         cache: (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
@@ -73,5 +83,17 @@ extension RequestExecutingClient {
             logger: logger,
             transferControl: nil
         )
+    }
+
+    /// A default only so that adding the `transferControl` requirement stays additive for the
+    /// package API: a conformance must implement this one, and the two real ones do.
+    package func execute(
+        configuration: RequestConfiguration,
+        decompression: Internals.Decompression,
+        cache: (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
+        logger: Internals.TaskLogger?,
+        transferControl: Internals.TransferControl?
+    ) async throws -> SessionTask {
+        preconditionFailure("\(Self.self) must implement execute(configuration:...:transferControl:)")
     }
 }

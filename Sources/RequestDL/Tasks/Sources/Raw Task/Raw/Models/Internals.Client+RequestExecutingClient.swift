@@ -38,6 +38,23 @@ extension Internals.Client: RequestExecutingClient {
         )
     }
 
+    /// The pre-`transferControl` entry point, kept so the package API stays additive: an execution
+    /// that can't be suspended or reconnected.
+    package func execute(
+        configuration: RequestConfiguration,
+        decompression: Internals.Decompression,
+        cache: (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
+        logger: Internals.TaskLogger?
+    ) async throws -> SessionTask {
+        try await execute(
+            configuration: configuration,
+            decompression: decompression,
+            cache: cache,
+            logger: logger,
+            transferControl: nil
+        )
+    }
+
     /// - Note: `isKeepAlive` has no equivalent on `HTTPClient.Response` and this method's own
     /// caller (`Internals.CacheControl`'s conditional-revalidation check) never reads it either
     /// way: `true` is an inert default, matching the same call `Internals.ResponseHead.init(_
