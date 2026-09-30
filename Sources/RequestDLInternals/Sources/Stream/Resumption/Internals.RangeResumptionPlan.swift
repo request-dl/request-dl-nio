@@ -311,6 +311,9 @@ extension Internals {
 
         /// Where, and how, the next continuation starts.
         package struct Attempt: Sendable {
+            /// Which reconnection this is over the whole download, from 1. Unlike the budget, not
+            /// reset by progress.
+            package let number: Int
             package let offset: Int64
             package let plan: Internals.RangeResumptionPlan
             package let headers: [(name: String, value: String)]
@@ -329,6 +332,7 @@ extension Internals {
         // MARK: - Private properties
 
         private var attemptsWithoutProgress = 0
+        private var attempts = 0
         private var deliveredBytesAtLastAttempt: Int64 = -1
 
         // MARK: - Inits
@@ -368,9 +372,11 @@ extension Internals {
             }
 
             attemptsWithoutProgress += 1
+            attempts += 1
             deliveredBytesAtLastAttempt = deliveredBytes
 
             return Attempt(
+                number: attempts,
                 offset: deliveredBytes,
                 plan: plan,
                 headers: plan.requestHeaders(resumingAt: deliveredBytes)

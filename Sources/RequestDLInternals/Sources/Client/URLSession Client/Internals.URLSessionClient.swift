@@ -635,7 +635,11 @@ extension Internals {
 
             let upload = Internals.AsyncStream<Int>()
             let head = Internals.AsyncStream<Internals.ResponseHead>()
-            let downloadBuffer = await Internals.DownloadBuffer(readingMode: readingMode, flowControl: flowControl)
+            let downloadBuffer = await Internals.DownloadBuffer(
+                readingMode: readingMode,
+                flowControl: flowControl,
+                observer: transferControl?.observer
+            )
 
             let redirectConfiguration = redirectConfiguration
             let proxyAuthorization = proxyAuthorization
@@ -647,6 +651,7 @@ extension Internals {
                 tls: tlsDelegate,
                 forwarding: delegate,
                 onUploadProgress: { bytesSent, _ in
+                    transferControl?.observer?.didSend(bytesSent)
                     upload.append(.success(bytesSent))
                 },
                 makeBodyStream: makeBodyStream
@@ -829,6 +834,7 @@ extension Internals {
                     downloadBuffer.cacheStream(cacheStream)
                 }
 
+                transferControl?.observer?.didReceiveHead(responseHead)
                 head.append(.success(responseHead))
                 head.close()
                 isHeadResolved = true
@@ -874,9 +880,12 @@ extension Internals {
                     )
                 }
 
+                transferControl?.observer?.didChange(.finished)
                 downloadBuffer.close()
             } catch {
                 let error = taskDelegate.substitutingRecordedError(for: error)
+
+                transferControl?.observer?.didChange(.failed(error))
 
                 if !isHeadResolved {
                     head.append(.failure(error))
@@ -940,6 +949,8 @@ extension Internals {
                 guard !Task.isCancelled else {
                     throw URLError(.cancelled)
                 }
+
+                transferControl.observer?.didChange(.reconnecting(attempt: attempt.number))
 
                 var continuation = request
 
