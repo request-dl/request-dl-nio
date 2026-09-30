@@ -2,6 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Dispatch
 import SwiftAsyncStream
 import Testing
 
@@ -13,12 +14,6 @@ import FoundationEssentials
 #else
 import struct Foundation.Data
 import struct Foundation.UUID
-#endif
-
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
 #endif
 
 /// A ``RequestMonitor`` that records everything it is told, and can be slowed down.
@@ -41,6 +36,16 @@ final class RecordingMonitor: RequestMonitor, @unchecked Sendable {
 
     init(progressDelay: UInt32 = 0) {
         self.progressDelay = progressDelay
+    }
+
+    /// Blocks the calling thread, the way a monitor doing slow work would. Through `Dispatch`
+    /// rather than a libc call, which is spelled differently on every platform this builds for.
+    private func block(for microseconds: UInt32) {
+        guard microseconds > 0 else {
+            return
+        }
+
+        _ = DispatchSemaphore(value: 0).wait(timeout: .now() + .microseconds(Int(microseconds)))
     }
 
     var uploads: [Transfer] { lock.withLock { _uploads } }
@@ -74,9 +79,7 @@ final class RecordingMonitor: RequestMonitor, @unchecked Sendable {
     }
 
     func request(_ execution: RequestExecution, didUpload bytes: Int, total: Int, of expected: Int?) {
-        if progressDelay > 0 {
-            usleep(progressDelay)
-        }
+        block(for: progressDelay)
 
         lock.withLock {
             _uploads.append(.init(execution: execution.id, bytes: bytes, total: total, expected: expected))
@@ -84,9 +87,7 @@ final class RecordingMonitor: RequestMonitor, @unchecked Sendable {
     }
 
     func request(_ execution: RequestExecution, didDownload bytes: Int, total: Int, of expected: Int?) {
-        if progressDelay > 0 {
-            usleep(progressDelay)
-        }
+        block(for: progressDelay)
 
         lock.withLock {
             _downloads.append(.init(execution: execution.id, bytes: bytes, total: total, expected: expected))
