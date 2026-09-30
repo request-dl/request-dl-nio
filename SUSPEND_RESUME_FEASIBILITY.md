@@ -261,50 +261,75 @@ toggled suspend/resume every few milliseconds, all complete intact (run repeated
 
 ---
 
-## 4. Open questions for the public-API task, with proposed answers
+## 4. Public-API decisions
 
-Each question below carries a *proposed* answer, informed by what comparable clients do
-(`URLSession`/`URLSessionTask`, Alamofire, OkHttp, Android `DownloadManager`, browsers). The
-market comparison is from general knowledge of those APIs and was not re-verified against their
-current documentation for this document; check it before the answers are treated as decided.
-These are recommendations for the public-API task, not commitments made by this branch.
+Decided in review for the public-API task (branch `suspend-resume-public-api`). Where the
+earlier proposal changed, the change is noted.
 
-1. **Should every request be suspendable, or only requests that opt in?**
-   Market: `URLSession` and Alamofire expose `suspend()`/`resume()` on every request; OkHttp
-   has no pause at all.
-   Proposal: make `suspend()`/`resume()` available on every request, but keep the bound-pair
-   `.urlSession` upload path (section 1.1) tied to a request that actually has a
-   `TransferControl`, rather than making it the default upload path. It costs an extra pump and
-   a copy of the body, and `.nio` pauses uploads without any of that.
+### 4.1 Public surface: `RequestController`
 
-2. **How to present the bounded pause duration (`timeoutIntervalForRequest` / `Timeout.read`)?**
-   Market: none of the comparable clients solves this; a long pause simply may hit the idle
-   timeout. This is the least settled of the five.
-   Proposal: document it instead of masking it. A suspended download that outlives the
-   connection reconnects on resume through `Range` (section 2, "resumption"); a suspended
-   `.urlSession` upload cannot, and fails with `URLError.timedOut` (section 3), which the public
-   API should state explicitly rather than raising timeouts while suspended.
+```swift
+let controller = RequestController()
 
-3. **Should `Range` reconnection be on by default, and with what budget?**
-   Market: `downloadTask(withResumeData:)` and Alamofire's resume data are explicit, app-driven
-   steps; browsers resume on their own, and only against a strong validator.
-   Proposal: on by default only for idempotent (`GET`) downloads whose response carries a
-   strong `ETag` or strong `Last-Modified` -- the same eligibility this branch already enforces
-   -- with a small finite budget of attempts without progress (for example three), and a way to
-   turn it off.
+try await DataTask { ... }
+    .decode(...)
+    .map { ... }
+    .controller(controller)
+```
 
-4. **Where do partial bodies live for cross-launch resume?**
-   Market: `URLSession` hands the app an opaque resume-data blob and leaves persistence to it;
-   Alamofire does the same.
-   Proposal: support it for `DownloadTask` to a file only, with the partial file next to the
-   destination and `Internals.RangeResumptionPlan` (URL, validator, offset, length) persisted
-   with it. Do not persist a `DataTask`'s partial body: it only ever lives in memory.
+- **Name: `RequestController`.** It controls (`suspend()`/`resume()`); it does not merely observe.
+  `TransferControl` stays the internal name.
+- **Wired through the environment**, like `.description(_:enabled:onDescribe:)`: it works anywhere
+  in a task chain, does not change `Element`, and needs no change to `RequestTask`. `RawTask`
+  reads it from `RequestEnvironmentValues`.
+- **A shared switch, not one-per-execution.** One controller may be attached to several
+  executions (for instance every child of a `GroupTask`); `suspend()` pauses all of them.
+- **Sticky state.** Attaching to a suspended controller starts the execution suspended
+  (measured: suspended before sending means zero body bytes on the wire).
+- `suspend()`/`resume()` are synchronous, non-throwing, idempotent, `Sendable`, and do nothing
+  on an execution that has finished.
+- **Cancellation is not on the controller.** Swift `Task` cancellation stays the mechanism; it
+  already releases the window and the gate.
+- The controller owns the internal `TransferControl` of each execution. A `TransferControl` is
+  only created when a controller (or an opted-in resumption) is attached, so the `.urlSession`
+  upload path keeps today's behaviour, not the bound-pair path, for everyone else.
 
-5. **Which resumable-upload protocol(s), if any (section 1.2)?**
-   Market: tus 1.0, vendor protocols (GCS resumable uploads, S3 multipart) and the IETF
-   `resumable-upload` draft coexist; `URLSession` implements the IETF draft on its own, without
-   exposing it through `bytes(for:delegate:)`.
-   Proposal: defer. Ship pause/resume and download resumption first and take resumable uploads
-   as a separate feature once there is demand; when it comes, start from the IETF draft
-   (the likeliest to become the standard), behind an explicit, app-selected protocol as
-   recommended in section 1.2.
+### 4.2 Range reconnection: opt-in
+
+Changed from the earlier proposal ("on by default"). Download managers (browsers, `wget`,
+Android `DownloadManager`) resume on their own, but HTTP client libraries (`URLSession`,
+Alamofire, OkHttp) leave it to the app. A silent reconnect would also change behaviour for every
+existing `DownloadTask`, which today fails when the connection drops mid-body. So: opt-in in the
+first release, default reconsidered later. When enabled:
+
+- only `GET`, only against a strong `ETag` or strong `Last-Modified` (RFC 9110 §13.1.5);
+- a finite budget of attempts without progress;
+- a changed resource, a server ignoring `If-Range`, or no range support is rejected before any
+  byte of the continuation reaches the reader.
+
+`.disabled` remains available.
+
+### 4.3 Partial bodies
+
+- In-process resumption needs only the delivered-byte count and the validator, both already
+  tracked; it adds no storage. A `DataTask` keeps accumulating in memory, as today.
+- **No spill-to-disk for `DataTask`:** its result is a `Data`, so moving the body to disk would
+  only move the memory cost to `result()`. Very large bodies belong to `DownloadTask`.
+- A size limit that *fails* with a clear error (for example `maxBodySize`) is a separate feature
+  and not part of this work.
+- Cross-launch resume: `DownloadTask` to a file only.
+
+### 4.4 Pause duration versus timeouts
+
+Document, don't mask: a suspended download that outlives the connection reconnects on resume
+(when reconnection is enabled); a suspended `.urlSession` upload fails with `URLError.timedOut`.
+
+### 4.5 Resumable uploads: separate branch
+
+Out of this work. The plan for it: implement the IETF `resumable-upload` draft **once, above the
+executors**, so `.urlSession` and `.nio` behave identically (`URLSession`'s own implementation
+only exists on `uploadTask`, which `bytes(for:delegate:)` has no counterpart for). It needs the
+creation step that does not depend on the `104` interim response, so it is opt-in per request,
+never auto-negotiated. The extension point is an upload-strategy protocol, **not** a delegate on
+`RequestController`; it stays internal until a second implementation (likely tus) exists to shape
+it. Before starting, verify the draft's current status and which servers support it.
