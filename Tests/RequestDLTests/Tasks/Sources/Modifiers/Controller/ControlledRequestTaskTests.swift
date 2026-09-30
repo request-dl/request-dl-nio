@@ -118,7 +118,7 @@ struct ControlledRequestTaskTests {
                 let controller = RequestController()
                 controller.suspend()
 
-                func task(_ server: TransferServer) -> some RequestTask<Int> {
+                func task(_ server: TransferServer) -> AnyTask<Int> {
                     DataTask {
                         BaseURL(.http, host: "127.0.0.1:\(server.port)")
                         Path("/resource")
