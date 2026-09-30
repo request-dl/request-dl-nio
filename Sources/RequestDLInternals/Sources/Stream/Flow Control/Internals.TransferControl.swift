@@ -7,7 +7,7 @@ import SwiftAsyncStream
 extension Internals {
 
     /// Suspends and resumes one request execution in flight, in both directions, on whichever
-    /// executor it runs: the internal mechanism behind a future public suspend/resume API.
+    /// executor it runs: the internal mechanism behind the public `RequestController`.
     ///
     /// Nothing here is OS-specific. Every executor already moves bytes through a producer that
     /// RequestDL itself drives, and each producer waits on an `Internals.FlowControlWindow` whenever

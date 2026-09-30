@@ -38,7 +38,7 @@ package protocol RequestExecutingClient: Sendable {
     /// `Internals.TransferControl`). Every conformance must honour it the same way: the request
     /// body paused between pieces, the response body paused at the connection, a continuation
     /// only ever spliced onto the same representation. `nil` behaves exactly as before it
-    /// existed. Nothing passes one yet; it's the seam a public suspend/resume API plugs into.
+    /// existed. `RawTask` passes one whenever a `RequestController` is attached.
     func execute(
         configuration: RequestConfiguration,
         decompression: Internals.Decompression,
