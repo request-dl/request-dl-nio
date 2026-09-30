@@ -9,6 +9,8 @@ import SwiftAsyncStream
 import Darwin
 #elseif canImport(Glibc)
 import Glibc
+#elseif canImport(Android)
+import Android
 #elseif canImport(Musl)
 import Musl
 #endif
@@ -207,10 +209,11 @@ package final class TransferServer: @unchecked Sendable {
     package init(resource: Resource) throws {
         self._resource = resource
 
-        #if canImport(Darwin)
-        let socketType = SOCK_STREAM
-        #else
+        // An enum on Glibc, a plain `Int32` everywhere else (Darwin, Musl, Bionic).
+        #if canImport(Glibc)
         let socketType = Int32(SOCK_STREAM.rawValue)
+        #else
+        let socketType = SOCK_STREAM
         #endif
 
         #if !canImport(Darwin)
@@ -949,6 +952,8 @@ private enum Glue {
         Darwin.send(socket, bytes, count, flags)
         #elseif canImport(Glibc)
         Glibc.send(socket, bytes, count, flags)
+        #elseif canImport(Android)
+        Android.send(socket, bytes, count, flags)
         #else
         Musl.send(socket, bytes, count, flags)
         #endif
@@ -959,6 +964,8 @@ private enum Glue {
         Darwin.recv(socket, bytes, count, flags)
         #elseif canImport(Glibc)
         Glibc.recv(socket, bytes, count, flags)
+        #elseif canImport(Android)
+        Android.recv(socket, bytes, count, flags)
         #else
         Musl.recv(socket, bytes, count, flags)
         #endif
