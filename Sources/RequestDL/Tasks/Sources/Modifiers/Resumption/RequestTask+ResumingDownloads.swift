@@ -2,27 +2,6 @@
 // See LICENSE for this package's licensing information.
 //
 
-/// Backs `resumingDownloads(_:)`. Sets the policy on the environment instead of acting on the task
-/// itself: only `RawTask`, sitting under whatever chain of modifiers wraps it, actually runs a
-/// transfer.
-struct ResumingDownloadsRequestTask<Task: RequestTask>: RequestTask {
-
-    // MARK: - Internal properties
-
-    let task: Task
-    let policy: DownloadResumptionPolicy
-
-    // MARK: - Internal methods
-
-    func _result(environment: RequestEnvironmentValues) async throws -> Task.Element {
-        var environment = environment
-        environment.downloadResumptionPolicy = policy
-        return try await task._result(environment: environment)
-    }
-}
-
-// MARK: - RequestTask extension
-
 extension RequestTask {
 
     ///
@@ -34,9 +13,10 @@ extension RequestTask {
     ///
     /// Nothing runs until the returned task is: it composes lazily, the same way ``modifier(_:)``
     /// does. Works anywhere in a task chain, directly on ``DownloadTask``/``DataTask`` or after any
-    /// modifier, since it sets the policy on the environment rather than depending on the task in
-    /// front of it exposing anything special. When a task has several, the one closest to it wins,
-    /// so a later `.resumingDownloads(.disabled)` doesn't undo an earlier, inner one.
+    /// modifier, since it sets the policy on the environment (see ``environment(_:_:)``) rather
+    /// than depending on the task in front of it exposing anything special. When a task has
+    /// several, the one closest to it wins, so a later `.resumingDownloads(.disabled)` doesn't
+    /// undo an earlier, inner one.
     ///
     /// Reconnection waits while a ``RequestController`` attached to the task is suspended: a
     /// paused transfer never opens a new connection behind the application's back.
@@ -46,8 +26,7 @@ extension RequestTask {
     ///
     public func resumingDownloads(
         _ policy: DownloadResumptionPolicy = .enabled()
-    ) -> AnyTask<Element> {
-        ResumingDownloadsRequestTask(task: self, policy: policy)
-            .eraseToAnyTask()
+    ) -> ModifiedRequestTask<Modifiers.Environment<Element>> {
+        environment(\.downloadResumptionPolicy, policy)
     }
 }
