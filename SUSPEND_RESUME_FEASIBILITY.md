@@ -334,6 +334,37 @@ Asking for resumption alone creates a `TransferControl` that cannot be suspended
 Document, don't mask: a suspended download that outlives the connection reconnects on resume
 (when reconnection is enabled); a suspended `.urlSession` upload fails with `URLError.timedOut`.
 
+Correction to the earlier market comparison, which said no comparable client handles this:
+`URLSessionTask.suspend()` does. Apple documents that a suspended task "produces no network
+traffic and isn't subject to timeouts", and Alamofire's `suspend()` is built on it. It is not
+what this work uses (section 1.1: it can't gate a `bytes(for:delegate:)` upload, and was measured
+to lose its suspension under load), so here the client's idle timeouts keep counting while
+suspended. That is the only part in the client's power. A server or middlebox that closes an idle
+connection (typically tens of seconds) ends any suspended transfer regardless of the client, which
+is why download managers reconnect with `Range`, as `.resumingDownloads(_:)` does, rather than
+rely on the connection surviving.
+
+Making the client's own timeouts pause too is possible but not cheap: the transport timers can't
+be paused, so it means giving a controlled request a transport timeout that never fires and
+enforcing the configured idle timeout inside RequestDL, pausing it while suspended (and, on `.nio`,
+a client configured differently from the pooled one). It would only help pauses shorter than the
+server's own idle timeout. Not done.
+
+### 4.4.1 Chunked responses cut on a chunk boundary
+
+Not detectable on `.urlSession`, and not fixable from RequestDL: verified with bare `URLSession`
+(`bytes(from:)`, `data(from:)` and a delegate-based task alike) against a chunked response cut
+exactly between chunks, without the terminating zero-length chunk. All three report a successful
+response with the truncated body. The response carries no signal to tell it from a complete one:
+`Transfer-Encoding` comes back as `Identity`, there is no `Content-Length`
+(`expectedContentLength == -1`), and `URLSessionTaskMetrics.countOfResponseBodyBytesReceived` counts
+wire bytes including chunk framing without saying whether the last chunk was the last. A cut in the
+middle of a chunk fails with `-1005` on every executor. `.nio` and `.nioTransportServices` detect
+both cuts (`ChunkedTruncationTests` pins this down, with the `.urlSession` case as a known issue).
+Since the body looks complete, reconnection cannot help either. For downloads where truncation
+matters, use one of the NIO executors, or verify the body yourself (a checksum, or a length the
+server states elsewhere); the underlying behaviour is worth a Feedback report to Apple.
+
 ### 4.5 Resumable uploads: separate branch
 
 Out of this work. The plan for it: implement the IETF `resumable-upload` draft **once, above the

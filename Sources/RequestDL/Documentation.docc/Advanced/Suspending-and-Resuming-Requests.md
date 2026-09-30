@@ -85,6 +85,8 @@ The continuation asks with `If-Range`, so a resource that changed in the meantim
 
 The modifier closest to the task wins, so `.resumingDownloads(.disabled)` placed after an inner `.resumingDownloads(.enabled())` does not undo it.
 
+> Important: On the `.urlSession` executor, a chunked response that is cut exactly between two chunks, without its terminating chunk, is reported by the system as a successful, complete response. RequestDL can't tell it from a real one, so it can neither fail nor continue that download. The NIO executors detect it. When a truncated body would be a problem, use one of them, or verify the body yourself with a checksum or a length the server states separately.
+
 A ``DataTask`` continues the same way, and needs nothing stored beyond what it already accumulates. Bodies too large for memory belong in a ``DownloadTask``.
 
 ### Using both together
