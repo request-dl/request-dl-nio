@@ -30,6 +30,7 @@ extension Internals {
             // MARK: - Private properties
 
             private let writer: HTTPClient.Body.StreamWriter
+            private let gate: Internals.FlowControlWindow?
 
             // MARK: - Unsafe properties
 
@@ -39,15 +40,27 @@ extension Internals {
 
             package init(
                 writer: HTTPClient.Body.StreamWriter,
-                iterator: Body.AsyncIterator
+                iterator: Body.AsyncIterator,
+                gate: Internals.FlowControlWindow? = nil
             ) {
                 self.writer = writer
                 self._iterator = iterator
+                self.gate = gate
             }
 
             // MARK: - Methods
 
             package mutating func next() async throws -> Element? {
+                // Before pulling the next chunk, not before writing one already pulled: a
+                // suspension then leaves nothing half-consumed behind it, and resuming carries on
+                // with exactly the next byte of the body. Not cancellable on its own, and doesn't
+                // need to be: every way the exchange ends releases the gate (see
+                // `Internals.TransferControl`), after which the write below fails on a request
+                // that is already over.
+                if let gate, !gate.isWritable {
+                    await gate.waitUntilWritable()
+                }
+
                 guard var item = try await _iterator.next() else {
                     return nil
                 }
@@ -63,11 +76,20 @@ extension Internals {
         package let writer: HTTPClient.Body.StreamWriter
         package let body: Body
 
+        /// Shut while the execution is suspended: see `Internals.TransferControl.gate`. `nil`
+        /// streams the body without ever pausing, as before.
+        package let gate: Internals.FlowControlWindow?
+
         // MARK: - Inits
 
-        package init(writer: HTTPClient.Body.StreamWriter, body: Body) {
+        package init(
+            writer: HTTPClient.Body.StreamWriter,
+            body: Body,
+            gate: Internals.FlowControlWindow? = nil
+        ) {
             self.writer = writer
             self.body = body
+            self.gate = gate
         }
 
         // MARK: - Internal methods
@@ -75,7 +97,8 @@ extension Internals {
         package func makeAsyncIterator() -> AsyncIterator {
             AsyncIterator(
                 writer: writer,
-                iterator: body.makeAsyncIterator()
+                iterator: body.makeAsyncIterator(),
+                gate: gate
             )
         }
     }

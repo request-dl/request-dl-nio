@@ -130,13 +130,16 @@ public struct RequestBody: Sendable {
 
     #if canImport(NIOCore)
     /// - Parameter eventLoop: Hosts the task that streams the body, when there is one. See
-    /// ``connect(writer:body:eventLoop:)``.
-    func build(eventLoop: EventLoop) -> HTTPClient.Body {
+    /// ``connect(writer:body:eventLoop:gate:)``.
+    /// - Parameter gate: Pauses the upload between chunks while shut: an
+    /// `Internals.TransferControl`'s `gate`. `nil` never pauses.
+    func build(eventLoop: EventLoop, gate: Internals.FlowControlWindow? = nil) -> HTTPClient.Body {
         .stream(length: knownWireSize) {
             Self.connect(
                 writer: $0,
                 body: self,
-                eventLoop: eventLoop
+                eventLoop: eventLoop,
+                gate: gate
             )
         }
     }
@@ -170,12 +173,14 @@ public struct RequestBody: Sendable {
     private static func connect(
         writer: HTTPClient.Body.StreamWriter,
         body: RequestBody,
-        eventLoop: EventLoop
+        eventLoop: EventLoop,
+        gate: Internals.FlowControlWindow?
     ) -> EventLoopFuture<Void> {
         eventLoop.makeFutureWithTask {
             var iterator = Internals.StreamWriterSequence(
                 writer: writer,
-                body: body.bytesSequence
+                body: body.bytesSequence,
+                gate: gate
             ).makeAsyncIterator()
 
             while let next = try await iterator.next() {

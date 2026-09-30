@@ -14,20 +14,27 @@ import RequestDLInternals
 /// `Internals.Client` already did.
 extension Internals.Client: RequestExecutingClient {
 
+    /// With a `transferControl`, the request body streams through its gate (paused between
+    /// chunks while suspended), and the rest is `Internals.Client`'s own business.
     package func execute(
         configuration: RequestConfiguration,
         decompression: Internals.Decompression,
         cache: (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
-        logger: Internals.TaskLogger?
+        logger: Internals.TaskLogger?,
+        transferControl: Internals.TransferControl?
     ) async throws -> SessionTask {
         try await execute(
-            request: try configuration.build(eventLoop: eventLoopGroup.any()),
+            request: try configuration.build(
+                eventLoop: eventLoopGroup.any(),
+                uploadGate: transferControl?.gate
+            ),
             url: configuration.url,
             readingMode: configuration.readingMode,
             uploadingBytes: configuration.body?.totalSize ?? .zero,
             decompression: decompression,
             cache: cache,
-            logger: logger
+            logger: logger,
+            transferControl: transferControl
         )
     }
 

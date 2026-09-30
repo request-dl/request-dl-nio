@@ -407,6 +407,9 @@ extension Internals {
         ///   response stops being read. The `.urlSession` counterpart to the parameter of the same
         ///   name on `Internals.Client.execute(request:url:readingMode:...)`: a fresh window with
         ///   the default watermarks per request; only tests pass their own.
+        /// - Parameter transferControl: Suspends and resumes this execution, and reconnects its
+        ///   download if the connection is lost (see `Internals.TransferControl`). `nil` behaves
+        ///   exactly as before it existed.
         package func execute(
             request: URLRequest,
             readingMode: Internals.DownloadStep.ReadingMode,
@@ -415,7 +418,8 @@ extension Internals {
             cache: (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
             logger: Internals.TaskLogger?,
             delegate: URLSessionTaskDelegate? = nil,
-            flowControl: Internals.FlowControlWindow = .init()
+            flowControl: Internals.FlowControlWindow = .init(),
+            transferControl: Internals.TransferControl? = nil
         ) async throws -> SessionTask {
             try await executeSessionTask(
                 request: request,
@@ -426,6 +430,7 @@ extension Internals {
                 logger: logger,
                 forwarding: delegate,
                 flowControl: flowControl,
+                transferControl: transferControl,
                 makeUploadBody: nil
             )
         }
@@ -441,6 +446,9 @@ extension Internals {
         /// for this same parameter. Identical meaning here, `body` still required but unread
         /// when set.
         /// - Parameter flowControl: See the bodyless overload just above.
+        /// - Parameter transferControl: See the bodyless overload just above. With one, the body
+        ///   reaches the wire through `Internals.URLSessionUploadBodyPump`, which is what lets a
+        ///   suspension pause the upload too.
         package func execute<Body: AsyncSequence & Sendable>(
             request: URLRequest,
             streaming body: Body,
@@ -451,7 +459,8 @@ extension Internals {
             logger: Internals.TaskLogger?,
             delegate: URLSessionTaskDelegate? = nil,
             existingUploadFile: URL? = nil,
-            flowControl: Internals.FlowControlWindow = .init()
+            flowControl: Internals.FlowControlWindow = .init(),
+            transferControl: Internals.TransferControl? = nil
         ) async throws -> SessionTask where Body.Element == Internals.Bytes {
             try await executeSessionTask(
                 request: request,
@@ -462,6 +471,7 @@ extension Internals {
                 logger: logger,
                 forwarding: delegate,
                 flowControl: flowControl,
+                transferControl: transferControl,
                 makeUploadBody: {
                     if let existingUploadFile {
                         return .existingFile(existingUploadFile)
@@ -506,7 +516,15 @@ extension Internals {
         /// - The request body can no longer go through `uploadTask(with:from:)`/
         ///   `uploadTask(with:fromFile:)`, which `bytes(for:delegate:)` has no counterpart for. The
         ///   body is still materialized exactly as before (`Internals.URLSessionUploadFile`), and
-        ///   then attached to the request itself: see `attachUploadBody(_:to:)`.
+        ///   then attached to the request itself: see `attachUploadBody(_:to:)`, or, when the
+        ///   execution can be suspended, `Internals.URLSessionUploadBodyPump`.
+        ///
+        /// ## Suspension and reconnection
+        ///
+        /// With a `transferControl`, `flowControl` follows its suspension (the pump parks on it
+        /// like it parks behind a slow reader), the request body is written through a pump that
+        /// waits on its gate, and a download whose connection is lost can continue on a new
+        /// exchange (see `runExchange` and `Internals.RangeResumptionPlan`).
         private func executeSessionTask(
             request: URLRequest,
             readingMode: Internals.DownloadStep.ReadingMode,
@@ -516,8 +534,13 @@ extension Internals {
             logger: Internals.TaskLogger?,
             forwarding delegate: URLSessionTaskDelegate?,
             flowControl: Internals.FlowControlWindow,
+            transferControl: Internals.TransferControl?,
             makeUploadBody: (@Sendable () async throws -> Internals.URLSessionUploadFile.Materialized)?
         ) async throws -> SessionTask {
+            // Before anything can be produced into the window, so a suspension that came first
+            // already holds.
+            transferControl?.attach(flowControl)
+
             // See the equivalent comment in `execute(request:delegate:)`: registered before the
             // throttle wait so this client counts as busy for as long as a caller is queued on
             // it, not just once it starts sending.
@@ -571,7 +594,6 @@ extension Internals {
             }
 
             let uploadBody: Internals.URLSessionUploadFile.Materialized?
-            let bodyFileURL: URL?
             do {
                 uploadBody = try await makeUploadBody?()
             } catch {
@@ -580,8 +602,24 @@ extension Internals {
                 throw error
             }
 
+            let makeBodyStream: (@Sendable () -> InputStream?)?
+            let uploadPump: Internals.URLSessionUploadBodyPump?
             do {
-                bodyFileURL = try Self.attachUploadBody(uploadBody, to: &request)
+                if let transferControl, let uploadBody {
+                    let pump = try Internals.URLSessionUploadBodyPump(uploadBody, gate: transferControl.gate)
+                    request.httpBodyStream = try pump.makeStream()
+                    request.setValue(String(pump.size), forHTTPHeaderField: "Content-Length")
+                    uploadPump = pump
+                    makeBodyStream = { try? pump.makeStream() }
+                } else {
+                    uploadPump = nil
+
+                    if let fileURL = try Self.attachUploadBody(uploadBody, to: &request) {
+                        makeBodyStream = { InputStream(url: fileURL) }
+                    } else {
+                        makeBodyStream = nil
+                    }
+                }
             } catch {
                 if case .file(let bufferURL) = uploadBody {
                     await bufferURL.removeIfTemporary()
@@ -599,6 +637,9 @@ extension Internals {
             let head = Internals.AsyncStream<Internals.ResponseHead>()
             let downloadBuffer = await Internals.DownloadBuffer(readingMode: readingMode, flowControl: flowControl)
 
+            let redirectConfiguration = redirectConfiguration
+            let proxyAuthorization = proxyAuthorization
+
             let taskDelegate = TaskDelegate(
                 redirectConfiguration: redirectConfiguration,
                 initialRequest: request,
@@ -608,11 +649,25 @@ extension Internals {
                 onUploadProgress: { bytesSent, _ in
                     upload.append(.success(bytesSent))
                 },
-                bodyFileURL: bodyFileURL
+                makeBodyStream: makeBodyStream
             )
+
+            // A download continuation is a new exchange, so it gets a delegate of its own, with
+            // its own redirect bookkeeping, for the same policies. It never has a body to send:
+            // only a bodyless `GET` is ever resumed.
+            let continuationDelegate: @Sendable (URLRequest) -> TaskDelegate = { continuation in
+                TaskDelegate(
+                    redirectConfiguration: redirectConfiguration,
+                    initialRequest: continuation,
+                    proxyAuthorization: proxyAuthorization,
+                    tls: tlsDelegate,
+                    forwarding: delegate
+                )
+            }
 
             let box = CancellableTaskBox()
             let session = session
+            let isResumable = uploadBody == nil
 
             // Unstructured on purpose: it runs for as long as the exchange does, well past this
             // method's return, the same way the `URLSessionTask` it replaces did. Owns every
@@ -623,6 +678,7 @@ extension Internals {
                     session: session,
                     request: request,
                     taskDelegate: taskDelegate,
+                    continuationDelegate: continuationDelegate,
                     box: box,
                     readingMode: readingMode,
                     cache: cache,
@@ -630,7 +686,10 @@ extension Internals {
                     upload: upload,
                     head: head,
                     downloadBuffer: downloadBuffer,
-                    flowControl: flowControl
+                    flowControl: flowControl,
+                    transferControl: transferControl,
+                    resumption: isResumable ? transferControl?.resumption : nil,
+                    uploadPump: uploadPump
                 )
 
                 upload.close()
@@ -662,23 +721,29 @@ extension Internals {
             // does, through `bytes(for:delegate:)`'s own cancellation handling (see
             // `runExchange`). Releasing the window wakes a pump parked on it, which then finds the
             // task cancelled on its next read instead of waiting for a reader that may never come.
+            //
+            // The same goes for a suspension: releasing the transfer control's gate wakes an
+            // upload pump, or a download reconnection, parked on it.
             return SessionTask(
                 seed: Internals.TaskSeed {
                     exchange.cancel()
                     box.cancel()
                     flowControl.release()
+                    transferControl?.release()
                 },
                 response: response
             )
         }
 
-        /// Runs one exchange for `executeSessionTask`, from sending the request to the end of the
-        /// response body, resolving `head` and ending `downloadBuffer` exactly once whichever way
-        /// it goes.
+        /// Runs one request for `executeSessionTask`, from sending it to the end of the response
+        /// body, resolving `head` and ending `downloadBuffer` exactly once whichever way it goes --
+        /// over as many exchanges as reconnecting a lost download takes, when `resumption` allows
+        /// it.
         private static func runExchange(
             session: URLSession,
             request: URLRequest,
             taskDelegate: TaskDelegate,
+            continuationDelegate: @Sendable (URLRequest) -> TaskDelegate,
             box: CancellableTaskBox,
             readingMode: Internals.DownloadStep.ReadingMode,
             cache: (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
@@ -686,11 +751,19 @@ extension Internals {
             upload: Internals.AsyncStream<Int>,
             head: Internals.AsyncStream<Internals.ResponseHead>,
             downloadBuffer: Internals.DownloadBuffer,
-            flowControl: Internals.FlowControlWindow
+            flowControl: Internals.FlowControlWindow,
+            transferControl: Internals.TransferControl?,
+            resumption: Internals.DownloadResumptionPolicy?,
+            uploadPump: Internals.URLSessionUploadBodyPump?
         ) async {
             // Nothing is produced into the window past this point, whichever way this ends, so
-            // it must not be left able to pause anything.
-            defer { flowControl.release() }
+            // it must not be left able to pause anything. The pump stops before the gate opens,
+            // so a pump parked on the gate wakes up to find itself already finished.
+            defer {
+                uploadPump?.stop()
+                flowControl.release()
+                transferControl?.release()
+            }
 
             var isHeadResolved = false
 
@@ -760,12 +833,46 @@ extension Internals {
                 head.close()
                 isHeadResolved = true
 
-                try await pumpResponseBody(
-                    bytes,
-                    readingMode: readingMode,
-                    into: downloadBuffer,
-                    flowControl: flowControl
+                var state = resumption.map { Internals.DownloadResumptionState(policy: $0) }
+
+                state?.didReceiveOriginalHead(
+                    responseHead,
+                    method: request.httpMethod ?? "GET",
+                    requestHeaderNames: request.allHTTPHeaderFields?.keys.map { $0 } ?? []
                 )
+
+                var deliveredBytes: Int64 = .zero
+
+                do {
+                    try await pumpResponseBody(
+                        bytes,
+                        readingMode: readingMode,
+                        into: downloadBuffer,
+                        flowControl: flowControl,
+                        deliveredBytes: &deliveredBytes
+                    )
+                } catch {
+                    let error = taskDelegate.substitutingRecordedError(for: error)
+
+                    guard var state, let transferControl else {
+                        throw error
+                    }
+
+                    state.deliveredBytes = deliveredBytes
+
+                    try await resumeDownload(
+                        after: error,
+                        state: &state,
+                        session: session,
+                        request: request,
+                        continuationDelegate: continuationDelegate,
+                        box: box,
+                        readingMode: readingMode,
+                        downloadBuffer: downloadBuffer,
+                        flowControl: flowControl,
+                        transferControl: transferControl
+                    )
+                }
 
                 downloadBuffer.close()
             } catch {
@@ -777,6 +884,127 @@ extension Internals {
                 }
 
                 downloadBuffer.failed(error)
+            }
+        }
+
+        /// Continues a download whose exchange failed after its head, on new exchanges asking
+        /// for the rest with `Range`/`If-Range`, for as long as the failures are transport
+        /// failures and `state`'s budget lasts.
+        ///
+        /// Each continuation's head is validated (`Internals.RangeResumptionPlan.validate`)
+        /// before a single byte of its body reaches `downloadBuffer`; anything but exactly the
+        /// rest of the same representation ends the download with the mismatch.
+        ///
+        /// A failure while suspended -- typically the request timing out because nothing moved
+        /// for `timeoutIntervalForRequest` -- only reconnects once the execution is resumed:
+        /// a new connection would otherwise just idle out the same way.
+        ///
+        /// - Returns: Once the body is complete.
+        /// - Throws: Whatever should end the download: the last transport failure once the budget
+        ///   is spent, a mismatch, or the cancellation.
+        private static func resumeDownload(
+            after error: Error,
+            state: inout Internals.DownloadResumptionState,
+            session: URLSession,
+            request: URLRequest,
+            continuationDelegate: @Sendable (URLRequest) -> TaskDelegate,
+            box: CancellableTaskBox,
+            readingMode: Internals.DownloadStep.ReadingMode,
+            downloadBuffer: Internals.DownloadBuffer,
+            flowControl: Internals.FlowControlWindow,
+            transferControl: Internals.TransferControl
+        ) async throws {
+            var failure = error
+
+            while true {
+                guard
+                    !Task.isCancelled,
+                    isTransientTransportFailure(failure),
+                    let attempt = state.nextAttempt()
+                else {
+                    throw failure
+                }
+
+                // Released by the seed along with everything else when the exchange is cancelled,
+                // which is what ends this wait then; the handler covers any other cancellation.
+                await withTaskCancellationHandler {
+                    await transferControl.waitUntilResumed()
+                } onCancel: {
+                    transferControl.release()
+                }
+
+                if state.policy.delay > .zero {
+                    try? await Task.sleep(nanoseconds: state.policy.delay)
+                }
+
+                guard !Task.isCancelled else {
+                    throw URLError(.cancelled)
+                }
+
+                var continuation = request
+
+                for header in attempt.headers {
+                    continuation.setValue(header.value, forHTTPHeaderField: header.name)
+                }
+
+                let taskDelegate = continuationDelegate(continuation)
+                var deliveredBytes = state.deliveredBytes
+
+                do {
+                    let (bytes, response) = try await withTaskCancellationHandler {
+                        try await session.bytes(for: continuation, delegate: taskDelegate)
+                    } onCancel: {
+                        box.cancel()
+                    }
+
+                    box.task = bytes.task
+
+                    let outcome: Internals.RangeResumptionPlan.Continuation
+                    do {
+                        outcome = try attempt.plan.validate(
+                            taskDelegate.responseHead(for: response),
+                            resumingAt: attempt.offset
+                        )
+                    } catch {
+                        bytes.task.cancel()
+                        throw error
+                    }
+
+                    if outcome == .alreadyComplete {
+                        bytes.task.cancel()
+                        return
+                    }
+
+                    try await pumpResponseBody(
+                        bytes,
+                        readingMode: readingMode,
+                        into: downloadBuffer,
+                        flowControl: flowControl,
+                        deliveredBytes: &deliveredBytes
+                    )
+
+                    return
+                } catch {
+                    state.deliveredBytes = deliveredBytes
+                    failure = taskDelegate.substitutingRecordedError(for: error)
+                }
+            }
+        }
+
+        /// Whether `error` means the connection was lost or couldn't be (re)established -- the
+        /// failures a download continuation can recover from -- as opposed to a cancellation, a
+        /// TLS/trust or redirect-policy failure, or a malformed response, which it can't.
+        static func isTransientTransportFailure(_ error: Error) -> Bool {
+            guard let error = error as? URLError else {
+                return false
+            }
+
+            switch error.code {
+            case .networkConnectionLost, .timedOut, .notConnectedToInternet, .cannotConnectToHost,
+                .cannotFindHost, .dnsLookupFailed, .dataNotAllowed:
+                return true
+            default:
+                return false
             }
         }
 
@@ -955,9 +1183,13 @@ extension Internals.URLSessionClient {
         /// that method's own doc comment for why it can't just `defer { release() }` the way the
         /// other two `execute` overloads do.
         private let onDownloadComplete: (@Sendable () -> Void)?
-        /// The file an `httpBodyStream` request body reads from, set only by
-        /// `executeSessionTask` for a file-backed upload. What `needNewBodyStream` reopens.
-        private let bodyFileURL: URL?
+        /// A fresh `httpBodyStream` for the request body, set only by `executeSessionTask`: over the
+        /// same file again for a file-backed upload, or a new pair from
+        /// `Internals.URLSessionUploadBodyPump` for a suspendable one. What `needNewBodyStream`
+        /// answers with.
+        private let makeBodyStream: (@Sendable () -> InputStream?)?
+        /// The initial request's `Content-Length`, which a manual redirect resend reattaches.
+        private let bodyLength: String?
         private let lock = Lock()
 
         // MARK: - Unsafe properties
@@ -966,7 +1198,7 @@ extension Internals.URLSessionClient {
         private var _visited: [String]
         private var _redirectError: Error?
         /// A redirect `willPerformHTTPRedirection` decided to follow but refused to hand back to
-        /// `URLSession` itself, because this task's body is file-backed (`bodyFileURL` set): see
+        /// `URLSession` itself, because this task's body is file-backed (`makeBodyStream` set): see
         /// that method's own doc comment for why. `runExchange` takes this, attaches a fresh
         /// stream, and reissues the request itself as a new `bytes(for:delegate:)` call.
         private var _pendingManualBodyRedirect: URLRequest?
@@ -1029,7 +1261,7 @@ extension Internals.URLSessionClient {
             onUploadProgress: (@Sendable (Int, Int) -> Void)? = nil,
             downloadBuffer: Internals.DownloadBuffer? = nil,
             onDownloadComplete: (@Sendable () -> Void)? = nil,
-            bodyFileURL: URL? = nil
+            makeBodyStream: (@Sendable () -> InputStream?)? = nil
         ) {
             self.redirectConfiguration = redirectConfiguration
             self.proxyAuthorization = proxyAuthorization
@@ -1038,7 +1270,8 @@ extension Internals.URLSessionClient {
             self.onUploadProgress = onUploadProgress
             self.downloadBuffer = downloadBuffer
             self.onDownloadComplete = onDownloadComplete
-            self.bodyFileURL = bodyFileURL
+            self.makeBodyStream = makeBodyStream
+            self.bodyLength = initialRequest.value(forHTTPHeaderField: "Content-Length")
             self._lastRequest = initialRequest
             self._visited = [initialRequest.url?.absoluteString ?? ""]
             self._responseData = Data()
@@ -1166,7 +1399,7 @@ extension Internals.URLSessionClient {
         /// the same continuing exchange) never applies to it.
         private func completeRedirect(with request: URLRequest, _ completionHandler: (URLRequest?) -> Void) {
             guard
-                bodyFileURL != nil,
+                makeBodyStream != nil,
                 let method = request.httpMethod,
                 !["GET", "HEAD"].contains(method.uppercased())
             else {
@@ -1281,11 +1514,11 @@ extension Internals.URLSessionClient {
             onUploadProgress?(Int(bytesSent), Int(totalBytesExpectedToSend))
         }
 
-        /// Hands `URLSession` a fresh stream over `bodyFileURL` when it has to send the request
-        /// body again: a 307/308 redirect, an authentication retry, a retry on a connection that
-        /// turned out to be stale. Only ever asked for an `httpBodyStream` body, which only
-        /// `executeSessionTask` builds (see `attachUploadBody(_:to:)`); `uploadTask(with:fromFile:)`
-        /// and `httpBody` resend by themselves.
+        /// Hands `URLSession` a fresh body stream (`makeBodyStream`) when it has to send the
+        /// request body again: a 307/308 redirect, an authentication retry, a retry on a connection
+        /// that turned out to be stale. Only ever asked for an `httpBodyStream` body, which only
+        /// `executeSessionTask` builds (see `attachUploadBody(_:to:)`);
+        /// `uploadTask(with:fromFile:)` and `httpBody` resend by themselves.
         ///
         /// Never answers `nil` while leaving the task running: observed directly, `URLSession`
         /// does not fail the task on a `nil` answer, it asks again, millions of times, until the
@@ -1295,7 +1528,7 @@ extension Internals.URLSessionClient {
             task: URLSessionTask,
             needNewBodyStream completionHandler: @escaping @Sendable (InputStream?) -> Void
         ) {
-            guard let bodyFileURL, let stream = InputStream(url: bodyFileURL) else {
+            guard let stream = makeBodyStream?() else {
                 task.cancel()
                 completionHandler(nil)
                 return
@@ -1314,10 +1547,10 @@ extension Internals.URLSessionClient {
 
         /// The redirect `willPerformHTTPRedirection` deferred to `runExchange` (see
         /// `_pendingManualBodyRedirect`'s own doc comment), with a fresh stream over
-        /// `bodyFileURL` already attached and ready to send -- `nil` when there's nothing
+        /// `makeBodyStream`'s stream already attached and ready to send -- `nil` when there's nothing
         /// pending. Cleared so it's only ever taken once.
         ///
-        /// - Throws: if `bodyFileURL`'s file is gone by the time of the resend, the same
+        /// - Throws: if the body's file is gone by the time of the resend, the same
         /// failure `attachUploadBody(_:to:)` raises for the initial request, rather than
         /// silently sending an empty or wrong body.
         func takePendingManualBodyRedirect() throws -> URLRequest? {
@@ -1330,20 +1563,17 @@ extension Internals.URLSessionClient {
                 return nil
             }
 
-            guard
-                let bodyFileURL,
-                let size = try? FileManager.default.attributesOfItem(atPath: bodyFileURL.path)[.size] as? NSNumber,
-                let stream = InputStream(url: bodyFileURL)
-            else {
-                throw URLError(
-                    .cannotOpenFile,
-                    userInfo: bodyFileURL.map { [NSURLErrorFailingURLErrorKey: $0] } ?? [:]
-                )
+            guard let stream = makeBodyStream?() else {
+                throw URLError(.cannotOpenFile)
             }
 
             var request = pending
             request.httpBodyStream = stream
-            request.setValue(String(size.int64Value), forHTTPHeaderField: "Content-Length")
+
+            if let bodyLength {
+                request.setValue(bodyLength, forHTTPHeaderField: "Content-Length")
+            }
+
             return request
         }
 

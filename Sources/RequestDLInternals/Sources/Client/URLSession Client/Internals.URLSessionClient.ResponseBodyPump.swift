@@ -66,22 +66,39 @@ extension Internals.URLSessionClient {
     /// Anything that ends the exchange without the reader draining the window releases it
     /// instead (see the `SessionTask` seed `executeSessionTask` builds, and the reader's own
     /// flow-control lease on `Internals.AsyncStream`), after which this never waits again.
+    ///
+    /// The window is also what an `Internals.TransferControl` suspends, so a suspended exchange
+    /// parks here, at its next flush, exactly like one whose reader fell behind.
+    ///
+    /// ## Failure
+    ///
+    /// Whatever was already pulled when `bytes` throws is still handed to `downloadBuffer` before
+    /// the error propagates: those bytes did arrive intact, and a continuation of the download
+    /// (see `Internals.RangeResumptionPlan`) starts from the count in `deliveredBytes`, which has
+    /// to match what the reader actually got.
+    ///
+    /// - Parameter deliveredBytes: Incremented by every byte handed to `downloadBuffer`.
     static func pumpResponseBody(
         _ bytes: URLSession.AsyncBytes,
         readingMode: Internals.DownloadStep.ReadingMode,
         into downloadBuffer: Internals.DownloadBuffer,
-        flowControl: Internals.FlowControlWindow
+        flowControl: Internals.FlowControlWindow,
+        deliveredBytes: inout Int64
     ) async throws {
-        let capacity = maximumPendingBytes
-        let storage = UnsafeMutablePointer<UInt8>.allocate(capacity: capacity)
+        let storage = UnsafeMutablePointer<UInt8>.allocate(capacity: Self.maximumPendingBytes)
         defer { storage.deallocate() }
 
         var iterator = bytes.makeAsyncIterator()
         var count = 0
 
-        func flush() async {
+        func handOver() {
             downloadBuffer.append(makeBuffer(Data(bytes: storage, count: count)))
+            deliveredBytes += Int64(count)
             count = .zero
+        }
+
+        func flush() async {
+            handOver()
 
             // After `append`, which charged what it just handed over; the same order
             // `Internals.ClientResponseReceiver` checks the window in.
@@ -90,49 +107,61 @@ extension Internals.URLSessionClient {
             }
         }
 
-        switch readingMode {
-        case .length(let length) where length > .zero:
-            // Counted across flushes: a boundary can fall anywhere relative to `capacity`.
-            var untilBoundary = length
+        let capacity = maximumPendingBytes
 
-            while let byte = try await iterator.next() {
-                storage[count] = byte
-                count &+= 1
-                untilBoundary &-= 1
+        do {
+            switch readingMode {
+            case .length(let length) where length > .zero:
+                // Counted across flushes: a boundary can fall anywhere relative to `capacity`.
+                var untilBoundary = length
 
-                if untilBoundary == .zero {
-                    untilBoundary = length
-                    await flush()
-                } else if count == capacity {
-                    await flush()
+                while let byte = try await iterator.next() {
+                    storage[count] = byte
+                    count &+= 1
+                    untilBoundary &-= 1
+
+                    if untilBoundary == .zero {
+                        untilBoundary = length
+                        await flush()
+                    } else if count == capacity {
+                        await flush()
+                    }
+                }
+
+            case .separator(let separator) where !separator.isEmpty:
+                // Only the separator's last byte can complete a match, so it is the only one
+                // worth flushing on; `Internals.DownloadBuffer` decides whether it actually did.
+                let terminator = separator[separator.count - 1]
+
+                while let byte = try await iterator.next() {
+                    storage[count] = byte
+                    count &+= 1
+
+                    if byte == terminator || count == capacity {
+                        await flush()
+                    }
+                }
+
+            default:
+                // A degenerate reading mode (`.length` <= 0, empty `.separator`): no boundary to
+                // flush on, only the capacity.
+                while let byte = try await iterator.next() {
+                    storage[count] = byte
+                    count &+= 1
+
+                    if count == capacity {
+                        await flush()
+                    }
                 }
             }
-
-        case .separator(let separator) where !separator.isEmpty:
-            // Only the separator's last byte can complete a match, so it is the only one worth
-            // flushing on; `Internals.DownloadBuffer` decides whether it actually did.
-            let terminator = separator[separator.count - 1]
-
-            while let byte = try await iterator.next() {
-                storage[count] = byte
-                count &+= 1
-
-                if byte == terminator || count == capacity {
-                    await flush()
-                }
+        } catch {
+            // Not waiting on the window here: nothing more is coming from this exchange, and
+            // whatever ends it next releases or reuses the window anyway.
+            if count > .zero {
+                handOver()
             }
 
-        default:
-            // A degenerate reading mode (`.length` <= 0, empty `.separator`): no boundary to
-            // flush on, only the capacity.
-            while let byte = try await iterator.next() {
-                storage[count] = byte
-                count &+= 1
-
-                if count == capacity {
-                    await flush()
-                }
-            }
+            throw error
         }
 
         if count > .zero {

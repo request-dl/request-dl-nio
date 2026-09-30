@@ -151,13 +151,15 @@ public struct RequestConfiguration: Sendable {
 
     #if canImport(NIOCore)
     /// - Parameter eventLoop: Hosts the task that streams the body, when there is one. See
-    /// ``RequestBody/connect(writer:body:eventLoop:)``.
-    func build(eventLoop: EventLoop) throws -> HTTPClient.Request {
+    /// ``RequestBody/connect(writer:body:eventLoop:gate:)``.
+    /// - Parameter uploadGate: Pauses the body between chunks while shut: an
+    /// `Internals.TransferControl`'s `gate`. `nil` never pauses.
+    func build(eventLoop: EventLoop, uploadGate: Internals.FlowControlWindow? = nil) throws -> HTTPClient.Request {
         try HTTPClient.Request(
             url: url,
             method: method.map { .init(rawValue: $0) } ?? .GET,
             headers: headers.build(),
-            body: body?.build(eventLoop: eventLoop)
+            body: body?.build(eventLoop: eventLoop, gate: uploadGate)
         )
     }
     #endif

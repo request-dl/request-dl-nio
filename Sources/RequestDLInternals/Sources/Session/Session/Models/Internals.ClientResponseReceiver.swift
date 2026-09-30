@@ -33,11 +33,26 @@ extension Internals {
 
         private let logger: Internals.TaskLogger?
 
+        /// Released, like `download`'s window, once this exchange has ended for good; see
+        /// `Internals.TransferControl.release()`.
+        private let transferControl: Internals.TransferControl?
+
+        /// Set when a lost connection may be recovered from: the body's bytes are counted as they
+        /// are delivered, a transport failure mid-body is handed over to it instead of ending the
+        /// body, and the body is only ever ended through it (see `endDownload(_:)`).
+        private let reconnection: Internals.NIODownloadReconnection?
+
         // MARK: - Unsafe properties
 
         private var _phase: Phase = .upload
         private var _state: State = .idle
         private var _reference: StreamReference = .none
+
+        /// The body part AsyncHTTPClient is currently held back on, if any.
+        private var _pausedPart: PausedBodyPart?
+
+        /// Set once `reconnection` took the rest of the body over from this exchange.
+        private var _isHandedOver = false
 
         // MARK: - Inits
 
@@ -48,7 +63,9 @@ extension Internals {
             download: DownloadBuffer,
             cache: ((ResponseHead) -> Internals.AsyncStream<DataBuffer>?)?,
             decompressionDispatch: Internals.ManualDecompressionDispatch,
-            logger: Internals.TaskLogger?
+            logger: Internals.TaskLogger?,
+            transferControl: Internals.TransferControl? = nil,
+            reconnection: Internals.NIODownloadReconnection? = nil
         ) {
             self.url = url
             self.upload = upload
@@ -57,6 +74,8 @@ extension Internals {
             self.cache = cache
             self.decompressionDispatch = decompressionDispatch
             self.logger = logger
+            self.transferControl = transferControl
+            self.reconnection = reconnection
         }
 
         // MARK: - Internal methods
@@ -118,6 +137,9 @@ extension Internals {
                 _reference = .download
 
                 return [
+                    // First, so whether this download can be resumed is settled before any part
+                    // of its body is counted.
+                    { self.reconnection?.didReceiveOriginalHead(responseHead) },
                     { self.head.append(.success(responseHead)) },
                     { self.upload.close() },
                     { self.head.close() },
@@ -171,7 +193,12 @@ extension Internals {
 
                 // `head` is closed by `didReceiveHead`, and closing is idempotent, so repeating
                 // it once per body part achieved nothing.
-                return [{ self.download.append(dataBuffer) }]
+                return [
+                    // Counted as it is handed over: the offset a continuation would resume from
+                    // is exactly what the reader gets.
+                    { self.reconnection?.didDeliver(dataBuffer.readableBytes) },
+                    { self.download.append(dataBuffer) },
+                ]
             }
 
             // The returned future is AsyncHTTPClient's back pressure: it reads nothing more from
@@ -190,17 +217,16 @@ extension Internals {
             // the reader draining the window releases it instead: `didReceiveError`,
             // `didFinishRequest`, the reader's iterator going away, and the request being
             // cancelled or dropped (see `Internals.Client.execute(request:url:...)`).
-            guard let flowControl = download.flowControl, !flowControl.isWritable else {
-                return task.eventLoop.makeSucceededVoidFuture()
+            //
+            // A suspended window is shut the same way, so this is also where a suspension holds
+            // the connection (see `Internals.TransferControl`).
+            let (future, pausedPart) = PausedBodyPart.gate(download.flowControl, on: task.eventLoop)
+
+            if let pausedPart {
+                lock.withLock { _pausedPart = pausedPart }
             }
 
-            let promise = task.eventLoop.makePromise(of: Void.self)
-
-            flowControl.whenWritable {
-                promise.succeed(())
-            }
-
-            return promise.futureResult
+            return future
         }
 
         package func didFinishRequest(task: HTTPClient.Task<Response>) throws -> Response {
@@ -208,6 +234,7 @@ extension Internals {
             // the last part's future completed -- but nothing will be produced into it again
             // either, so there is no reason to leave it able to pause.
             download.flowControl?.release()
+            transferControl?.release()
 
             decide {
                 guard [.head, .downloading, .end].contains(_state) && _phase == .download else {
@@ -219,7 +246,7 @@ extension Internals {
                 _reference = .lockout
 
                 return [
-                    { self.download.close() },
+                    endDownload { self.download.close() },
                     { self.head.close() },
                     { self.upload.close() },
                 ]
@@ -227,6 +254,20 @@ extension Internals {
         }
 
         package func didReceiveError(task: HTTPClient.Task<Response>, _ error: Error) {
+            // A connection lost mid-body that a continuation can recover from ends only this
+            // exchange, not the body: nothing below applies, the window in particular, which
+            // the continuation goes on using.
+            if let reconnection, handOver(error, to: reconnection) {
+                return
+            }
+
+            // A late or repeated error for an exchange whose body a continuation already took
+            // over must not touch anything shared with it either: the releases below would leave
+            // the continuation unmetered and deaf to a suspension.
+            guard !lock.withLock({ _isHandedOver }) else {
+                return
+            }
+
             // First, unconditionally, and outside the state machine: whatever state this error
             // lands in, including the `.end`/`.failure` ones that otherwise do nothing, a
             // `didReceiveBodyPart` future still waiting on the window must complete. Left
@@ -236,6 +277,7 @@ extension Internals {
             // state to finished before calling this, so the continuation that runs inline only
             // finds that out and returns.
             download.flowControl?.release()
+            transferControl?.release()
 
             decide {
                 var effects = [Effect]()
@@ -266,7 +308,7 @@ extension Internals {
                         fallthrough
                     }
 
-                    effects.append { self.download.failed(error) }
+                    effects.append(endDownload { self.download.failed(error) })
                 case .end, .failure:
                     // Reported, not trapped. Must not call `_unexpectedStateOrPhase` here, which
                     // is `Never` and ends the process: reaching this branch does not require a
@@ -291,7 +333,7 @@ extension Internals {
 
                 effects.append { self.upload.close() }
                 effects.append { self.head.close() }
-                effects.append { self.download.close() }
+                effects.append(endDownload { self.download.close() })
 
                 return effects
             }
@@ -317,14 +359,55 @@ extension Internals {
                 _state = .failure
 
                 return [
+                    { self.transferControl?.release() },
                     { self.head.append(.failure(error)) },
                     { self.upload.close() },
-                    { self.download.close() },
+                    endDownload { self.download.close() },
                 ]
             }
         }
 
         // MARK: - Private methods
+
+        /// Hands a failure mid-body over to `reconnection`, when it can recover from it.
+        ///
+        /// - Returns: `true` if a continuation now owns the rest of the body. This exchange is then
+        ///   over, and only this exchange: its paused body part, if any, completes on its own,
+        ///   without releasing the window the continuation shares.
+        private func handOver(_ error: Error, to reconnection: Internals.NIODownloadReconnection) -> Bool {
+            let isMidBody = lock.withLock {
+                [.head, .downloading].contains(_state) && _phase == .download
+            }
+
+            guard isMidBody, reconnection.claim(error) else {
+                return false
+            }
+
+            let pausedPart = lock.withLock { () -> PausedBodyPart? in
+                _state = .failure
+                _reference = .lockout
+                _isHandedOver = true
+
+                defer { _pausedPart = nil }
+                return _pausedPart
+            }
+
+            pausedPart?.complete()
+            return true
+        }
+
+        /// Ends `download` directly, or, with a `reconnection`, through it: there, the body can
+        /// outlive this exchange, and whichever exchange (or cancellation) ends it first is the
+        /// only one that may.
+        private func endDownload(_ body: @escaping () -> Void) -> Effect {
+            {
+                if let reconnection = self.reconnection {
+                    reconnection.terminate(body)
+                } else {
+                    body()
+                }
+            }
+        }
 
         /// Runs `body` under the state lock and its returned side effects after releasing it.
         ///
