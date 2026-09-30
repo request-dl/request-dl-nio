@@ -418,10 +418,21 @@ struct InternalsTransferControlDownloadTests {
             #expect(reader.verifier.isIntact)
             #expect(reader.position == length)
 
+            // At least the one reconnection the suspension forces. A client-side idle timeout this
+            // short can also fire again on a continuation whose reader briefly falls behind (a
+            // loaded machine), which reconnects once more by design, so the chain is what's checked:
+            // every continuation asks for a point inside what its predecessor had sent, and gets it.
             let requests = server.requests
-            try #require(requests.count == 2)
-            #expect((1...requests[0].bodyLength).contains(try #require(Self.rangeStart(requests[1]))))
-            #expect(requests[1].status == 206)
+            try #require(requests.count >= 2)
+
+            var previousStart = 0
+
+            for (previous, next) in zip(requests, requests.dropFirst()) {
+                let start = try #require(Self.rangeStart(next))
+                #expect((previousStart + 1...previousStart + previous.bodyLength).contains(start))
+                #expect(next.status == 206)
+                previousStart = start
+            }
 
             withExtendedLifetime(download) {}
         }
