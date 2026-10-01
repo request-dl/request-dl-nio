@@ -12,8 +12,24 @@ package struct EventuallyTimeoutError: Error, CustomStringConvertible {
     }
 }
 
+/// How much longer a wait may last on an Apple simulator runner than its caller asked for.
+///
+/// A CI simulator job runs the whole suite on a host-bridged, scheduler-contended runner, where a
+/// step that takes milliseconds anywhere else can take minutes (the suites there report durations
+/// of several hundred seconds, with the time spent queued, not working). A wait sized for a quiet
+/// machine then expires for a reason that has nothing to do with what the test checks. Scaling it
+/// costs nothing when the condition holds, which ends the wait early, and only lengthens a wait
+/// that was going to fail.
+private let simulatorTimeoutScale: Double = {
+    #if targetEnvironment(simulator)
+    return 4
+    #else
+    return 1
+    #endif
+}()
+
 /// Polls `condition` until it holds, or throws ``EventuallyTimeoutError`` after `timeout`
-/// seconds.
+/// seconds (more on an Apple simulator, see `simulatorTimeoutScale`).
 ///
 /// For tests that need to wait for something they cannot await directly -- a producer reaching
 /// a paused state, a background task giving up a resource -- without sleeping a fixed duration
@@ -25,6 +41,7 @@ package func eventually(
     // Counted in polls rather than measured against a clock: `ContinuousClock` needs a newer
     // deployment target than this package's, and a poll that overruns only makes the wait longer,
     // never a pass into a failure.
+    let timeout = timeout * simulatorTimeoutScale
     let polls = max(1, Int(timeout * 100))
 
     for _ in 0..<polls {
