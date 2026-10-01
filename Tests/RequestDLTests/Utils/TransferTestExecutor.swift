@@ -58,9 +58,23 @@ enum TransferTestExecutor: Sendable, CaseIterable, CustomTestStringConvertible {
         }
     }
 
+    /// The session a transfer test runs under: pinned to this executor, and with a client idle
+    /// timeout far longer than any of these tests holds a transfer still.
+    ///
+    /// The transports' own idle timeouts (60 s by default on `.urlSession`) keep counting while a
+    /// transfer is suspended, which is by design. A test only holds one suspended for a moment, but
+    /// on a CI runner starved of CPU a moment can last minutes, and the timeout fires for a reason
+    /// that has nothing to do with what the test is checking.
+    @PropertyBuilder
+    var session: some Property {
+        pinnedSession
+
+        Timeout(.seconds(900), for: .read)
+    }
+
     /// A session that can only run on this executor: a request that would fall back to another one
     /// fails instead of passing for the wrong reason.
-    var session: Session {
+    private var pinnedSession: Session {
         switch self {
         #if canImport(NIOCore)
         case .nio:
