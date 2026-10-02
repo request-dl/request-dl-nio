@@ -335,7 +335,9 @@ struct RequestMonitorTests {
             .result()
         }
 
-        try await eventually(timeout: 30) { monitor.hasEnded }
+        // Generous: the request above is itself bounded by a 3s budget, yet on a saturated runner
+        // that budget has been seen to take over a minute to fire, and the end is only reported after.
+        try await eventually(timeout: 120) { monitor.hasEnded }
 
         // Then
         #expect(monitor.states() == ["started", "failed"])
