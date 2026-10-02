@@ -605,8 +605,8 @@ extension Internals {
             let makeBodyStream: (@Sendable () -> InputStream?)?
             let uploadPump: Internals.URLSessionUploadBodyPump?
             do {
-                if let transferControl, let uploadBody {
-                    let pump = try Internals.URLSessionUploadBodyPump(uploadBody, gate: transferControl.gate)
+                if let uploadGate = transferControl?.uploadGate, let uploadBody {
+                    let pump = try Internals.URLSessionUploadBodyPump(uploadBody, gate: uploadGate)
                     request.httpBodyStream = try pump.makeStream()
                     request.setValue(String(pump.size), forHTTPHeaderField: "Content-Length")
                     uploadPump = pump

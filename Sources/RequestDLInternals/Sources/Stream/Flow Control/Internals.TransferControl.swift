@@ -7,7 +7,7 @@ import SwiftAsyncStream
 extension Internals {
 
     /// Suspends and resumes one request execution in flight, in both directions, on whichever
-    /// executor it runs: the internal mechanism behind a future public suspend/resume API.
+    /// executor it runs: the internal mechanism behind the public `RequestController`.
     ///
     /// Nothing here is OS-specific. Every executor already moves bytes through a producer that
     /// RequestDL itself drives, and each producer waits on an `Internals.FlowControlWindow` whenever
@@ -54,9 +54,20 @@ extension Internals {
         /// behaviour of an execution without a `TransferControl`: a lost connection fails the body.
         package let resumption: Internals.DownloadResumptionPolicy?
 
+        /// Whether anything can suspend this execution. `false` for an execution that only asked
+        /// to reconnect a lost download (see ``resumption``): it then has no use for the request
+        /// body producers waiting on ``gate``, and must not change how a request body is sent.
+        package let allowsSuspension: Bool
+
         /// Shut exactly while suspended (and open for good once released). What request-body
         /// producers and download reconnections wait on.
         package let gate = Internals.FlowControlWindow()
+
+        /// ``gate``, for the request body producers to wait on: `nil` when nothing can suspend
+        /// this execution, so the body is sent exactly as it is without a control at all.
+        package var uploadGate: Internals.FlowControlWindow? {
+            allowsSuspension ? gate : nil
+        }
 
         package var isSuspended: Bool {
             lock.withLock { _isSuspended }
@@ -73,8 +84,12 @@ extension Internals {
 
         // MARK: - Inits
 
-        package init(resumption: Internals.DownloadResumptionPolicy? = nil) {
+        package init(
+            resumption: Internals.DownloadResumptionPolicy? = nil,
+            allowsSuspension: Bool = true
+        ) {
             self.resumption = resumption
+            self.allowsSuspension = allowsSuspension
         }
 
         // MARK: - Internal methods

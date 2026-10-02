@@ -76,7 +76,8 @@ struct RawTask<Content: Property>: RequestTask {
             isURLSessionExecutor: isURLSessionExecutor,
             cacheControl: cacheControl,
             logger: logger,
-            deadline: deadline
+            deadline: deadline,
+            transferControl: makeTransferControl(environment: environment)
         )
 
         return AsyncResponse(
@@ -119,6 +120,32 @@ struct RawTask<Content: Property>: RequestTask {
                 )
             )
         }
+    }
+
+    /// A control for this one execution, attached to every `RequestController` queued on
+    /// `environment` and carrying its download resumption policy; `nil` when it has neither, which
+    /// keeps an execution nobody controls exactly as it was: no control to create, and no change
+    /// to how a `.urlSession` upload sends its body.
+    ///
+    /// An execution that only reconnects a lost download (no controller) is created unable to be
+    /// suspended, so asking for resumption alone never changes how a request body is sent.
+    private func makeTransferControl(environment: RequestEnvironmentValues) -> Internals.TransferControl? {
+        let controllers = environment.requestControllers
+        let resumption = environment.downloadResumptionPolicy.resumption
+
+        guard !controllers.isEmpty || resumption != nil else {
+            return nil
+        }
+
+        let control = Internals.TransferControl(
+            resumption: resumption,
+            allowsSuspension: !controllers.isEmpty
+        )
+        for controller in controllers {
+            controller.attach(control)
+        }
+
+        return control
     }
 
     private func validateRequiredExecutor(resolved: Resolved) throws {
@@ -202,7 +229,7 @@ struct RawTask<Content: Property>: RequestTask {
     ///
     /// Only rebinds the task-local when `RequestServiceContext` was actually declared; leaving
     /// it untouched otherwise preserves whatever `ServiceContext.current` the caller's own task
-    /// already carries. `executeTraced(resolved:client:isURLSessionExecutor:cache:logger:)` starts
+    /// already carries. `executeTraced(resolved:client:isURLSessionExecutor:cache:logger:transferControl:)` starts
     /// its span reading this same task-local, so both the explicit and the ambient case are picked
     /// up correctly here: there's no `EventLoop` hop between the bind and the read.
     private func runSession(
@@ -211,7 +238,8 @@ struct RawTask<Content: Property>: RequestTask {
         isURLSessionExecutor: Bool,
         cacheControl: Internals.CacheControl,
         logger: Internals.TaskLogger?,
-        deadline: Internals.ResourceDeadline
+        deadline: Internals.ResourceDeadline,
+        transferControl: Internals.TransferControl?
     ) async throws -> (task: SessionTask, onResponseHead: OnResponseHead?) {
         // A cache hit (the `.task` case below) never reaches the network, so it isn't traced.
         //
@@ -229,7 +257,8 @@ struct RawTask<Content: Property>: RequestTask {
                     client: client,
                     isURLSessionExecutor: isURLSessionExecutor,
                     cache: cache,
-                    logger: logger
+                    logger: logger,
+                    transferControl: transferControl
                 )
             }
         }
@@ -265,7 +294,8 @@ struct RawTask<Content: Property>: RequestTask {
         client: any RequestExecutingClient,
         isURLSessionExecutor: Bool,
         cache: (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
-        logger: Internals.TaskLogger?
+        logger: Internals.TaskLogger?,
+        transferControl: Internals.TransferControl?
     ) async throws -> (task: SessionTask, onResponseHead: OnResponseHead?) {
         var configuration = resolved.requestConfiguration
 
@@ -286,7 +316,8 @@ struct RawTask<Content: Property>: RequestTask {
                 configuration: configuration,
                 decompression: resolved.session.configuration.decompression,
                 cache: cache,
-                logger: logger
+                logger: logger,
+                transferControl: transferControl
             )
 
             return (task, { result in endRequestSpan(span, with: result) })

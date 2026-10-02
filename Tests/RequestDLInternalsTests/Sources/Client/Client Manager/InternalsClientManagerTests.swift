@@ -445,8 +445,13 @@ struct InternalsClientManagerTests {
         // rather than slept through: the sweep is a detached `.utility` task, so when exactly it
         // gets to run is up to the scheduler, and a fixed sleep only ever encodes a guess about
         // how contended the machine is.
+        //
+        // Up to two minutes, not the twenty seconds this once waited: on a CI runner starved enough
+        // that the sweep's `.utility` task doesn't get to run for that long, the clients were all
+        // still there when the wait ended. Waiting costs nothing when the sweep does run, which
+        // ends the loop at once.
         var remaining = manager.count
-        for _ in 0..<200 where remaining > 0 {
+        for _ in 0..<1_200 where remaining > 0 {
             try await _Concurrency.Task.sleep(nanoseconds: 100_000_000)
             remaining = manager.count
         }

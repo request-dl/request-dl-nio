@@ -393,7 +393,14 @@ struct CachedRequestTests {
     func cache_whenReloadAndValidateCachedDataWithValidCache() async throws {
         let testState = try await TestState()
         let eTag = UUID()
-        let cacheData = await mockCachedData(makeHeaders(eTag: eTag))
+        // A freshness window far wider than the request can take, on both sides: the cached
+        // entry has to still be fresh when the revalidation finishes, and the server's answer has
+        // to carry the same directive, or revalidating would refresh the entry's `max-age` and
+        // the comparison below would see a changed one. With the default two seconds, a runner
+        // slow enough to take longer than that between caching the entry and validating it found
+        // the entry expired: the revalidation `HEAD` had already used up the server's one
+        // response, so the refetch got the server's default one instead.
+        let cacheData = await mockCachedData(makeHeaders(eTag: eTag, maxAgeSeconds: 3_600))
         let cacheKey = "https://localhost:8888" + testState.uri
 
         // When
@@ -401,7 +408,7 @@ struct CachedRequestTests {
 
         let response = try await performCacheRequest(
             testState: testState,
-            headers: makeHeaders(eTag: eTag),
+            headers: makeHeaders(eTag: eTag, maxAgeSeconds: 3_600),
             cacheStrategy: .reloadAndValidateCachedData
         )
 
@@ -617,8 +624,10 @@ struct CachedRequestTests {
         let eTag = UUID()
         // No "Content-Length" header at all, the exact shape a chunked-transfer or HTTP/2
         // response leaves behind.
+        // `maxAgeSeconds` wide enough that the entry is still fresh when it is looked up, however
+        // slow the runner: this test is about the missing `Content-Length`, not about expiry.
         let cacheData = await mockCachedData(
-            makeHeaders(eTag: eTag),
+            makeHeaders(eTag: eTag, maxAgeSeconds: 3_600),
             includeContentLength: false
         )
         let cacheKey = "https://localhost:8888" + testState.uri
@@ -653,8 +662,10 @@ struct CachedRequestTests {
         // the cached bytes are the decoded body, but `Content-Length` still reflects the
         // compressed size on the wire, since neither `NIOHTTPResponseDecompressor` nor
         // CFNetwork's own decoding strips the header.
+        // `maxAgeSeconds` wide enough that the entry is still fresh when it is looked up, however
+        // slow the runner: this test is about the `Content-Length` mismatch, not about expiry.
         let cacheData = await mockCachedData(
-            makeHeaders(eTag: eTag) + [("Content-Encoding", "gzip")],
+            makeHeaders(eTag: eTag, maxAgeSeconds: 3_600) + [("Content-Encoding", "gzip")],
             contentLengthOverride: 1
         )
         let cacheKey = "https://localhost:8888" + testState.uri
