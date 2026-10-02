@@ -14,6 +14,8 @@ import FoundationEssentials
 #else
 import struct Foundation.Data
 import struct Foundation.UUID
+import struct Foundation.URL
+import class Foundation.JSONEncoder
 #endif
 
 /// A ``RequestMonitor`` that records everything it is told, and can be slowed down.
@@ -337,6 +339,137 @@ struct RequestMonitorTests {
 
         // Then
         #expect(monitor.states() == ["started", "failed"])
+    }
+
+    // MARK: - Defaults, rejection and the cache
+
+    /// A monitor implements only what it needs: one that implements nothing is told about a request
+    /// all the same, through the empty defaults, and the request is unaffected.
+    @Test(arguments: Executor.allCases)
+    private func aMonitorThatImplementsNothing_changesNothing(_ executor: Executor) async throws {
+        struct Silent: RequestMonitor {}
+
+        try await withTransferServer(.init(length: 1_024)) { server in
+            // When: an upload, so that every kind of event is produced.
+            let data = try await UploadTask {
+                BaseURL(.http, host: "127.0.0.1:\(server.port)")
+                Path("/upload")
+                RequestMethod(.put)
+                executor.session
+                Payload(data: Data(repeating: 7, count: 256 * 1_024))
+            }
+            .collectData()
+            .extractPayload()
+            .monitor(Silent())
+            .result()
+
+            // Then
+            #expect(!data.isEmpty)
+
+            try await eventually(timeout: 30) { !server.requests.isEmpty }
+            #expect(server.requests.first?.bodyLength == 256 * 1_024)
+        }
+    }
+
+    /// A request rejected before it is ever sent still ends: started, then failed, and nothing
+    /// reaches the network.
+    @Test(arguments: Executor.allCases)
+    private func aRequestRejectedBeforeBeingSent_isReportedAsStartedThenFailed(_ executor: Executor) async throws {
+        try await withTransferServer(.init(length: 1_024)) { server in
+            // Given: a body to compress, and a `Content-Encoding` already set, which is a conflict
+            // that is refused before anything is sent.
+            let monitor = RecordingMonitor()
+
+            // When
+            await #expect(throws: (any Error).self) {
+                _ = try await UploadTask {
+                    BaseURL(.http, host: "127.0.0.1:\(server.port)")
+                    Path("/upload")
+                    RequestMethod(.put)
+                    executor.session
+                    CustomHeader(name: "Content-Encoding", value: "br")
+                    Payload(data: Data(repeating: 7, count: 64 * 1_024))
+                        .compression(.gzip)
+                }
+                .collectData()
+                .extractPayload()
+                .monitor(monitor)
+                .result()
+            }
+
+            try await eventually(timeout: 30) { monitor.hasEnded }
+
+            // Then
+            #expect(monitor.states() == ["started", "failed"])
+            #expect(monitor.failure != nil)
+            #expect(server.acceptedConnections == 0)
+        }
+    }
+
+    /// A response served from the cache never reaches an executor, which is where an execution
+    /// otherwise ends: it finishes right after it starts, having moved nothing on the network.
+    @Test
+    private func aResponseServedFromTheCache_finishesRightAfterItStarts() async throws {
+        let certificate = Certificates().server()
+        let uniqueKey = UUID().uuidString
+        let uri = "/" + uniqueKey
+        let dataCache = DataCache(suiteName: uniqueKey)
+        let localServer = try await LocalServer(.standard)
+
+        localServer.cleanup(at: uri)
+        await dataCache.removeAll()
+        dataCache.memoryCapacity = 8 * 1_024 * 1_024
+
+        let body = try JSONEncoder().encode("from the cache")
+
+        await dataCache.setCachedData(
+            await CachedData(
+                response: ResponseHead(
+                    url: URL(string: "https://localhost:8888"),
+                    status: .init(code: 200, reason: "Ok"),
+                    version: .init(minor: 1, major: 2),
+                    headers: HTTPHeaders([
+                        ("Cache-Control", "public, max-age=3600"),
+                        ("Content-Length", String(body.count)),
+                    ]),
+                    isKeepAlive: false
+                ),
+                policy: .all,
+                data: body
+            ),
+            forKey: "https://localhost:8888" + uri
+        )
+
+        let monitor = RecordingMonitor()
+
+        // When
+        let data = try await DataTask {
+            Session.localServer
+                .cachePolicy(.all)
+                .cacheStrategy(.returnCachedDataElseLoad)
+                .cache(memoryCapacity: .zero, diskCapacity: .zero, url: dataCache.directoryURL, encryptionKey: nil)
+
+            SecureConnection {
+                TrustRoots(certificate.certificateURL.absolutePath(percentEncoded: false))
+            }
+
+            BaseURL(localServer.baseURL)
+            Path(uri)
+        }
+        .extractPayload()
+        .monitor(monitor)
+        .result()
+
+        try await eventually(timeout: 30) { monitor.hasEnded }
+
+        // Then: the cached body, and an execution that started and finished without a byte moved.
+        #expect(data == body)
+        #expect(monitor.states() == ["started", "finished"])
+        #expect(monitor.downloads.isEmpty)
+        #expect(monitor.uploads.isEmpty)
+
+        localServer.cleanup(at: uri)
+        await dataCache.removeAll()
     }
 
     // MARK: - With a controller and a resumption policy

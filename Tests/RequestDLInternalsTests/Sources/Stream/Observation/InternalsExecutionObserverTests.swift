@@ -268,6 +268,37 @@ struct InternalsExecutionObserverTests {
         )
     }
 
+    @Test
+    func theFirstHeadWins_andALaterOneChangesNothing() async throws {
+        // Given
+        let (observer, recorder) = makeObserver()
+
+        // When: a head that states a length, then another one (a continuation's, say).
+        observer.didReceiveHead(head([("Content-Length", "100")]))
+        observer.didReceiveHead(head([("Content-Length", "999")]))
+        observer.didReceive(1)
+
+        // Then
+        try await eventually { !recorder.downloads.isEmpty }
+        #expect(recorder.downloads.first?.expected == 100)
+    }
+
+    @Test
+    func aHeadAfterTheEnd_isIgnored() async throws {
+        // Given
+        let (observer, recorder) = makeObserver()
+        observer.didChange(.finished)
+        try await eventually { recorder.states == ["finished"] }
+
+        // When
+        observer.didReceiveHead(head([("Content-Length", "100")]))
+        observer.didReceive(1)
+
+        // Then: closed, so neither the size nor the bytes are reported.
+        try await _Concurrency.Task.sleep(nanoseconds: 100_000_000)
+        #expect(recorder.downloads.isEmpty)
+    }
+
     @Test(
         arguments: [
             ([("Content-Length", "1234")], 1_234 as Int?),
