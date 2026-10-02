@@ -506,7 +506,7 @@ extension DataTaskTests {
 
             // The default connect timeout is sized for a quiet machine; on a starved simulator the
             // handshake alone can outlast it.
-            Timeout(.seconds(Int64(simulatorAffectedURLSessionRequestTimeout)), for: .connect)
+            Timeout(.seconds(simulatorAffectedConnectTimeoutSeconds), for: .connect)
 
             SecureConnection {
                 AdditionalTrustRoots(server.certificateURL.absolutePath(percentEncoded: false))
@@ -565,7 +565,7 @@ extension DataTaskTests {
                 .requiredExecutor(.nioTransportServices)
 
             // See `dataTask_whenAdditionalTrustRootsSetAndNIOTransportServicesRequired_...`.
-            Timeout(.seconds(Int64(simulatorAffectedURLSessionRequestTimeout)), for: .connect)
+            Timeout(.seconds(simulatorAffectedConnectTimeoutSeconds), for: .connect)
 
             SecureConnection {
                 TrustRoots(server.certificateURL.absolutePath(percentEncoded: false))
