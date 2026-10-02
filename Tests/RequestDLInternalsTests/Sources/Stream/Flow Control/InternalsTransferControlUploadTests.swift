@@ -103,6 +103,7 @@ struct InternalsTransferControlUploadTests {
             let uploaded = try await completing(within: 60) { try await completion.value }
             #expect(uploaded.status == 200)
 
+            try await awaitRecordedRequests(server, atLeast: 1)
             let requests = server.requests
             #expect(requests.count == 1)
             #expect(requests.first?.bodyLength == size)
@@ -144,6 +145,7 @@ struct InternalsTransferControlUploadTests {
 
             let uploaded = try await completing(within: 60) { try await completion.value }
             #expect(uploaded.status == 200)
+            try await awaitRecordedRequests(server, atLeast: 1)
             #expect(server.requests.first?.bodyLength == size)
             #expect(server.requests.first?.isBodyIntact == true)
 
@@ -190,6 +192,7 @@ struct InternalsTransferControlUploadTests {
             #expect(outcome == "failed")
             try await eventually(timeout: 30) { server.openConnections == 0 }
             #expect(server.uploadBytesReceived < size)
+            try await awaitRecordedRequests(server, atLeast: 1)
             #expect(server.requests.first?.isBodyComplete == false)
             #expect(control.gate.isReleasedForTesting)
 
@@ -240,6 +243,7 @@ struct InternalsTransferControlUploadTests {
             #if canImport(NIOCore)
             case .nio:
                 #expect(try result.get().status == 200)
+                try await awaitRecordedRequests(server, atLeast: 1)
                 #expect(server.requests.first?.isBodyIntact == true)
                 #expect(server.requests.first?.bodyLength == size)
             #endif
@@ -301,6 +305,7 @@ struct InternalsTransferControlUploadTests {
             #expect(outcome == "failed")
 
             try await _Concurrency.Task.sleep(nanoseconds: 500_000_000)
+            try await awaitRecordedRequests(server, atLeast: 1)
             #expect(server.requests.count == 1)
             #expect(server.requests.first?.isBodyComplete == false)
             #expect(server.requests.first?.isBodyIntact == true)
@@ -339,6 +344,7 @@ struct InternalsTransferControlUploadTests {
             #expect(outcome == "failed")
 
             try await _Concurrency.Task.sleep(nanoseconds: 500_000_000)
+            try await awaitRecordedRequests(server, atLeast: 1)
             #expect(server.requests.count == 1)
             #expect(server.requests.first?.bodyLength == 2_000_000)
             #expect(server.requests.first?.isBodyIntact == true)
@@ -386,6 +392,7 @@ struct InternalsTransferControlUploadTests {
             let uploaded = try await completing(within: 60) { try await completion.value }
             #expect(uploaded.status == 200)
 
+            try await awaitRecordedRequests(server, atLeast: 2)
             let requests = server.requests
             #expect(requests.map(\.path) == ["/upload", "/final"])
             #expect(requests.map(\.bodyLength) == [size, size])

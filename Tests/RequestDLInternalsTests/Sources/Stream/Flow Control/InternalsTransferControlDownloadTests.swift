@@ -82,6 +82,7 @@ struct InternalsTransferControlDownloadTests {
             #expect(reader.verifier.isIntact)
             #expect(reader.position == Self.largeBody)
             #expect(server.acceptedConnections == 1)
+            try await awaitRecordedRequests(server, atLeast: 1)
             #expect(server.requests.count == 1)
 
             withExtendedLifetime(download) {}
@@ -193,6 +194,7 @@ struct InternalsTransferControlDownloadTests {
             // Then
             #expect(try await reader.end(within: 30).isFailure)
             #expect(reader.verifier.isIntact)
+            try await awaitRecordedRequests(server, atLeast: 1)
             #expect(server.requests.count == 1)
 
             withExtendedLifetime(download) {}
@@ -261,6 +263,7 @@ struct InternalsTransferControlDownloadTests {
             // before reporting the failure; up to ~750 KiB on `.urlSession`, where CFNetwork
             // discards what it had read ahead of `AsyncBytes`). An intact body of the right length
             // is what proves the seam lands on exactly the right byte.
+            try await awaitRecordedRequests(server, atLeast: 2)
             let requests = server.requests
             try #require(requests.count == 2)
             #expect(requests[0].bodyLength == dropAt)
@@ -297,6 +300,7 @@ struct InternalsTransferControlDownloadTests {
             #expect(try await reader.end() == .finished)
             #expect(reader.verifier.isIntact)
             #expect(reader.position == resource.length)
+            try await awaitRecordedRequests(server, atLeast: 2)
             #expect(server.requests.last?.header("If-Range") == lastModified)
 
             withExtendedLifetime(download) {}
@@ -430,6 +434,7 @@ struct InternalsTransferControlDownloadTests {
             // short can also fire again on a continuation whose reader briefly falls behind (a
             // loaded machine), which reconnects once more by design, so the chain is what's checked:
             // every continuation asks for a point inside what its predecessor had sent, and gets it.
+            try await awaitRecordedRequests(server, atLeast: 2)
             let requests = server.requests
             try #require(requests.count >= 2)
 
@@ -506,11 +511,13 @@ struct InternalsTransferControlDownloadTests {
             switch executor {
             #if canImport(NIOCore)
             case .nio:
+                try await awaitRecordedRequests(server, atLeast: 2)
                 #expect(server.requests.map(\.status) == [200, 416])
             #endif
 
             #if canImport(Darwin)
             case .urlSession:
+                try await awaitRecordedRequests(server, atLeast: 1)
                 #expect(server.requests.map(\.status) == [200])
             #endif
             }
@@ -544,6 +551,7 @@ struct InternalsTransferControlDownloadTests {
             #expect(try await reader.end(within: 30).isFailure)
 
             try await _Concurrency.Task.sleep(nanoseconds: 500_000_000)
+            try await awaitRecordedRequests(server, atLeast: 1)
             #expect(server.requests.count == 1)
             #expect(control.gate.isReleasedForTesting)
         }
@@ -599,6 +607,7 @@ struct InternalsTransferControlDownloadTests {
             #expect(reader.verifier.isIntact)
             #expect(reader.position <= server.requests.first?.bodyLength ?? .max)
 
+            try await awaitRecordedRequests(server, atLeast: 2)
             let requests = server.requests
             try #require(requests.count == 2)
             #expect(requests[1].status == continuationStatus)
