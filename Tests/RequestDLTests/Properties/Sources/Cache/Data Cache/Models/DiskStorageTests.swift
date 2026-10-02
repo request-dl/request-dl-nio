@@ -324,11 +324,12 @@ struct DiskStorageTests {
             await storage.removeAll()
             let elapsed = clock.now - start
 
-            // Then: well under the 15s retry budget a by-key lookup would spend on the same miss.
-            // 8s, not a tighter margin, because CI Simulator scheduler contention already pushed
-            // this as high as 2.3s at a 2s margin; still leaves a wide gap below the 15s budget
-            // a genuine regression (falling back to the by-key retry loop) would actually hit.
-            #expect(elapsed < .seconds(8))
+            // Then: under the 15s retry budget a by-key lookup would spend on the same miss. A
+            // regression (falling back to that retry loop) takes at least those 15s whatever the
+            // load, so the bound only has to sit below them, and can be as loose as that allows:
+            // CI scheduler contention already pushed this as high as 2.3s at a 2s margin, then to
+            // 9.2s at an 8s one.
+            #expect(elapsed < .seconds(14))
         }
     }
 
