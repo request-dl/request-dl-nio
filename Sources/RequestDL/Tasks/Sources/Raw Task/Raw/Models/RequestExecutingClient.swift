@@ -56,22 +56,3 @@ package protocol RequestExecutingClient: Sendable {
         logger: Internals.TaskLogger?
     ) async throws -> Internals.ResponseHead
 }
-
-extension RequestExecutingClient {
-
-    /// An execution that can't be suspended or reconnected: every call site today.
-    func execute(
-        configuration: RequestConfiguration,
-        decompression: Internals.Decompression,
-        cache: (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
-        logger: Internals.TaskLogger?
-    ) async throws -> SessionTask {
-        try await execute(
-            configuration: configuration,
-            decompression: decompression,
-            cache: cache,
-            logger: logger,
-            transferControl: nil
-        )
-    }
-}
