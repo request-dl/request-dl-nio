@@ -38,7 +38,14 @@ import Network
 /// 80-160s instead of milliseconds) blew both this suite's own generous timing margins and,
 /// separately, crashed the whole job's process via the watchdog, taking every other in-flight test
 /// down with it, which is the exact failure mode these two traits exist to prevent.
-@Suite(.serialized, .concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog)
+@Suite(
+    .serialized,
+    .concurrent(watchdogAffectedPlatformConcurrencyLimit),
+    .nonFatalWatchdog,
+    .toleratingSimulatorFlake(
+        "CFNetwork intermittently returns kCFErrorPACFileError (Code=308) for a valid PAC script on the CI simulator runners, in a different test each run; never reproduced elsewhere"
+    )
+)
 struct InternalsPACEvaluatorTests {
 
     @Test
