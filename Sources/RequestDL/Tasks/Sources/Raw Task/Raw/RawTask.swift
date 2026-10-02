@@ -83,7 +83,8 @@ struct RawTask<Content: Property>: RequestTask {
             seed: sessionTask.seed,
             response: sessionTask.response,
             onResponseHead: onResponseHead,
-            deadline: deadline
+            deadline: deadline,
+            metrics: sessionTask.metrics
         )
     }
 

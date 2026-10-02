@@ -85,10 +85,7 @@ extension RequestTask<TaskResult<Data>> {
                 keyPath: { $0[keyPath: keyPath] },
                 data: \.payload,
                 element: {
-                    TaskResult(
-                        head: $0.head,
-                        payload: $1
-                    )
+                    $0.withPayload($1)
                 }
             )
         )

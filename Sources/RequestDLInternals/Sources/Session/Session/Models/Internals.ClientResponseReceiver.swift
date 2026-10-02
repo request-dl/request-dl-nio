@@ -42,6 +42,10 @@ extension Internals {
         /// body, and the body is only ever ended through it (see `endDownload(_:)`).
         private let reconnection: Internals.NIODownloadReconnection?
 
+        /// Where AsyncHTTPClient's per-transaction metrics end up. A redirect makes one transaction
+        /// per hop, all reported to this same receiver.
+        private let metrics: Internals.RequestMetricsCollector?
+
         // MARK: - Unsafe properties
 
         private var _phase: Phase = .upload
@@ -65,7 +69,8 @@ extension Internals {
             decompressionDispatch: Internals.ManualDecompressionDispatch,
             logger: Internals.TaskLogger?,
             transferControl: Internals.TransferControl? = nil,
-            reconnection: Internals.NIODownloadReconnection? = nil
+            reconnection: Internals.NIODownloadReconnection? = nil,
+            metrics: Internals.RequestMetricsCollector? = nil
         ) {
             self.url = url
             self.upload = upload
@@ -76,6 +81,7 @@ extension Internals {
             self.logger = logger
             self.transferControl = transferControl
             self.reconnection = reconnection
+            self.metrics = metrics
         }
 
         // MARK: - Internal methods
@@ -92,6 +98,13 @@ extension Internals {
                 let readableBytes = part.readableBytes
                 return [{ self.upload.append(.success(readableBytes)) }]
             }
+        }
+
+        /// Delivered by AsyncHTTPClient before `didFinishRequest(task:)` (and before
+        /// `didReceiveError(task:_:)` on a failure), so by the time the body ends, the
+        /// transaction is already recorded.
+        package func didCollectMetrics(task: HTTPClient.Task<Response>, _ metrics: HTTPClientTransactionMetrics) {
+            self.metrics?.append(Internals.TransactionMetrics(metrics))
         }
 
         package func didSendRequest(task: HTTPClient.Task<Response>) {

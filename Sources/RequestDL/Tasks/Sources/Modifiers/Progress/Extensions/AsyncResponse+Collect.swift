@@ -14,7 +14,7 @@ extension AsyncResponse {
                 progress.upload(step.chunkSize, totalSize: step.totalSize)
             case .download(let step):
                 log(responseHead: step.head)
-                return .init(head: step.head, payload: step.bytes)
+                return .init(head: step.head, payload: step.bytes, metrics: metrics)
             }
         }
 
@@ -31,7 +31,8 @@ extension AsyncResponse {
                 log(responseHead: step.head)
                 return .init(
                     head: step.head,
-                    payload: step.bytes
+                    payload: step.bytes,
+                    metrics: metrics
                 )
             }
         }

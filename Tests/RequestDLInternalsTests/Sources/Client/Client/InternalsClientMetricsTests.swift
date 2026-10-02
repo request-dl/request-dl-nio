@@ -1,0 +1,220 @@
+//
+// See LICENSE for this package's licensing information.
+//
+
+// What `Internals.Client` reports in `SessionTask.metrics`: the transactions AsyncHTTPClient
+// delivers through `didCollectMetrics(task:_:)`, converted by
+// `Internals.TransactionMetrics.init(_:)`. The NIO counterpart to
+// `InternalsURLSessionClientMetricsTests`.
+#if canImport(NIOCore)
+
+import AsyncHTTPClient
+import NIOCore
+import Testing
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.Data
+import struct Foundation.UUID
+#endif
+
+@testable import RequestDLInternals
+@testable import RequestDLTestSupport
+
+@Suite(.concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog)
+struct InternalsClientMetricsTests {
+
+    private func makeSession(
+        collectDNSMetrics: Bool = false,
+        redirectConfiguration: Internals.RedirectConfiguration? = nil
+    ) -> Internals.Session {
+        var configuration = Internals.Session.Configuration()
+        configuration.redirectConfiguration = redirectConfiguration
+        var secureConnection = Internals.SecureConnection()
+
+        secureConnection.certificateVerification = .some(.none)
+        configuration.secureConnection = secureConnection
+        configuration.timeout.connect = 60_000_000_000
+        configuration.collectDNSMetrics = collectDNSMetrics
+
+        return Internals.Session(
+            provider: .identified("com.requestdl.tests.client-metrics-\(UUID())", numberOfThreads: 1),
+            configuration: configuration
+        )
+    }
+
+    @Test
+    func whenResponseDrained_reportsTheTransactionAsyncHTTPClientMeasured() async throws {
+        // Given
+        let localServer = try await LocalServer(.standard)
+        let uri = "/" + UUID().uuidString
+
+        localServer.insert(try LocalServer.ResponseConfiguration(jsonObject: "metrics"), at: uri)
+        defer { localServer.cleanup(at: uri) }
+
+        let session = makeSession()
+
+        // When
+        let task = try await execute(session: session, localServer: localServer, uri: uri)
+        let collector = try #require(task.metrics)
+
+        try await drain(task)
+
+        // Then: delivered before the body ended, so no waiting is needed.
+        let transactions = collector.transactions()
+        #expect(transactions.count == 1)
+
+        let transaction = try #require(transactions.first)
+        let fetchStart = try #require(transaction.fetchStart)
+        let requestStart = try #require(transaction.requestStart)
+        let requestEnd = try #require(transaction.requestEnd)
+        let responseStart = try #require(transaction.responseStart)
+        let responseEnd = try #require(transaction.responseEnd)
+
+        #expect(fetchStart <= requestStart)
+        #expect(requestStart <= requestEnd)
+        #expect(requestEnd <= responseStart)
+        #expect(responseStart <= responseEnd)
+
+        #expect(transaction.error == nil)
+        #expect((transaction.responseBodyBytesReceived ?? 0) > 0)
+
+        let connection = try #require(transaction.connection)
+        #expect(connection.isReused == false)
+        #expect(connection.negotiatedProtocol != nil)
+        #expect(connection.tlsVersion != nil)
+
+        // A fresh connection went through the phases that establish one, except DNS, which
+        // AsyncHTTPClient only reports on request (`collectDNSMetrics`).
+        let connect = try #require(connection.connect)
+        let secureConnection = try #require(connection.secureConnection)
+        #expect(connect.start <= connect.end)
+        #expect(secureConnection.start <= secureConnection.end)
+
+        #if !canImport(Network)
+        #expect(connection.domainLookup == nil)
+        #endif
+    }
+
+    @Test
+    func whenSecondRequestSharesTheClient_reportsTheConnectionAsReused() async throws {
+        // Given
+        let localServer = try await LocalServer(.standard)
+        let uri = "/" + UUID().uuidString
+
+        localServer.insert(try LocalServer.ResponseConfiguration(jsonObject: "metrics"), at: uri)
+        defer { localServer.cleanup(at: uri) }
+
+        let session = makeSession()
+        let client = try await session.client()
+
+        // When
+        let first = try await execute(session: session, client: client, localServer: localServer, uri: uri)
+        try await drain(first)
+
+        let second = try await execute(session: session, client: client, localServer: localServer, uri: uri)
+        let collector = try #require(second.metrics)
+        try await drain(second)
+
+        // Then
+        let connection = try #require(collector.transactions().first?.connection)
+        #expect(connection.isReused == true)
+        #expect(connection.domainLookup == nil)
+        #expect(connection.connect == nil)
+        #expect(connection.secureConnection == nil)
+    }
+
+    @Test
+    func whenRedirectFollowed_reportsOneTransactionPerHop() async throws {
+        // Given
+        let localServer = try await LocalServer(.standard)
+        let origin = "/" + UUID().uuidString
+        let destination = "/" + UUID().uuidString
+
+        localServer.insert(
+            LocalServer.ResponseConfiguration(status: .found, headers: ["Location": destination], data: Data()),
+            at: origin
+        )
+        localServer.insert(try LocalServer.ResponseConfiguration(jsonObject: "metrics"), at: destination)
+
+        defer {
+            localServer.cleanup(at: origin)
+            localServer.cleanup(at: destination)
+        }
+
+        let session = makeSession(redirectConfiguration: .follow(max: 5, allowCycles: false))
+
+        // When
+        let task = try await execute(session: session, localServer: localServer, uri: origin)
+        let collector = try #require(task.metrics)
+        try await drain(task)
+
+        // Then: AsyncHTTPClient delivers each hop before it starts the next, so by the end of the
+        // body all of them are in.
+        let transactions = collector.transactions()
+        #expect(transactions.map(\.url?.path) == [origin, destination])
+        #expect(transactions.first?.connection?.isReused == false)
+        #expect(transactions.last?.connection?.isReused == true)
+    }
+
+    #if !canImport(Network)
+    @Test
+    func whenCollectingDNSMetrics_reportsTheLookup() async throws {
+        // Given
+        let localServer = try await LocalServer(.standard)
+        let uri = "/" + UUID().uuidString
+
+        localServer.insert(try LocalServer.ResponseConfiguration(jsonObject: "metrics"), at: uri)
+        defer { localServer.cleanup(at: uri) }
+
+        let session = makeSession(collectDNSMetrics: true)
+
+        // When
+        let task = try await execute(session: session, localServer: localServer, uri: uri)
+        let collector = try #require(task.metrics)
+        try await drain(task)
+
+        // Then
+        let connection = try #require(collector.transactions().first?.connection)
+        let lookup = try #require(connection.domainLookup)
+        let connect = try #require(connection.connect)
+
+        #expect(lookup.start <= lookup.end)
+        #expect(lookup.end <= connect.start)
+    }
+    #endif
+
+    // MARK: - Private methods
+
+    private func execute(
+        session: Internals.Session,
+        client: Internals.Client? = nil,
+        localServer: LocalServer,
+        uri: String
+    ) async throws -> SessionTask {
+        let client = if let client { client } else { try await session.client() }
+        let urlString = "https://\(localServer.baseURL)\(uri)"
+
+        return try await session.execute(
+            client: client,
+            request: try HTTPClient.Request(url: urlString),
+            url: urlString,
+            readingMode: .length(1_024),
+            uploadingBytes: .zero,
+            decompression: .disabled,
+            cache: nil,
+            logger: nil
+        )
+    }
+
+    private func drain(_ task: SessionTask) async throws {
+        for try await step in task.response {
+            if case .download(let downloadStep) = step {
+                for try await _ in downloadStep.bytes {}
+            }
+        }
+    }
+}
+
+#endif

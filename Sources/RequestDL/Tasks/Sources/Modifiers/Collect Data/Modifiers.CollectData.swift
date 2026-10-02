@@ -22,19 +22,13 @@ extension Modifiers {
         fileprivate init() where Input == AsyncResponse, Output == TaskResult<Data> {
             transform = {
                 let result = try await $0.collect()
-                return try await .init(
-                    head: result.head,
-                    payload: result.payload.collect()
-                )
+                return try await result.withPayload(result.payload.collect())
             }
         }
 
         fileprivate init() where Input == TaskResult<AsyncBytes>, Output == TaskResult<Data> {
             transform = {
-                try await .init(
-                    head: $0.head,
-                    payload: $0.payload.collect()
-                )
+                try await $0.withPayload($0.payload.collect())
             }
         }
 

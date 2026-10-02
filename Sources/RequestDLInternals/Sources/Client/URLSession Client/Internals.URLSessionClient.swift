@@ -636,6 +636,7 @@ extension Internals {
             let upload = Internals.AsyncStream<Int>()
             let head = Internals.AsyncStream<Internals.ResponseHead>()
             let downloadBuffer = await Internals.DownloadBuffer(readingMode: readingMode, flowControl: flowControl)
+            let metrics = Internals.RequestMetricsCollector()
 
             let redirectConfiguration = redirectConfiguration
             let proxyAuthorization = proxyAuthorization
@@ -649,7 +650,8 @@ extension Internals {
                 onUploadProgress: { bytesSent, _ in
                     upload.append(.success(bytesSent))
                 },
-                makeBodyStream: makeBodyStream
+                makeBodyStream: makeBodyStream,
+                metrics: metrics
             )
 
             // A download continuation is a new exchange, so it gets a delegate of its own, with
@@ -661,7 +663,8 @@ extension Internals {
                     initialRequest: continuation,
                     proxyAuthorization: proxyAuthorization,
                     tls: tlsDelegate,
-                    forwarding: delegate
+                    forwarding: delegate,
+                    metrics: metrics
                 )
             }
 
@@ -731,7 +734,8 @@ extension Internals {
                     flowControl.release()
                     transferControl?.release()
                 },
-                response: response
+                response: response,
+                metrics: metrics
             )
         }
 
@@ -1190,6 +1194,9 @@ extension Internals.URLSessionClient {
         private let makeBodyStream: (@Sendable () -> InputStream?)?
         /// The initial request's `Content-Length`, which a manual redirect resend reattaches.
         private let bodyLength: String?
+        /// Where the transactions `URLSession` measured are reported. Set only by
+        /// `executeSessionTask`, the one path whose result carries metrics to the caller.
+        private let metrics: Internals.RequestMetricsCollector?
         private let lock = Lock()
 
         // MARK: - Unsafe properties
@@ -1261,7 +1268,8 @@ extension Internals.URLSessionClient {
             onUploadProgress: (@Sendable (Int, Int) -> Void)? = nil,
             downloadBuffer: Internals.DownloadBuffer? = nil,
             onDownloadComplete: (@Sendable () -> Void)? = nil,
-            makeBodyStream: (@Sendable () -> InputStream?)? = nil
+            makeBodyStream: (@Sendable () -> InputStream?)? = nil,
+            metrics: Internals.RequestMetricsCollector? = nil
         ) {
             self.redirectConfiguration = redirectConfiguration
             self.proxyAuthorization = proxyAuthorization
@@ -1271,6 +1279,7 @@ extension Internals.URLSessionClient {
             self.downloadBuffer = downloadBuffer
             self.onDownloadComplete = onDownloadComplete
             self.makeBodyStream = makeBodyStream
+            self.metrics = metrics
             self.bodyLength = initialRequest.value(forHTTPHeaderField: "Content-Length")
             self._lastRequest = initialRequest
             self._visited = [initialRequest.url?.absoluteString ?? ""]
@@ -1512,6 +1521,26 @@ extension Internals.URLSessionClient {
             totalBytesExpectedToSend: Int64
         ) {
             onUploadProgress?(Int(bytesSent), Int(totalBytesExpectedToSend))
+        }
+
+        /// Reports every transaction of the task, one per redirect hop and one per retry on a fresh
+        /// connection, in the order they happened.
+        ///
+        /// Arrives once the task has ended, so the last transaction is already complete. Forwarded
+        /// afterwards, since `URLSession` allows only one delegate per task and this one stands
+        /// between it and the caller's.
+        func urlSession(
+            _ session: URLSession,
+            task: URLSessionTask,
+            didFinishCollecting metrics: URLSessionTaskMetrics
+        ) {
+            if let collector = self.metrics {
+                for transaction in metrics.transactionMetrics {
+                    collector.append(Internals.TransactionMetrics(transaction))
+                }
+            }
+
+            forwardingDelegate?.urlSession?(session, task: task, didFinishCollecting: metrics)
         }
 
         /// Hands `URLSession` a fresh body stream (`makeBodyStream`) when it has to send the
