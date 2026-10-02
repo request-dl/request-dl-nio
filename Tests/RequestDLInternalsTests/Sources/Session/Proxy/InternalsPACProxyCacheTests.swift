@@ -19,7 +19,13 @@ import Network
 /// `.concurrent(watchdogAffectedPlatformConcurrencyLimit)`/`.nonFatalWatchdog`: real threading
 /// and network I/O against a local listener, same rationale as `InternalsPACEvaluatorTests`'s own
 /// copy of this note.
-@Suite(.concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog)
+@Suite(
+    .concurrent(watchdogAffectedPlatformConcurrencyLimit),
+    .nonFatalWatchdog,
+    .toleratingSimulatorFlake(
+        "CFNetwork intermittently returns kCFErrorPACFileError (Code=308) for a valid PAC script on the CI simulator runners, in a different test each run; never reproduced elsewhere"
+    )
+)
 struct InternalsPACProxyCacheTests {
 
     @Test
