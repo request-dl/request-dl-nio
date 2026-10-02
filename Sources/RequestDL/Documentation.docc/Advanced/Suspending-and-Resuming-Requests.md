@@ -99,6 +99,8 @@ DownloadTask { ... }
     .controller(controller)
 ```
 
+To follow a request being suspended, resumed and reconnected as it happens, attach a ``RequestMonitor``: see <doc:Monitoring-requests>.
+
 ### Topics
 
 - ``RequestController``

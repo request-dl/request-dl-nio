@@ -74,7 +74,8 @@ try await DataTask {
 - [x] [JSON / Codable / Multipart / URL Encoded](<doc:Exploring-payload>);
 - [x] [UploadTask / DownloadTask / DataTask / MockedTask](<doc:Exploring-task>);
 - [x] [Modifiers & Interceptors](<doc:Modifiers-and-Interceptors>);
-- [x] [Upload & Download progress](<doc:Upload-and-download-progress>);
+- [x] [Monitoring requests](<doc:Monitoring-requests>) (progress and state, for any task);
+- [x] [Upload & Download progress (deprecated)](<doc:Upload-and-download-progress>);
 - [x] [Swift Concurrency](<doc:Swift-concurrency>);
 - [x] [Combine support](<doc:Exploring-combine>) (Apple platforms only);
 - [x] [Image loading for SwiftUI, UIKit, AppKit and watchOS](<doc:Loading-images>) (Apple platforms only);
