@@ -314,6 +314,7 @@ extension Internals {
         // MARK: - Private properties
 
         private let storage: Storage
+        private let observer: Internals.ExecutionObserver?
 
         // MARK: - Inits
 
@@ -326,16 +327,23 @@ extension Internals {
         ///   (the cached-response replay, the mocked task, the `URLSession` `didReceive data:`
         ///   delegate behind the non-`SessionTask` overloads) gains nothing from one and keeps the
         ///   previous, unmetered behaviour by passing `nil`.
+        ///
+        /// - Parameter observer: Counts every byte handed to ``append(_:)``, the one place both
+        ///   executors (and a continuation after a lost connection) feed the response body
+        ///   through, so it sees what came in off the network rather than what a reader took.
         package init(
             readingMode: Internals.DownloadStep.ReadingMode,
-            flowControl: Internals.FlowControlWindow? = nil
+            flowControl: Internals.FlowControlWindow? = nil,
+            observer: Internals.ExecutionObserver? = nil
         ) async {
             self.storage = await .init(readingMode: readingMode, flowControl: flowControl)
+            self.observer = observer
         }
 
         // MARK: - Internal methods
 
         package func append(_ incomeBytes: Internals.AnyBuffer) {
+            observer?.didReceive(incomeBytes.readableBytes)
             storage.append(incomeBytes)
         }
 

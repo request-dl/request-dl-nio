@@ -59,6 +59,13 @@ extension Internals {
         /// body producers waiting on ``gate``, and must not change how a request body is sent.
         package let allowsSuspension: Bool
 
+        /// Told about this execution as it happens on the network, when something observes it.
+        ///
+        /// Lives here because this is the one object every executor already receives for an
+        /// execution and every one of its ends (suspension, reconnection, the exchange itself)
+        /// can reach.
+        package let observer: Internals.ExecutionObserver?
+
         /// Shut exactly while suspended (and open for good once released). What request-body
         /// producers and download reconnections wait on.
         package let gate = Internals.FlowControlWindow()
@@ -86,10 +93,12 @@ extension Internals {
 
         package init(
             resumption: Internals.DownloadResumptionPolicy? = nil,
-            allowsSuspension: Bool = true
+            allowsSuspension: Bool = true,
+            observer: Internals.ExecutionObserver? = nil
         ) {
             self.resumption = resumption
             self.allowsSuspension = allowsSuspension
+            self.observer = observer
         }
 
         // MARK: - Internal methods
@@ -121,6 +130,10 @@ extension Internals {
                 for window in _windows {
                     window.suspend()
                 }
+
+                // Only recorded here: the observer delivers from a task of its own, so nothing of
+                // an observer's runs under this lock.
+                observer?.didChange(.suspended)
             }
         }
 
@@ -133,6 +146,8 @@ extension Internals {
                 for window in _windows {
                     window.resume()
                 }
+
+                observer?.didChange(.resumed)
             }
         }
 

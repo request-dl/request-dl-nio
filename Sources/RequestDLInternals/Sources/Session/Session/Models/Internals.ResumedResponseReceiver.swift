@@ -120,6 +120,7 @@ extension Internals {
                 _isOver = true
             }
 
+            reconnection.observer?.didChange(.finished)
             reconnection.terminate { self.download.close() }
         }
 
@@ -140,6 +141,7 @@ extension Internals {
             }
 
             if error is AlreadyComplete {
+                reconnection.observer?.didChange(.finished)
                 reconnection.terminate { self.download.close() }
                 return
             }
@@ -156,6 +158,7 @@ extension Internals {
                 return
             }
 
+            reconnection.observer?.didChange(.failed(error))
             reconnection.terminate { self.download.failed(error) }
         }
 
@@ -172,6 +175,7 @@ extension Internals {
             }
 
             if isFirst {
+                reconnection.observer?.didChange(.failed(error))
                 reconnection.terminate { self.download.failed(error) }
             }
         }

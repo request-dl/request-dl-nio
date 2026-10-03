@@ -90,7 +90,10 @@ extension Internals {
                 _reference = .upload
 
                 let readableBytes = part.readableBytes
-                return [{ self.upload.append(.success(readableBytes)) }]
+                return [
+                    { self.transferControl?.observer?.didSend(readableBytes) },
+                    { self.upload.append(.success(readableBytes)) },
+                ]
             }
         }
 
@@ -140,6 +143,7 @@ extension Internals {
                     // First, so whether this download can be resumed is settled before any part
                     // of its body is counted.
                     { self.reconnection?.didReceiveOriginalHead(responseHead) },
+                    { self.transferControl?.observer?.didReceiveHead(responseHead) },
                     { self.head.append(.success(responseHead)) },
                     { self.upload.close() },
                     { self.head.close() },
@@ -246,6 +250,7 @@ extension Internals {
                 _reference = .lockout
 
                 return [
+                    { self.transferControl?.observer?.didChange(.finished) },
                     endDownload { self.download.close() },
                     { self.head.close() },
                     { self.upload.close() },
@@ -278,6 +283,10 @@ extension Internals {
             // finds that out and returns.
             download.flowControl?.release()
             transferControl?.release()
+
+            // The first ending wins, so this is reported whatever state the error lands in: a
+            // repeated one, or one after the body finished, changes nothing.
+            transferControl?.observer?.didChange(.failed(error))
 
             decide {
                 var effects = [Effect]()
@@ -360,6 +369,7 @@ extension Internals {
 
                 return [
                     { self.transferControl?.release() },
+                    { self.transferControl?.observer?.didChange(.failed(error)) },
                     { self.head.append(.failure(error)) },
                     { self.upload.close() },
                     endDownload { self.download.close() },

@@ -77,6 +77,7 @@ extension RequestTask<AsyncResponse> {
     /// - Parameters:
     ///   - progress: The progress tracking object.
     /// - Returns: A modified request task with progress tracking.
+    @available(*, deprecated, message: "Use monitor(_:); add collectData() to also collect the body.")
     public func progress<Progress: RequestDL.Progress>(
         _ progress: Progress
     ) -> ModifiedRequestTask<Modifiers.Progress<Element, TaskResult<Data>>> {
@@ -89,6 +90,7 @@ extension RequestTask<AsyncResponse> {
     ///   - upload: The progress tracking object for upload.
     ///   - download: The progress tracking object for download.
     /// - Returns: A modified request task with progress tracking.
+    @available(*, deprecated, message: "Use monitor(_:); add collectData() to also collect the body.")
     public func progress<Upload: UploadProgress, Download: DownloadProgress>(
         upload: Upload,
         download: Download
@@ -106,6 +108,7 @@ extension RequestTask<AsyncResponse> {
     /// - Parameters:
     ///   - upload: The progress tracking object for upload.
     /// - Returns: A modified request task with progress tracking.
+    @available(*, deprecated, message: "Use monitor(_:); add collectData() to also collect the body.")
     public func progress<Upload: UploadProgress>(
         upload: Upload
     ) -> ModifiedRequestTask<Modifiers.Progress<Element, TaskResult<AsyncBytes>>> {
@@ -120,6 +123,7 @@ extension RequestTask<TaskResult<AsyncBytes>> {
     /// - Parameters:
     ///   - download: The progress tracking object for download.
     /// - Returns: A modified request task with progress tracking.
+    @available(*, deprecated, message: "Use monitor(_:); add collectData() to also collect the body.")
     public func progress<Download: DownloadProgress>(
         download: Download
     ) -> ModifiedRequestTask<Modifiers.Progress<Element, TaskResult<Data>>> {
@@ -134,6 +138,7 @@ extension RequestTask<AsyncBytes> {
     /// - Parameters:
     ///   - download: The progress tracking object for download.
     /// - Returns: A modified request task with progress tracking.
+    @available(*, deprecated, message: "Use monitor(_:); add collectData() to also collect the body.")
     public func progress<Download: DownloadProgress>(
         download: Download
     ) -> ModifiedRequestTask<Modifiers.Progress<Element, Data>> {

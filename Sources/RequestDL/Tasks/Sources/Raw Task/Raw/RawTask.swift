@@ -70,15 +70,31 @@ struct RawTask<Content: Property>: RequestTask {
             logger: logger
         )
 
-        let (sessionTask, onResponseHead) = try await runSession(
-            resolved: resolved,
-            client: client,
-            isURLSessionExecutor: isURLSessionExecutor,
-            cacheControl: cacheControl,
-            logger: logger,
-            deadline: deadline,
-            transferControl: makeTransferControl(environment: environment)
-        )
+        let observer = makeObserver(resolved: resolved, environment: environment)
+
+        let sessionTask: SessionTask
+        let onResponseHead: OnResponseHead?
+
+        do {
+            (sessionTask, onResponseHead) = try await runSession(
+                resolved: resolved,
+                client: client,
+                isURLSessionExecutor: isURLSessionExecutor,
+                cacheControl: cacheControl,
+                logger: logger,
+                deadline: deadline,
+                transferControl: makeTransferControl(environment: environment, observer: observer)
+            )
+        } catch {
+            observer?.didChange(.failed(error))
+            throw error
+        }
+
+        // A response served from the cache never reaches an executor, which is where an
+        // execution otherwise ends, so it ends here: nothing crossed the network.
+        if onResponseHead == nil {
+            observer?.didChange(.finished)
+        }
 
         return AsyncResponse(
             seed: sessionTask.seed,
@@ -129,23 +145,82 @@ struct RawTask<Content: Property>: RequestTask {
     ///
     /// An execution that only reconnects a lost download (no controller) is created unable to be
     /// suspended, so asking for resumption alone never changes how a request body is sent.
-    private func makeTransferControl(environment: RequestEnvironmentValues) -> Internals.TransferControl? {
+    private func makeTransferControl(
+        environment: RequestEnvironmentValues,
+        observer: Internals.ExecutionObserver?
+    ) -> Internals.TransferControl? {
         let controllers = environment.requestControllers
         let resumption = environment.downloadResumptionPolicy.resumption
 
-        guard !controllers.isEmpty || resumption != nil else {
+        guard !controllers.isEmpty || resumption != nil || observer != nil else {
             return nil
         }
 
         let control = Internals.TransferControl(
             resumption: resumption,
-            allowsSuspension: !controllers.isEmpty
+            allowsSuspension: !controllers.isEmpty,
+            observer: observer
         )
+
+        // Before the controllers are attached: attaching to one that is already suspended
+        // suspends the execution, and a monitor must hear it started first.
+        observer?.didChange(.started)
         for controller in controllers {
             controller.attach(control)
         }
 
         return control
+    }
+
+    /// Observes this one execution for every `RequestMonitor` queued on `environment`; `nil` when
+    /// there is none, which leaves the execution with nothing to count.
+    private func makeObserver(
+        resolved: Resolved,
+        environment: RequestEnvironmentValues
+    ) -> Internals.ExecutionObserver? {
+        let monitors = environment.requestMonitors
+
+        guard !monitors.isEmpty else {
+            return nil
+        }
+
+        let configuration = resolved.requestConfiguration
+        let execution = RequestExecution(url: configuration.url, method: configuration.method ?? "GET")
+
+        let observer = Internals.ExecutionObserver { event in
+            switch event {
+            case .progress(let upload, let download):
+                for monitor in monitors {
+                    if let upload {
+                        monitor.request(
+                            execution,
+                            didUpload: upload.bytes,
+                            total: upload.total,
+                            of: upload.expected
+                        )
+                    }
+
+                    if let download {
+                        monitor.request(
+                            execution,
+                            didDownload: download.bytes,
+                            total: download.total,
+                            of: download.expected
+                        )
+                    }
+                }
+
+            case .state(let state):
+                let state = RequestState(state)
+
+                for monitor in monitors {
+                    monitor.request(execution, didChange: state)
+                }
+            }
+        }
+
+        observer.expectUpload(configuration.body?.totalSize)
+        return observer
     }
 
     private func validateRequiredExecutor(resolved: Resolved) throws {
