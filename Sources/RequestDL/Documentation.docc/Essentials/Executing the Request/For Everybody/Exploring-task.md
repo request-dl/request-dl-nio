@@ -150,6 +150,40 @@ struct OfflineError: Error {}
 let task = MockedTask(throwing: OfflineError(), delay: .seconds(1))
 ```
 
+### Request metrics
+
+A ``RequestDL/TaskResult`` carries what the request measured on the wire in ``RequestDL/TaskResult/metrics``: one ``RequestDL/RequestMetrics/Transaction`` for every exchange it went through, so a redirect that was followed shows up as one transaction per hop, in order.
+
+```swift
+let result = try await DataTask {
+    // Property specifications
+}
+.result()
+
+for transaction in result.metrics?.transactions ?? [] {
+    print(transaction.url?.absoluteString ?? "-")
+
+    if let connection = transaction.connection {
+        print("reused:", connection.isReused)
+        print("tls:", connection.secureConnection?.duration ?? 0)
+    }
+}
+```
+
+Both executors fill the same values, with a few phases only one of them can observe. Anything that was not reached, or that the executor cannot observe, is `nil` rather than zero:
+
+- A reused connection did not go through ``RequestDL/RequestMetrics/Connection/domainLookup``, ``RequestDL/RequestMetrics/Connection/connect`` or ``RequestDL/RequestMetrics/Connection/secureConnection``, so those are `nil` for it.
+- ``RequestDL/RequestMetrics/Connection/tlsCipherSuite`` is only known to `URLSession` and to AsyncHTTPClient over the Network framework.
+- The header byte counts are `nil` for HTTP/2.
+- ``RequestDL/RequestMetrics/Transaction/queued`` is only reported by AsyncHTTPClient.
+- ``RequestDL/RequestMetrics/Transaction/error`` is the error of the exchange that failed. A request that fails as a whole throws and has no ``RequestDL/TaskResult``, so it is visible when a body fails after the response head, or when a download continued from a failed attempt.
+- ``RequestDL/RequestMetrics/fetchInterval`` is `nil` while the last transaction has not finished or failed.
+- ``RequestDL/TaskResult/metrics`` is `nil` when nothing went over the wire, as with a response served from the cache or a ``RequestDL/MockedTask``.
+
+> Note: With ``RequestDL/Session/Executor/nio``, the DNS lookup is only reported when the session opts in with ``RequestDL/Session/collectDNSMetrics(_:)``. Reporting it makes the client resolve host names with its own implementation instead of SwiftNIO's default one, which is why it is off by default.
+
+Metrics are read when asked for. A ``RequestDL/DataTask`` has collected the whole body by the time its result exists, so they are complete. For ``RequestDL/DownloadTask``, the last transaction only ends once the body has been consumed, so read ``RequestDL/TaskResult/metrics`` after that.
+
 ### BackgroundDownloadTask
 
 Every task above runs and reports back in the same process. ``RequestDL/BackgroundDownloadTask`` is different on purpose: it schedules a download that keeps running even if your app is suspended or terminated, using `URLSession`'s background transfer support, and does not conform to ``RequestDL/RequestTask``. See <doc:Downloading-in-the-Background> for how to schedule one and observe when it finishes.
@@ -162,6 +196,7 @@ Every task above runs and reports back in the same process. ``RequestDL/Backgrou
 - ``RequestDL/TaskResultPrimitive``
 - ``RequestDL/TaskError``
 - ``RequestDL/TaskResult``
+- ``RequestDL/RequestMetrics``
 
 ### Meet the tasks
 
