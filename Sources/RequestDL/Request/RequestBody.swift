@@ -128,6 +128,84 @@ public struct RequestBody: Sendable {
         }
     }
 
+    /// The same body without its first `count` bytes: what is left to send once that many have
+    /// been delivered. `nil` for a compressing body, whose bytes don't exist until it is pulled,
+    /// so there is nothing to skip over (see ``materialized(memoryLimit:)``).
+    func dropping(first count: Int) -> RequestBody? {
+        guard case .fixed(let body) = backing else {
+            return nil
+        }
+
+        return RequestBody(backing: .fixed(body.dropping(first: count)))
+    }
+
+    /// This body as bytes that exist, so that any part of it can be read again: itself, when it
+    /// already is, and otherwise a compressing body drained, once, into a buffer.
+    ///
+    /// Whatever the compressor produces is what every later read sees, so a body that is read
+    /// again from an offset is the very bytes the first read started with, which a second pass of
+    /// the compressor would not promise.
+    ///
+    /// - Parameter memoryLimit: How many bytes are kept in memory. A body that outgrows it is
+    /// moved to a temporary file, which goes away with the last copy of the result.
+    /// - Throws: Whatever the compressor throws, and ``ResumableUploadBodyError`` if what was
+    /// produced could not all be stored.
+    func materialized(memoryLimit: Int) async throws -> RequestBody {
+        guard case .compressing(let sequence) = backing else {
+            return self
+        }
+
+        var memory = await Internals.DataBuffer()
+        var file: Internals.FileBuffer?
+        var total = Int.zero
+
+        for try await var chunk in sequence {
+            let data = chunk.asData(byteTransferStrategy: .noCopy)
+
+            if file == nil, total + data.count > memoryLimit {
+                var spilled = await Internals.FileBuffer()
+                await spilled.writeBuffer(&memory)
+                file = spilled
+            }
+
+            if file != nil {
+                await file?.writeData(data)
+            } else {
+                await memory.writeData(data)
+            }
+
+            total += data.count
+        }
+
+        // Writing never reports a failure, so the only way to know is to look at what is stored.
+        let stored: Int
+        let buffer: Internals.AnyBuffer
+
+        if let file {
+            stored = await file.estimatedBytes
+            buffer = file
+        } else {
+            stored = await memory.estimatedBytes
+            buffer = memory
+        }
+
+        guard stored == total else {
+            throw ResumableUploadBodyError.couldNotStoreBody(expected: total, stored: stored)
+        }
+
+        return RequestBody(buffers: [buffer])
+    }
+
+    /// Whether this body is backed by a file: the one a ``materialized(memoryLimit:)`` body is
+    /// moved to once it outgrows memory.
+    var isBackedByFile: Bool {
+        guard case .fixed(let body) = backing else {
+            return false
+        }
+
+        return body.isBackedByFile
+    }
+
     #if canImport(NIOCore)
     /// - Parameter eventLoop: Hosts the task that streams the body, when there is one. See
     /// ``connect(writer:body:eventLoop:gate:)``.
