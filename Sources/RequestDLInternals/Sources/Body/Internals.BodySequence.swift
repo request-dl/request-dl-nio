@@ -165,6 +165,11 @@ extension Internals {
             return fileBuffer.wholeFileURL
         }
 
+        /// Whether any buffer is backed by a file rather than by memory.
+        package var isBackedByFile: Bool {
+            buffers.contains { $0 is Internals.FileBuffer }
+        }
+
         // MARK: - Private properties
 
         private let buffers: [Internals.AnyBuffer]
@@ -217,6 +222,39 @@ extension Internals {
         }
 
         // MARK: - Internal methods
+
+        /// The same body without its first `count` bytes: what is left to send after that many
+        /// have already been delivered.
+        ///
+        /// Only the cursors move, never the stores behind them, so nothing is read or copied and
+        /// the receiver stays whole (a buffer is a value over a shared store). A `count` past the
+        /// end leaves an empty body.
+        ///
+        /// - Precondition: `count` is not negative.
+        package func dropping(first count: Int) -> BodySequence {
+            precondition(count >= .zero, "Cannot drop \(count) bytes")
+
+            var remaining = count
+            var kept: [Internals.AnyBuffer] = []
+
+            for var buffer in buffers {
+                let readable = buffer.readableBytes
+
+                if remaining >= readable {
+                    remaining -= readable
+                    continue
+                }
+
+                if remaining > .zero {
+                    buffer.moveReaderIndex(to: buffer.readerIndex + remaining)
+                    remaining = .zero
+                }
+
+                kept.append(buffer)
+            }
+
+            return BodySequence(chunkSize: chunkSize, buffers: kept)
+        }
 
         package func makeAsyncIterator() -> AsyncIterator {
             AsyncIterator(
