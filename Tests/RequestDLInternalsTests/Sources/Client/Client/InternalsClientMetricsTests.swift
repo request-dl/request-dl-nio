@@ -158,6 +158,46 @@ struct InternalsClientMetricsTests {
         #expect(transactions.last?.connection?.isReused == true)
     }
 
+    @Test
+    func whenConnectionRefused_recordsTheErrorOnTheTransaction() async throws {
+        // Given: a port nothing listens on any more.
+        let server = try TransferServer(resource: .init(length: 1))
+        let port = server.port
+        await server.stop()
+
+        let session = makeSession()
+        let client = try await session.client()
+        let urlString = "http://127.0.0.1:\(port)/resource"
+
+        // When
+        let task = try await session.execute(
+            client: client,
+            request: try HTTPClient.Request(url: urlString),
+            url: urlString,
+            readingMode: .length(1_024),
+            uploadingBytes: .zero,
+            decompression: .disabled,
+            cache: nil,
+            logger: nil
+        )
+
+        let collector = try #require(task.metrics)
+        var failed = false
+
+        do {
+            try await drain(task)
+        } catch {
+            failed = true
+        }
+
+        // Then
+        try await eventually { collector.transactions().last?.error != nil }
+
+        #expect(failed)
+        #expect(collector.transactions().count == 1)
+        #expect(collector.transactions().first?.responseStart == nil)
+    }
+
     #if !canImport(Network)
     @Test
     func whenCollectingDNSMetrics_reportsTheLookup() async throws {

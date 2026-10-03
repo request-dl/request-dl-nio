@@ -19,7 +19,7 @@ import struct Foundation.URL
 /// those is documented where it is declared, and is `nil` when it cannot be observed.
 ///
 /// Read it from ``TaskResult/metrics``.
-public struct RequestMetrics: Sendable {
+public struct RequestMetrics: Sendable, Equatable {
 
     /// A start and an end of one phase.
     public struct Interval: Sendable, Hashable {
@@ -63,7 +63,7 @@ public struct RequestMetrics: Sendable {
     }
 
     /// The connection a transaction ran on.
-    public struct Connection: Sendable {
+    public struct Connection: Sendable, Equatable {
 
         /// The protocol negotiated for the connection.
         public let negotiatedProtocol: NegotiatedProtocol?
@@ -143,7 +143,11 @@ public struct RequestMetrics: Sendable {
     /// One request/response exchange on the wire.
     ///
     /// Every date and count is `nil` when it was never reached, or when the executor cannot observe it.
-    public struct Transaction: Sendable {
+    ///
+    /// Two transactions are equal when every field is, and ``error`` is compared by the type of the error and its
+    /// description (`String(reflecting:)`), since `Error` itself is not `Equatable`. Two different errors that
+    /// share a type and a description therefore compare equal.
+    public struct Transaction: Sendable, Equatable {
 
         /// The URL this transaction was sent to.
         public let url: URL?
@@ -194,8 +198,15 @@ public struct RequestMetrics: Sendable {
 
         /// The error that ended the transaction, if any.
         ///
-        /// Only AsyncHTTPClient reports an error for a single transaction. `URLSession` does for the
-        /// task as a whole.
+        /// AsyncHTTPClient reports it for the transaction itself. `URLSession` only does for the task as a whole,
+        /// so there it is the error of the exchange that failed, recorded on the transaction that exchange ran
+        /// as: a transaction that went through (a redirect hop, or an attempt a download then continued from)
+        /// has none.
+        ///
+        /// A request that fails as a whole throws, so there is no ``TaskResult`` to read this from. It is
+        /// visible when the failure came after the response head and the body is read from a
+        /// ``TaskResult`` of `AsyncBytes`, or when an earlier attempt of a download failed and a continuation
+        /// finished it.
         public let error: (any Error)?
 
         public init(
@@ -231,6 +242,41 @@ public struct RequestMetrics: Sendable {
             self.connection = connection
             self.error = error
         }
+
+        // MARK: - Public static methods
+
+        public static func == (lhs: Transaction, rhs: Transaction) -> Bool {
+            lhs.url == rhs.url
+                && lhs.fetchStart == rhs.fetchStart
+                && lhs.queued == rhs.queued
+                && lhs.requestStart == rhs.requestStart
+                && lhs.requestEnd == rhs.requestEnd
+                && lhs.responseStart == rhs.responseStart
+                && lhs.responseEnd == rhs.responseEnd
+                && lhs.requestHeaderBytesSent == rhs.requestHeaderBytesSent
+                && lhs.requestBodyBytesSent == rhs.requestBodyBytesSent
+                && lhs.requestBodyBytesBeforeEncoding == rhs.requestBodyBytesBeforeEncoding
+                && lhs.responseHeaderBytesReceived == rhs.responseHeaderBytesReceived
+                && lhs.responseBodyBytesReceived == rhs.responseBodyBytesReceived
+                && lhs.responseBodyBytesAfterDecoding == rhs.responseBodyBytesAfterDecoding
+                && lhs.connection == rhs.connection
+                && Self.isEqual(lhs.error, rhs.error)
+        }
+
+        // MARK: - Private static methods
+
+        /// `Error` is not `Equatable`, so two errors are the same when they are of the same type and describe
+        /// themselves the same way.
+        private static func isEqual(_ lhs: (any Error)?, _ rhs: (any Error)?) -> Bool {
+            switch (lhs, rhs) {
+            case (nil, nil):
+                true
+            case (let lhs?, let rhs?):
+                type(of: lhs) == type(of: rhs) && String(reflecting: lhs) == String(reflecting: rhs)
+            default:
+                false
+            }
+        }
     }
 
     // MARK: - Public properties
@@ -238,8 +284,12 @@ public struct RequestMetrics: Sendable {
     /// The transactions the request went through, in the order they ended.
     public let transactions: [Transaction]
 
-    /// From the start of the first transaction to the end of the last one that was received, or
-    /// `nil` when either is not known.
+    /// From the start of the first transaction to the end of the last one's response, or `nil` when
+    /// either is not known.
+    ///
+    /// It is the time of a fetch that completed. It is `nil` when the last transaction failed or did not
+    /// finish, including a body that has not been consumed yet, since there is no end to measure up to.
+    /// ``Transaction/error`` says whether it failed.
     public var fetchInterval: Interval? {
         guard
             let start = transactions.first?.fetchStart,

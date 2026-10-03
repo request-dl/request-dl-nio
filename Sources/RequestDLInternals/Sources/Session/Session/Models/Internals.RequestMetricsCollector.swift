@@ -32,9 +32,26 @@ extension Internals {
         // MARK: - Internal methods
 
         /// Records a transaction that has ended, after the ones that came before it.
-        package func append(_ transaction: TransactionMetrics) {
+        ///
+        /// - Returns: Where it was recorded, for ``setError(_:at:)``.
+        @discardableResult
+        package func append(_ transaction: TransactionMetrics) -> Int {
             lock.withLock {
                 _transactions.append(transaction)
+                return _transactions.count - 1
+            }
+        }
+
+        /// Sets the error that ended a transaction already recorded, for transports that only learn
+        /// it after the transaction's metrics were reported. Leaves a transaction that already has
+        /// an error alone.
+        package func setError(_ error: any Error, at index: Int) {
+            lock.withLock {
+                guard _transactions.indices.contains(index), _transactions[index].error == nil else {
+                    return
+                }
+
+                _transactions[index].error = error
             }
         }
 

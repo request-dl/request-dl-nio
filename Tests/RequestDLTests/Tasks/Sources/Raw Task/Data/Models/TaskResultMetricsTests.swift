@@ -104,6 +104,79 @@ struct TaskResultMetricsTests {
     }
 
     @Test
+    func transaction_whenEveryFieldMatches_isEqual() {
+        // Given
+        let date = Date(timeIntervalSince1970: 100)
+        let connection = RequestMetrics.Connection(
+            negotiatedProtocol: .http2,
+            isReused: true,
+            tlsVersion: .tls13,
+            connect: .init(start: date, end: date.addingTimeInterval(1))
+        )
+
+        // Then
+        #expect(
+            RequestMetrics.Transaction(fetchStart: date, connection: connection)
+                == RequestMetrics.Transaction(fetchStart: date, connection: connection)
+        )
+    }
+
+    @Test
+    func transaction_whenAnyFieldDiffers_isNotEqual() {
+        // Given
+        let date = Date(timeIntervalSince1970: 100)
+        let base = RequestMetrics.Transaction(fetchStart: date, responseBodyBytesReceived: 10)
+
+        // Then
+        #expect(base != RequestMetrics.Transaction(fetchStart: date, responseBodyBytesReceived: 11))
+        #expect(
+            base != RequestMetrics.Transaction(fetchStart: date.addingTimeInterval(1), responseBodyBytesReceived: 10)
+        )
+        #expect(
+            base
+                != RequestMetrics.Transaction(
+                    fetchStart: date,
+                    responseBodyBytesReceived: 10,
+                    connection: .init(isReused: false)
+                )
+        )
+    }
+
+    @Test
+    func transaction_whenComparingErrors_usesTypeAndDescription() {
+        // Given
+        struct FirstError: Error { let reason: String }
+        struct SecondError: Error { let reason: String }
+
+        let date = Date(timeIntervalSince1970: 100)
+
+        func transaction(error: (any Error)?) -> RequestMetrics.Transaction {
+            .init(fetchStart: date, error: error)
+        }
+
+        // Then: the same type describing itself the same way is the same error.
+        #expect(transaction(error: FirstError(reason: "a")) == transaction(error: FirstError(reason: "a")))
+        #expect(transaction(error: nil) == transaction(error: nil))
+
+        // Different description, different type, or no error at all, is not.
+        #expect(transaction(error: FirstError(reason: "a")) != transaction(error: FirstError(reason: "b")))
+        #expect(transaction(error: FirstError(reason: "a")) != transaction(error: SecondError(reason: "a")))
+        #expect(transaction(error: FirstError(reason: "a")) != transaction(error: nil))
+        #expect(transaction(error: nil) != transaction(error: FirstError(reason: "a")))
+    }
+
+    @Test
+    func requestMetrics_whenTransactionsMatch_isEqual() {
+        // Given
+        let date = Date(timeIntervalSince1970: 100)
+        let transactions = [RequestMetrics.Transaction(fetchStart: date)]
+
+        // Then
+        #expect(RequestMetrics(transactions: transactions) == RequestMetrics(transactions: transactions))
+        #expect(RequestMetrics(transactions: transactions) != RequestMetrics(transactions: []))
+    }
+
+    @Test
     func mockedTask_whenCollected_hasNoMetrics() async throws {
         // When: nothing goes over the wire, so there is nothing to have measured.
         let result = try await MockedTask {

@@ -771,6 +771,12 @@ extension Internals {
 
             var isHeadResolved = false
 
+            // The task of the exchange running now, so a failure lands on its own transaction:
+            // `nil` between one task ending and the next one starting, and when `bytes(for:)`
+            // throws before there is one.
+            var currentTask: URLSessionTask?
+            var isFailureRecorded = false
+
             do {
                 // Ordinarily just one request. Loops only when `TaskDelegate` deferred a redirect
                 // to here instead of handing it back to `URLSession` -- see
@@ -783,6 +789,8 @@ extension Internals {
                     var currentRequest = request
 
                     while true {
+                        currentTask = nil
+
                         let (bytes, response) = try await withTaskCancellationHandler {
                             try await session.bytes(for: currentRequest, delegate: taskDelegate)
                         } onCancel: {
@@ -790,6 +798,7 @@ extension Internals {
                         }
 
                         box.task = bytes.task
+                        currentTask = bytes.task
 
                         guard let manualRedirect = try taskDelegate.takePendingManualBodyRedirect() else {
                             return (bytes, response)
@@ -858,6 +867,10 @@ extension Internals {
                 } catch {
                     let error = taskDelegate.substitutingRecordedError(for: error)
 
+                    // This exchange is over whatever comes next: a continuation is another one.
+                    taskDelegate.recordFailure(error, of: currentTask)
+                    isFailureRecorded = true
+
                     guard var state, let transferControl else {
                         throw error
                     }
@@ -881,6 +894,12 @@ extension Internals {
                 downloadBuffer.close()
             } catch {
                 let error = taskDelegate.substitutingRecordedError(for: error)
+
+                // Already recorded when it came from the body or from a continuation, which each
+                // record their own exchange's failure.
+                if !isFailureRecorded {
+                    taskDelegate.recordFailure(error, of: currentTask)
+                }
 
                 if !isHeadResolved {
                     head.append(.failure(error))
@@ -953,6 +972,7 @@ extension Internals {
 
                 let taskDelegate = continuationDelegate(continuation)
                 var deliveredBytes = state.deliveredBytes
+                var attemptTask: URLSessionTask?
 
                 do {
                     let (bytes, response) = try await withTaskCancellationHandler {
@@ -962,6 +982,7 @@ extension Internals {
                     }
 
                     box.task = bytes.task
+                    attemptTask = bytes.task
 
                     let outcome: Internals.RangeResumptionPlan.Continuation
                     do {
@@ -991,6 +1012,8 @@ extension Internals {
                 } catch {
                     state.deliveredBytes = deliveredBytes
                     failure = taskDelegate.substitutingRecordedError(for: error)
+
+                    taskDelegate.recordFailure(failure, of: attemptTask)
                 }
             }
         }
@@ -1237,6 +1260,20 @@ extension Internals.URLSessionClient {
         /// so whichever fires first wins and the other is a no-op.
         private var _headCompletion: ((Result<Internals.DownloadStep, Error>) -> Void)?
         private var _headResolved = false
+        /// Where in `metrics` the last transaction of each task of this delegate was recorded, by
+        /// `taskIdentifier`, so an error learned afterwards lands on the right one.
+        private var _transactionIndices: [Int: Int] = [:]
+        /// Errors of a task whose metrics had not been reported yet, by `taskIdentifier`.
+        private var _pendingFailures: [Int: any Error] = [:]
+        /// The error of an exchange that failed before it had a task at all, waiting for the next
+        /// transaction reported. With a manual body redirect (see `completeRedirect(with:_:)`) it
+        /// can land on an earlier hop's transaction, if that hop's metrics are reported after the
+        /// failing exchange has already started.
+        private var _unattributedFailure: (any Error)?
+        /// The last transaction reported, and whether it ever got a response. A transaction that
+        /// did not cannot be a hop that went through, so a failure with no task of its own can
+        /// only be that one's.
+        private var _lastTransaction: (index: Int, gotResponse: Bool)?
 
         // MARK: - Internal properties
 
@@ -1535,12 +1572,69 @@ extension Internals.URLSessionClient {
             didFinishCollecting metrics: URLSessionTaskMetrics
         ) {
             if let collector = self.metrics {
-                for transaction in metrics.transactionMetrics {
-                    collector.append(Internals.TransactionMetrics(transaction))
+                var transactions = metrics.transactionMetrics.map(Internals.TransactionMetrics.init)
+
+                lock.withLock {
+                    // The task ended with an error before its metrics arrived: it is the last
+                    // transaction's, since every earlier one (a redirect hop) went through.
+                    if !transactions.isEmpty {
+                        if let failure = _pendingFailures.removeValue(forKey: task.taskIdentifier) {
+                            transactions[transactions.count - 1].error = failure
+                        } else if let failure = _unattributedFailure {
+                            transactions[transactions.count - 1].error = failure
+                            _unattributedFailure = nil
+                        }
+                    }
+
+                    var lastIndex: Int?
+
+                    for transaction in transactions {
+                        lastIndex = collector.append(transaction)
+                    }
+
+                    if let lastIndex {
+                        _transactionIndices[task.taskIdentifier] = lastIndex
+                        _lastTransaction = (lastIndex, transactions.last?.responseStart != nil)
+                    }
                 }
             }
 
             forwardingDelegate?.urlSession?(session, task: task, didFinishCollecting: metrics)
+        }
+
+        /// Records the error that ended `task`, on its last transaction.
+        ///
+        /// `URLSession` reports an error for the task as a whole (`didCompleteWithError:`, which
+        /// `bytes(for:delegate:)` consumes itself), never for a single transaction, so it has to
+        /// come from whoever runs the exchange. It can arrive before or after the task's metrics,
+        /// and both orders end up on the same transaction.
+        ///
+        /// - Parameter task: The task that failed, or `nil` when the exchange failed before it had
+        ///   one, as when the connection could not be made.
+        func recordFailure(_ error: any Error, of task: URLSessionTask?) {
+            guard let collector = metrics else {
+                return
+            }
+
+            lock.withLock {
+                guard let task else {
+                    // Its metrics may already be in, which is the usual order for a connection that
+                    // could not be made.
+                    if let last = _lastTransaction, !last.gotResponse {
+                        collector.setError(error, at: last.index)
+                    } else {
+                        _unattributedFailure = error
+                    }
+
+                    return
+                }
+
+                if let index = _transactionIndices[task.taskIdentifier] {
+                    collector.setError(error, at: index)
+                } else {
+                    _pendingFailures[task.taskIdentifier] = error
+                }
+            }
         }
 
         /// Hands `URLSession` a fresh body stream (`makeBodyStream`) when it has to send the

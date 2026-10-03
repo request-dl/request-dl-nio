@@ -170,6 +170,37 @@ struct InternalsURLSessionClientMetricsTests {
         #expect(transactions.map(\.url?.path) == [origin, destination])
     }
 
+    @Test
+    func sessionTask_whenConnectionRefused_recordsTheErrorOnTheTransaction() async throws {
+        // Given: a port nothing listens on any more.
+        let server = try TransferServer(resource: .init(length: 1))
+        let port = server.port
+        await server.stop()
+
+        let url = try #require(URL(string: "http://127.0.0.1:\(port)/resource"))
+        let client = try Internals.URLSessionClient(configuration: .ephemeral)
+
+        // When
+        let sessionTask = try await execute(client, url: url)
+        let collector = try #require(sessionTask.metrics)
+
+        var failed = false
+
+        do {
+            try await drain(sessionTask)
+        } catch {
+            failed = true
+        }
+
+        // Then: the exchange never had a task to attribute the error to when it failed, and still
+        // ends up on its own transaction.
+        try await eventually { collector.transactions().last?.error != nil }
+
+        #expect(failed)
+        #expect(collector.transactions().count == 1)
+        #expect(collector.transactions().first?.responseStart == nil)
+    }
+
     // MARK: - Private methods
 
     /// Ignores `URLSession`'s own cache: a repeated request would otherwise be answered from it,

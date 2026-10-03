@@ -175,7 +175,9 @@ Both executors fill the same values, with a few phases only one of them can obse
 - A reused connection did not go through ``RequestDL/RequestMetrics/Connection/domainLookup``, ``RequestDL/RequestMetrics/Connection/connect`` or ``RequestDL/RequestMetrics/Connection/secureConnection``, so those are `nil` for it.
 - ``RequestDL/RequestMetrics/Connection/tlsCipherSuite`` is only known to `URLSession` and to AsyncHTTPClient over the Network framework.
 - The header byte counts are `nil` for HTTP/2.
-- ``RequestDL/RequestMetrics/Transaction/queued`` and ``RequestDL/RequestMetrics/Transaction/error`` are only reported by AsyncHTTPClient.
+- ``RequestDL/RequestMetrics/Transaction/queued`` is only reported by AsyncHTTPClient.
+- ``RequestDL/RequestMetrics/Transaction/error`` is the error of the exchange that failed. A request that fails as a whole throws and has no ``RequestDL/TaskResult``, so it is visible when a body fails after the response head, or when a download continued from a failed attempt.
+- ``RequestDL/RequestMetrics/fetchInterval`` is `nil` while the last transaction has not finished or failed.
 - ``RequestDL/TaskResult/metrics`` is `nil` when nothing went over the wire, as with a response served from the cache or a ``RequestDL/MockedTask``.
 
 > Note: With ``RequestDL/Session/Executor/nio``, the DNS lookup is only reported when the session opts in with ``RequestDL/Session/collectDNSMetrics(_:)``. Reporting it makes the client resolve host names with its own implementation instead of SwiftNIO's default one, which is why it is off by default.
