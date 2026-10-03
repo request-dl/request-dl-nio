@@ -89,6 +89,53 @@ The modifier closest to the task wins, so `.resumingDownloads(.disabled)` placed
 
 A ``DataTask`` continues the same way, and needs nothing stored beyond what it already accumulates. Bodies too large for memory belong in a ``DownloadTask``.
 
+### Continuing a download after the app was closed
+
+A reconnection only helps while the request is still running. To continue a download in a new launch of the application, keep two things from the first one: the bytes you received, in a file of your own, and a ``DownloadResumptionPoint``, which is `Codable`.
+
+```swift
+// While downloading: keep what is needed to continue.
+let result = try await DownloadTask {
+    BaseURL("example.com")
+    Path("/video.mp4")
+}
+.result()
+
+// `nil` when this download can't be continued safely: nothing to keep, download it again later.
+if let point = DownloadResumptionPoint(head: result.head, offset: 0) {
+    try JSONEncoder().encode(point).write(to: pointURL)
+}
+
+// ... the application is closed, and later opened again ...
+
+let saved = try JSONDecoder().decode(DownloadResumptionPoint.self, from: Data(contentsOf: pointURL))
+
+let rest = try await DownloadTask {
+    BaseURL("example.com")
+    Path("/video.mp4")
+}
+.resumingDownload(from: saved.at(offset: bytesAlreadyOnDisk))
+.result()
+```
+
+The library doesn't store a partial download: `offset` is the size of what you kept, which is also the one number that can't be wrong about how much was actually persisted. What you persist once is the point, which holds the validator of the resource; ``DownloadResumptionPoint/at(offset:)`` moves it to however many bytes are on disk when it is time to continue.
+
+``DownloadResumptionPoint/init(head:offset:)`` returns `nil` when the download can't be continued safely, for the same reasons a reconnection wouldn't: the response has no strong validator, it carries a content coding, or it isn't a plain `200`. Check for `nil` and fall back to downloading again.
+
+``RequestTask/resumingDownload(from:)`` asks the server for the rest, with `Range` and `If-Range`, and checks the answer before a single byte of it reaches you:
+
+- The result is the *rest* of the resource: what comes after the offset. Its head is the `206` the server answered with.
+- If the resource changed since the point was taken, the server sends it whole instead, and the task fails with a ``DownloadResumptionError``. Start the download again from the beginning.
+- A point already at the end of the resource fails with ``DownloadResumptionError/Reason/alreadyComplete``, which isn't a failure: the file is complete. ``DownloadResumptionPoint/isComplete`` says so beforehand when the length is known.
+- It always goes to the network, whatever the cache strategy: a cached copy of the whole resource isn't the rest of it.
+- The request has to be a `GET` without a `Range` of its own, or it fails with ``DownloadResumptionError/Reason/requestNotResumable`` without being sent.
+
+It works with ``DownloadTask`` and ``DataTask``, and combines with ``RequestTask/resumingDownloads(_:)``: if the connection is lost again, the download reconnects from everything received since the point.
+
+> Note: A point is kept across launches, and across updates of your application, so its encoded format is versioned and stable. A point from a version this one doesn't know fails to decode instead of being misread.
+
+> Note: For a transfer that has to keep going while the application isn't running, use ``BackgroundDownloadTask``, which the operating system runs.
+
 ### Using both together
 
 The two combine. A controller that is suspended also holds back reconnection: a paused transfer never opens a new connection behind your back. If the pause outlives the connection, the download reconnects when you resume.
@@ -107,3 +154,6 @@ To follow a request being suspended, resumed and reconnected as it happens, atta
 - ``RequestTask/controller(_:)``
 - ``RequestTask/resumingDownloads(_:)``
 - ``DownloadResumptionPolicy``
+- ``RequestTask/resumingDownload(from:)``
+- ``DownloadResumptionPoint``
+- ``DownloadResumptionError``

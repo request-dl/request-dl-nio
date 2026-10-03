@@ -15,6 +15,7 @@ public struct AsyncResponse: Sendable, AsyncSequence {
         fileprivate let seed: Internals.TaskSeed
         fileprivate var iterator: Internals.AsyncResponse.Iterator
         fileprivate let onResponseHead: (@Sendable (Result<Internals.ResponseHead, Error>) -> Void)?
+        fileprivate let validateHead: (@Sendable (Internals.ResponseHead) throws -> Void)?
         fileprivate let deadline: Internals.ResourceDeadline
 
         ///
@@ -45,6 +46,10 @@ public struct AsyncResponse: Sendable, AsyncSequence {
                         )
                     )
                 case .download(let step):
+                    // Before anything of the response is handed on: a head that isn't the one a
+                    // continuation has to be fails here, with no byte of its body delivered.
+                    try validateHead?(step.head)
+
                     // Fires at most once: the underlying iterator only ever produces a single
                     // `.download` case, after which it's exhausted (see
                     // `Internals.AsyncResponse.Iterator.next()`), so there's no later call this
@@ -72,6 +77,10 @@ public struct AsyncResponse: Sendable, AsyncSequence {
                 let error = UnsupportedContentEncodingError(value: error.value)
                 onResponseHead?(.failure(error))
                 throw error
+            } catch let error as Internals.DownloadResumptionMismatchError {
+                let error = DownloadResumptionError(error)
+                onResponseHead?(.failure(error))
+                throw error
             } catch {
                 onResponseHead?(.failure(error))
                 throw error
@@ -92,6 +101,7 @@ public struct AsyncResponse: Sendable, AsyncSequence {
     private let seed: Internals.TaskSeed
     private let response: Internals.AsyncResponse
     private let onResponseHead: (@Sendable (Result<Internals.ResponseHead, Error>) -> Void)?
+    private let validateHead: (@Sendable (Internals.ResponseHead) throws -> Void)?
     private let deadline: Internals.ResourceDeadline
 
     // MARK: - Inits
@@ -100,11 +110,13 @@ public struct AsyncResponse: Sendable, AsyncSequence {
         seed: Internals.TaskSeed,
         response: Internals.AsyncResponse,
         onResponseHead: (@Sendable (Result<Internals.ResponseHead, Error>) -> Void)? = nil,
+        validateHead: (@Sendable (Internals.ResponseHead) throws -> Void)? = nil,
         deadline: Internals.ResourceDeadline = .init(nanoseconds: nil)
     ) {
         self.seed = seed
         self.response = response
         self.onResponseHead = onResponseHead
+        self.validateHead = validateHead
         self.deadline = deadline
     }
 
@@ -120,6 +132,7 @@ public struct AsyncResponse: Sendable, AsyncSequence {
             seed: seed,
             iterator: response.makeAsyncIterator(),
             onResponseHead: onResponseHead,
+            validateHead: validateHead,
             deadline: deadline
         )
     }

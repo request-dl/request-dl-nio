@@ -66,6 +66,10 @@ extension Internals {
         /// can reach.
         package let observer: Internals.ExecutionObserver?
 
+        /// Where the download starts, when it continues one a previous launch left unfinished (see
+        /// `Internals.DownloadResumptionStart`). Only meaningful together with ``resumption``.
+        package let resumptionStart: Internals.DownloadResumptionStart?
+
         /// Shut exactly while suspended (and open for good once released). What request-body
         /// producers and download reconnections wait on.
         package let gate = Internals.FlowControlWindow()
@@ -94,11 +98,13 @@ extension Internals {
         package init(
             resumption: Internals.DownloadResumptionPolicy? = nil,
             allowsSuspension: Bool = true,
-            observer: Internals.ExecutionObserver? = nil
+            observer: Internals.ExecutionObserver? = nil,
+            resumptionStart: Internals.DownloadResumptionStart? = nil
         ) {
             self.resumption = resumption
             self.allowsSuspension = allowsSuspension
             self.observer = observer
+            self.resumptionStart = resumptionStart
         }
 
         // MARK: - Internal methods
