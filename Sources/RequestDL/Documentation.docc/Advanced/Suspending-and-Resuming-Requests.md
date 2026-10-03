@@ -114,7 +114,7 @@ let rest = try await DownloadTask {
     BaseURL("example.com")
     Path("/video.mp4")
 }
-.resumingDownload(from: saved.at(offset: bytesAlreadyOnDisk))
+.continuingDownload(from: saved.at(offset: bytesAlreadyOnDisk))
 .result()
 ```
 
@@ -122,7 +122,7 @@ The library doesn't store a partial download: `offset` is the size of what you k
 
 ``DownloadResumptionPoint/init(head:offset:)`` returns `nil` when the download can't be continued safely, for the same reasons a reconnection wouldn't: the response has no strong validator, it carries a content coding, or it isn't a plain `200`. Check for `nil` and fall back to downloading again.
 
-``RequestTask/resumingDownload(from:)`` asks the server for the rest, with `Range` and `If-Range`, and checks the answer before a single byte of it reaches you:
+``RequestTask/continuingDownload(from:)`` asks the server for the rest, with `Range` and `If-Range`, and checks the answer before a single byte of it reaches you:
 
 - The result is the *rest* of the resource: what comes after the offset. Its head is the `206` the server answered with.
 - If the resource changed since the point was taken, the server sends it whole instead, and the task fails with a ``DownloadResumptionError``. Start the download again from the beginning.
@@ -154,6 +154,6 @@ To follow a request being suspended, resumed and reconnected as it happens, atta
 - ``RequestTask/controller(_:)``
 - ``RequestTask/resumingDownloads(_:)``
 - ``DownloadResumptionPolicy``
-- ``RequestTask/resumingDownload(from:)``
+- ``RequestTask/continuingDownload(from:)``
 - ``DownloadResumptionPoint``
 - ``DownloadResumptionError``

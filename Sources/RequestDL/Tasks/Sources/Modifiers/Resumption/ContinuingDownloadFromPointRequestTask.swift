@@ -2,10 +2,10 @@
 // See LICENSE for this package's licensing information.
 //
 
-/// Backs `resumingDownload(from:)`. Sets the point on the environment instead of acting on the
+/// Backs `continuingDownload(from:)`. Sets the point on the environment instead of acting on the
 /// task itself: only `RawTask`, sitting under whatever chain of modifiers wraps it, actually runs a
 /// transfer.
-struct ResumingDownloadFromPointRequestTask<Task: RequestTask>: RequestTask {
+struct ContinuingDownloadFromPointRequestTask<Task: RequestTask>: RequestTask {
 
     // MARK: - Internal properties
 
@@ -51,8 +51,8 @@ extension RequestTask {
     /// answer isn't exactly the rest of the same resource. ``DownloadResumptionError/Reason/alreadyComplete``
     /// is not a failure: it says there was nothing left to download.
     ///
-    public func resumingDownload(from point: DownloadResumptionPoint) -> AnyTask<Element> {
-        ResumingDownloadFromPointRequestTask(task: self, point: point)
+    public func continuingDownload(from point: DownloadResumptionPoint) -> AnyTask<Element> {
+        ContinuingDownloadFromPointRequestTask(task: self, point: point)
             .eraseToAnyTask()
     }
 }

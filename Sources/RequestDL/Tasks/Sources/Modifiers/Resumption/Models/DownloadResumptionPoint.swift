@@ -19,7 +19,7 @@ import RequestDLInternals
 ///
 /// // Later, even after a relaunch: ask for the rest, from as many bytes as the partial file has.
 /// let rest = try await DownloadTask { ... }
-///     .resumingDownload(from: point.at(offset: bytesAlreadyOnDisk))
+///     .continuingDownload(from: point.at(offset: bytesAlreadyOnDisk))
 ///     .result()
 /// ```
 ///

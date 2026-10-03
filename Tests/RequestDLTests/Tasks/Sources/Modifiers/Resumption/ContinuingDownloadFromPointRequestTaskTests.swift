@@ -13,11 +13,11 @@ import FoundationEssentials
 import Foundation
 #endif
 
-/// `.resumingDownload(from:)` through the public API, against a real ``TransferServer`` on each
+/// `.continuingDownload(from:)` through the public API, against a real ``TransferServer`` on each
 /// executor: asking for the rest of a download from a saved point, and refusing anything that isn't
 /// exactly that.
 @Suite(.serialized, .concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog)
-struct ResumingDownloadFromPointRequestTaskTests {
+struct ContinuingDownloadFromPointRequestTaskTests {
 
     private static let length = 8 * 1_048_576
 
@@ -105,7 +105,7 @@ struct ResumingDownloadFromPointRequestTaskTests {
 
             // When
             let result = try await Self.download(from: server, executor: executor)
-                .resumingDownload(from: point)
+                .continuingDownload(from: point)
                 .result()
 
             // Then: a `206` carrying only what comes after the offset, byte for byte.
@@ -155,7 +155,7 @@ struct ResumingDownloadFromPointRequestTaskTests {
             let point = try JSONDecoder().decode(DownloadResumptionPoint.self, from: stored)
 
             let rest = try await Self.download(from: server, executor: executor)
-                .resumingDownload(from: point)
+                .continuingDownload(from: point)
                 .result()
 
             let (count, isIntact) = try await Self.read(rest, from: received)
@@ -181,7 +181,7 @@ struct ResumingDownloadFromPointRequestTaskTests {
                 executor.session
             }
             .extractPayload()
-            .resumingDownload(from: point)
+            .continuingDownload(from: point)
             .result()
 
             // Then
@@ -206,7 +206,7 @@ struct ResumingDownloadFromPointRequestTaskTests {
             // When
             let result = try await Self.download(from: server, executor: executor)
                 .resumingDownloads(.enabled(delay: 0))
-                .resumingDownload(from: point)
+                .continuingDownload(from: point)
                 .result()
 
             // Then: the rest of the resource, whole and in place, across the two connections.
@@ -236,7 +236,7 @@ struct ResumingDownloadFromPointRequestTaskTests {
 
             // When
             let result = try await Self.download(from: server, executor: executor)
-                .resumingDownload(from: point)
+                .continuingDownload(from: point)
                 .result()
 
             // Then: reconnecting is something asked for, not something a saved point implies.
@@ -298,7 +298,7 @@ struct ResumingDownloadFromPointRequestTaskTests {
 
             // When
             let error = await Self.resumptionError(
-                of: Self.download(from: server, executor: executor).resumingDownload(from: point)
+                of: Self.download(from: server, executor: executor).continuingDownload(from: point)
             )
 
             // Then: `If-Range` no longer matched, so the server sent the whole new resource, which
@@ -316,7 +316,7 @@ struct ResumingDownloadFromPointRequestTaskTests {
 
             // When
             let error = await Self.resumptionError(
-                of: Self.download(from: server, executor: executor).resumingDownload(from: point)
+                of: Self.download(from: server, executor: executor).continuingDownload(from: point)
             )
 
             // Then
@@ -333,7 +333,7 @@ struct ResumingDownloadFromPointRequestTaskTests {
 
             // When
             let error = await Self.resumptionError(
-                of: Self.download(from: server, executor: executor).resumingDownload(from: point)
+                of: Self.download(from: server, executor: executor).continuingDownload(from: point)
             )
 
             // Then: not a failure, and said apart from the ones that are.
@@ -349,7 +349,7 @@ struct ResumingDownloadFromPointRequestTaskTests {
 
             // When
             let error = await Self.resumptionError(
-                of: Self.download(from: server, executor: executor).resumingDownload(from: point)
+                of: Self.download(from: server, executor: executor).continuingDownload(from: point)
             )
 
             // Then
@@ -370,7 +370,7 @@ struct ResumingDownloadFromPointRequestTaskTests {
                     RequestMethod(.post)
                     executor.session
                 }
-                .resumingDownload(from: try Self.offlinePoint(offset: 100))
+                .continuingDownload(from: try Self.offlinePoint(offset: 100))
             )
 
             // Then
@@ -390,7 +390,7 @@ struct ResumingDownloadFromPointRequestTaskTests {
                     CustomHeader(name: "Range", value: "bytes=0-9")
                     executor.session
                 }
-                .resumingDownload(from: try Self.offlinePoint(offset: 100))
+                .continuingDownload(from: try Self.offlinePoint(offset: 100))
             )
 
             // Then
