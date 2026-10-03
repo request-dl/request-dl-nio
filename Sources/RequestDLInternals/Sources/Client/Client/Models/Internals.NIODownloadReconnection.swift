@@ -218,6 +218,11 @@ extension Internals {
 
         // MARK: - Private methods
 
+        /// Told about the execution as it happens, when something observes it.
+        var observer: Internals.ExecutionObserver? {
+            transferControl.observer
+        }
+
         private func reconnect(_ attempt: Internals.DownloadResumptionState.Attempt) async {
             // Released, like everything else, once the download ends; that is what ends this
             // wait if it's cancelled while suspended.
@@ -232,6 +237,8 @@ extension Internals {
             guard !Task.isCancelled, !lock.withLock({ _isCancelled || _isTerminated }) else {
                 return
             }
+
+            observer?.didChange(.reconnecting(attempt: attempt.number))
 
             var continuation = request
 
