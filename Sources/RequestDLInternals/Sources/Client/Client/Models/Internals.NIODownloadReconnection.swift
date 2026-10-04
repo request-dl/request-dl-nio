@@ -52,6 +52,7 @@ extension Internals {
         private let flowControl: Internals.FlowControlWindow
         private let transferControl: Internals.TransferControl
         private let logger: Internals.TaskLogger?
+        private let metrics: Internals.RequestMetricsCollector?
         private let lock = Lock()
 
         // MARK: - Unsafe properties
@@ -76,7 +77,8 @@ extension Internals {
             flowControl: Internals.FlowControlWindow,
             transferControl: Internals.TransferControl,
             policy: Internals.DownloadResumptionPolicy,
-            logger: Internals.TaskLogger?
+            logger: Internals.TaskLogger?,
+            metrics: Internals.RequestMetricsCollector? = nil
         ) {
             self.client = client
             self.request = request
@@ -85,6 +87,7 @@ extension Internals {
             self.flowControl = flowControl
             self.transferControl = transferControl
             self.logger = logger
+            self.metrics = metrics
             self._state = .init(policy: policy, start: transferControl.resumptionStart)
             self._operation = client.holdOperation()
         }
@@ -98,6 +101,11 @@ extension Internals {
             lock.withLock {
                 _state.didReceiveOriginalHead(head, method: method, requestHeaderNames: headerNames)
             }
+        }
+
+        /// A continuation is a transaction of its own, recorded after the ones before it.
+        func recordMetrics(_ transaction: HTTPClientTransactionMetrics) {
+            metrics?.append(Internals.TransactionMetrics(transaction))
         }
 
         func didDeliver(_ bytes: Int) {

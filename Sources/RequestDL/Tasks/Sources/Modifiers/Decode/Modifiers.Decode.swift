@@ -82,10 +82,7 @@ extension RequestTask {
                 decoder: decoder,
                 data: \.payload,
                 output: {
-                    TaskResult(
-                        head: $0.head,
-                        payload: $1
-                    )
+                    $0.withPayload($1)
                 }
             )
         )

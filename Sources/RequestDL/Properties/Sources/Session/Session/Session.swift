@@ -177,6 +177,26 @@ public struct Session: Property {
     }
 
     ///
+    /// Reports the DNS lookup of new connections in ``TaskResult/metrics``, under
+    /// ``Session/Executor/nio``.
+    ///
+    /// AsyncHTTPClient cannot observe SwiftNIO's default resolver, so reporting the lookup makes it resolve
+    /// host names with its own implementation of the same thing (`getaddrinfo`, run off the event loop). That
+    /// changes how names are resolved for every request of this session, which is why it is off by default.
+    /// While it is off, ``RequestMetrics/Connection/domainLookup`` is `nil` for requests made with
+    /// ``Session/Executor/nio``.
+    ///
+    /// - Note: It has no effect on ``Session/Executor/urlSession`` and
+    /// ``Session/Executor/nioTransportServices``, which report the lookup by themselves.
+    ///
+    /// - Parameter enabled: Whether the DNS lookup is reported.
+    /// - Returns: The modified `Session` instance.
+    ///
+    public func collectDNSMetrics(_ enabled: Bool = true) -> Self {
+        edit { $0.collectDNSMetrics = enabled }
+    }
+
+    ///
     /// Enable the usage of Network framework on Apple Platforms when compatible.
     ///
     /// Currently AsyncHTTPClient doesn't provide full compatibility to Apple's Network Framework. The main issue is when using mTLS

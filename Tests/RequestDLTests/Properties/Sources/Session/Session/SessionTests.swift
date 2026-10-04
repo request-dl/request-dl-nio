@@ -159,6 +159,42 @@ struct SessionTests {
     }
 
     @Test
+    func session_whenCollectDNSMetrics_shouldBeValid() async throws {
+        // Given
+        let property = Session()
+            .collectDNSMetrics()
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        #expect(resolved.session.configuration.collectDNSMetrics == true)
+    }
+
+    @Test
+    func session_whenCollectDNSMetricsDisabledAfterEnabled_shouldBeOff() async throws {
+        // Given
+        let property = Session()
+            .collectDNSMetrics()
+            .collectDNSMetrics(false)
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        #expect(resolved.session.configuration.collectDNSMetrics == false)
+    }
+
+    @Test
+    func session_whenCollectDNSMetricsNotSet_shouldBeOffByDefault() async throws {
+        // When
+        let resolved = try await resolve(TestProperty { Session() })
+
+        // Then: reporting it changes how names are resolved, so it is opt-in.
+        #expect(resolved.session.configuration.collectDNSMetrics == false)
+    }
+
+    @Test
     func session_whenMaxConnectionsPerHost_shouldBeValid() async throws {
         // Given
         let maximumConnections = 10

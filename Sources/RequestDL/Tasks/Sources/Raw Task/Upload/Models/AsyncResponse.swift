@@ -96,6 +96,10 @@ public struct AsyncResponse: Sendable, AsyncSequence {
         response.logger
     }
 
+    /// Where the executor reports what each exchange on the wire measured, read by the `TaskResult`
+    /// this response is collected into. `nil` for a response that never touched the wire.
+    let metrics: Internals.RequestMetricsCollector?
+
     // MARK: - Private properties
 
     private let seed: Internals.TaskSeed
@@ -111,13 +115,15 @@ public struct AsyncResponse: Sendable, AsyncSequence {
         response: Internals.AsyncResponse,
         onResponseHead: (@Sendable (Result<Internals.ResponseHead, Error>) -> Void)? = nil,
         validateHead: (@Sendable (Internals.ResponseHead) throws -> Void)? = nil,
-        deadline: Internals.ResourceDeadline = .init(nanoseconds: nil)
+        deadline: Internals.ResourceDeadline = .init(nanoseconds: nil),
+        metrics: Internals.RequestMetricsCollector? = nil
     ) {
         self.seed = seed
         self.response = response
         self.onResponseHead = onResponseHead
         self.validateHead = validateHead
         self.deadline = deadline
+        self.metrics = metrics
     }
 
     // MARK: - Public methods
