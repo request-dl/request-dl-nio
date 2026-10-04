@@ -41,6 +41,8 @@ public struct AsyncBytes: Sendable, AsyncSequence, Hashable {
                 return element
             } catch is Internals.ResourceTimeoutError {
                 throw ResourceTimeoutError()
+            } catch let error as Internals.DownloadResumptionMismatchError {
+                throw DownloadResumptionError(error)
             }
         }
     }

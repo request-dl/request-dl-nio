@@ -23,12 +23,19 @@ struct RawTask<Content: Property>: RequestTask {
         // Resolution hands back its own deadline rather than one built from the result: system
         // proxy/PAC resolution happens inside it, and a deadline created afterwards could not
         // cover it. See `Resolve.buildBoundedByResourceDeadline()`.
-        let (resolved, deadline) = try await surfacingResourceTimeout {
+        let (resolvedFromProperties, deadline) = try await surfacingResourceTimeout {
             try await Resolve(
                 root: content,
                 environment: environment
             ).buildBoundedByResourceDeadline()
         }
+
+        // Asking for the rest of a download from a saved point changes the request itself, so it is
+        // done before anything downstream looks at the configuration, the cache included.
+        let (resolved, validateHead) = try Self.applyResumption(
+            environment.downloadResumptionStart,
+            to: resolvedFromProperties
+        )
 
         let logger = Internals.TaskLogger(
             baseURL: resolved.requestConfiguration.baseURL,
@@ -106,7 +113,66 @@ struct RawTask<Content: Property>: RequestTask {
             seed: sessionTask.seed,
             response: sessionTask.response,
             onResponseHead: onResponseHead,
+            validateHead: validateHead,
             deadline: deadline
+        )
+    }
+
+    // MARK: - Private static methods, resumption
+
+    /// Turns the request into the one that asks for the rest of a download from `point`, and
+    /// returns what checks the answer.
+    ///
+    /// - Returns: `resolved` untouched and no check when there is no `point`. Otherwise `resolved`
+    /// with the request that asks for the rest, and the check the head of the response has to pass
+    /// before anything of it is handed on: exactly the rest of the same representation.
+    /// - Throws: ``DownloadResumptionError`` with ``DownloadResumptionError/Reason/requestNotResumable``
+    /// when the request can't be continued at all: it isn't a `GET`, or it has a `Range` of its own.
+    private static func applyResumption(
+        _ point: DownloadResumptionPoint?,
+        to resolved: Resolved
+    ) throws -> (Resolved, (@Sendable (Internals.ResponseHead) throws -> Void)?) {
+        guard let point else {
+            return (resolved, nil)
+        }
+
+        var configuration = resolved.requestConfiguration
+
+        guard
+            (configuration.method ?? "GET").uppercased() == "GET",
+            !configuration.headers.contains(name: "Range")
+        else {
+            throw DownloadResumptionError(.requestNotResumable)
+        }
+
+        for header in point.plan.requestHeaders(resumingAt: point.offset) {
+            configuration.headers.set(name: header.name, value: header.value)
+        }
+
+        // A cached copy of the whole resource is not the rest of it.
+        configuration.cacheStrategy = .ignoreCachedData
+
+        let plan = point.plan
+        let offset = point.offset
+
+        return (
+            Resolved(
+                session: resolved.session,
+                requestConfiguration: configuration,
+                dataCache: resolved.dataCache
+            ),
+            { head in
+                do {
+                    switch try plan.validate(head, resumingAt: offset) {
+                    case .resume:
+                        return
+                    case .alreadyComplete:
+                        throw DownloadResumptionError(.alreadyComplete)
+                    }
+                } catch let error as Internals.DownloadResumptionMismatchError {
+                    throw DownloadResumptionError(error)
+                }
+            }
         )
     }
 
@@ -165,7 +231,10 @@ struct RawTask<Content: Property>: RequestTask {
         let control = Internals.TransferControl(
             resumption: resumption,
             allowsSuspension: !controllers.isEmpty,
-            observer: observer
+            observer: observer,
+            resumptionStart: environment.downloadResumptionStart.map {
+                Internals.DownloadResumptionStart(plan: $0.plan, offset: $0.offset)
+            }
         )
 
         // Before the controllers are attached: attaching to one that is already suspended
