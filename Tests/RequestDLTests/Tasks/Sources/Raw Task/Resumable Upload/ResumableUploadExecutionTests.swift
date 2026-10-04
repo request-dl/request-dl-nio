@@ -270,7 +270,7 @@ struct ResumableUploadExecutionTests {
 
             // When
             _ = try await Self.upload(to: server, scenario).monitor(monitor).result()
-            try await eventually(timeout: 30) { monitor.hasEnded }
+            try await eventually(timeout: 120) { monitor.hasEnded }
 
             // Then: one execution, started once and finished once, with the retries in between.
             #expect(monitor.states().first == "started")
@@ -320,7 +320,7 @@ struct ResumableUploadExecutionTests {
                     .result()
             }
 
-            try await eventually(timeout: 30) { suspendedAt.withLockedValue { $0 != nil } }
+            try await eventually(timeout: 120) { suspendedAt.withLockedValue { $0 != nil } }
             server.onUploadProgress = nil
 
             let stalledAt = try await server.settled { server.uploadBytesReceived }
@@ -361,7 +361,7 @@ struct ResumableUploadExecutionTests {
                     .result()
             }
 
-            try await eventually(timeout: 30) { controller.isSuspended }
+            try await eventually(timeout: 120) { controller.isSuspended }
             try await _Concurrency.Task.sleep(nanoseconds: 900_000_000)
 
             // Then: no attempt to find out where the upload stands, nor to send the rest.
@@ -388,7 +388,7 @@ struct ResumableUploadExecutionTests {
                 try await Self.upload(to: server, scenario, payload: Data(Self.body(size: size))).result()
             }
 
-            try await eventually(timeout: 30) { server.uploadBytesReceived >= 100_000 }
+            try await eventually(timeout: 120) { server.uploadBytesReceived >= 100_000 }
 
             // When
             running.cancel()

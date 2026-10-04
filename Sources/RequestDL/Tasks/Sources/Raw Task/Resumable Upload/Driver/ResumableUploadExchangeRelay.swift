@@ -32,8 +32,11 @@ final class ResumableUploadExchangeRelay: @unchecked Sendable {
 
     // MARK: - Internal properties
 
-    /// The control the executor of the exchange is given.
-    private(set) var control: Internals.TransferControl!
+    /// The control the executor of the exchange is given. Gone once the exchange is over, which
+    /// is what ends the cycle it makes with this relay through its observer.
+    var control: Internals.TransferControl? {
+        lock.withLock { _control }
+    }
 
     // MARK: - Private properties
 
@@ -42,6 +45,7 @@ final class ResumableUploadExchangeRelay: @unchecked Sendable {
 
     // MARK: - Unsafe properties
 
+    private var _control: Internals.TransferControl?
     private var _decision = Decision.undecided
     private var _pendingDownload = 0
     private var _pendingEnd: Internals.ExecutionObserver.State?
@@ -51,17 +55,22 @@ final class ResumableUploadExchangeRelay: @unchecked Sendable {
     init(parent: Internals.TransferControl) {
         self.parent = parent
 
+        // The observer holds this relay, and nothing else does once the exchange is handed over:
+        // how the exchange ended is delivered after the response has already been consumed, and a
+        // relay that was gone by then would never tell the execution it finished. The cycle this
+        // makes (relay, control, observer, relay) is broken when the exchange is over.
         let observer = parent.observer.map { _ in
-            Internals.ExecutionObserver { [weak self] event in
-                self?.receive(event)
+            Internals.ExecutionObserver { [self] event in
+                receive(event)
             }
         }
 
-        control = Internals.TransferControl(
+        let control = Internals.TransferControl(
             allowsSuspension: parent.allowsSuspension,
             observer: observer
         )
 
+        _control = control
         parent.attach(control)
     }
 
@@ -90,13 +99,16 @@ final class ResumableUploadExchangeRelay: @unchecked Sendable {
 
     /// This exchange is not what anyone waits for.
     func discard() {
-        lock.withLock {
+        let control = lock.withLock { () -> Internals.TransferControl? in
             _decision = .discarded
             _pendingDownload = .zero
             _pendingEnd = nil
+
+            defer { _control = nil }
+            return _control
         }
 
-        parent.detach(control)
+        control.map(parent.detach)
     }
 
     // MARK: - Private methods
@@ -142,7 +154,11 @@ final class ResumableUploadExchangeRelay: @unchecked Sendable {
     private func finish(with state: Internals.ExecutionObserver.State) {
         parent.observer?.didChange(state)
         parent.release()
-        parent.detach(control)
+
+        if let control = _control {
+            parent.detach(control)
+            _control = nil
+        }
     }
 }
 
