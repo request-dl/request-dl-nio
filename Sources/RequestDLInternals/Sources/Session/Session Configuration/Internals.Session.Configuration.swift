@@ -66,6 +66,15 @@ extension Internals.Session {
         package var allowsConstrainedNetworkAccess: Bool?
         package var multipathServiceType: Internals.MultipathServiceType = .none
 
+        /// Whether AsyncHTTPClient reports the DNS lookup of a new connection in its transaction
+        /// metrics.
+        ///
+        /// Off by default because reporting it makes the client resolve host names with its own
+        /// implementation instead of SwiftNIO's default one, which cannot be observed. It is part of
+        /// `==`, since it is baked into the pooled client that `==` is the cache key for. Only
+        /// the NIO executor reads it: `URLSession` and the Network framework report DNS by themselves.
+        package var collectDNSMetrics: Bool = false
+
         package var httpVersion: Internals.HTTPVersion?
         package var enableNetworkFramework: Bool = false
         package var maximumConcurrentConnections: Int?
@@ -127,6 +136,7 @@ extension Internals.Session {
 
             configuration.dnsOverride = dnsOverride
             configuration.enableMultipath = (multipathServiceType != .none)
+            configuration.collectDNSMetrics = collectDNSMetrics
 
             if let httpVersion {
                 configuration.httpVersion = httpVersion.build()
@@ -331,6 +341,7 @@ extension Internals.Session.Configuration: Equatable {
             && lhs.allowsExpensiveNetworkAccess == rhs.allowsExpensiveNetworkAccess
             && lhs.allowsConstrainedNetworkAccess == rhs.allowsConstrainedNetworkAccess
             && lhs.multipathServiceType == rhs.multipathServiceType
+            && lhs.collectDNSMetrics == rhs.collectDNSMetrics
             && lhs.httpVersion == rhs.httpVersion
             && lhs.enableNetworkFramework == rhs.enableNetworkFramework
             && lhs.maximumConcurrentConnections == rhs.maximumConcurrentConnections

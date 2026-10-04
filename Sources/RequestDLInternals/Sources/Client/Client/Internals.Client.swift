@@ -264,6 +264,7 @@ extension Internals {
                 flowControl: flowControl,
                 observer: transferControl?.observer
             )
+            let metrics = Internals.RequestMetricsCollector()
 
             // Only a bodyless request can be continued with `Range` (and only a `GET`, which
             // `Internals.RangeResumptionPlan` checks once the head is in): a streamed body can't
@@ -282,7 +283,8 @@ extension Internals {
                         flowControl: flowControl,
                         transferControl: transferControl,
                         policy: policy,
-                        logger: logger
+                        logger: logger,
+                        metrics: metrics
                     )
                 }
             }
@@ -340,7 +342,8 @@ extension Internals {
                 decompressionDispatch: decompressionDispatch,
                 logger: logger,
                 transferControl: transferControl,
-                reconnection: reconnection
+                reconnection: reconnection,
+                metrics: metrics
             )
 
             let response = Internals.AsyncResponse(
@@ -420,7 +423,8 @@ extension Internals {
 
             return SessionTask(
                 seed: seed,
-                response: response
+                response: response,
+                metrics: metrics
             )
         }
 

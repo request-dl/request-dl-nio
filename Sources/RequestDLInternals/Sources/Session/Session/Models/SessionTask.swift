@@ -14,18 +14,26 @@ package struct SessionTask: Sendable {
     package let seed: Internals.TaskSeed
     package let response: Internals.AsyncResponse
 
+    /// Where the transport reports what each exchange on the wire measured.
+    ///
+    /// `nil` when nothing went over the wire, as with a response served from the cache.
+    package let metrics: Internals.RequestMetricsCollector?
+
     // MARK: - Inits
 
     package init(
         seed: Internals.TaskSeed,
-        response: Internals.AsyncResponse
+        response: Internals.AsyncResponse,
+        metrics: Internals.RequestMetricsCollector? = nil
     ) {
         self.seed = seed
         self.response = response
+        self.metrics = metrics
     }
 
     package init(_ response: Internals.AsyncResponse) {
         self.response = response
         self.seed = .withoutCancellation
+        self.metrics = nil
     }
 }

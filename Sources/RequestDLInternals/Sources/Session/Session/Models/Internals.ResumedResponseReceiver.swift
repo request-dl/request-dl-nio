@@ -114,6 +114,10 @@ extension Internals {
             return future
         }
 
+        func didCollectMetrics(task: HTTPClient.Task<Response>, _ metrics: HTTPClientTransactionMetrics) {
+            reconnection.recordMetrics(metrics)
+        }
+
         func didFinishRequest(task: HTTPClient.Task<Response>) throws -> Response {
             lock.withLock {
                 _isDriven = true
