@@ -852,7 +852,9 @@ extension Internals {
                 head.close()
                 isHeadResolved = true
 
-                var state = resumption.map { Internals.DownloadResumptionState(policy: $0) }
+                var state = resumption.map {
+                    Internals.DownloadResumptionState(policy: $0, start: transferControl?.resumptionStart)
+                }
 
                 state?.didReceiveOriginalHead(
                     responseHead,
@@ -860,7 +862,10 @@ extension Internals {
                     requestHeaderNames: request.allHTTPHeaderFields?.keys.map { $0 } ?? []
                 )
 
-                var deliveredBytes: Int64 = .zero
+                // From where the download started, which is not zero for one a previous launch left
+                // unfinished: a reconnection asks for what comes after everything received so far.
+                var deliveredBytes: Int64 =
+                    resumption == nil ? .zero : (transferControl?.resumptionStart?.offset ?? .zero)
 
                 do {
                     try await pumpResponseBody(

@@ -33,6 +33,21 @@ extension Internals {
         }
     }
 
+    /// Where a download starts when it doesn't start at the beginning: continuing one a previous
+    /// launch of the application left unfinished. Its first exchange is then already a continuation,
+    /// so there is no original response to read a plan from, and what a reconnection counts from is
+    /// ``offset``, not zero.
+    package struct DownloadResumptionStart: Sendable, Hashable {
+
+        package let plan: Internals.RangeResumptionPlan
+        package let offset: Int64
+
+        package init(plan: Internals.RangeResumptionPlan, offset: Int64) {
+            self.plan = plan
+            self.offset = offset
+        }
+    }
+
     /// Whether, and how, a download can continue on a new exchange from where a lost one stopped,
     /// with an HTTP `Range` request (RFC 9110 §14), and whether a continuation actually does.
     ///
@@ -90,6 +105,13 @@ extension Internals {
         package let completeLength: Int64?
 
         // MARK: - Inits
+
+        /// A plan for a download whose original response is long gone (a previous launch of the
+        /// application), from what was kept of it.
+        package init(validator: Validator, completeLength: Int64?) {
+            self.validator = validator
+            self.completeLength = completeLength
+        }
 
         /// - Returns: `nil` when the exchange isn't resumable (see the type's doc comment).
         package init?(
@@ -334,11 +356,17 @@ extension Internals {
         private var attemptsWithoutProgress = 0
         private var attempts = 0
         private var deliveredBytesAtLastAttempt: Int64 = -1
+        private let hasStart: Bool
 
         // MARK: - Inits
 
-        package init(policy: Internals.DownloadResumptionPolicy) {
+        /// - Parameter start: Where the download starts, when that isn't the beginning. Its plan is
+        ///   then taken as given, and bytes are counted from its offset.
+        package init(policy: Internals.DownloadResumptionPolicy, start: DownloadResumptionStart? = nil) {
             self.policy = policy
+            self.plan = start?.plan
+            self.deliveredBytes = start?.offset ?? .zero
+            self.hasStart = start != nil
         }
 
         // MARK: - Internal methods
@@ -350,6 +378,12 @@ extension Internals {
             method: String,
             requestHeaderNames: some Sequence<String>
         ) {
+            // The head of a continuation, which is validated against the plan it started with, not
+            // a source for a new one.
+            guard !hasStart else {
+                return
+            }
+
             plan = RangeResumptionPlan(method: method, requestHeaderNames: requestHeaderNames, response: response)
         }
 

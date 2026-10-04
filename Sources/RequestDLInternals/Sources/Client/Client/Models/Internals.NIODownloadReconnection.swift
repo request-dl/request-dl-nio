@@ -88,7 +88,7 @@ extension Internals {
             self.transferControl = transferControl
             self.logger = logger
             self.metrics = metrics
-            self._state = .init(policy: policy)
+            self._state = .init(policy: policy, start: transferControl.resumptionStart)
             self._operation = client.holdOperation()
         }
 
