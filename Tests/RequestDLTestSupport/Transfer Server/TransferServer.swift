@@ -209,6 +209,39 @@ package final class TransferServer: @unchecked Sendable {
         set { lock.withLock { _omitsLocationOnCreation = newValue } }
     }
 
+    /// Per `HEAD` of an upload, the status to answer with in place of the one that says where the
+    /// upload stands (consumed in order; once empty the server answers properly again).
+    package var headStatuses: [Int] {
+        get { lock.withLock { _headStatuses } }
+        set { lock.withLock { _headStatuses = newValue } }
+    }
+
+    /// Bytes added to the offset every `HEAD` of an upload states, as a server that is wrong about
+    /// what it holds would.
+    package var headOverstatesOffsetBy: Int {
+        get { lock.withLock { _headOverstatesOffsetBy } }
+        set { lock.withLock { _headOverstatesOffsetBy = newValue } }
+    }
+
+    /// Answer the next `HEAD` of an upload without an offset.
+    package var headOmitsOffset: Bool {
+        get { lock.withLock { _headOmitsOffset } }
+        set { lock.withLock { _headOmitsOffset = newValue } }
+    }
+
+    /// Answer every `PATCH` with a conflict, whatever its offset.
+    package var rejectsEveryPatchWithConflict: Bool {
+        get { lock.withLock { _rejectsEveryPatchWithConflict } }
+        set { lock.withLock { _rejectsEveryPatchWithConflict = newValue } }
+    }
+
+    /// The most bytes of a `PATCH` that tus's server keeps: it answers with the offset it holds
+    /// then, which is less than the length when the body was longer.
+    package var keepsAtMostPerPatch: Int? {
+        get { lock.withLock { _keepsAtMostPerPatch } }
+        set { lock.withLock { _keepsAtMostPerPatch = newValue } }
+    }
+
     /// Cut the connection instead of answering the `PATCH` that completes an upload, once: the
     /// server has the whole body and the client never hears it.
     package var dropsFinalResponse: Bool {
@@ -267,6 +300,11 @@ package final class TransferServer: @unchecked Sendable {
     private var _creationStatus: Int?
     private var _omitsLocationOnCreation = false
     private var _dropsFinalResponse = false
+    private var _headStatuses: [Int] = []
+    private var _headOverstatesOffsetBy = 0
+    private var _headOmitsOffset = false
+    private var _rejectsEveryPatchWithConflict = false
+    private var _keepsAtMostPerPatch: Int?
     private var _requests: [ReceivedRequest] = []
     private var _bodyBytesWritten = 0
     private var _uploadBytesReceived = 0
@@ -791,9 +829,28 @@ package final class TransferServer: @unchecked Sendable {
 
         switch head.method {
         case "HEAD":
-            var headers: [(String, String)] = [
-                ("Upload-Offset", String(held.data.count)), ("Cache-Control", "no-store"),
-            ]
+            let (scriptedStatus, overstated, omitsOffset) = lock.withLock { () -> (Int?, Int, Bool) in
+                let status = _headStatuses.isEmpty ? nil : _headStatuses.removeFirst()
+                let omits = _headOmitsOffset
+                _headOmitsOffset = false
+                return (status, _headOverstatesOffsetBy, omits)
+            }
+
+            if let scriptedStatus {
+                let isSent = io.send(
+                    Self.head(status: scriptedStatus, headers: [("Content-Length", "0")]),
+                    counted: false
+                )
+
+                record(head, bodyLength: 0, isIntact: true, isComplete: true, status: scriptedStatus)
+                return isSent
+            }
+
+            var headers: [(String, String)] = [("Cache-Control", "no-store")]
+
+            if !omitsOffset {
+                headers.append(("Upload-Offset", String(held.data.count + overstated)))
+            }
 
             if let length = held.length {
                 headers.append(("Upload-Length", String(length)))
@@ -843,7 +900,9 @@ package final class TransferServer: @unchecked Sendable {
 
         let offsetSent = head.header("Upload-Offset").flatMap { Int($0) }
 
-        guard offsetSent == offsetHeld else {
+        let rejectsEverything = lock.withLock { _rejectsEveryPatchWithConflict }
+
+        guard offsetSent == offsetHeld, !rejectsEverything else {
             let isRead = io.readBody(head, dropAfter: nil, sink: { _ in }).isComplete
 
             var headers: [(String, String)] = [("Content-Length", "0")]
@@ -876,6 +935,10 @@ package final class TransferServer: @unchecked Sendable {
 
         let (held, dropsResponse) = lock.withLock { () -> (HeldUpload, Bool) in
             var held = _heldUploads[id] ?? HeldUpload()
+
+            if let keeps = _keepsAtMostPerPatch, held.data.count > offsetHeld + keeps {
+                held.data.removeLast(held.data.count - (offsetHeld + keeps))
+            }
 
             switch dialect {
             case .ietf:

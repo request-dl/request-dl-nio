@@ -122,6 +122,31 @@ struct ResumableUploadExchangeRelayTests {
         #expect(recording.events.filter { $0 == "finished" }.count == 1)
     }
 
+    /// The end of an exchange can be told before the exchange is known to be the response of the
+    /// upload (a body that is over by the time its head has been looked at). It is kept until it is.
+    @Test
+    func anEndThatArrivesBeforeTheExchangeIsDecided_isKeptUntilThen() async throws {
+        // Given
+        let (parent, recording) = makeParent()
+        let relay = ResumableUploadExchangeRelay(parent: parent)
+        let control = try #require(relay.control)
+
+        // When
+        control.observer?.didReceive(40)
+        control.observer?.didChange(.finished)
+        try await _Concurrency.Task.sleep(nanoseconds: 200_000_000)
+
+        // Then: nothing has reached the execution yet.
+        #expect(recording.events.isEmpty)
+
+        // When
+        relay.decide(final: Self.head)
+
+        // Then
+        try await eventually { recording.events.last == "finished" }
+        #expect(recording.downloaded == 40)
+    }
+
     /// How an exchange ended is delivered after its response was consumed, which is after whoever
     /// drove it has let go of the relay. It has to still reach the execution.
     @Test

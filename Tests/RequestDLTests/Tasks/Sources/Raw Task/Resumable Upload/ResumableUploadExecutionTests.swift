@@ -147,6 +147,102 @@ struct ResumableUploadExecutionTests {
         }
     }
 
+    @Test(arguments: Executor.allCases)
+    private func aServerThatKeepsOnlyPartOfTheBody_isSentTheRestAgain(_ executor: Executor) async throws {
+        let scenario = Case(executor: executor, kind: .tus)
+
+        try await Self.withUploadServer(scenario) { server in
+            // Given: each `PATCH` is answered with an offset short of the length.
+            server.keepsAtMostPerPatch = 100_000
+
+            // When
+            _ = try await Self.upload(to: server, scenario).result()
+
+            // Then: the body is sent in pieces, each from where the server says it is.
+            #expect(server.heldUploads[1]?.data == Self.body())
+            #expect(
+                server.requests.filter { $0.method == "PATCH" }.map { $0.header("Upload-Offset") }
+                    == ["0", "100000", "200000", "300000"]
+            )
+        }
+    }
+
+    @Test(arguments: cases)
+    private func aServerThatKeepsAnsweringNotNow_isAskedAgainUntilItAnswers(_ scenario: Case) async throws {
+        try await Self.withUploadServer(scenario) { server in
+            // Given: the connection is lost, and the server then says "not now" twice.
+            server.uploadDropPlan = [100_000]
+            server.headStatuses = [503, 429]
+
+            // When
+            _ = try await Self.upload(to: server, scenario).result()
+
+            // Then
+            #expect(server.heldUploads[1]?.data == Self.body())
+            #expect(server.requests.filter { $0.method == "HEAD" }.map(\.status) == [503, 429, 204])
+        }
+    }
+
+    @Test(arguments: cases)
+    private func aServerThatNeverAnswersTheOffsetQuery_endsInTheFailureOfTheLastAttempt(_ scenario: Case) async throws {
+        try await Self.withUploadServer(scenario) { server in
+            // Given
+            server.uploadDropPlan = [100_000]
+            server.headStatuses = Array(repeating: 503, count: 10)
+
+            // Then: the budget runs out, and what ends it is the answer of the server.
+            await #expect(throws: ResumableUploadTransientResponse.self) {
+                _ = try await Self.upload(to: server, scenario, attempts: 2).result()
+            }
+
+            #expect(server.requests.filter { $0.method == "HEAD" }.count == 2)
+        }
+    }
+
+    @Test(arguments: cases)
+    private func aServerThatDoesNotSayWhereItStands_isAnError(_ scenario: Case) async throws {
+        try await Self.withUploadServer(scenario) { server in
+            // Given
+            server.uploadDropPlan = [100_000]
+            server.headOmitsOffset = true
+
+            // Then
+            await #expect(throws: ResumableUploadError(reason: .offsetRejected(status: 204))) {
+                _ = try await Self.upload(to: server, scenario).result()
+            }
+        }
+    }
+
+    @Test(arguments: cases)
+    private func aServerThatHoldsMoreThanTheBody_isAnError(_ scenario: Case) async throws {
+        try await Self.withUploadServer(scenario) { server in
+            // Given
+            server.uploadDropPlan = [100_000]
+            server.headOverstatesOffsetBy = Self.size
+
+            // Then
+            await #expect(throws: ResumableUploadError.self) {
+                _ = try await Self.upload(to: server, scenario).result()
+            }
+        }
+    }
+
+    @Test(arguments: cases)
+    private func aServerThatKeepsRejectingTheOffset_isGivenUpOn(_ scenario: Case) async throws {
+        try await Self.withUploadServer(scenario) { server in
+            // Given
+            server.rejectsEveryPatchWithConflict = true
+
+            // Then
+            await #expect(throws: ResumableUploadError(reason: .conflictingOffsets)) {
+                _ = try await Self.upload(to: server, scenario, attempts: 2).result()
+            }
+
+            // The first, and the two that follow it, which is what was allowed.
+            #expect(server.requests.filter { $0.method == "PATCH" }.count == 3)
+        }
+    }
+
     // MARK: - Giving up
 
     @Test(arguments: cases)

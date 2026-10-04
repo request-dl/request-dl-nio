@@ -468,27 +468,12 @@ final class ResumableUploadExecution: @unchecked Sendable {
     // MARK: - Private methods, ending
 
     private func finishQuietly() {
-        let isFirst = lock.withLock { () -> Bool in
-            defer { _isOver = true }
-            return !_isOver
-        }
-
-        guard isFirst else {
-            return
-        }
-
+        lock.withLock { _isOver = true }
         control?.release()
     }
 
     private func fail(_ error: Error) {
-        let isFirst = lock.withLock { () -> Bool in
-            defer { _isOver = true }
-            return !_isOver
-        }
-
-        guard isFirst else {
-            return
-        }
+        lock.withLock { _isOver = true }
 
         upload.append(.failure(error))
         head.append(.failure(error))
