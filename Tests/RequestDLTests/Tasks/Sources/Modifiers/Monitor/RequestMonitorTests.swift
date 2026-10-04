@@ -32,6 +32,7 @@ final class RecordingMonitor: RequestMonitor, @unchecked Sendable {
     private var _uploads: [Transfer] = []
     private var _downloads: [Transfer] = []
     private var _states: [(execution: RequestExecution, state: RequestState)] = []
+    private var _transactions: [RequestMetrics.Transaction] = []
 
     /// Microseconds each progress call takes, to model a monitor slower than the network.
     let progressDelay: UInt32
@@ -53,6 +54,7 @@ final class RecordingMonitor: RequestMonitor, @unchecked Sendable {
     var uploads: [Transfer] { lock.withLock { _uploads } }
     var downloads: [Transfer] { lock.withLock { _downloads } }
     var executions: [RequestExecution] { lock.withLock { _states.map(\.execution) } }
+    var transactions: [RequestMetrics.Transaction] { lock.withLock { _transactions } }
 
     /// The states of one execution, or of every one when `execution` is `nil`, by name.
     func states(of execution: RequestExecution? = nil) -> [String] {
@@ -98,6 +100,10 @@ final class RecordingMonitor: RequestMonitor, @unchecked Sendable {
 
     func request(_ execution: RequestExecution, didChange state: RequestState) {
         lock.withLock { _states.append((execution, state)) }
+    }
+
+    func request(_ execution: RequestExecution, didCollect transaction: RequestMetrics.Transaction) {
+        lock.withLock { _transactions.append(transaction) }
     }
 
     static func name(_ state: RequestState) -> String {
@@ -313,6 +319,78 @@ struct RequestMonitorTests {
             #expect(monitor.states() == ["started", "failed"])
             #expect(monitor.failure != nil)
         }
+    }
+
+    // MARK: - Metrics
+
+    @Test(arguments: Executor.allCases)
+    private func aRequest_reportsTheTransactionItRanAs(_ executor: Executor) async throws {
+        try await withTransferServer(.init(length: Self.length)) { server in
+            // Given
+            let monitor = RecordingMonitor()
+
+            // When
+            _ = try await Self.data(from: server, executor: executor)
+                .monitor(monitor)
+                .result()
+
+            // Then: when the transport reports it is up to the transport, so this waits for it.
+            try await eventually(timeout: 30) { monitor.transactions.count == 1 }
+
+            let transaction = try #require(monitor.transactions.first)
+            #expect(transaction.responseStart != nil)
+            #expect(transaction.responseEnd != nil)
+            #expect(transaction.connection != nil)
+            #expect(transaction.error == nil)
+        }
+    }
+
+    @Test(arguments: Executor.allCases)
+    private func aRequestThatFails_stillReportsTheTransactionItRanAs(_ executor: Executor) async throws {
+        try await withTransferServer(.init(length: Self.length)) { server in
+            // Given: the connection is cut after part of the body, so there is a response head and no end.
+            server.dropPlan = [1_000_000]
+            let monitor = RecordingMonitor()
+
+            // When
+            await #expect(throws: (any Error).self) {
+                _ = try await Self.data(from: server, executor: executor)
+                    .monitor(monitor)
+                    .result()
+            }
+
+            // Then: the request threw, so there is no `TaskResult` to read the metrics from.
+            try await eventually(timeout: 30) { monitor.hasEnded && monitor.transactions.count == 1 }
+
+            let transaction = try #require(monitor.transactions.first)
+            #expect(transaction.responseStart != nil)
+            #expect(transaction.responseEnd == nil)
+            #expect(monitor.failure != nil)
+        }
+    }
+
+    @Test(arguments: Executor.allCases)
+    private func aRequestThatNeverGetsSent_reportsATransactionWithoutAResponse(_ executor: Executor) async throws {
+        // Given: nothing listens on this port.
+        let monitor = RecordingMonitor()
+
+        // When
+        await #expect(throws: (any Error).self) {
+            _ = try await DataTask {
+                BaseURL(.http, host: "127.0.0.1:1")
+                Path("/resource")
+                executor.session
+                Timeout(.seconds(3), for: .resource)
+            }
+            .monitor(monitor)
+            .result()
+        }
+
+        // Then: generous for the same reason as the test below.
+        try await eventually(timeout: 120) { !monitor.transactions.isEmpty }
+
+        let transaction = try #require(monitor.transactions.first)
+        #expect(transaction.responseStart == nil)
     }
 
     @Test(arguments: Executor.allCases)

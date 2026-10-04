@@ -286,6 +286,13 @@ struct RawTask<Content: Property>: RequestTask {
                 for monitor in monitors {
                     monitor.request(execution, didChange: state)
                 }
+
+            case .metrics(let transaction):
+                let transaction = RequestMetrics.Transaction(transaction)
+
+                for monitor in monitors {
+                    monitor.request(execution, didCollect: transaction)
+                }
             }
         }
 

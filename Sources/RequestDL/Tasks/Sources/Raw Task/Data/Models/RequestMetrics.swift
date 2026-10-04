@@ -319,7 +319,7 @@ extension RequestMetrics {
 
 extension RequestMetrics.Transaction {
 
-    fileprivate init(_ transaction: Internals.TransactionMetrics) {
+    init(_ transaction: Internals.TransactionMetrics) {
         self.init(
             url: transaction.url,
             fetchStart: transaction.fetchStart,

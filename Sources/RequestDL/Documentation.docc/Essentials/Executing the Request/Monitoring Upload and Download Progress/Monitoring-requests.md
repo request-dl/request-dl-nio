@@ -45,6 +45,22 @@ Bytes are counted where they cross the network, not where your code reads them. 
 
 A response served from the cache finishes right after it starts, having moved nothing on the network.
 
+### Metrics
+
+``RequestMonitor/request(_:didCollect:)`` reports each ``RequestMetrics/Transaction`` of an execution: one exchange on the wire, with the phases it went through and the connection it ran on. A request that follows a redirect or continues a download reports one for every exchange.
+
+It is independent of how the request ends. A request that fails as a whole throws, so there is no ``TaskResult`` to read ``TaskResult/metrics`` from, but a monitor still hears about the transactions it went through:
+
+```swift
+struct MetricsMonitor: RequestMonitor {
+    func request(_ execution: RequestExecution, didCollect transaction: RequestMetrics.Transaction) {
+        print(execution.url, transaction.connection?.isReused ?? false, transaction.responseStart != nil)
+    }
+}
+```
+
+When it arrives depends on the executor. AsyncHTTPClient reports a transaction before the execution ends. `URLSession` reports it once its task is done, which can be after the final ``RequestState``, and it only reports an error for the task as a whole, so ``RequestMetrics/Transaction/error`` can be missing from a transaction even when the execution failed. The ``RequestState/failed(_:)`` state carries the error.
+
 ### Telling requests apart
 
 Every call includes a ``RequestExecution``, which identifies the run it is about (`id`, `url`, `method`). When one monitor is attached to a ``GroupTask``, that is how you know which of its requests an event belongs to. Two runs of the same request, such as the attempts of a `.retry`, are two executions.

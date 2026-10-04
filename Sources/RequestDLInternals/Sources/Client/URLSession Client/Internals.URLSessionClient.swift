@@ -656,7 +656,8 @@ extension Internals {
                     upload.append(.success(bytesSent))
                 },
                 makeBodyStream: makeBodyStream,
-                metrics: metrics
+                metrics: metrics,
+                observer: transferControl?.observer
             )
 
             // A download continuation is a new exchange, so it gets a delegate of its own, with
@@ -669,7 +670,8 @@ extension Internals {
                     proxyAuthorization: proxyAuthorization,
                     tls: tlsDelegate,
                     forwarding: delegate,
-                    metrics: metrics
+                    metrics: metrics,
+                    observer: transferControl?.observer
                 )
             }
 
@@ -1236,6 +1238,8 @@ extension Internals.URLSessionClient {
         /// Where the transactions `URLSession` measured are reported. Set only by
         /// `executeSessionTask`, the one path whose result carries metrics to the caller.
         private let metrics: Internals.RequestMetricsCollector?
+        /// Told about each transaction as `URLSession` reports it, for a `RequestMonitor`.
+        private let observer: Internals.ExecutionObserver?
         private let lock = Lock()
 
         // MARK: - Unsafe properties
@@ -1322,7 +1326,8 @@ extension Internals.URLSessionClient {
             downloadBuffer: Internals.DownloadBuffer? = nil,
             onDownloadComplete: (@Sendable () -> Void)? = nil,
             makeBodyStream: (@Sendable () -> InputStream?)? = nil,
-            metrics: Internals.RequestMetricsCollector? = nil
+            metrics: Internals.RequestMetricsCollector? = nil,
+            observer: Internals.ExecutionObserver? = nil
         ) {
             self.redirectConfiguration = redirectConfiguration
             self.proxyAuthorization = proxyAuthorization
@@ -1333,6 +1338,7 @@ extension Internals.URLSessionClient {
             self.onDownloadComplete = onDownloadComplete
             self.makeBodyStream = makeBodyStream
             self.metrics = metrics
+            self.observer = observer
             self.bodyLength = initialRequest.value(forHTTPHeaderField: "Content-Length")
             self._lastRequest = initialRequest
             self._visited = [initialRequest.url?.absoluteString ?? ""]
@@ -1612,6 +1618,13 @@ extension Internals.URLSessionClient {
                         _transactionIndices[task.taskIdentifier] = lastIndex
                         _lastTransaction = (lastIndex, transactions.last?.responseStart != nil)
                     }
+                }
+
+                // After the lock: the observer takes its own and hands events on from another task.
+                // An error that only arrives later is not in what is handed on here; the execution's
+                // own ending carries it.
+                for transaction in transactions {
+                    observer?.didCollect(transaction)
                 }
             }
 

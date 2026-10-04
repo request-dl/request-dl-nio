@@ -73,6 +73,25 @@ public protocol RequestMonitor: Sendable {
 
     /// The execution moved to a new state.
     func request(_ execution: RequestExecution, didChange state: RequestState)
+
+    /// A transaction of the execution was measured: one exchange on the wire, with the phases it went
+    /// through and the connection it ran on.
+    ///
+    /// Called once for each transaction, so a request that follows a redirect or continues a download
+    /// reports one for every exchange. It is independent of how the request ends, which is the point:
+    /// a request that fails as a whole throws and has no ``TaskResult`` to read ``TaskResult/metrics``
+    /// from, but the transactions it went through are reported here all the same.
+    ///
+    /// When it arrives depends on the executor. AsyncHTTPClient reports a transaction before the
+    /// execution ends. `URLSession` reports it once its task is done, which can be after the final
+    /// ``RequestState``, and it only reports an error for the task as a whole, so
+    /// ``RequestMetrics/Transaction/error`` can be missing here even when the execution failed. The
+    /// ``RequestState/failed(_:)`` state carries the error.
+    ///
+    /// - Parameters:
+    ///   - execution: The execution this is about.
+    ///   - transaction: What was measured.
+    func request(_ execution: RequestExecution, didCollect transaction: RequestMetrics.Transaction)
 }
 
 extension RequestMonitor {
@@ -82,4 +101,6 @@ extension RequestMonitor {
     public func request(_ execution: RequestExecution, didDownload bytes: Int, total: Int, of expected: Int?) {}
 
     public func request(_ execution: RequestExecution, didChange state: RequestState) {}
+
+    public func request(_ execution: RequestExecution, didCollect transaction: RequestMetrics.Transaction) {}
 }
