@@ -10,12 +10,15 @@
 
 import AsyncHTTPClient
 import NIOCore
+import NIOSSL
 import Testing
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
 import struct Foundation.Data
+import struct Foundation.Date
+import struct Foundation.URL
 import struct Foundation.UUID
 #endif
 
@@ -224,6 +227,101 @@ struct InternalsClientMetricsTests {
         #expect(lookup.end <= connect.start)
     }
     #endif
+
+    // MARK: - Conversion
+
+    @Test
+    func conversion_whenHTTP2OverEveryTLSVersion_isCarriedOver() throws {
+        let versions: [(TLSVersion, Internals.TransactionMetrics.TLSVersion)] = [
+            (.tlsv1, .tls10),
+            (.tlsv11, .tls11),
+            (.tlsv12, .tls12),
+            (.tlsv13, .tls13),
+        ]
+
+        for (input, expected) in versions {
+            // Given
+            let transaction = HTTPClientTransactionMetrics(
+                url: try #require(URL(string: "https://example.com")),
+                fetchStartDate: Date(timeIntervalSince1970: 100),
+                connection: .init(
+                    id: 1,
+                    negotiatedProtocol: .http2,
+                    isReused: false,
+                    tlsVersion: input,
+                    tlsCipherSuite: 0x1301
+                )
+            )
+
+            // When
+            let converted = Internals.TransactionMetrics(transaction)
+
+            // Then
+            #expect(converted.connection?.negotiatedProtocol == .http2)
+            #expect(converted.connection?.tlsVersion == expected)
+            #expect(converted.connection?.tlsCipherSuite == 0x1301)
+        }
+    }
+
+    @Test
+    func conversion_whenHTTP1_isCarriedOver() throws {
+        // Given
+        let transaction = HTTPClientTransactionMetrics(
+            url: try #require(URL(string: "http://example.com")),
+            fetchStartDate: Date(timeIntervalSince1970: 100),
+            connection: .init(id: 1, negotiatedProtocol: .http1_1, isReused: true)
+        )
+
+        // When
+        let converted = Internals.TransactionMetrics(transaction)
+
+        // Then
+        #expect(converted.connection?.negotiatedProtocol == .http1_1)
+        #expect(converted.connection?.isReused == true)
+        #expect(converted.connection?.tlsVersion == nil)
+    }
+
+    @Test
+    func conversion_whenAddressesAreIPAndUnixSockets_keepsTheHostAndPort() throws {
+        // Given
+        let transaction = HTTPClientTransactionMetrics(
+            url: try #require(URL(string: "http://example.com")),
+            fetchStartDate: Date(timeIntervalSince1970: 100),
+            connection: .init(
+                id: 1,
+                negotiatedProtocol: .http1_1,
+                isReused: false,
+                localAddress: try SocketAddress(ipAddress: "127.0.0.1", port: 1234),
+                remoteAddress: try SocketAddress(unixDomainSocketPath: "/tmp/requestdl.sock")
+            )
+        )
+
+        // When
+        let connection = try #require(Internals.TransactionMetrics(transaction).connection)
+
+        // Then
+        #expect(connection.localAddress == "127.0.0.1")
+        #expect(connection.localPort == 1234)
+        #expect(connection.remoteAddress == "/tmp/requestdl.sock")
+        #expect(connection.remotePort == nil)
+    }
+
+    @Test
+    func conversion_whenTheTransactionNeverGotAConnection_hasNone() throws {
+        // Given
+        let transaction = HTTPClientTransactionMetrics(
+            url: try #require(URL(string: "http://example.com")),
+            fetchStartDate: Date(timeIntervalSince1970: 100),
+            error: HTTPClientError.cancelled
+        )
+
+        // When
+        let converted = Internals.TransactionMetrics(transaction)
+
+        // Then
+        #expect(converted.connection == nil)
+        #expect(converted.error as? HTTPClientError == .cancelled)
+    }
 
     // MARK: - Private methods
 

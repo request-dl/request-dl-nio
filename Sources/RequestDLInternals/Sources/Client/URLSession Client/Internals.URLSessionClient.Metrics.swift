@@ -74,7 +74,7 @@ extension Internals.TransactionMetrics {
 extension Internals.TransactionMetrics.NegotiatedProtocol {
 
     /// `URLSession` reports the ALPN name, such as `http/1.1`, `h2` or `h3`.
-    fileprivate init(_ name: String) {
+    package init(_ name: String) {
         switch name {
         case "http/1.1", "http/1.0":
             self = .http1_1
@@ -89,7 +89,7 @@ extension Internals.TransactionMetrics.NegotiatedProtocol {
 extension Internals.TransactionMetrics.TLSVersion {
 
     /// The IANA value of the protocol version, as `tls_protocol_version_t` carries it.
-    fileprivate init?(rawValue: UInt16) {
+    package init?(rawValue: UInt16) {
         switch rawValue {
         case 0x0301:
             self = .tls10

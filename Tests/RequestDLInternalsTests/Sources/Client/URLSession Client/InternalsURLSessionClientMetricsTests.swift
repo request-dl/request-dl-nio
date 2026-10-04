@@ -2,6 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
+import SwiftAsyncStream
 import Testing
 
 @testable import RequestDLInternals
@@ -201,6 +202,76 @@ struct InternalsURLSessionClientMetricsTests {
         #expect(collector.transactions().first?.responseStart == nil)
     }
 
+    @Test(
+        arguments: [
+            ("http/1.1", Internals.TransactionMetrics.NegotiatedProtocol.http1_1),
+            ("http/1.0", .http1_1),
+            ("h2", .http2),
+            ("h3", .other("h3")),
+            ("spdy/3.1", .other("spdy/3.1")),
+        ]
+    )
+    func negotiatedProtocol_fromTheALPNName(
+        _ name: String,
+        _ expected: Internals.TransactionMetrics.NegotiatedProtocol
+    ) {
+        #expect(Internals.TransactionMetrics.NegotiatedProtocol(name) == expected)
+    }
+
+    @Test(
+        arguments: [
+            (UInt16(0x0301), Internals.TransactionMetrics.TLSVersion.tls10),
+            (0x0302, .tls11),
+            (0x0303, .tls12),
+            (0x0304, .tls13),
+        ]
+    )
+    func tlsVersion_fromTheIANAValue(
+        _ value: UInt16,
+        _ expected: Internals.TransactionMetrics.TLSVersion
+    ) {
+        #expect(Internals.TransactionMetrics.TLSVersion(rawValue: value) == expected)
+    }
+
+    @Test
+    func tlsVersion_whenTheValueHasNoEquivalent_isNil() {
+        // DTLS 1.2 and an unassigned value.
+        #expect(Internals.TransactionMetrics.TLSVersion(rawValue: 0xFEFD) == nil)
+        #expect(Internals.TransactionMetrics.TLSVersion(rawValue: 0) == nil)
+    }
+
+    @Test
+    func sessionTask_whenCallerGaveADelegate_stillForwardsTheMetricsToIt() async throws {
+        // Given
+        let localServer = try await LocalServer(.standard)
+        let uri = "/" + UUID().uuidString
+
+        localServer.cleanup(at: uri)
+        localServer.insert(try LocalServer.ResponseConfiguration(jsonObject: "metrics"), at: uri)
+        defer { localServer.cleanup(at: uri) }
+
+        let url = try #require(URL(string: "https://\(localServer.baseURL)\(uri)"))
+        let client = try Internals.URLSessionClient(configuration: .ephemeral)
+        let delegate = MetricsForwardingDelegate()
+
+        // When
+        let sessionTask = try await client.execute(
+            request: URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData),
+            readingMode: .length(1_024),
+            uploadingBytes: .zero,
+            decompression: .disabled,
+            cache: nil,
+            logger: nil,
+            delegate: delegate
+        )
+
+        try await drain(sessionTask)
+
+        // Then: `URLSession` allows one delegate per task, and the client's own stands between it and the caller's.
+        try await eventually { delegate.collectedCount > 0 }
+        #expect(delegate.collectedCount == 1)
+    }
+
     // MARK: - Private methods
 
     /// Ignores `URLSession`'s own cache: a repeated request would otherwise be answered from it,
@@ -228,6 +299,42 @@ struct InternalsURLSessionClientMetricsTests {
                 for try await _ in downloadStep.bytes {}
             }
         }
+    }
+}
+
+/// A caller's delegate that trusts the test server and counts the metrics it is handed.
+private final class MetricsForwardingDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+
+    private let lock = Lock()
+    private var _collectedCount = 0
+
+    var collectedCount: Int {
+        lock.withLock { _collectedCount }
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        didReceive challenge: URLAuthenticationChallenge,
+        completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+    ) {
+        guard
+            challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
+            let serverTrust = challenge.protectionSpace.serverTrust
+        else {
+            completionHandler(.performDefaultHandling, nil)
+            return
+        }
+
+        completionHandler(.useCredential, URLCredential(trust: serverTrust))
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        didFinishCollecting metrics: URLSessionTaskMetrics
+    ) {
+        lock.withLock { _collectedCount += 1 }
     }
 }
 
