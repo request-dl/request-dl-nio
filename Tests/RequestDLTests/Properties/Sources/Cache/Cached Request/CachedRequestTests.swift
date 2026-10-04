@@ -454,6 +454,188 @@ struct CachedRequestTests {
         #expect(response.head != cacheData.response)
     }
 
+    // MARK: - Metrics
+
+    /// A response served from the cache is a transaction of its own, with the source to say so, and
+    /// not an absence of metrics: nothing crossed the wire, so there is no connection.
+    @Test
+    func cache_whenServedFromTheCache_reportsACacheTransaction() async throws {
+        // Given
+        let testState = try await TestState()
+        let cacheKey = "https://localhost:8888" + testState.uri
+
+        await testState.dataCache.setCachedData(
+            await mockCachedData(makeHeaders(maxAgeSeconds: 3_600)),
+            forKey: cacheKey
+        )
+
+        // When
+        let response = try await performCacheRequest(
+            testState: testState,
+            headers: makeHeaders(maxAgeSeconds: 3_600),
+            cacheStrategy: .returnCachedDataElseLoad
+        )
+
+        // Then
+        let transactions = try #require(response.metrics).transactions
+        #expect(transactions.map(\.source) == [.cache])
+
+        let transaction = try #require(transactions.first)
+        #expect(transaction.connection == nil)
+        #expect(transaction.url?.absoluteString == cacheKey)
+        #expect(transaction.responseStart != nil)
+        #expect(transaction.error == nil)
+    }
+
+    @Test
+    func cache_whenNothingIsCached_reportsOnlyTheNetworkTransaction() async throws {
+        // Given
+        let testState = try await TestState()
+
+        // When
+        let response = try await performCacheRequest(
+            testState: testState,
+            headers: makeHeaders(maxAgeSeconds: 3_600),
+            cacheStrategy: .returnCachedDataElseLoad
+        )
+
+        // Then
+        #expect(try #require(response.metrics).transactions.map(\.source) == [.network])
+    }
+
+    /// The conditional request is a request the caller did not make. It comes first, marked as such,
+    /// and the cached response it confirmed after it.
+    @Test
+    func cache_whenRevalidationConfirmsTheCache_reportsTheRevalidationThenTheCache() async throws {
+        // Given
+        let testState = try await TestState()
+        let eTag = UUID()
+        let cacheKey = "https://localhost:8888" + testState.uri
+
+        await testState.dataCache.setCachedData(
+            await mockCachedData(makeHeaders(eTag: eTag, maxAgeSeconds: 3_600)),
+            forKey: cacheKey
+        )
+
+        // When
+        let response = try await performCacheRequest(
+            testState: testState,
+            headers: makeHeaders(eTag: eTag, maxAgeSeconds: 3_600),
+            cacheStrategy: .reloadAndValidateCachedData
+        )
+
+        // Then
+        let transactions = try #require(response.metrics).transactions
+        #expect(transactions.map(\.source) == [.revalidation, .cache])
+
+        let revalidation = try #require(transactions.first)
+        #expect(revalidation.connection != nil)
+        #expect(revalidation.responseStart != nil)
+        #expect(transactions.last?.connection == nil)
+    }
+
+    /// A revalidation that does not settle the matter is followed by the request itself, which is
+    /// what the response then is.
+    @Test
+    func cache_whenRevalidationFindsTheCacheInvalid_reportsTheRevalidationThenTheRequest() async throws {
+        // Given
+        let testState = try await TestState()
+        let eTag = UUID()
+        let cacheKey = "https://localhost:8888" + testState.uri
+
+        await testState.dataCache.setCachedData(
+            await mockCachedData(makeHeaders()),
+            forKey: cacheKey
+        )
+
+        try await waitCacheExpiration()
+
+        // When
+        let response = try await performCacheRequest(
+            testState: testState,
+            headers: makeHeaders(eTag: eTag),
+            cacheStrategy: .reloadAndValidateCachedData
+        )
+
+        // Then
+        let transactions = try #require(response.metrics).transactions
+        #expect(transactions.map(\.source) == [.revalidation, .network])
+        #expect(transactions.allSatisfy { $0.connection != nil })
+    }
+
+    /// The conditional request goes through each executor's own `revalidationHead`, so each one has to
+    /// record it as a revalidation.
+    private static var executors: [Session.Executor] {
+        var executors: [Session.Executor] = []
+
+        #if canImport(Darwin)
+        executors.append(.urlSession)
+        #endif
+
+        #if canImport(NIOCore)
+        executors.append(.nio)
+        #endif
+
+        return executors
+    }
+
+    @Test(arguments: executors)
+    private func cache_whenRevalidationConfirmsTheCache_reportsItOnEveryExecutor(
+        _ executor: Session.Executor
+    ) async throws {
+        // Given
+        let testState = try await TestState()
+        let eTag = UUID()
+        let cacheKey = "https://localhost:8888" + testState.uri
+
+        await testState.dataCache.setCachedData(
+            await mockCachedData(makeHeaders(eTag: eTag, maxAgeSeconds: 3_600)),
+            forKey: cacheKey
+        )
+
+        // When
+        let response = try await performCacheRequest(
+            testState: testState,
+            headers: makeHeaders(eTag: eTag, maxAgeSeconds: 3_600),
+            cacheStrategy: .reloadAndValidateCachedData,
+            executor: executor
+        )
+
+        // Then
+        let transactions = try #require(response.metrics).transactions
+        #expect(transactions.map(\.source) == [.revalidation, .cache])
+        #expect(transactions.first?.connection != nil)
+        #expect(transactions.first?.responseStart != nil)
+    }
+
+    @Test(arguments: executors)
+    private func cache_whenRevalidationFindsTheCacheInvalid_reportsItOnEveryExecutor(
+        _ executor: Session.Executor
+    ) async throws {
+        // Given
+        let testState = try await TestState()
+        let cacheKey = "https://localhost:8888" + testState.uri
+
+        await testState.dataCache.setCachedData(
+            await mockCachedData(makeHeaders()),
+            forKey: cacheKey
+        )
+
+        try await waitCacheExpiration()
+
+        // When
+        let response = try await performCacheRequest(
+            testState: testState,
+            headers: makeHeaders(eTag: UUID()),
+            cacheStrategy: .reloadAndValidateCachedData,
+            executor: executor
+        )
+
+        // Then: the revalidation first, then the request itself, whose transaction the executor recorded.
+        let transactions = try #require(response.metrics).transactions
+        #expect(transactions.map(\.source) == [.revalidation, .network])
+    }
+
     @Test
     func cache_whenCacheDisabledByPolicy_withUseCachedDataOnlyStrategy() async throws {
         let testState = try await TestState()
@@ -1027,22 +1209,32 @@ extension CachedRequestTests {
         encryptionKey: DataCache.EncryptionKey? = nil,
         cacheHeader: CacheHeader? = nil,
         includesAuthorizationHeader: Bool = false,
+        executor: Session.Executor? = nil,
         logger: Logger? = nil
     ) async throws -> TaskResult<Data> {
         let response = try responseConfiguration(headers, testState.output, status: status)
 
         testState.localServer.insert(response, at: testState.uri)
 
+        var base = Session.localServer
+
+        if let executor {
+            base = base.requiredExecutor(executor)
+        }
+
+        let session =
+            base
+            .cachePolicy(cachePolicy)
+            .cacheStrategy(cacheStrategy)
+            .cache(
+                memoryCapacity: memoryCapacity,
+                diskCapacity: diskCapacity,
+                url: testState.dataCache.directoryURL,
+                encryptionKey: encryptionKey
+            )
+
         let output = try await DataTask {
-            Session.localServer
-                .cachePolicy(cachePolicy)
-                .cacheStrategy(cacheStrategy)
-                .cache(
-                    memoryCapacity: memoryCapacity,
-                    diskCapacity: diskCapacity,
-                    url: testState.dataCache.directoryURL,
-                    encryptionKey: encryptionKey
-                )
+            session
 
             SecureConnection {
                 TrustRoots {

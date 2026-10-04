@@ -51,8 +51,13 @@ package protocol RequestExecutingClient: Sendable {
     /// `Internals.CacheControl`'s conditional-revalidation request (`If-None-Match`/
     /// `If-Modified-Since`) needs to decide whether a cached entry is still fresh, without paying
     /// for a full `SessionTask`/streaming response it would otherwise throw away.
+    ///
+    /// - Parameter metrics: Where the transaction of this request is recorded, marked as a
+    ///   revalidation, when the caller wants it. It is not the response's own: the conditional
+    ///   request is one the caller did not make.
     func revalidationHead(
         configuration: RequestConfiguration,
-        logger: Internals.TaskLogger?
+        logger: Internals.TaskLogger?,
+        metrics: Internals.RequestMetricsCollector?
     ) async throws -> Internals.ResponseHead
 }

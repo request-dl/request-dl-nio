@@ -21,8 +21,14 @@ public struct TaskResult<Element: Sendable>: TaskResultPrimitive {
     /// The payload of the task result.
     public let payload: Element
 
-    /// What the request measured on the wire, or `nil` when nothing went over it, as when the response
-    /// came from the cache or was mocked.
+    /// What the request measured, or `nil` when there is nothing to measure, as when the response was
+    /// mocked.
+    ///
+    /// A response served from the cache is not an absence of metrics: it is a transaction whose
+    /// ``RequestMetrics/Transaction/source`` is `.cache`, with no connection. And a cached response
+    /// that was first revalidated has the conditional request in front of it, as a transaction
+    /// whose source is `.revalidation`. That one is a request the caller did not make, so filter by
+    /// source when adding the transactions up.
     ///
     /// It is read when asked for, so it reflects the transactions that had ended by then. For a
     /// `TaskResult<Data>` that is all of them, since the body has been collected by the time the

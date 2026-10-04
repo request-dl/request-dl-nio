@@ -72,7 +72,7 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
                 seed: task.seed,
                 response: task.response
             )
-        case .cache(let cache):
+        case .cache(let cache, _):
             return try await .init(
                 seed: Internals.TaskSeed.withoutCancellation,
                 response: mockRequest(

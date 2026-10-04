@@ -44,12 +44,26 @@ extension Internals.Client: RequestExecutingClient {
     /// response: HTTPURLResponse)` makes for the same reason on the URLSession side.
     package func revalidationHead(
         configuration: RequestConfiguration,
-        logger: Internals.TaskLogger?
+        logger: Internals.TaskLogger?,
+        metrics: Internals.RequestMetricsCollector?
     ) async throws -> Internals.ResponseHead {
-        let response = try await execute(
-            request: try configuration.build(eventLoop: eventLoopGroup.any()),
-            logger: logger
-        ).response()
+        let request = try configuration.build(eventLoop: eventLoopGroup.any())
+
+        let response: HTTPClient.Response
+
+        if let metrics {
+            response = try await execute(
+                request: request,
+                logger: logger,
+                metrics: metrics,
+                source: .revalidation
+            ).response()
+        } else {
+            response = try await execute(
+                request: request,
+                logger: logger
+            ).response()
+        }
 
         return Internals.ResponseHead(
             url: configuration.url,
