@@ -112,6 +112,12 @@ struct IETFResumableUploadDialect: ResumableUploadDialect {
         }
     }
 
+    func completionResponse(from head: ResponseHead) -> ResponseHead? {
+        // The response to the request that completed the upload is the application's, which an
+        // answer about the upload's offset says nothing of.
+        nil
+    }
+
     func cancellation(of resource: UploadResource, like request: RequestConfiguration) -> RequestConfiguration? {
         request.derived(method: "DELETE", url: resource.url)
     }

@@ -85,4 +85,10 @@ struct IETFResumableUploadDialectTests {
         #expect(dialect.outcome(of: head, offset: 1_024, length: 2_048) == .conflict(offset: 512))
         #expect(dialect.outcome(of: Fixtures.head(409), offset: 1_024, length: 2_048) == .conflict(offset: nil))
     }
+
+    @Test
+    func completionResponse_isNone() {
+        // The response to the request that completed the upload is the application's.
+        #expect(dialect.completionResponse(from: Fixtures.head(204, [("Upload-Offset", "10")])) == nil)
+    }
 }

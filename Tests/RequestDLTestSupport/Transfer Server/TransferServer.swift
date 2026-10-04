@@ -100,6 +100,24 @@ package final class TransferServer: @unchecked Sendable {
         }
     }
 
+    /// Which resumable upload protocol the server speaks, when it speaks one.
+    package enum ResumableProtocol: Sendable, Hashable {
+        /// `draft-ietf-httpbis-resumable-upload`: an upload is created by a request carrying
+        /// `Upload-Complete: ?0`, its bytes go in `PATCH` requests, and the response to the
+        /// `PATCH` that completes it is the response of the application.
+        case ietf
+
+        /// tus 1.0 with the creation extension.
+        case tus
+    }
+
+    /// What the server holds of one upload it created.
+    package struct HeldUpload: Sendable {
+        package var data: [UInt8] = []
+        package var length: Int?
+        package var isComplete = false
+    }
+
     // MARK: - Internal properties
 
     package let port: Int
@@ -151,6 +169,53 @@ package final class TransferServer: @unchecked Sendable {
         set { lock.withLock { _redirectsFirstUpload = newValue } }
     }
 
+    /// The resumable upload protocol the server speaks. `nil` (the default) leaves `PUT`/`POST`
+    /// as plain uploads and everything else as downloads. When set, a request that creates an
+    /// upload, and every request to `/uploads/<id>`, is handled as that protocol says; the rest is
+    /// served as before.
+    package var resumableProtocol: ResumableProtocol? {
+        get { lock.withLock { _resumableProtocol } }
+        set { lock.withLock { _resumableProtocol = newValue } }
+    }
+
+    /// The uploads the server created, by the id in their URL.
+    package var heldUploads: [Int: HeldUpload] {
+        lock.withLock { _heldUploads }
+    }
+
+    /// Bytes the server forgets of an upload right before it looks at the next `PATCH`, the way a
+    /// server that lost part of what it was sent would: the `PATCH` then starts from an offset
+    /// that is not the one the server holds.
+    package var forgetsBytesBeforeNextPatch: Int {
+        get { lock.withLock { _forgetsBytesBeforeNextPatch } }
+        set { lock.withLock { _forgetsBytesBeforeNextPatch = newValue } }
+    }
+
+    /// Drop every upload right before the next request about one, as an expired upload is.
+    package var expiresUploadsBeforeNextRequest: Bool {
+        get { lock.withLock { _expiresUploadsBeforeNextRequest } }
+        set { lock.withLock { _expiresUploadsBeforeNextRequest = newValue } }
+    }
+
+    /// The status the next request that creates an upload is answered with, in place of success.
+    package var creationStatus: Int? {
+        get { lock.withLock { _creationStatus } }
+        set { lock.withLock { _creationStatus = newValue } }
+    }
+
+    /// Answer the next request that creates an upload without a `Location`.
+    package var omitsLocationOnCreation: Bool {
+        get { lock.withLock { _omitsLocationOnCreation } }
+        set { lock.withLock { _omitsLocationOnCreation = newValue } }
+    }
+
+    /// Cut the connection instead of answering the `PATCH` that completes an upload, once: the
+    /// server has the whole body and the client never hears it.
+    package var dropsFinalResponse: Bool {
+        get { lock.withLock { _dropsFinalResponse } }
+        set { lock.withLock { _dropsFinalResponse = newValue } }
+    }
+
     /// Every request that got as far as a complete head, in arrival order, recorded once it's
     /// done (answered, dropped, or failed).
     package var requests: [ReceivedRequest] {
@@ -194,6 +259,14 @@ package final class TransferServer: @unchecked Sendable {
     private var _uploadReadDelay: UInt32 = .zero
     private var _onUploadProgress: (@Sendable (Int) -> Void)?
     private var _redirectsFirstUpload = false
+    private var _resumableProtocol: ResumableProtocol?
+    private var _heldUploads: [Int: HeldUpload] = [:]
+    private var _nextUploadID = 1
+    private var _forgetsBytesBeforeNextPatch = 0
+    private var _expiresUploadsBeforeNextRequest = false
+    private var _creationStatus: Int?
+    private var _omitsLocationOnCreation = false
+    private var _dropsFinalResponse = false
     private var _requests: [ReceivedRequest] = []
     private var _bodyBytesWritten = 0
     private var _uploadBytesReceived = 0
@@ -437,6 +510,15 @@ package final class TransferServer: @unchecked Sendable {
         while let head = io.readHead() {
             let keepGoing: Bool
 
+            if let isKept = serveResumableUpload(head, io: &io) {
+                keepGoing = isKept
+                guard keepGoing else {
+                    return
+                }
+
+                continue
+            }
+
             switch head.method {
             case "PUT", "POST":
                 keepGoing = serveUpload(head, io: &io)
@@ -608,6 +690,252 @@ package final class TransferServer: @unchecked Sendable {
         return isSent
     }
 
+    // MARK: - Resumable uploads
+
+    /// `nil` when `head` is not about a resumable upload at all.
+    private func serveResumableUpload(_ head: TransferServerIO.Head, io: inout TransferServerIO) -> Bool? {
+        guard let dialect = lock.withLock({ _resumableProtocol }) else {
+            return nil
+        }
+
+        if head.path.hasPrefix("/uploads/") {
+            return serveHeldUpload(head, dialect: dialect, io: &io)
+        }
+
+        let isCreation: Bool
+
+        switch dialect {
+        case .ietf:
+            isCreation = head.header("Upload-Complete") == "?0"
+        case .tus:
+            isCreation = head.method == "POST" && head.header("Tus-Resumable") != nil
+        }
+
+        guard isCreation else {
+            return nil
+        }
+
+        let outcome = io.readBody(head, dropAfter: nil, sink: { _ in })
+
+        guard outcome.isComplete else {
+            record(head, bodyLength: outcome.length, isIntact: true, isComplete: false, status: 0)
+            return false
+        }
+
+        let (id, status, omitsLocation) = lock.withLock { () -> (Int, Int, Bool) in
+            let id = _nextUploadID
+            _nextUploadID += 1
+
+            let status = _creationStatus ?? 201
+            let omitsLocation = _omitsLocationOnCreation
+            _creationStatus = nil
+            _omitsLocationOnCreation = false
+
+            if (200..<300).contains(status) {
+                _heldUploads[id] = HeldUpload(length: head.header("Upload-Length").flatMap { Int($0) })
+            }
+
+            return (id, status, omitsLocation)
+        }
+
+        var headers: [(String, String)] = [("Content-Length", "0")]
+
+        if (200..<300).contains(status), !omitsLocation {
+            headers.append(("Location", "/uploads/\(id)"))
+        }
+
+        if dialect == .tus {
+            headers.append(("Tus-Resumable", "1.0.0"))
+        }
+
+        let isSent = io.send(Self.head(status: status, headers: headers), counted: false)
+        record(head, bodyLength: 0, isIntact: true, isComplete: true, status: status)
+        return isSent
+    }
+
+    private func serveHeldUpload(
+        _ head: TransferServerIO.Head,
+        dialect: ResumableProtocol,
+        io: inout TransferServerIO
+    ) -> Bool {
+        let id = head.path.split(separator: "/").last.flatMap { Int($0) }
+
+        lock.withLock {
+            if _expiresUploadsBeforeNextRequest {
+                _heldUploads.removeAll()
+                _expiresUploadsBeforeNextRequest = false
+            }
+        }
+
+        // Read and thrown away whatever body a request has, so that answering it never races the
+        // client still writing.
+        func discardBody() -> Bool {
+            io.readBody(head, dropAfter: nil, sink: { _ in }).isComplete
+        }
+
+        func respond(_ status: Int, _ headers: [(String, String)]) -> Bool {
+            var headers = headers + [("Content-Length", "0")]
+
+            if dialect == .tus {
+                headers.append(("Tus-Resumable", "1.0.0"))
+            }
+
+            let isSent = io.send(Self.head(status: status, headers: headers), counted: false)
+            record(head, bodyLength: 0, isIntact: true, isComplete: true, status: status)
+            return isSent
+        }
+
+        guard let id, let held = lock.withLock({ _heldUploads[id] }) else {
+            return discardBody() && respond(404, [])
+        }
+
+        switch head.method {
+        case "HEAD":
+            var headers: [(String, String)] = [
+                ("Upload-Offset", String(held.data.count)), ("Cache-Control", "no-store"),
+            ]
+
+            if let length = held.length {
+                headers.append(("Upload-Length", String(length)))
+            }
+
+            if dialect == .ietf {
+                headers.append(("Upload-Complete", held.isComplete ? "?1" : "?0"))
+            }
+
+            // A `HEAD` answer states no length of its own.
+            let isSent = io.send(
+                Self.head(status: 204, headers: headers + (dialect == .tus ? [("Tus-Resumable", "1.0.0")] : [])),
+                counted: false
+            )
+
+            record(head, bodyLength: 0, isIntact: true, isComplete: true, status: 204)
+            return isSent
+
+        case "DELETE":
+            lock.withLock { _heldUploads[id] = nil }
+            return respond(204, [])
+
+        case "PATCH":
+            return servePatch(head, id: id, dialect: dialect, io: &io)
+
+        default:
+            return discardBody() && respond(405, [])
+        }
+    }
+
+    private func servePatch(
+        _ head: TransferServerIO.Head,
+        id: Int,
+        dialect: ResumableProtocol,
+        io: inout TransferServerIO
+    ) -> Bool {
+        let (dropAfter, offsetHeld) = lock.withLock { () -> (Int?, Int) in
+            if _forgetsBytesBeforeNextPatch > 0, var held = _heldUploads[id], !held.data.isEmpty {
+                held.data.removeLast(min(_forgetsBytesBeforeNextPatch, held.data.count))
+                _heldUploads[id] = held
+                _forgetsBytesBeforeNextPatch = 0
+            }
+
+            let dropAfter = _uploadDropPlan.isEmpty ? nil : _uploadDropPlan.removeFirst()
+            return (dropAfter, _heldUploads[id]?.data.count ?? 0)
+        }
+
+        let offsetSent = head.header("Upload-Offset").flatMap { Int($0) }
+
+        guard offsetSent == offsetHeld else {
+            let isRead = io.readBody(head, dropAfter: nil, sink: { _ in }).isComplete
+
+            var headers: [(String, String)] = [("Content-Length", "0")]
+
+            if dialect == .ietf {
+                headers.append(("Upload-Offset", String(offsetHeld)))
+            } else {
+                headers.append(("Tus-Resumable", "1.0.0"))
+            }
+
+            let isSent = isRead && io.send(Self.head(status: 409, headers: headers), counted: false)
+            record(head, bodyLength: 0, isIntact: true, isComplete: isRead, status: 409)
+            return isSent
+        }
+
+        // What arrives is kept as it arrives, so an upload cut short holds the part that made it:
+        // that is what the client is then told.
+        let outcome = io.readBody(
+            head,
+            dropAfter: dropAfter,
+            sink: { [self] bytes in
+                lock.withLock { _heldUploads[id]?.data.append(contentsOf: bytes) }
+            }
+        )
+
+        guard outcome.isComplete else {
+            record(head, bodyLength: outcome.length, isIntact: true, isComplete: false, status: 0)
+            return false
+        }
+
+        let (held, dropsResponse) = lock.withLock { () -> (HeldUpload, Bool) in
+            var held = _heldUploads[id] ?? HeldUpload()
+
+            switch dialect {
+            case .ietf:
+                held.isComplete = head.header("Upload-Complete") == "?1"
+            case .tus:
+                held.isComplete = held.length.map { held.data.count >= $0 } ?? false
+            }
+
+            _heldUploads[id] = held
+
+            let dropsResponse = held.isComplete && _dropsFinalResponse
+            if dropsResponse {
+                _dropsFinalResponse = false
+            }
+
+            return (held, dropsResponse)
+        }
+
+        guard !dropsResponse else {
+            record(head, bodyLength: outcome.length, isIntact: true, isComplete: true, status: 0)
+            return false
+        }
+
+        let isSent: Bool
+        let status: Int
+
+        switch dialect {
+        case .ietf where held.isComplete:
+            let body = Array("done".utf8)
+            status = 200
+            isSent = io.send(
+                Self.head(
+                    status: 200,
+                    headers: [
+                        ("Content-Type", "text/plain"), ("X-Upload", "done"), ("Content-Length", String(body.count)),
+                    ]
+                ) + body,
+                counted: false
+            )
+        case .ietf:
+            status = 204
+            isSent = io.send(
+                Self.head(status: 204, headers: [("Upload-Offset", String(held.data.count))]),
+                counted: false
+            )
+        case .tus:
+            status = 204
+            isSent = io.send(
+                Self.head(
+                    status: 204,
+                    headers: [("Upload-Offset", String(held.data.count)), ("Tus-Resumable", "1.0.0")]
+                ),
+                counted: false
+            )
+        }
+
+        record(head, bodyLength: outcome.length, isIntact: true, isComplete: true, status: status)
+        return isSent
+    }
+
     // MARK: - Bookkeeping (called from `TransferServerIO`)
 
     fileprivate func didSendBody(_ count: Int) {
@@ -654,7 +982,13 @@ package final class TransferServer: @unchecked Sendable {
         switch status {
         case 200: reason = "OK"
         case 206: reason = "Partial Content"
+        case 201: reason = "Created"
+        case 204: reason = "No Content"
         case 307: reason = "Temporary Redirect"
+        case 401: reason = "Unauthorized"
+        case 404: reason = "Not Found"
+        case 405: reason = "Method Not Allowed"
+        case 409: reason = "Conflict"
         case 416: reason = "Range Not Satisfiable"
         default: reason = "Status"
         }
@@ -760,12 +1094,20 @@ private struct TransferServerIO {
         }
     }
 
-    mutating func readBody(_ head: Head, dropAfter: Int?) -> BodyOutcome {
+    /// - Parameter sink: Given every piece of the body as it arrives, in place of checking it
+    ///   against the pattern of ``TransferServer/uploadByte(at:)``.
+    mutating func readBody(
+        _ head: Head,
+        dropAfter: Int?,
+        sink: ((ArraySlice<UInt8>) -> Void)? = nil
+    ) -> BodyOutcome {
         var position = 0
         var isIntact = true
 
         func consume(_ bytes: ArraySlice<UInt8>) {
-            if !bytes.elementsEqual(TransferServer.uploadBody(from: position, count: bytes.count)) {
+            if let sink {
+                sink(bytes)
+            } else if !bytes.elementsEqual(TransferServer.uploadBody(from: position, count: bytes.count)) {
                 isIntact = false
             }
 

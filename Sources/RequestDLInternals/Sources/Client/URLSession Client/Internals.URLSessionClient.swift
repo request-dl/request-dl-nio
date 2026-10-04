@@ -1005,7 +1005,7 @@ extension Internals {
         /// Whether `error` means the connection was lost or couldn't be (re)established -- the
         /// failures a download continuation can recover from -- as opposed to a cancellation, a
         /// TLS/trust or redirect-policy failure, or a malformed response, which it can't.
-        static func isTransientTransportFailure(_ error: Error) -> Bool {
+        package static func isTransientTransportFailure(_ error: Error) -> Bool {
             guard let error = error as? URLError else {
                 return false
             }

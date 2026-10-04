@@ -41,7 +41,7 @@ struct RawTask<Content: Property>: RequestTask {
         // hook doing its own I/O, a client cache entry whose `AsyncLock` is held by a slow
         // neighbour, a TLS identity read off disk -- and a `.resource` timeout that only started
         // counting once all of that was already done would have promised a bound it never had.
-        let (client, isURLSessionExecutor) = try await surfacingResourceTimeout {
+        let (resolvedClient, isURLSessionExecutor) = try await surfacingResourceTimeout {
             try await deadline.race {
                 try await notifyDescriptorHooks(resolved: resolved, environment: environment)
             }
@@ -63,6 +63,12 @@ struct RawTask<Content: Property>: RequestTask {
                 try await resolveClient(resolved: resolved)
             }
         }
+
+        // An upload that asked to be resumable is sent by a client that does that on top of the
+        // one picked for the executor, so every executor gets it the same way.
+        let client: any RequestExecutingClient =
+            environment.resumableUploadSetup.map { ResumableUploadClient(base: resolvedClient, setup: $0) }
+            ?? resolvedClient
 
         let cacheControl = Internals.CacheControl(
             requestConfiguration: resolved.requestConfiguration,

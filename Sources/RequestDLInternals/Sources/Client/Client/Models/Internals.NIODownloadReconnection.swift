@@ -287,7 +287,7 @@ extension Internals {
         /// Whether `error` means the connection was lost or couldn't be (re)established -- what a
         /// continuation can recover from -- rather than a cancellation, a TLS/trust or
         /// redirect-policy failure, or a protocol error, which it can't.
-        static func isTransientTransportFailure(_ error: Error) -> Bool {
+        package static func isTransientTransportFailure(_ error: Error) -> Bool {
             if let error = error as? HTTPClientError {
                 return [
                     .remoteConnectionClosed,
@@ -329,10 +329,44 @@ extension Internals {
             if let error = error as? NWError, case .posix = error {
                 return true
             }
+
+            if isNetworkFrameworkConnectionLoss(error) {
+                return true
+            }
             #endif
 
             return false
         }
+
+        #if canImport(Network)
+        /// What SwiftNIO's Network.framework transport (`NIOTransportServices`) reports when the
+        /// connection is reset, closed or unreachable: its own `NWPOSIXError`, which wraps the
+        /// `POSIXErrorCode` and is not an `NWError`.
+        ///
+        /// Recognised by name and by the code it wraps, since that module is a dependency of
+        /// AsyncHTTPClient and not one of this target's own, and a connection lost while a request
+        /// body is being written is reported this way.
+        private static func isNetworkFrameworkConnectionLoss(_ error: Error) -> Bool {
+            guard String(reflecting: type(of: error)).hasSuffix("NWPOSIXError") else {
+                return false
+            }
+
+            guard
+                let code = Mirror(reflecting: error).children.first(where: { $0.label == "errorCode" })?.value
+                    as? POSIXErrorCode
+            else {
+                return false
+            }
+
+            switch code {
+            case .ECONNRESET, .EPIPE, .ECONNABORTED, .ETIMEDOUT, .ENOTCONN, .ENETDOWN, .ENETUNREACH,
+                .EHOSTUNREACH, .ECONNREFUSED:
+                return true
+            default:
+                return false
+            }
+        }
+        #endif
     }
 }
 

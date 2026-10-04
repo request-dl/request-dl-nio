@@ -103,6 +103,12 @@ protocol ResumableUploadDialect: Sendable {
     /// how long the whole body is.
     func outcome(of head: ResponseHead, offset: Int64, length: Int64?) -> UploadAppendOutcome
 
+    /// The response to hand over as the response of the upload, when the server holds all of it but
+    /// the response to the request that completed it was lost, and `head` is what the server just
+    /// said about the upload. `nil` when nothing the server says takes the place of that response,
+    /// as when it is the response of the application.
+    func completionResponse(from head: ResponseHead) -> ResponseHead?
+
     /// The request that tells the server the upload is abandoned, if the protocol has one.
     func cancellation(of resource: UploadResource, like request: RequestConfiguration) -> RequestConfiguration?
 }
