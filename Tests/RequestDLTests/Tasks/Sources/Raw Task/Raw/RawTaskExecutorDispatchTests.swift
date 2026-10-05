@@ -434,7 +434,11 @@ struct RawTaskExecutorDispatchTests {
     /// that's demonstrably still open, the same technique
     /// `downloadTask_whenResponseDroppedMidFlight_actuallyCancelsTheUnderlyingURLSessionClient`
     /// above uses to prove cancellation for real instead of merely asserting an error type.
-    @Test
+    @Test(
+        .toleratingSimulatorFlake(
+            "Asserts that cancelling reached the URLSession task within a fixed wait, which a simulator runner starved of CPU can't promise; the other platforms are what catch a regression"
+        )
+    )
     func dataTask_whenResourceTimeoutFiresMidFlightUnderRequiredURLSession_cancelsTheUnderlyingURLSessionTaskAndThrows()
         async throws
     {

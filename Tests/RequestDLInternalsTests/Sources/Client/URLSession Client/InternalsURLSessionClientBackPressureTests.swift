@@ -106,7 +106,11 @@ struct InternalsURLSessionClientBackPressureTests {
     /// its own buffer ahead of the stalled queue, and with nothing but `suspend()` it then went on
     /// delivering the entire body to a task reporting `.suspended`, every time. The `AsyncBytes`
     /// path has to hold regardless.
-    @Test
+    @Test(
+        .toleratingSimulatorFlake(
+            "Asserts that a task is observed waiting at an exact moment, which a simulator runner starved of CPU for minutes (this test has taken over 180s there) can't promise; the other platforms are what catch a regression"
+        )
+    )
     func delegateQueueFallingBehind_stillPausesTheConnection() async throws {
         try await withRawStreamingServer(totalBytes: Self.largeBody) { server in
             // Given: the delegate queue blocked while the response starts streaming in.
