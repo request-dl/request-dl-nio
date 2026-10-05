@@ -618,12 +618,12 @@ struct DiskStorageTests {
             let found = await coldStorage["complete"]
             let elapsed = clock.now - start
 
-            // Then: it resolves, and nowhere near the 15s the incomplete neighbor used to cost.
-            // 8s rather than a tighter margin for the same reason `removeAll`'s sibling test
-            // uses it: CI Simulator scheduler contention. Still a wide gap below the budget a
-            // regression here would actually hit.
+            // Then: it resolves, and well short of the 15s the incomplete neighbor used to cost.
+            // 12s rather than a tighter margin: a CI runner under contention has been seen to take
+            // 8.8s over a lookup that takes a few milliseconds when nothing else is running, and
+            // the gap this leaves to 15s is the one a regression here would fall into.
             #expect(found != nil)
-            #expect(elapsed < .seconds(8))
+            #expect(elapsed < .seconds(12))
         }
     }
 

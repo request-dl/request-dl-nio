@@ -17,6 +17,11 @@ struct PropertyReaderTests {
 
     @Test
     func propertyReaderModifiesBasedOnResolvedConfiguration() async throws {
+        // The counter is shared by every test that runs at the same time, so what this one sees is
+        // not `0` but whatever the first resolution of its own property read. The point is that it
+        // stays that, however many times the property is resolved.
+        var expectedCounter: String?
+
         for _ in 1...5 {
             let content = PropertyGroup {
                 BaseURL(.https, host: "apple.com:1090")
@@ -38,7 +43,11 @@ struct PropertyReaderTests {
                 }
             )
 
-            #expect(resolved.requestConfiguration.url == "http://google.com?counter=0")
+            let url = resolved.requestConfiguration.url
+            let counter = try #require(url.split(separator: "?counter=").last.map(String.init))
+            expectedCounter = expectedCounter ?? counter
+
+            #expect(url == "http://google.com?counter=\(expectedCounter ?? "")")
             #expect(
                 resolved.requestConfiguration.headers.contains(name: "Authorization") {
                     $0.hasPrefix("Bearer ")
@@ -52,9 +61,8 @@ struct PropertyReaderTests {
         // This also tests the consistency of the counter after multiple PropertyReader executions
         let resolved = try await resolve(ReferenceMemoryProperty())
 
-        // Expects the counter parameter to be present with its initial value '0'
-        // This verifies the initial state captured by the first execution of ReferenceMemoryProperty
-        #expect(resolved.requestConfiguration.url.contains("counter=0"))
+        // Expects the counter parameter to be present with the value the first execution captured
+        #expect(resolved.requestConfiguration.url.contains("counter=\(expectedCounter ?? "")"))
     }
 
     @Test
