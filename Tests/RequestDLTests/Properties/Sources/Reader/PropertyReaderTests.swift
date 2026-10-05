@@ -44,7 +44,7 @@ struct PropertyReaderTests {
             )
 
             let url = resolved.requestConfiguration.url
-            let counter = try #require(url.split(separator: "?counter=").last.map(String.init))
+            let counter = try #require(url.range(of: "?counter=").map { String(url[$0.upperBound...]) })
             expectedCounter = expectedCounter ?? counter
 
             #expect(url == "http://google.com?counter=\(expectedCounter ?? "")")

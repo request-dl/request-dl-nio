@@ -30,6 +30,34 @@ struct RawTask<Content: Property>: RequestTask {
             ).buildBoundedByResourceDeadline()
         }
 
+        // From here on there is a request to describe, so a monitor hears about it, and hears how it
+        // ends, whatever stops it: a hook that throws, a pinned executor that cannot run it, a
+        // budget that runs out while the client is being made. Only what happens before there is a
+        // request at all (resolving the properties) is nobody's execution.
+        let observer = makeObserver(resolved: resolvedFromProperties, environment: environment)
+        let transferControl = makeTransferControl(environment: environment, observer: observer)
+
+        do {
+            return try await execute(
+                resolvedFromProperties: resolvedFromProperties,
+                deadline: deadline,
+                observer: observer,
+                transferControl: transferControl,
+                environment: environment
+            )
+        } catch {
+            observer?.didChange(.failed(error))
+            throw error
+        }
+    }
+
+    private func execute(
+        resolvedFromProperties: Resolved,
+        deadline: Internals.ResourceDeadline,
+        observer: Internals.ExecutionObserver?,
+        transferControl: Internals.TransferControl?,
+        environment: RequestEnvironmentValues
+    ) async throws -> AsyncResponse {
         // Asking for the rest of a download from a saved point changes the request itself, so it is
         // done before anything downstream looks at the configuration, the cache included.
         let (resolved, validateHead) = try Self.applyResumption(
@@ -83,25 +111,15 @@ struct RawTask<Content: Property>: RequestTask {
             logger: logger
         )
 
-        let observer = makeObserver(resolved: resolved, environment: environment)
-
-        let sessionTask: SessionTask
-        let onResponseHead: OnResponseHead?
-
-        do {
-            (sessionTask, onResponseHead) = try await runSession(
-                resolved: resolved,
-                client: client,
-                isURLSessionExecutor: isURLSessionExecutor,
-                cacheControl: cacheControl,
-                logger: logger,
-                deadline: deadline,
-                transferControl: makeTransferControl(environment: environment, observer: observer)
-            )
-        } catch {
-            observer?.didChange(.failed(error))
-            throw error
-        }
+        let (sessionTask, onResponseHead) = try await runSession(
+            resolved: resolved,
+            client: client,
+            isURLSessionExecutor: isURLSessionExecutor,
+            cacheControl: cacheControl,
+            logger: logger,
+            deadline: deadline,
+            transferControl: transferControl
+        )
 
         // A response served from the cache never reaches an executor, which is where an
         // execution otherwise ends, so it ends here: nothing crossed the network.

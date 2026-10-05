@@ -326,6 +326,70 @@ struct RequestMonitorTests {
         }
     }
 
+    /// A hook that fails before the request is sent is a failed request all the same: the monitor
+    /// hears it started and hears it failed, like any other.
+    @Test
+    func aRequestThatFailsBeforeItsExecutorIsChosen_isReportedAsStartedThenFailed() async throws {
+        // Given
+        struct Failing: TaskDescriptor {
+            struct Failure: Error {}
+
+            func describe(_ context: TaskDescriptorContext) async throws -> Bool {
+                throw Failure()
+            }
+        }
+
+        let monitor = RecordingMonitor()
+
+        // When
+        await #expect(throws: Failing.Failure.self) {
+            _ = try await DataTask {
+                BaseURL("example.com")
+            }
+            .description(Failing()) { _ in }
+            .monitor(monitor)
+            .result()
+        }
+
+        try await eventually(timeout: 120) { monitor.hasEnded }
+
+        // Then
+        #expect(monitor.states() == ["started", "failed"])
+        #expect(monitor.failure is Failing.Failure)
+    }
+
+    /// The same for a budget that runs out before there is a client to send it with, which is where
+    /// a request that is too slow to even start ends.
+    @Test
+    func aRequestWhoseBudgetRunsOutBeforeItIsSent_isReportedAsStartedThenFailed() async throws {
+        // Given
+        struct Stalling: TaskDescriptor {
+            func describe(_ context: TaskDescriptorContext) async throws -> Bool {
+                try await _Concurrency.Task.sleep(nanoseconds: 30_000_000_000)
+                return true
+            }
+        }
+
+        let monitor = RecordingMonitor()
+
+        // When
+        await #expect(throws: ResourceTimeoutError.self) {
+            _ = try await DataTask {
+                BaseURL("example.com")
+                Timeout(.milliseconds(200), for: .resource)
+            }
+            .description(Stalling()) { _ in }
+            .monitor(monitor)
+            .result()
+        }
+
+        try await eventually(timeout: 120) { monitor.hasEnded }
+
+        // Then
+        #expect(monitor.states() == ["started", "failed"])
+        #expect(monitor.failure is ResourceTimeoutError)
+    }
+
     @Test(arguments: Executor.allCases)
     private func aRequestThatNeverGetsSent_isReportedAsStartedThenFailed(_ executor: Executor) async throws {
         // Given: a port nothing listens on any more. One a server held a moment ago, so that the
