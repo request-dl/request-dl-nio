@@ -343,6 +343,46 @@ struct RequestMonitorTests {
         #expect(monitor.states() == ["started", "failed"])
     }
 
+    /// A step ahead of the transport that outlasts any budget, standing in for whatever can block
+    /// there: a descriptor hook doing its own I/O, a client whose lock a slow neighbour holds.
+    private struct StallingDescriptor: TaskDescriptor {
+
+        func describe(_ context: TaskDescriptorContext) async throws -> Bool {
+            try await _Concurrency.Task.sleep(nanoseconds: 30_000_000_000)
+            return true
+        }
+    }
+
+    /// What goes wrong before a request reaches a transport is told to a monitor as well. Here the
+    /// resource deadline fires while a step ahead of the transport is still running, and a request
+    /// that ended there is otherwise one nobody can tell from a request that never happened.
+    @Test(arguments: Executor.allCases)
+    private func aRequestThatFailsBeforeReachingATransport_isReportedAsStartedThenFailed(
+        _ executor: Executor
+    ) async throws {
+        // Given
+        let monitor = RecordingMonitor()
+
+        // When
+        await #expect(throws: ResourceTimeoutError.self) {
+            _ = try await DataTask {
+                BaseURL(.http, host: "127.0.0.1:1")
+                Path("/resource")
+                executor.session
+                Timeout(.milliseconds(200), for: .resource)
+            }
+            .description(StallingDescriptor()) { _ in }
+            .monitor(monitor)
+            .result()
+        }
+
+        try await eventually(timeout: 30) { monitor.hasEnded }
+
+        // Then
+        #expect(monitor.states() == ["started", "failed"])
+        #expect(monitor.failure is ResourceTimeoutError)
+    }
+
     // MARK: - Defaults, rejection and the cache
 
     /// A monitor implements only what it needs: one that implements nothing is told about a request

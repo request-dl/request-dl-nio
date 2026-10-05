@@ -43,32 +43,46 @@ struct RawTask<Content: Property>: RequestTask {
             logger: environment.logger
         )
 
+        // Made before the steps below, so that one failing there is still told to a monitor.
+        let observer = makeObserver(resolved: resolved, environment: environment)
+
         // Every step from here to the request itself is raced against the same budget. Each one
         // can block for an unbounded stretch on something the caller can't see -- a descriptor
         // hook doing its own I/O, a client cache entry whose `AsyncLock` is held by a slow
         // neighbour, a TLS identity read off disk -- and a `.resource` timeout that only started
         // counting once all of that was already done would have promised a bound it never had.
-        let (resolvedClient, isURLSessionExecutor) = try await surfacingResourceTimeout {
-            try await deadline.race {
-                try await notifyDescriptorHooks(resolved: resolved, environment: environment)
-            }
+        let resolvedClient: any RequestExecutingClient
+        let isURLSessionExecutor: Bool
 
-            // Checked before anything else touches `resolved`: a hard-pinned executor this
-            // configuration can't actually run on must fail loudly, not after paying for a
-            // logger/client/cache setup nobody will get to use.
-            try validateRequiredExecutor(resolved: resolved)
+        do {
+            (resolvedClient, isURLSessionExecutor) = try await surfacingResourceTimeout {
+                try await deadline.race {
+                    try await notifyDescriptorHooks(resolved: resolved, environment: environment)
+                }
 
-            try await deadline.race {
-                try await waitForNetworkPath(resolved: resolved)
-            }
+                // Checked before anything else touches `resolved`: a hard-pinned executor this
+                // configuration can't actually run on must fail loudly, not after paying for a
+                // logger/client/cache setup nobody will get to use.
+                try validateRequiredExecutor(resolved: resolved)
 
-            // - Note: `Internals.ClientManager`'s `AsyncLock` is not cancellation aware, so the
-            // lock acquisition inside this cannot itself be interrupted. Racing it from out here
-            // is still what the caller was promised: the deadline fires and they get their
-            // timeout on schedule, rather than waiting on the lock indefinitely.
-            return try await deadline.race {
-                try await resolveClient(resolved: resolved)
+                try await deadline.race {
+                    try await waitForNetworkPath(resolved: resolved)
+                }
+
+                // - Note: `Internals.ClientManager`'s `AsyncLock` is not cancellation aware, so the
+                // lock acquisition inside this cannot itself be interrupted. Racing it from out here
+                // is still what the caller was promised: the deadline fires and they get their
+                // timeout on schedule, rather than waiting on the lock indefinitely.
+                return try await deadline.race {
+                    try await resolveClient(resolved: resolved)
+                }
             }
+        } catch {
+            // The request never got as far as a transport, and a monitor is told how every
+            // execution ends all the same: started, then failed, as for one a transport refused.
+            observer?.didChange(.started)
+            observer?.didChange(.failed(error))
+            throw error
         }
 
         // An upload that asked to be resumable is sent by a client that does that on top of the
@@ -82,8 +96,6 @@ struct RawTask<Content: Property>: RequestTask {
             dataCache: resolved.dataCache,
             logger: logger
         )
-
-        let observer = makeObserver(resolved: resolved, environment: environment)
 
         let sessionTask: SessionTask
         let onResponseHead: OnResponseHead?
