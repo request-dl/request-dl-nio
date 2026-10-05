@@ -32,7 +32,14 @@ import Testing
 /// ahead of `AsyncBytes` by up to about the socket's receive ceiling before it stops, and none of
 /// that is visible to the window. So these tests bound the window itself tightly and the whole
 /// backlog -- what the server got out minus what the reader took -- by that ceiling.
-@Suite(.serialized, .concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog)
+@Suite(
+    .serialized,
+    .concurrent(watchdogAffectedPlatformConcurrencyLimit),
+    .nonFatalWatchdog,
+    .toleratingSimulatorFlake(
+        "Its tests assert that a task is observed waiting at an exact moment, which a simulator runner starved of CPU for minutes (a test of this suite has taken over 180s there) can't promise; the other platforms are what catch a regression"
+    )
+)
 struct InternalsURLSessionClientBackPressureTests {
 
     /// Far past the window plus anything `readAheadAllowance` allows for, so "stalled well short
@@ -106,11 +113,7 @@ struct InternalsURLSessionClientBackPressureTests {
     /// its own buffer ahead of the stalled queue, and with nothing but `suspend()` it then went on
     /// delivering the entire body to a task reporting `.suspended`, every time. The `AsyncBytes`
     /// path has to hold regardless.
-    @Test(
-        .toleratingSimulatorFlake(
-            "Asserts that a task is observed waiting at an exact moment, which a simulator runner starved of CPU for minutes (this test has taken over 180s there) can't promise; the other platforms are what catch a regression"
-        )
-    )
+    @Test
     func delegateQueueFallingBehind_stillPausesTheConnection() async throws {
         try await withRawStreamingServer(totalBytes: Self.largeBody) { server in
             // Given: the delegate queue blocked while the response starts streaming in.
