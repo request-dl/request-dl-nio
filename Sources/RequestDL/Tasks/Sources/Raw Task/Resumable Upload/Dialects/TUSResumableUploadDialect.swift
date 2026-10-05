@@ -129,6 +129,12 @@ struct TUSResumableUploadDialect: ResumableUploadDialect {
         }
     }
 
+    func completionResponse(from head: ResponseHead) -> ResponseHead? {
+        // What tus answers to the `PATCH` that completes an upload carries nothing but the offset,
+        // which is also what the answer to asking for it says.
+        head
+    }
+
     func cancellation(of resource: UploadResource, like request: RequestConfiguration) -> RequestConfiguration? {
         var configuration = request.derived(method: "DELETE", url: resource.url)
         configuration.headers.set(name: "Tus-Resumable", value: Self.version)
