@@ -49,21 +49,14 @@ extension Internals.Client: RequestExecutingClient {
     ) async throws -> Internals.ResponseHead {
         let request = try configuration.build(eventLoop: eventLoopGroup.any())
 
-        let response: HTTPClient.Response
-
-        if let metrics {
-            response = try await execute(
-                request: request,
-                logger: logger,
-                metrics: metrics,
-                source: .revalidation
-            ).response()
-        } else {
-            response = try await execute(
-                request: request,
-                logger: logger
-            ).response()
-        }
+        // A request that nobody collects metrics for still goes through the wrapper, into a collector
+        // of its own that is dropped: one path to maintain and to test, instead of two.
+        let response = try await execute(
+            request: request,
+            logger: logger,
+            metrics: metrics ?? Internals.RequestMetricsCollector(),
+            source: .revalidation
+        ).response()
 
         return Internals.ResponseHead(
             url: configuration.url,

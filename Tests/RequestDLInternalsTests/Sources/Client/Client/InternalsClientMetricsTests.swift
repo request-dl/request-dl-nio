@@ -161,6 +161,76 @@ struct InternalsClientMetricsTests {
         #expect(transactions.last?.connection?.isReused == true)
     }
 
+    // MARK: - Revalidation
+
+    /// The buffered request that is not the caller's own (the conditional one that asks whether a
+    /// cached response still holds) records what it measured, marked as a revalidation, and still
+    /// hands the accumulated response back.
+    @Test
+    func revalidation_whenTheRequestFollowsARedirect_recordsEveryHopAsARevalidation() async throws {
+        // Given
+        let localServer = try await LocalServer(.standard)
+        let origin = "/" + UUID().uuidString
+        let destination = "/" + UUID().uuidString
+
+        localServer.insert(
+            LocalServer.ResponseConfiguration(status: .found, headers: ["Location": destination], data: Data()),
+            at: origin
+        )
+        localServer.insert(try LocalServer.ResponseConfiguration(jsonObject: "metrics"), at: destination)
+
+        defer {
+            localServer.cleanup(at: origin)
+            localServer.cleanup(at: destination)
+        }
+
+        let session = makeSession(redirectConfiguration: .follow(max: 5, allowCycles: false))
+        let client = try await session.client()
+        let collector = Internals.RequestMetricsCollector()
+
+        // When
+        let response = try await client.execute(
+            request: try HTTPClient.Request(url: "https://\(localServer.baseURL)\(origin)"),
+            logger: nil,
+            metrics: collector,
+            source: .revalidation
+        ).response()
+
+        // Then
+        #expect(response.status.code == 200)
+
+        let transactions = collector.transactions()
+        #expect(transactions.map(\.source) == [.revalidation, .revalidation])
+        #expect(transactions.map(\.url?.path) == [origin, destination])
+    }
+
+    @Test
+    func revalidation_whenTheRequestFails_recordsTheTransactionWithItsError() async throws {
+        // Given: a port nothing listens on any more.
+        let server = try TransferServer(resource: .init(length: 1))
+        let port = server.port
+        await server.stop()
+
+        let session = makeSession()
+        let client = try await session.client()
+        let collector = Internals.RequestMetricsCollector()
+
+        // When
+        await #expect(throws: (any Error).self) {
+            _ = try await client.execute(
+                request: try HTTPClient.Request(url: "http://127.0.0.1:\(port)/resource"),
+                logger: nil,
+                metrics: collector,
+                source: .revalidation
+            ).response()
+        }
+
+        // Then
+        let transactions = collector.transactions()
+        #expect(transactions.map(\.source) == [.revalidation])
+        #expect(transactions.first?.error != nil)
+    }
+
     @Test
     func whenConnectionRefused_recordsTheErrorOnTheTransaction() async throws {
         // Given: a port nothing listens on any more.
