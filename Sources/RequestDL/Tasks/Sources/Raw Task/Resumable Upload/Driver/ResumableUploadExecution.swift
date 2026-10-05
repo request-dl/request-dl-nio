@@ -102,6 +102,8 @@ final class ResumableUploadExecution: @unchecked Sendable {
     private var _current: Internals.TaskSeed?
     private var _isCancelled = false
     private var _isOver = false
+    private var _resource: UploadResource?
+    private var _isComplete = false
 
     // MARK: - Inits
 
@@ -168,20 +170,28 @@ final class ResumableUploadExecution: @unchecked Sendable {
     }
 
     /// Ends the upload: the exchange in flight is cancelled and the suspension, if any, lifted so
-    /// that nothing keeps waiting. The upload stays on the server, which is left to expire it.
+    /// that nothing keeps waiting. If there is an upload on the server that isn't complete, and
+    /// the setup says so, the server is told it is abandoned, in the background.
     func cancel() {
-        let (task, current) = lock.withLock { () -> (Task<Void, Never>?, Internals.TaskSeed?) in
+        let (task, current, abandoned) = lock.withLock {
+            () -> (Task<Void, Never>?, Internals.TaskSeed?, UploadResource?) in
             guard !_isOver else {
-                return (nil, nil)
+                return (nil, nil, nil)
             }
 
             _isCancelled = true
-            return (_task, _current)
+
+            let isAbandoned = setup.cancellation == .terminate && !_isComplete
+            return (_task, _current, isAbandoned ? _resource : nil)
         }
 
         control?.release()
         task?.cancel()
         current?()
+
+        if let abandoned {
+            terminate(abandoned)
+        }
     }
 
     // MARK: - Private methods
@@ -212,10 +222,11 @@ final class ResumableUploadExecution: @unchecked Sendable {
 
         do {
             resource = try setup.dialect.resource(from: createdHead, createdFor: request)
+            lock.withLock { _resource = resource }
             created.discard()
         } catch {
             created.discard()
-            throw ResumableUploadError(reason: .notSupported)
+            throw UploadResumptionError(.notSupported)
         }
 
         // 2. Its body is sent, and sent again from wherever the server says it is.
@@ -229,7 +240,7 @@ final class ResumableUploadExecution: @unchecked Sendable {
             // The first attempt isn't counted: it is the others, the ones that follow a loss or a
             // disagreement, that are allowed to go without moving anything only so many times.
             guard budget.withoutProgress <= setup.maximumAttemptsWithoutProgress else {
-                throw ResumableUploadError(reason: .conflictingOffsets)
+                throw UploadResumptionError(.conflictingOffsets)
             }
 
             var append = setup.dialect.append(to: resource, from: budget.knownOffset, like: request)
@@ -271,7 +282,7 @@ final class ResumableUploadExecution: @unchecked Sendable {
 
                 case .gone:
                     sent.discard()
-                    throw ResumableUploadError(reason: .uploadLost(status: UInt(sent.head.status.code)))
+                    throw UploadResumptionError(.uploadLost(status: UInt(sent.head.status.code)))
                 }
             } catch {
                 guard Self.isTransient(error) else {
@@ -302,7 +313,7 @@ final class ResumableUploadExecution: @unchecked Sendable {
 
         while true {
             guard budget.withoutProgress < setup.maximumAttemptsWithoutProgress else {
-                throw failure
+                throw Self.surfaced(failure)
             }
 
             budget.attempts += 1
@@ -347,7 +358,7 @@ final class ResumableUploadExecution: @unchecked Sendable {
 
         switch head.status.code {
         case 404, 410:
-            throw ResumableUploadError(reason: .uploadLost(status: head.status.code))
+            throw UploadResumptionError(.uploadLost(status: head.status.code))
         case 408, 425, 429, 500..<600:
             throw ResumableUploadTransientResponse(status: head.status.code)
         default:
@@ -357,14 +368,14 @@ final class ResumableUploadExecution: @unchecked Sendable {
         do {
             return (try setup.dialect.report(from: head), head)
         } catch {
-            throw ResumableUploadError(reason: .offsetRejected(status: head.status.code))
+            throw UploadResumptionError(.offsetRejected(status: head.status.code))
         }
     }
 
     /// Moves what is known of the server to `offset`.
     private func advance(_ budget: inout Budget, to offset: Int64, countsAsAttempt: Bool = false) throws {
         guard offset <= source.length else {
-            throw ResumableUploadError(reason: .offsetBeyondLength(offset: offset, length: source.length))
+            throw UploadResumptionError(.offsetBeyondLength(offset: offset, length: source.length))
         }
 
         if offset > budget.knownOffset {
@@ -430,6 +441,8 @@ final class ResumableUploadExecution: @unchecked Sendable {
 
     /// The exchange is the response of the upload: what it says, and its body, are handed over.
     private func forward(_ exchange: Exchange) async throws {
+        // Past this point the upload is whole on the server, if it was ever created.
+        lock.withLock { _isComplete = true }
         exchange.relay?.decide(final: exchange.head)
 
         upload.close()
@@ -452,8 +465,10 @@ final class ResumableUploadExecution: @unchecked Sendable {
     /// The upload is complete on the server but its response was lost, and the protocol says the
     /// answer to the query for the offset is as good: that is what is handed over, with no body.
     private func forwardCompletion(_ queried: ResponseHead) async throws {
+        lock.withLock { _isComplete = true }
+
         guard let completion = setup.dialect.completionResponse(from: queried) else {
-            throw ResumableUploadError(reason: .completedWithoutResponse)
+            throw UploadResumptionError(.completedWithoutResponse)
         }
 
         upload.close()
@@ -463,6 +478,54 @@ final class ResumableUploadExecution: @unchecked Sendable {
 
         control?.observer?.didReceiveHead(completion.internalHead)
         control?.observer?.didChange(.finished)
+    }
+
+    // MARK: - Private methods, cancellation
+
+    /// How long the server is given to answer that an upload was abandoned.
+    private static let terminationTimeout: Int64 = 5_000_000_000
+
+    /// Tells the server the upload is abandoned, if the protocol has a way to, and doesn't wait for
+    /// the answer: whoever cancelled has moved on, and a server that doesn't answer is not a reason
+    /// to keep anything alive. Not sent through this execution's control, which is released.
+    private func terminate(_ resource: UploadResource) {
+        guard let termination = setup.dialect.cancellation(of: resource, like: request) else {
+            return
+        }
+
+        let client = client
+        let decompression = decompression
+        let logger = logger
+
+        Task.detached(priority: .utility) {
+            guard
+                let task = try? await client.execute(
+                    configuration: termination,
+                    decompression: decompression,
+                    cache: nil,
+                    logger: logger,
+                    transferControl: nil
+                )
+            else {
+                return
+            }
+
+            let deadline = Internals.ResourceDeadline(nanoseconds: Self.terminationTimeout)
+
+            // Until the head: that it was heard is all there is to know, and the seed is what lets
+            // go of the exchange whether it answered or not.
+            _ = try? await deadline.race(seed: task.seed) {
+                var iterator = task.response.makeAsyncIterator()
+
+                while let step = try await iterator.next() {
+                    if case .download = step {
+                        break
+                    }
+                }
+            }
+
+            task.seed()
+        }
     }
 
     // MARK: - Private methods, ending
@@ -487,6 +550,16 @@ final class ResumableUploadExecution: @unchecked Sendable {
         if lock.withLock({ _isCancelled }) || Task.isCancelled {
             throw CancellationError()
         }
+    }
+
+    /// The error to hand over for the failure that ended the last attempt: a "not now" from the
+    /// server is a public error of its own, and a failure of the connection is thrown as it is.
+    private static func surfaced(_ failure: Error) -> Error {
+        guard let response = failure as? ResumableUploadTransientResponse else {
+            return failure
+        }
+
+        return UploadResumptionError(.serverUnavailable(status: response.status))
     }
 
     /// Whether `error` means "try again" rather than "no".

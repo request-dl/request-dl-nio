@@ -5,7 +5,7 @@
 import SwiftAsyncStream
 import Testing
 
-@testable import RequestDL
+@_spi(Private) @testable import RequestDL
 @testable import RequestDLInternals
 @testable import RequestDLTestSupport
 
@@ -147,6 +147,129 @@ struct ResumableUploadExecutionStubTests {
         #expect(cancelled.withLockedValue { $0 })
     }
 
+    // MARK: - What the server is told when the upload is cancelled
+
+    @Test
+    func cancellingAnUploadThatWasCreated_terminatesIt() async throws {
+        // Given: a creation that is answered, and a body that is being sent.
+        let methods = LockedValueBox<[String]>([])
+        let gate = Gate()
+
+        let execution = try await Self.execution(
+            client: ScriptedClient { configuration in
+                methods.withLockedValue { $0.append(configuration.method ?? "") }
+
+                if configuration.method == "PATCH" {
+                    await gate.wait()
+                }
+
+                return Self.sessionTask(head: Self.head(status: 201, headers: [("Location", "/uploads/1")]))
+            }
+        )
+
+        execution.start()
+        try await eventually { methods.withLockedValue { $0 }.contains("PATCH") }
+
+        // When
+        execution.makeSeed()()
+        gate.open()
+
+        // Then: the server is told, with the upload's own URL.
+        try await eventually { methods.withLockedValue { $0 }.contains("DELETE") }
+        #expect(methods.withLockedValue { $0 } == ["PUT", "PATCH", "DELETE"])
+    }
+
+    @Test
+    func cancellingBeforeTheServerSaidWhereTheUploadIs_hasNothingToTerminate() async throws {
+        // Given
+        let methods = LockedValueBox<[String]>([])
+        let gate = Gate()
+
+        let execution = try await Self.execution(
+            client: ScriptedClient { configuration in
+                methods.withLockedValue { $0.append(configuration.method ?? "") }
+                await gate.wait()
+                return Self.sessionTask(head: Self.head(status: 201, headers: [("Location", "/uploads/1")]))
+            }
+        )
+
+        execution.start()
+        try await eventually { methods.withLockedValue { $0 }.contains("PUT") }
+
+        // When
+        execution.makeSeed()()
+        gate.open()
+        try await _Concurrency.Task.sleep(nanoseconds: 300_000_000)
+
+        // Then
+        #expect(methods.withLockedValue { $0 } == ["PUT"])
+    }
+
+    @Test
+    func cancellingAnUploadThatIsComplete_doesNotTerminateIt() async throws {
+        // Given: the response of the upload has arrived, and its body has not ended.
+        let methods = LockedValueBox<[String]>([])
+
+        let execution = try await Self.execution(
+            client: ScriptedClient { configuration in
+                methods.withLockedValue { $0.append(configuration.method ?? "") }
+
+                if configuration.method == "PATCH" {
+                    return Self.sessionTask(head: Self.head(status: 200), body: .endless)
+                }
+
+                return Self.sessionTask(head: Self.head(status: 201, headers: [("Location", "/uploads/1")]))
+            }
+        )
+
+        execution.start()
+
+        var iterator = execution.response.makeAsyncIterator()
+        var step = try await iterator.next()
+
+        while case .upload = step {
+            step = try await iterator.next()
+        }
+
+        // When
+        execution.makeSeed()()
+        try await _Concurrency.Task.sleep(nanoseconds: 300_000_000)
+
+        // Then: there is nothing on the server to free, it has the whole of it.
+        #expect(methods.withLockedValue { $0 } == ["PUT", "PATCH"])
+    }
+
+    @Test
+    func cancellingWhenAskedToKeepTheUpload_doesNotTerminateIt() async throws {
+        // Given
+        let methods = LockedValueBox<[String]>([])
+        let gate = Gate()
+
+        let execution = try await Self.execution(
+            cancellation: .keepOnServer,
+            client: ScriptedClient { configuration in
+                methods.withLockedValue { $0.append(configuration.method ?? "") }
+
+                if configuration.method == "PATCH" {
+                    await gate.wait()
+                }
+
+                return Self.sessionTask(head: Self.head(status: 201, headers: [("Location", "/uploads/1")]))
+            }
+        )
+
+        execution.start()
+        try await eventually { methods.withLockedValue { $0 }.contains("PATCH") }
+
+        // When
+        execution.makeSeed()()
+        gate.open()
+        try await _Concurrency.Task.sleep(nanoseconds: 300_000_000)
+
+        // Then
+        #expect(methods.withLockedValue { $0 } == ["PUT", "PATCH"])
+    }
+
     // MARK: - A body that breaks
 
     @Test
@@ -253,9 +376,17 @@ struct ResumableUploadExecutionStubTests {
         )
     }
 
+    private enum Body {
+        case success(Data)
+        case failure(Error)
+
+        /// A body that has begun and never ends.
+        case endless
+    }
+
     private static func sessionTask(
         head: Internals.ResponseHead,
-        body: Result<Data, Error> = .success(Data()),
+        body: Body = .success(Data()),
         seed: Internals.TaskSeed = .withoutCancellation
     ) -> SessionTask {
         let upload = Internals.AsyncStream<Int>()
@@ -271,6 +402,8 @@ struct ResumableUploadExecutionStubTests {
             download.close()
         case .failure(let error):
             download.append(.failure(error))
+        case .endless:
+            break
         }
 
         return SessionTask(
@@ -286,7 +419,10 @@ struct ResumableUploadExecutionStubTests {
         )
     }
 
-    private static func execution(client: ScriptedClient) async throws -> ResumableUploadExecution {
+    private static func execution(
+        cancellation: UploadCancellation = .terminate,
+        client: ScriptedClient
+    ) async throws -> ResumableUploadExecution {
         var request = RequestConfiguration()
         request.baseURL = "https://example.com"
         request.pathComponents = ["files"]
@@ -298,7 +434,11 @@ struct ResumableUploadExecutionStubTests {
 
         return await ResumableUploadExecution(
             client: client,
-            setup: ResumableUploadSetup(dialect: IETFResumableUploadDialect(), delay: 1_000_000),
+            setup: ResumableUploadSetup(
+                dialect: IETFResumableUploadDialect(),
+                delay: 1_000_000,
+                cancellation: cancellation
+            ),
             request: request,
             source: source,
             decompression: .disabled,

@@ -20,9 +20,10 @@ public enum RequestState: Sendable {
     /// A ``RequestController`` resumed the transfer.
     case resumed
 
-    /// The connection of a download was lost and the download is being continued from where it
-    /// stopped (see ``RequestTask/resumingDownloads(_:)``). `attempt` counts the reconnections of
-    /// this download, from 1.
+    /// The connection of a download or an upload was lost and it is being continued from where it
+    /// stopped (see ``RequestTask/resumingDownloads(_:)`` and
+    /// ``RequestTask/resumingUploads(_:maximumAttemptsWithoutProgress:delay:onCancellation:)``).
+    /// `attempt` counts the reconnections of this transfer, from 1.
     case reconnecting(attempt: Int)
 
     /// The request completed, and its body was received in full. A response served from the cache
