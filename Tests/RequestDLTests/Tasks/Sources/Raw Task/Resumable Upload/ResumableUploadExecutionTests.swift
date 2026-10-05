@@ -243,6 +243,23 @@ struct ResumableUploadExecutionTests {
         }
     }
 
+    @Test(arguments: cases)
+    private func anUploadThatIsGoneWhenTheServerIsAsked_failsWithoutSendingItAgain(_ scenario: Case) async throws {
+        try await Self.withUploadServer(scenario) { server in
+            // Given: the connection is lost, and the server no longer has the upload by the time it
+            // is asked where it stands.
+            server.uploadDropPlan = [100_000]
+            server.headStatuses = [404]
+
+            // Then
+            await #expect(throws: UploadResumptionError(.uploadLost(status: 404))) {
+                _ = try await Self.upload(to: server, scenario).result()
+            }
+
+            #expect(server.requests.filter { $0.method == "PATCH" }.count == 1)
+        }
+    }
+
     // MARK: - Giving up
 
     @Test(arguments: cases)

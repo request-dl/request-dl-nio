@@ -180,6 +180,73 @@ struct ResumableUploadExecutionStubTests {
     }
 
     @Test
+    func aServerThatCannotBeToldTheUploadIsAbandoned_doesNotMatter() async throws {
+        // Given: the executor fails to start the request that tells it.
+        let methods = LockedValueBox<[String]>([])
+        let gate = Gate()
+
+        let execution = try await Self.execution(
+            client: ScriptedClient { configuration in
+                methods.withLockedValue { $0.append(configuration.method ?? "") }
+
+                if configuration.method == "DELETE" {
+                    throw StubError()
+                }
+
+                if configuration.method == "PATCH" {
+                    await gate.wait()
+                }
+
+                return Self.sessionTask(head: Self.head(status: 201, headers: [("Location", "/uploads/1")]))
+            }
+        )
+
+        execution.start()
+        try await eventually { methods.withLockedValue { $0 }.contains("PATCH") }
+
+        // When
+        execution.makeSeed()()
+        gate.open()
+
+        // Then: it was tried, and that is all there is to it.
+        try await eventually { methods.withLockedValue { $0 }.contains("DELETE") }
+        await #expect(throws: (any Error).self) {
+            for try await _ in execution.response {}
+        }
+    }
+
+    @Test
+    func aProtocolWithNoWayToAbandonAnUpload_isNeverTold() async throws {
+        // Given
+        let methods = LockedValueBox<[String]>([])
+        let gate = Gate()
+
+        let execution = try await Self.execution(
+            dialect: NoCancellationDialect(),
+            client: ScriptedClient { configuration in
+                methods.withLockedValue { $0.append(configuration.method ?? "") }
+
+                if configuration.method == "PATCH" {
+                    await gate.wait()
+                }
+
+                return Self.sessionTask(head: Self.head(status: 201, headers: [("Location", "/uploads/1")]))
+            }
+        )
+
+        execution.start()
+        try await eventually { methods.withLockedValue { $0 }.contains("PATCH") }
+
+        // When
+        execution.makeSeed()()
+        gate.open()
+        try await _Concurrency.Task.sleep(nanoseconds: 300_000_000)
+
+        // Then
+        #expect(methods.withLockedValue { $0 } == ["PUT", "PATCH"])
+    }
+
+    @Test
     func cancellingBeforeTheServerSaidWhereTheUploadIs_hasNothingToTerminate() async throws {
         // Given
         let methods = LockedValueBox<[String]>([])
@@ -420,6 +487,7 @@ struct ResumableUploadExecutionStubTests {
     }
 
     private static func execution(
+        dialect: any ResumableUploadDialect = IETFResumableUploadDialect(),
         cancellation: UploadCancellation = .terminate,
         client: ScriptedClient
     ) async throws -> ResumableUploadExecution {
@@ -435,7 +503,7 @@ struct ResumableUploadExecutionStubTests {
         return await ResumableUploadExecution(
             client: client,
             setup: ResumableUploadSetup(
-                dialect: IETFResumableUploadDialect(),
+                dialect: dialect,
                 delay: 1_000_000,
                 cancellation: cancellation
             ),
@@ -445,5 +513,49 @@ struct ResumableUploadExecutionStubTests {
             logger: nil,
             control: nil
         )
+    }
+}
+
+/// The IETF dialect, for a protocol that has no way to tell a server an upload is abandoned.
+private struct NoCancellationDialect: ResumableUploadDialect {
+
+    private let base = IETFResumableUploadDialect()
+
+    var requiresKnownLength: Bool { base.requiresKnownLength }
+
+    func creation(for request: RequestConfiguration, length: Int64?) -> RequestConfiguration {
+        base.creation(for: request, length: length)
+    }
+
+    func resource(from head: ResponseHead, createdFor request: RequestConfiguration) throws -> UploadResource {
+        try base.resource(from: head, createdFor: request)
+    }
+
+    func offsetQuery(for resource: UploadResource, like request: RequestConfiguration) -> RequestConfiguration {
+        base.offsetQuery(for: resource, like: request)
+    }
+
+    func report(from head: ResponseHead) throws -> UploadOffsetReport {
+        try base.report(from: head)
+    }
+
+    func append(
+        to resource: UploadResource,
+        from offset: Int64,
+        like request: RequestConfiguration
+    ) -> RequestConfiguration {
+        base.append(to: resource, from: offset, like: request)
+    }
+
+    func outcome(of head: ResponseHead, offset: Int64, length: Int64?) -> UploadAppendOutcome {
+        base.outcome(of: head, offset: offset, length: length)
+    }
+
+    func completionResponse(from head: ResponseHead) -> ResponseHead? {
+        base.completionResponse(from: head)
+    }
+
+    func cancellation(of resource: UploadResource, like request: RequestConfiguration) -> RequestConfiguration? {
+        nil
     }
 }
