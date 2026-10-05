@@ -33,7 +33,7 @@ final class RecordingMonitor: RequestMonitor, @unchecked Sendable {
     private var _downloads: [Transfer] = []
     private var _states: [(execution: RequestExecution, state: RequestState)] = []
     private var _timeline: [String] = []
-    private let createdAt = ContinuousClock.now
+    private let createdAt = DispatchTime.now().uptimeNanoseconds
 
     /// Microseconds each progress call takes, to model a monitor slower than the network.
     let progressDelay: UInt32
@@ -103,11 +103,11 @@ final class RecordingMonitor: RequestMonitor, @unchecked Sendable {
     var timeline: [String] { lock.withLock { _timeline } }
 
     func request(_ execution: RequestExecution, didChange state: RequestState) {
-        let elapsed = ContinuousClock.now - createdAt
+        let elapsed = Double(DispatchTime.now().uptimeNanoseconds - createdAt) / 1_000_000_000
 
         lock.withLock {
             _states.append((execution, state))
-            _timeline.append("\(Self.name(state)) +\(elapsed)")
+            _timeline.append("\(Self.name(state)) +\(elapsed)s")
         }
     }
 
@@ -333,13 +333,12 @@ struct RequestMonitorTests {
         // to whatever machine runs this.
         let port = try await withTransferServer(.init(length: 1)) { $0.port }
         let monitor = RecordingMonitor()
-        let clock = ContinuousClock()
-        let start = clock.now
+        let start = DispatchTime.now().uptimeNanoseconds
 
         // When: the request is bounded by a 3s budget, and so is this wait for it. A transport that
         // doesn't honour the budget fails the test here, saying what it did, instead of holding
         // every other test of the run back for as long as it takes to give up on its own.
-        let outcome = await withTaskGroup(of: String?.self) { group in
+        let outcome = await withTaskGroup(of: String.self) { group in
             group.addTask {
                 do {
                     _ = try await DataTask {
@@ -355,31 +354,33 @@ struct RequestMonitorTests {
                     .monitor(monitor)
                     .result()
 
-                    return "the request succeeded"
+                    return "succeeded"
                 } catch {
-                    return nil
+                    return "failed: \(error)"
                 }
             }
 
             group.addTask {
                 try? await _Concurrency.Task.sleep(nanoseconds: 90_000_000_000)
-                return "the request was still running after 90s"
+                return "still running after 90s"
             }
 
             defer { group.cancelAll() }
-            return await group.next() ?? nil
+            return await group.next() ?? "nothing"
         }
 
-        let requestElapsed = clock.now - start
+        let requestElapsed = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000_000
+
+        // The end of the request is reported after the request itself fails.
+        for _ in 0..<300 where !monitor.hasEnded {
+            try await _Concurrency.Task.sleep(nanoseconds: 100_000_000)
+        }
 
         // Then
-        #expect(outcome == nil, "\(outcome ?? "") (\(executor.testDescription), \(monitor.timeline))")
+        let report = "\(executor.testDescription): the request \(outcome) after \(requestElapsed)s; \(monitor.timeline)"
 
-        try await eventually(timeout: 30) { monitor.hasEnded }
-        #expect(
-            monitor.states() == ["started", "failed"],
-            "after \(requestElapsed): \(monitor.timeline)"
-        )
+        #expect(outcome.hasPrefix("failed"), Comment(rawValue: report))
+        #expect(monitor.states() == ["started", "failed"], Comment(rawValue: report))
     }
 
     // MARK: - Defaults, rejection and the cache
