@@ -41,6 +41,8 @@ struct ResumableUploadExchangeRelayTests {
                 name = "failed"
             case .state:
                 name = "state"
+            case .metrics:
+                name = "metrics"
             }
 
             lock.withLock { _events.append(name) }
@@ -80,6 +82,26 @@ struct ResumableUploadExchangeRelayTests {
 
         // Then
         #expect(recording.events == ["progress(up: 100, down: 0)"])
+    }
+
+    @Test
+    func aTransactionMeasured_alwaysReachesTheExecution() async throws {
+        // Given
+        let (parent, recording) = makeParent()
+        let relay = ResumableUploadExchangeRelay(parent: parent)
+        let control = try #require(relay.control)
+
+        // When: one of an exchange that is discarded, and one of an exchange that is not decided
+        // yet. Each of them went over the wire.
+        control.observer?.didCollect(.init())
+        relay.discard()
+
+        let (other, otherRecording) = makeParent()
+        let undecided = ResumableUploadExchangeRelay(parent: other)
+        undecided.control?.observer?.didCollect(.init())
+
+        // Then
+        try await eventually { recording.events == ["metrics"] && otherRecording.events == ["metrics"] }
     }
 
     @Test

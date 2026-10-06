@@ -146,6 +146,12 @@ final class ResumableUploadExchangeRelay: @unchecked Sendable {
                 case .discarded:
                     break
                 }
+
+            case .metrics(let transaction):
+                // Whatever this exchange turned out to be, it went over the wire, and a monitor
+                // hears every transaction that did. It does not wait on the decision: it is not
+                // part of how the execution ends, so it cannot overtake the end it follows.
+                parent.observer?.didCollect(transaction)
             }
         }
     }
