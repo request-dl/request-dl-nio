@@ -65,7 +65,49 @@ This is required, not optional — without it, a download that finishes while yo
 let wasRunning = await BackgroundDownloads.cancel(id: "episode-42")
 ```
 
-There's no separate "cancelled" case in ``BackgroundDownloads/Event`` — a cancelled download is reported through ``BackgroundDownloads/onEvent`` as an ordinary `.failed` event, with `NSURLErrorCancelled` as its underlying error, the same way any other failure is. ``BackgroundDownloads/cancel(id:)`` returns `false` when there's nothing to cancel — the download already finished, failed, or never existed under that `id`.
+To also get what it takes to carry on later, see <doc:Downloading-in-the-Background#Continuing-a-download-that-stopped>. There's no separate "cancelled" case in ``BackgroundDownloads/Event`` — a cancelled download is reported through ``BackgroundDownloads/onEvent`` as an ordinary `.failed` event, with `NSURLErrorCancelled` as its underlying error, the same way any other failure is. ``BackgroundDownloads/cancel(id:)`` returns `false` when there's nothing to cancel — the download already finished, failed, or never existed under that `id`.
+
+## Pausing and resuming a download
+
+```swift
+await BackgroundDownloads.suspend(id: "episode-42")
+// ...
+await BackgroundDownloads.resume(id: "episode-42")
+```
+
+``BackgroundDownloads/suspend(id:)`` holds a running download back until ``BackgroundDownloads/resume(id:)``. Both return `false` when no running download has that `id`. A pause is something you asked for, so it isn't reported through ``BackgroundDownloads/onEvent``: a paused download simply makes no more progress. If the system or the server gives up the connection while it waits, it reconnects when you resume, from where it got to.
+
+## Continuing a download that stopped
+
+A download can stop before it finishes: the network failed for longer than the system keeps trying, or you cancelled it. When some of the file had arrived and the server can say whether the resource is still the same one, `URLSession` keeps what it takes to carry on from there, and you can use it instead of starting over:
+
+```swift
+BackgroundDownloads.onEvent = { event in
+    if case .failed(let id, _, let error) = event,
+       let resumeData = BackgroundDownloads.resumeData(from: error) {
+        save(resumeData, for: id)   // it is `Codable`
+    }
+}
+
+// Later, even after a relaunch:
+try await BackgroundDownloadTask(
+    id: "episode-42",
+    destination: episodesDirectory.appendingPathComponent("episode-42.mp3"),
+    resumingFrom: savedResumeData
+) {
+    BaseURL("api.example.com")
+    Path("episodes/42/audio")
+}
+.result()
+```
+
+``BackgroundDownloads/resumeData(from:)`` reads it from the error of a ``BackgroundDownloads/Event/failed(id:destination:error:)`` event, and returns `nil` when there is none (the failure is one that continuing can't fix, nothing of the file had arrived, or the server doesn't support asking for a part). To cancel and get it in one step, use ``BackgroundDownloads/cancelProducingResumeData(id:)``: the download is cancelled either way, and still reported as a `.failed` event.
+
+The content you pass when continuing is the request of the download that stopped, written again. What is asked for comes from the resume data; the content is what the download needs besides that: its trust and client certificate configuration, and the host the latter is bound to.
+
+If the resource changed in the meantime, the system starts the download over instead of continuing it, so what ends up at `destination` is always one version of the file and never a mix of two. Check the size, or use a validator of your own, if you need to know which.
+
+> Note: ``BackgroundDownloadResumeData`` is opaque: it is `URLSession`'s own, in a format that is neither documented nor stable across versions of the system. RequestDL stores nothing; keeping it is yours. It isn't interchangeable with a ``DownloadResumptionPoint``, which belongs to ``DownloadTask`` and ``RequestTask/continuingDownload(from:whenChanged:)`` and works on every platform.
 
 ## Trusting a specific server certificate
 
@@ -124,6 +166,13 @@ Only the file path is persisted alongside `id`/`destination` — never the key m
 
 - ``BackgroundDownloads``
 - ``BackgroundDownloads/Event``
+
+### Continuing a download that stopped
+
+- ``BackgroundDownloadResumeData``
+- ``BackgroundDownloads/resumeData(from:)``
+- ``BackgroundDownloads/cancelProducingResumeData(id:)``
+- ``BackgroundDownloadTask/init(id:destination:resumingFrom:content:)``
 
 ### Errors
 

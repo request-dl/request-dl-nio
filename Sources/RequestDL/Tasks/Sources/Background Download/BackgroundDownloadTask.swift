@@ -50,6 +50,7 @@ public struct BackgroundDownloadTask<Content: Property> {
     private let id: String
     private let destination: URL
     private let content: Content
+    private let resumeData: BackgroundDownloadResumeData?
 
     // MARK: - Inits
 
@@ -68,11 +69,42 @@ public struct BackgroundDownloadTask<Content: Property> {
         self.id = id
         self.destination = destination
         self.content = content()
+        self.resumeData = nil
+    }
+
+    /// Continues a download that stopped early, from where it got to, instead of starting it over.
+    ///
+    /// `content` is the request of the download that stopped, written again: what is asked for
+    /// comes from `resumeData`, and `content` is what the download needs besides that, which is
+    /// its trust and client certificate configuration and the host the latter is bound to.
+    /// Whether the server still has the same resource is checked as it continues, and a
+    /// download whose resource changed fails again, with no resume data: start it over with
+    /// ``init(id:destination:content:)``.
+    ///
+    /// - Parameters:
+    ///   - id: Identifies this download in every ``BackgroundDownloads/Event`` it produces. The
+    ///     one it had before is the natural choice.
+    ///   - destination: Where the downloaded file ends up, as in ``init(id:destination:content:)``.
+    ///   - resumeData: What `URLSession` produced for the download that stopped, from
+    ///     ``BackgroundDownloads/resumeData(from:)`` or
+    ///     ``BackgroundDownloads/cancelProducingResumeData(id:)``.
+    ///   - content: The request of the download that stopped.
+    public init(
+        id: String,
+        destination: URL,
+        resumingFrom resumeData: BackgroundDownloadResumeData,
+        @PropertyBuilder content: () -> Content
+    ) {
+        self.id = id
+        self.destination = destination
+        self.content = content()
+        self.resumeData = resumeData
     }
 
     // MARK: - Public methods
 
-    /// Resolves `content` and schedules the download. Returns as soon as it's scheduled;
+    /// Resolves `content` and schedules the download (or continues it, for one made with
+    /// ``init(id:destination:resumingFrom:content:)``). Returns as soon as it's scheduled;
     /// use ``BackgroundDownloads/onEvent`` to observe how it turns out.
     ///
     /// - Throws: ``BackgroundDownloadUnsupportedConfigurationError`` if `content` configures a
@@ -105,6 +137,18 @@ public struct BackgroundDownloadTask<Content: Property> {
         }
 
         let request = try resolved.requestConfiguration.buildURLRequestWithoutBody()
+
+        if let resumeData {
+            BackgroundDownloads.Session.shared.schedule(
+                resumeData: resumeData,
+                id: id,
+                destination: destination,
+                serverTrust: serverTrust,
+                clientIdentity: clientIdentity,
+                host: request.url?.host
+            )
+            return
+        }
 
         BackgroundDownloads.Session.shared.schedule(
             request: request,
