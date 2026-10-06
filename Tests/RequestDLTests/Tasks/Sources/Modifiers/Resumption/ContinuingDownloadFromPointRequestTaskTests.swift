@@ -229,8 +229,14 @@ struct ContinuingDownloadFromPointRequestTaskTests {
                 .compactMap { $0.header("Range") }
                 .compactMap { Int($0.dropFirst("bytes=".count).dropLast()) }
 
-            #expect(starts.first == offset)
-            #expect(starts.dropFirst().allSatisfy { $0 > offset && $0 <= offset + 1_000_000 })
+            // The values go with the failure: a CI log only shows the expression, and which side of
+            // the range a start fell on is what tells a transport that lost everything from one
+            // that counted more than it was sent.
+            #expect(starts.first == offset, "Range starts: \(starts), the point is at \(offset)")
+            #expect(
+                starts.dropFirst().allSatisfy { $0 > offset && $0 <= offset + 1_000_000 },
+                "Range starts: \(starts), the point is at \(offset)"
+            )
         }
     }
 
