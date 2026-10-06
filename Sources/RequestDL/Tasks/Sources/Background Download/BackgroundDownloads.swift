@@ -32,6 +32,9 @@ public enum BackgroundDownloads {
         /// `URLSession`'s own temporary location before this event is ever produced.
         case completed(id: String, destination: URL)
 
+        /// The download stopped without finishing. When it can be continued from where it got to
+        /// (the server supports asking for a part, and some of the file had arrived), `error`
+        /// carries what it takes: see ``BackgroundDownloads/resumeData(from:)``.
         case failed(id: String, destination: URL, error: any Error)
     }
 
@@ -87,6 +90,52 @@ public enum BackgroundDownloads {
     @discardableResult
     public static func cancel(id: String) async -> Bool {
         await Session.shared.cancel(id: id)
+    }
+
+    /// Pauses the ``BackgroundDownloadTask`` scheduled with this `id`: nothing more is downloaded
+    /// until ``resume(id:)``. The connection may be given up by the system or the server while it
+    /// waits, in which case it reconnects on resuming, from where it got to.
+    ///
+    /// Not an event: a pause is not reported through ``onEvent``, since it is something you asked
+    /// for, and a download that is paused simply makes no more progress.
+    ///
+    /// - Returns: `true` if a matching, still-running download was found and paused; `false` if
+    ///   none was, since it may have already finished, failed, or never existed.
+    @discardableResult
+    public static func suspend(id: String) async -> Bool {
+        await Session.shared.control(id: id, .suspend)
+    }
+
+    /// Lets the ``BackgroundDownloadTask`` scheduled with this `id` carry on after
+    /// ``suspend(id:)``.
+    ///
+    /// - Returns: `true` if a matching download was found and resumed; `false` if none was.
+    @discardableResult
+    public static func resume(id: String) async -> Bool {
+        await Session.shared.control(id: id, .resume)
+    }
+
+    /// Cancels the ``BackgroundDownloadTask`` scheduled with this `id`, like ``cancel(id:)``, and
+    /// hands back what it takes to continue it later from where it got to.
+    ///
+    /// The download is cancelled whether or not there is anything to hand back, and is reported
+    /// through ``onEvent`` as a `.failed` event all the same.
+    ///
+    /// - Returns: The resume data, or `nil` if there was no matching, still-running download, or
+    ///   if it can't be continued (the server gave no way to tell the resource is the same one,
+    ///   or nothing of the file had arrived yet).
+    public static func cancelProducingResumeData(id: String) async -> BackgroundDownloadResumeData? {
+        await Session.shared.cancelProducingResumeData(id: id)
+    }
+
+    /// What it takes to continue a download that stopped early, from the error of its
+    /// ``Event/failed(id:destination:error:)`` event.
+    ///
+    /// - Returns: `nil` when `error` carries none: a download that failed for a reason that
+    ///   continuing can't fix, one that stopped before any of the file had arrived, or one from a
+    ///   server that doesn't support asking for a part of a resource.
+    public static func resumeData(from error: any Error) -> BackgroundDownloadResumeData? {
+        Session.resumeData(from: error)
     }
 }
 
