@@ -34,14 +34,14 @@ Every method has an empty default implementation, so a monitor only implements w
 
 ``RequestMonitor/request(_:didUpload:total:of:)`` reports the request body going out, and ``RequestMonitor/request(_:didDownload:total:of:)`` the response body coming in. Each call says how many bytes were added since the previous one (`bytes`), how many there are in all (`total`), and what the total is expected to reach (`expected`) when that is known:
 
-- for an upload, the size of the request body;
+- for an upload, the size of the request body (for one made resumable with ``RequestTask/resumingUploads(_:maximumAttemptsWithoutProgress:delay:onCancellation:)``, the size of what is sent, which for a compressed body is its compressed size);
 - for a download, the response's `Content-Length`. It is `nil` for a chunked response, and for one with a content coding, because the transport may already have decoded the bytes being counted.
 
-Bytes are counted where they cross the network, not where your code reads them. A download's progress keeps advancing while you aren't reading its body, up to what the transport buffers ahead of you, and it stops when the transfer does, for instance while suspended by a ``RequestController``.
+Bytes are counted where they cross the network, not where your code reads them. For that reason `total` is never limited to `expected`: when a resumable upload has to send part of the body again after a loss, those bytes count again, and `total` can pass `expected`. A download's progress keeps advancing while you aren't reading its body, up to what the transport buffers ahead of you, and it stops when the transfer does, for instance while suspended by a ``RequestController``.
 
 ### State
 
-``RequestMonitor/request(_:didChange:)`` reports each ``RequestState`` an execution goes through. It always begins with ``RequestState/started``. It may pass through ``RequestState/suspended``, ``RequestState/resumed`` and ``RequestState/reconnecting(attempt:)``, when a controller or ``RequestTask/resumingDownloads(_:)`` are in use. It always ends with exactly one of ``RequestState/finished`` or ``RequestState/failed(_:)``, after which nothing more is reported for that execution. Cancelling a request ends it as failed.
+``RequestMonitor/request(_:didChange:)`` reports each ``RequestState`` an execution goes through. It always begins with ``RequestState/started``. It may pass through ``RequestState/suspended``, ``RequestState/resumed`` and ``RequestState/reconnecting(attempt:)``, when a controller, ``RequestTask/resumingDownloads(_:)`` or ``RequestTask/resumingUploads(_:maximumAttemptsWithoutProgress:delay:onCancellation:)`` are in use. It always ends with exactly one of ``RequestState/finished`` or ``RequestState/failed(_:)``, after which nothing more is reported for that execution. Cancelling a request ends it as failed.
 
 A response served from the cache finishes right after it starts, having moved nothing on the network.
 
