@@ -786,9 +786,10 @@ package final class TransferServer: @unchecked Sendable {
             headers.append(("Tus-Resumable", "1.0.0"))
         }
 
-        let isSent = io.send(Self.head(status: status, headers: headers), counted: false)
+        // Recorded before it is sent: a client that has the answer may look at what the server
+        // recorded right away, and it must find the request there.
         record(head, bodyLength: 0, isIntact: true, isComplete: true, status: status)
-        return isSent
+        return io.send(Self.head(status: status, headers: headers), counted: false)
     }
 
     private func serveHeldUpload(
@@ -818,9 +819,9 @@ package final class TransferServer: @unchecked Sendable {
                 headers.append(("Tus-Resumable", "1.0.0"))
             }
 
-            let isSent = io.send(Self.head(status: status, headers: headers), counted: false)
+            // Recorded before it is sent, for the same reason as the creation's.
             record(head, bodyLength: 0, isIntact: true, isComplete: true, status: status)
-            return isSent
+            return io.send(Self.head(status: status, headers: headers), counted: false)
         }
 
         guard let id, let held = lock.withLock({ _heldUploads[id] }) else {
