@@ -143,7 +143,7 @@ struct DataTaskTests {
     private struct StallingDescriptor: TaskDescriptor {
 
         func describe(_ context: TaskDescriptorContext) async throws -> Bool {
-            try await _Concurrency.Task.sleep(nanoseconds: 30_000_000_000)
+            try await _Concurrency.Task.sleep(nanoseconds: 300_000_000_000)
             return true
         }
     }
@@ -172,12 +172,10 @@ struct DataTaskTests {
         let elapsed = clock.now - start
 
         // Then: the budget bounds that step too, rather than starting to count only once it is
-        // done. A wide margin below the 30s stall, since what a regression looks like here is
-        // waiting the stall out in full, not missing the deadline by a hair -- and cancelling a
-        // `Task.sleep` still has to wait for a free cooperative-pool thread, which a contended CI
-        // simulator can stretch to several seconds on its own (see e.g. the O(n²) DiskStorage
-        // fixes' own notes on simulator contention). 25s rather than 15s: a macOS runner has taken
-        // 15.9s over this, and the stall a regression waits out is 30s.
-        #expect(elapsed < .seconds(25))
+        // done. What a regression looks like here is waiting the stall out in full, 300s, and not
+        // missing the deadline by a hair, so the limit is far below that and far above what a
+        // contended CI simulator takes to cancel a `Task.sleep`, which has been seen to be 27s
+        // (it still has to wait for a free cooperative-pool thread).
+        #expect(elapsed < .seconds(200))
     }
 }

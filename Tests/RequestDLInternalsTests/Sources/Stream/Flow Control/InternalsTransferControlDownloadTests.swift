@@ -28,7 +28,14 @@ import Foundation
 /// connection, would show up as that count running on to the end of the body; a continuation that
 /// spliced two versions of the resource would show up as the reader's verifier catching a byte of
 /// the wrong version.
-@Suite(.serialized, .concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog)
+@Suite(
+    .serialized,
+    .concurrent(watchdogAffectedPlatformConcurrencyLimit),
+    .nonFatalWatchdog,
+    .toleratingSimulatorFlake(
+        "Its tests hold a transfer still and wait on real connections, and on a simulator runner starved of CPU (this suite has taken over 490s there) some of those waits run out while the transfer is still going; the other platforms are what catch a regression"
+    )
+)
 struct InternalsTransferControlDownloadTests {
 
     /// Far past the window, the client's socket buffers and CFNetwork's read-ahead combined, so a
@@ -51,7 +58,7 @@ struct InternalsTransferControlDownloadTests {
             let window = try #require(download.step.bytes.flowControlWindowForTesting)
             let reader = BackgroundReader(download.step.bytes)
 
-            try await eventually(timeout: 30) { reader.position >= 4 * 1_048_576 }
+            try await eventually(timeout: 120) { reader.position >= 4 * 1_048_576 }
 
             // When
             let writtenAtSuspension = server.bodyBytesWritten
@@ -129,7 +136,7 @@ struct InternalsTransferControlDownloadTests {
             let download = try await TransferHarness(executor).download(from: server, transferControl: control)
             let reader = BackgroundReader(download.step.bytes)
 
-            try await eventually(timeout: 30) { reader.position > 0 }
+            try await eventually(timeout: 120) { reader.position > 0 }
             control.suspend()
             _ = try await server.settled { server.bodyBytesWritten }
 
@@ -138,7 +145,7 @@ struct InternalsTransferControlDownloadTests {
 
             // Then
             #expect(try await reader.end(within: 30).isFailure)
-            try await eventually(timeout: 30) { server.openConnections == 0 }
+            try await eventually(timeout: 120) { server.openConnections == 0 }
             #expect(server.bodyBytesWritten < Self.largeBody)
         }
     }
@@ -164,8 +171,8 @@ struct InternalsTransferControlDownloadTests {
             }
 
             // Then
-            try await eventually(timeout: 30) { window.isReleasedForTesting && window.waitingCountForTesting == 0 }
-            try await eventually(timeout: 30) { server.openConnections == 0 }
+            try await eventually(timeout: 120) { window.isReleasedForTesting && window.waitingCountForTesting == 0 }
+            try await eventually(timeout: 120) { server.openConnections == 0 }
             #expect(control.gate.isReleasedForTesting)
             #expect(server.bodyBytesWritten < Self.largeBody)
         }
@@ -182,7 +189,7 @@ struct InternalsTransferControlDownloadTests {
             let download = try await TransferHarness(executor).download(from: server, transferControl: control)
             let reader = BackgroundReader(download.step.bytes)
 
-            try await eventually(timeout: 30) { reader.position > 0 }
+            try await eventually(timeout: 120) { reader.position > 0 }
             control.suspend()
             _ = try await server.settled { server.bodyBytesWritten }
 
@@ -218,7 +225,7 @@ struct InternalsTransferControlDownloadTests {
             )
             let reader = BackgroundReader(download.step.bytes)
 
-            try await eventually(timeout: 30) { reader.position > 0 }
+            try await eventually(timeout: 120) { reader.position > 0 }
             control.suspend()
 
             // When
@@ -399,7 +406,7 @@ struct InternalsTransferControlDownloadTests {
             let download = try await harness.download(from: server, transferControl: control)
             let reader = BackgroundReader(download.step.bytes)
 
-            try await eventually(timeout: 30) { reader.position >= 1_048_576 }
+            try await eventually(timeout: 120) { reader.position >= 1_048_576 }
 
             // When: suspended for three times the idle timeout.
             control.suspend()
@@ -536,7 +543,7 @@ struct InternalsTransferControlDownloadTests {
             let download = try await TransferHarness(executor).download(from: server, transferControl: control)
             let reader = BackgroundReader(download.step.bytes)
 
-            try await eventually(timeout: 30) { reader.position > 0 }
+            try await eventually(timeout: 120) { reader.position > 0 }
             control.suspend()
             _ = try await server.settled { server.bodyBytesWritten }
 
@@ -584,7 +591,7 @@ struct InternalsTransferControlDownloadTests {
             let download = try await TransferHarness(executor).download(from: server, transferControl: control)
             let reader = BackgroundReader(download.step.bytes, seed: resource.seed)
 
-            try await eventually(timeout: 30) { reader.position > 0 }
+            try await eventually(timeout: 120) { reader.position > 0 }
             control.suspend()
             _ = try await server.settled { server.bodyBytesWritten }
 
