@@ -47,7 +47,7 @@ A response served from the cache finishes right after it starts, having moved no
 
 ### Metrics
 
-``RequestMonitor/request(_:didCollect:)`` reports each ``RequestMetrics/Transaction`` of an execution: one exchange on the wire, with the phases it went through and the connection it ran on. A request that follows a redirect or continues a download reports one for every exchange.
+``RequestMonitor/request(_:didCollect:)`` reports each ``RequestMetrics/Transaction`` of an execution: one exchange on the wire, with the phases it went through and the connection it ran on. A request that follows a redirect or continues a download reports one for every exchange. A response served from the cache is one with `.cache` as its ``RequestMetrics/Transaction/source``, and the conditional request that asked whether the cache still held is one with `.revalidation`, reported ahead of whatever followed it.
 
 It is independent of how the request ends. A request that fails as a whole throws, so there is no ``TaskResult`` to read ``TaskResult/metrics`` from, but a monitor still hears about the transactions it went through:
 
