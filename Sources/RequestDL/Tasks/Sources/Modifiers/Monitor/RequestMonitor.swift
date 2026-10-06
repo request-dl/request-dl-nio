@@ -82,6 +82,11 @@ public protocol RequestMonitor: Sendable {
     /// a request that fails as a whole throws and has no ``TaskResult`` to read ``TaskResult/metrics``
     /// from, but the transactions it went through are reported here all the same.
     ///
+    /// A response served from the cache is reported too, as a transaction with
+    /// ``RequestMetrics/Transaction/Source/cache`` that has no connection, and so is the conditional
+    /// request that asked whether the cache still held, with
+    /// ``RequestMetrics/Transaction/Source/revalidation``, ahead of whatever followed it.
+    ///
     /// When it arrives depends on the executor. AsyncHTTPClient reports a transaction before the
     /// execution ends. `URLSession` reports it once its task is done, which can be after the final
     /// ``RequestState``, and it only reports an error for the task as a whole, so

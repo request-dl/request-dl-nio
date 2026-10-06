@@ -1198,6 +1198,94 @@ extension CachedRequestTests {
         return headers
     }
 
+    /// A monitor hears what a response served from the cache measured too: no executor is there to
+    /// tell it, so it is told from where the cache answered.
+    @Test
+    func cache_whenServedFromTheCache_aMonitorHearsTheCacheTransaction() async throws {
+        // Given
+        let testState = try await TestState()
+        let cacheKey = "https://localhost:8888" + testState.uri
+        let monitor = RecordingMonitor()
+
+        await testState.dataCache.setCachedData(
+            await mockCachedData(makeHeaders(maxAgeSeconds: 3_600)),
+            forKey: cacheKey
+        )
+
+        // When
+        _ = try await performCacheRequest(
+            testState: testState,
+            headers: makeHeaders(maxAgeSeconds: 3_600),
+            cacheStrategy: .returnCachedDataElseLoad,
+            monitor: monitor
+        )
+
+        // Then
+        try await eventually(timeout: 30) { monitor.transactions.count == 1 && monitor.hasEnded }
+
+        #expect(monitor.transactions.map(\.source) == [.cache])
+        #expect(monitor.states() == ["started", "finished"])
+    }
+
+    @Test
+    func cache_whenRevalidationConfirmsTheCache_aMonitorHearsTheRevalidationThenTheCache() async throws {
+        // Given
+        let testState = try await TestState()
+        let eTag = UUID()
+        let cacheKey = "https://localhost:8888" + testState.uri
+        let monitor = RecordingMonitor()
+
+        await testState.dataCache.setCachedData(
+            await mockCachedData(makeHeaders(eTag: eTag, maxAgeSeconds: 3_600)),
+            forKey: cacheKey
+        )
+
+        // When
+        _ = try await performCacheRequest(
+            testState: testState,
+            headers: makeHeaders(eTag: eTag, maxAgeSeconds: 3_600),
+            cacheStrategy: .reloadAndValidateCachedData,
+            monitor: monitor
+        )
+
+        // Then
+        try await eventually(timeout: 30) { monitor.transactions.count == 2 && monitor.hasEnded }
+
+        #expect(monitor.transactions.map(\.source) == [.revalidation, .cache])
+        #expect(monitor.states() == ["started", "finished"])
+    }
+
+    /// The revalidation is told as soon as it is over, ahead of the request that follows it.
+    @Test
+    func cache_whenRevalidationFindsTheCacheInvalid_aMonitorHearsTheRevalidationThenTheRequest() async throws {
+        // Given
+        let testState = try await TestState()
+        let eTag = UUID()
+        let cacheKey = "https://localhost:8888" + testState.uri
+        let monitor = RecordingMonitor()
+
+        await testState.dataCache.setCachedData(
+            await mockCachedData(makeHeaders()),
+            forKey: cacheKey
+        )
+
+        try await waitCacheExpiration()
+
+        // When
+        _ = try await performCacheRequest(
+            testState: testState,
+            headers: makeHeaders(eTag: eTag),
+            cacheStrategy: .reloadAndValidateCachedData,
+            monitor: monitor
+        )
+
+        // Then
+        try await eventually(timeout: 30) { monitor.transactions.count == 2 && monitor.hasEnded }
+
+        #expect(monitor.transactions.map(\.source) == [.revalidation, .network])
+        #expect(monitor.states() == ["started", "finished"])
+    }
+
     func performCacheRequest(
         testState: TestState,
         headers: [(String, String)],
@@ -1210,7 +1298,8 @@ extension CachedRequestTests {
         cacheHeader: CacheHeader? = nil,
         includesAuthorizationHeader: Bool = false,
         executor: Session.Executor? = nil,
-        logger: Logger? = nil
+        logger: Logger? = nil,
+        monitor: RecordingMonitor? = nil
     ) async throws -> TaskResult<Data> {
         let response = try responseConfiguration(headers, testState.output, status: status)
 
@@ -1233,7 +1322,7 @@ extension CachedRequestTests {
                 encryptionKey: encryptionKey
             )
 
-        let output = try await DataTask {
+        let task = DataTask {
             session
 
             SecureConnection {
@@ -1254,9 +1343,12 @@ extension CachedRequestTests {
             }
         }
         .environment(\.logger, logger)
-        .result()
 
-        return output
+        guard let monitor else {
+            return try await task.result()
+        }
+
+        return try await task.monitor(monitor).result()
     }
 
     private func responseConfiguration(

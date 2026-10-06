@@ -426,8 +426,20 @@ struct RawTask<Content: Property>: RequestTask {
         func executeSessionTask() async throws -> (task: SessionTask, onResponseHead: OnResponseHead?) {
             switch await cacheControl(client) {
             case .task(let task):
+                // Served from the cache, so no executor is there to say what was measured: the
+                // revalidation that confirmed it, when there was one, and the cache's own.
+                for transaction in task.metrics?.transactions() ?? [] {
+                    transferControl?.observer?.didCollect(transaction)
+                }
+
                 return (task, nil)
             case .cache(let cache, let revalidation):
+                // The revalidation happened before the request that follows it, and no executor
+                // reports it: it is a request the caller did not make.
+                for transaction in revalidation {
+                    transferControl?.observer?.didCollect(transaction)
+                }
+
                 let result = try await Self.executeTraced(
                     resolved: resolved,
                     client: client,
