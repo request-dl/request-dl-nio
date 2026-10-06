@@ -4,7 +4,7 @@
 
 import Testing
 
-@testable import RequestDL
+@_spi(Private) @testable import RequestDL
 
 /// What holds for every dialect, since it is what a driver that doesn't know which one it has
 /// relies on.

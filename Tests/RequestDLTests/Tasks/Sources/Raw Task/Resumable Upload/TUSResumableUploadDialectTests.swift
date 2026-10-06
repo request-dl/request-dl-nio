@@ -4,7 +4,7 @@
 
 import Testing
 
-@testable import RequestDL
+@_spi(Private) @testable import RequestDL
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials

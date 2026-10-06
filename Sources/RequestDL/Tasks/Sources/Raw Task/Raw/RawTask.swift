@@ -30,6 +30,34 @@ struct RawTask<Content: Property>: RequestTask {
             ).buildBoundedByResourceDeadline()
         }
 
+        // From here on there is a request to describe, so a monitor hears about it, and hears how it
+        // ends, whatever stops it: a hook that throws, a pinned executor that cannot run it, a
+        // budget that runs out while the client is being made. Only what happens before there is a
+        // request at all (resolving the properties) is nobody's execution.
+        let observer = makeObserver(resolved: resolvedFromProperties, environment: environment)
+        let transferControl = makeTransferControl(environment: environment, observer: observer)
+
+        do {
+            return try await execute(
+                resolvedFromProperties: resolvedFromProperties,
+                deadline: deadline,
+                observer: observer,
+                transferControl: transferControl,
+                environment: environment
+            )
+        } catch {
+            observer?.didChange(.failed(error))
+            throw error
+        }
+    }
+
+    private func execute(
+        resolvedFromProperties: Resolved,
+        deadline: Internals.ResourceDeadline,
+        observer: Internals.ExecutionObserver?,
+        transferControl: Internals.TransferControl?,
+        environment: RequestEnvironmentValues
+    ) async throws -> AsyncResponse {
         // Asking for the rest of a download from a saved point changes the request itself, so it is
         // done before anything downstream looks at the configuration, the cache included.
         let (resolved, validateHead) = try Self.applyResumption(
@@ -43,46 +71,32 @@ struct RawTask<Content: Property>: RequestTask {
             logger: environment.logger
         )
 
-        // Made before the steps below, so that one failing there is still told to a monitor.
-        let observer = makeObserver(resolved: resolved, environment: environment)
-
         // Every step from here to the request itself is raced against the same budget. Each one
         // can block for an unbounded stretch on something the caller can't see -- a descriptor
         // hook doing its own I/O, a client cache entry whose `AsyncLock` is held by a slow
         // neighbour, a TLS identity read off disk -- and a `.resource` timeout that only started
         // counting once all of that was already done would have promised a bound it never had.
-        let resolvedClient: any RequestExecutingClient
-        let isURLSessionExecutor: Bool
-
-        do {
-            (resolvedClient, isURLSessionExecutor) = try await surfacingResourceTimeout {
-                try await deadline.race {
-                    try await notifyDescriptorHooks(resolved: resolved, environment: environment)
-                }
-
-                // Checked before anything else touches `resolved`: a hard-pinned executor this
-                // configuration can't actually run on must fail loudly, not after paying for a
-                // logger/client/cache setup nobody will get to use.
-                try validateRequiredExecutor(resolved: resolved)
-
-                try await deadline.race {
-                    try await waitForNetworkPath(resolved: resolved)
-                }
-
-                // - Note: `Internals.ClientManager`'s `AsyncLock` is not cancellation aware, so the
-                // lock acquisition inside this cannot itself be interrupted. Racing it from out here
-                // is still what the caller was promised: the deadline fires and they get their
-                // timeout on schedule, rather than waiting on the lock indefinitely.
-                return try await deadline.race {
-                    try await resolveClient(resolved: resolved)
-                }
+        let (resolvedClient, isURLSessionExecutor) = try await surfacingResourceTimeout {
+            try await deadline.race {
+                try await notifyDescriptorHooks(resolved: resolved, environment: environment)
             }
-        } catch {
-            // The request never got as far as a transport, and a monitor is told how every
-            // execution ends all the same: started, then failed, as for one a transport refused.
-            observer?.didChange(.started)
-            observer?.didChange(.failed(error))
-            throw error
+
+            // Checked before anything else touches `resolved`: a hard-pinned executor this
+            // configuration can't actually run on must fail loudly, not after paying for a
+            // logger/client/cache setup nobody will get to use.
+            try validateRequiredExecutor(resolved: resolved)
+
+            try await deadline.race {
+                try await waitForNetworkPath(resolved: resolved)
+            }
+
+            // - Note: `Internals.ClientManager`'s `AsyncLock` is not cancellation aware, so the
+            // lock acquisition inside this cannot itself be interrupted. Racing it from out here
+            // is still what the caller was promised: the deadline fires and they get their
+            // timeout on schedule, rather than waiting on the lock indefinitely.
+            return try await deadline.race {
+                try await resolveClient(resolved: resolved)
+            }
         }
 
         // An upload that asked to be resumable is sent by a client that does that on top of the
@@ -97,23 +111,15 @@ struct RawTask<Content: Property>: RequestTask {
             logger: logger
         )
 
-        let sessionTask: SessionTask
-        let onResponseHead: OnResponseHead?
-
-        do {
-            (sessionTask, onResponseHead) = try await runSession(
-                resolved: resolved,
-                client: client,
-                isURLSessionExecutor: isURLSessionExecutor,
-                cacheControl: cacheControl,
-                logger: logger,
-                deadline: deadline,
-                transferControl: makeTransferControl(environment: environment, observer: observer)
-            )
-        } catch {
-            observer?.didChange(.failed(error))
-            throw error
-        }
+        let (sessionTask, onResponseHead) = try await runSession(
+            resolved: resolved,
+            client: client,
+            isURLSessionExecutor: isURLSessionExecutor,
+            cacheControl: cacheControl,
+            logger: logger,
+            deadline: deadline,
+            transferControl: transferControl
+        )
 
         // A response served from the cache never reaches an executor, which is where an
         // execution otherwise ends, so it ends here: nothing crossed the network.

@@ -3,14 +3,16 @@
 //
 
 /// The upload a server created for a request, which is where the rest of the body is sent to.
-struct UploadResource: Sendable, Hashable {
+@_spi(Private)
+public struct UploadResource: Sendable, Hashable {
 
     /// Absolute URL of the upload.
     let url: String
 }
 
 /// What a server says about an upload it holds.
-struct UploadOffsetReport: Sendable, Hashable {
+@_spi(Private)
+public struct UploadOffsetReport: Sendable, Hashable {
 
     /// How many bytes of the body the server has.
     let offset: Int64
@@ -23,7 +25,8 @@ struct UploadOffsetReport: Sendable, Hashable {
 }
 
 /// What the response to sending the rest of a body means.
-enum UploadAppendOutcome: Sendable, Hashable {
+@_spi(Private)
+public enum UploadAppendOutcome: Sendable, Hashable {
 
     /// The server has the whole body. The response is the response of the upload as a whole.
     case finished
@@ -44,7 +47,8 @@ enum UploadAppendOutcome: Sendable, Hashable {
 }
 
 /// Why a response was not what a dialect needs from it.
-struct ResumableUploadDialectError: Error, Hashable {
+@_spi(Private)
+public struct ResumableUploadDialectError: Error, Hashable {
 
     enum Reason: Sendable, Hashable {
 
@@ -74,7 +78,8 @@ struct ResumableUploadDialectError: Error, Hashable {
 ///
 /// Every request is built from the request the caller wrote, so what the caller set up for it
 /// (credentials, cookies, a proxy) reaches the requests that finish the job.
-protocol ResumableUploadDialect: Sendable {
+@_spi(Private)
+public protocol ResumableUploadDialect: Sendable {
 
     /// Whether the length of the body has to be declared before its first byte.
     var requiresKnownLength: Bool { get }
