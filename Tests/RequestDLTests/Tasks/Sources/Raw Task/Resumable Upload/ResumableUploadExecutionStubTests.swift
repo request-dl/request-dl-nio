@@ -40,7 +40,8 @@ struct ResumableUploadExecutionStubTests {
 
         func revalidationHead(
             configuration: RequestConfiguration,
-            logger: Internals.TaskLogger?
+            logger: Internals.TaskLogger?,
+            metrics: Internals.RequestMetricsCollector?
         ) async throws -> Internals.ResponseHead {
             ResumableUploadExecutionStubTests.head(status: 304)
         }
@@ -389,7 +390,11 @@ struct ResumableUploadExecutionStubTests {
         )
 
         // When
-        let head = try await client.revalidationHead(configuration: RequestConfiguration(), logger: nil)
+        let head = try await client.revalidationHead(
+            configuration: RequestConfiguration(),
+            logger: nil,
+            metrics: nil
+        )
 
         // Then
         #expect(head.status.code == 304)

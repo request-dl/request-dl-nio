@@ -8,6 +8,7 @@ import RequestDLInternals
 import FoundationEssentials
 #else
 import struct Foundation.Date
+import struct Foundation.URL
 #endif
 
 extension Internals {
@@ -16,7 +17,13 @@ extension Internals {
 
         enum Output {
             case task(SessionTask)
-            case cache((@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?)
+            /// Nothing served from the cache: the request has to go out. `revalidation` is what was
+            /// measured on the way, when the cache was consulted by a conditional request that did
+            /// not settle the matter, and comes before whatever the request itself measures.
+            case cache(
+                (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
+                revalidation: [Internals.TransactionMetrics]
+            )
         }
 
         // MARK: - Internal properties
@@ -28,6 +35,9 @@ extension Internals {
         // MARK: - Internal methods
 
         func callAsFunction(_ client: any RequestExecutingClient) async -> Output {
+            let startedAt = Date()
+            let revalidation = Internals.RequestMetricsCollector()
+
             logger?.log(
                 level: .debug,
                 "Evaluating cache for request",
@@ -40,7 +50,9 @@ extension Internals {
                 if let cachedData = await storedCachedData() {
                     let cachedSessionTask = await checkIfCachedDataStillValid(
                         client: client,
-                        cached: cachedData
+                        cached: cachedData,
+                        startedAt: startedAt,
+                        revalidation: revalidation
                     )
 
                     if let cachedSessionTask {
@@ -62,7 +74,8 @@ extension Internals {
                 try? await cacheIfNeeded(
                     dataCache: dataCache,
                     requestConfiguration: requestConfiguration
-                )
+                ),
+                revalidation: revalidation.transactions()
             )
         }
 
@@ -175,17 +188,20 @@ extension Internals {
 
         private func checkIfCachedDataStillValid(
             client: any RequestExecutingClient,
-            cached cachedData: CachedData
+            cached cachedData: CachedData,
+            startedAt: Date,
+            revalidation: Internals.RequestMetricsCollector
         ) async -> SessionTask? {
             switch effectiveCacheStrategy {
             case .ignoreCachedData:
                 return nil
 
             case .useCachedDataOnly:
-                return await makeCachedSession(cachedData) ?? emptyCachedDataTask()
+                return await makeCachedSession(cachedData, startedAt: startedAt, revalidation: revalidation)
+                    ?? emptyCachedDataTask()
 
             case .returnCachedDataElseLoad:
-                return await makeCachedSession(cachedData)
+                return await makeCachedSession(cachedData, startedAt: startedAt, revalidation: revalidation)
 
             case .reloadAndValidateCachedData:
                 guard
@@ -193,15 +209,20 @@ extension Internals {
                         client: client,
                         dataCache: dataCache,
                         cached: cachedData,
-                        requestConfiguration: requestConfiguration
+                        requestConfiguration: requestConfiguration,
+                        revalidation: revalidation
                     )
                 else { return nil }
 
-                return await makeCachedSession(cachedData)
+                return await makeCachedSession(cachedData, startedAt: startedAt, revalidation: revalidation)
             }
         }
 
-        private func makeCachedSession(_ cachedData: CachedData) async -> SessionTask? {
+        private func makeCachedSession(
+            _ cachedData: CachedData,
+            startedAt: Date,
+            revalidation: Internals.RequestMetricsCollector
+        ) async -> SessionTask? {
             if !isCachedDataValid(cachedData) {
                 await dataCache.remove(forKey: requestConfiguration.url)
                 return nil
@@ -217,6 +238,25 @@ extension Internals {
                 download.close()
             }
 
+            // Nothing crossed the wire for this response, but it is still part of what happened to
+            // the request: the revalidation that confirmed it came first, when there was one.
+            let now = Date()
+            let metrics = Internals.RequestMetricsCollector()
+
+            for transaction in revalidation.transactions() {
+                metrics.append(transaction)
+            }
+
+            metrics.append(
+                Internals.TransactionMetrics(
+                    source: .cache,
+                    url: URL(string: requestConfiguration.url),
+                    fetchStart: startedAt,
+                    responseStart: now,
+                    responseEnd: now
+                )
+            )
+
             return SessionTask(
                 seed: .init {
                     download.failed(Internals.TaskCancelledError())
@@ -229,7 +269,8 @@ extension Internals {
                     decompressionDispatch: .skip,
                     head: .constant(cachedData.cachedResponse.response),
                     download: download.stream
-                )
+                ),
+                metrics: metrics
             )
         }
 
@@ -237,12 +278,14 @@ extension Internals {
             client: any RequestExecutingClient,
             dataCache: DataCache,
             cached cachedData: CachedData,
-            requestConfiguration: RequestConfiguration
+            requestConfiguration: RequestConfiguration,
+            revalidation: Internals.RequestMetricsCollector
         ) async -> CachedData? {
             guard
                 let headers = await getUpdatedHeadersForCache(
                     client: client,
-                    cached: cachedData
+                    cached: cachedData,
+                    revalidation: revalidation
                 )
             else { return nil }
 
@@ -273,7 +316,8 @@ extension Internals {
 
         private func getUpdatedHeadersForCache(
             client: any RequestExecutingClient,
-            cached cachedData: CachedData
+            cached cachedData: CachedData,
+            revalidation: Internals.RequestMetricsCollector
         ) async -> RequestDL.HTTPHeaders? {
             var requestConfiguration = requestConfiguration
             requestConfiguration.method = "HEAD"
@@ -298,7 +342,8 @@ extension Internals {
             guard
                 let head = try? await client.revalidationHead(
                     configuration: requestConfiguration,
-                    logger: logger
+                    logger: logger,
+                    metrics: revalidation
                 )
             else { return nil }
 

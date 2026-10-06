@@ -40,6 +40,20 @@ extension Internals {
             }
         }
 
+        /// Where the response of a transaction came from.
+        package enum Source: Sendable, Hashable {
+
+            /// An exchange on the wire that carried the request itself.
+            case network
+
+            /// A response served from the cache, with nothing exchanged on the wire.
+            case cache
+
+            /// The conditional request sent to ask whether a cached response is still valid. It is a
+            /// request of its own, not the one the caller made.
+            case revalidation
+        }
+
         /// The application protocol negotiated for the connection.
         package enum NegotiatedProtocol: Sendable, Hashable {
             case http1_1
@@ -99,6 +113,7 @@ extension Internals {
             }
         }
 
+        package var source: Source
         package var url: URL?
         package var fetchStart: Date?
         package var queued: Date?
@@ -118,6 +133,7 @@ extension Internals {
         package var error: (any Error)?
 
         package init(
+            source: Source = .network,
             url: URL? = nil,
             fetchStart: Date? = nil,
             queued: Date? = nil,
@@ -134,6 +150,7 @@ extension Internals {
             connection: Connection? = nil,
             error: (any Error)? = nil
         ) {
+            self.source = source
             self.url = url
             self.fetchStart = fetchStart
             self.queued = queued

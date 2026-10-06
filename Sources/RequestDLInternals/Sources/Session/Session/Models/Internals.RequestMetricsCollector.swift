@@ -25,6 +25,11 @@ extension Internals {
 
         private var _transactions: [TransactionMetrics] = []
 
+        /// What happened before the transport started this request, which is not the transport's to
+        /// record: a conditional revalidation that did not settle the matter. Kept apart from
+        /// `_transactions` so the indices ``append(_:)`` hands out stay what they were.
+        private var _prefix: [TransactionMetrics] = []
+
         // MARK: - Inits
 
         package init() {}
@@ -55,9 +60,19 @@ extension Internals {
             }
         }
 
+        /// Puts transactions in front of every one the transport records, in the order given.
+        ///
+        /// They are not recorded through ``append(_:)``: what the transport already recorded keeps its
+        /// indices, so ``setError(_:at:)`` still finds the transaction it was meant for.
+        package func prepend(_ transactions: [TransactionMetrics]) {
+            lock.withLock {
+                _prefix = transactions + _prefix
+            }
+        }
+
         /// The transactions that have ended so far, in the order they ended.
         package func transactions() -> [TransactionMetrics] {
-            lock.withLock { _transactions }
+            lock.withLock { _prefix + _transactions }
         }
     }
 }

@@ -60,10 +60,13 @@ extension Internals.URLSessionClient: RequestExecutingClient {
     /// either.
     package func revalidationHead(
         configuration: RequestConfiguration,
-        logger: Internals.TaskLogger?
+        logger: Internals.TaskLogger?,
+        metrics: Internals.RequestMetricsCollector?
     ) async throws -> Internals.ResponseHead {
         let (head, _) = try await execute(
-            request: try configuration.buildURLRequestWithoutBody()
+            request: try configuration.buildURLRequestWithoutBody(),
+            metrics: metrics,
+            metricsSource: .revalidation
         )
 
         return head

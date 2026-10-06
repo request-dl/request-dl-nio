@@ -59,6 +59,31 @@ struct RequestMetricsConversionTests {
         #expect(metrics.transactions.first?.connection?.tlsVersion == expected)
     }
 
+    @Test(
+        arguments: [
+            (Internals.TransactionMetrics.Source.network, RequestMetrics.Transaction.Source.network),
+            (.cache, .cache),
+            (.revalidation, .revalidation),
+        ]
+    )
+    func source_isCarriedOver(
+        _ input: Internals.TransactionMetrics.Source,
+        _ expected: RequestMetrics.Transaction.Source
+    ) {
+        // When
+        let metrics = RequestMetrics([.init(source: input)])
+
+        // Then
+        #expect(metrics.transactions.first?.source == expected)
+    }
+
+    @Test
+    func transaction_whenOnlyTheSourceDiffers_isNotEqual() {
+        #expect(
+            RequestMetrics.Transaction(source: .network) != RequestMetrics.Transaction(source: .cache)
+        )
+    }
+
     @Test
     func transaction_carriesEveryFieldOver() throws {
         // Given

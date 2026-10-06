@@ -44,11 +44,18 @@ extension Internals.Client: RequestExecutingClient {
     /// response: HTTPURLResponse)` makes for the same reason on the URLSession side.
     package func revalidationHead(
         configuration: RequestConfiguration,
-        logger: Internals.TaskLogger?
+        logger: Internals.TaskLogger?,
+        metrics: Internals.RequestMetricsCollector?
     ) async throws -> Internals.ResponseHead {
+        let request = try configuration.build(eventLoop: eventLoopGroup.any())
+
+        // A request that nobody collects metrics for still goes through the wrapper, into a collector
+        // of its own that is dropped: one path to maintain and to test, instead of two.
         let response = try await execute(
-            request: try configuration.build(eventLoop: eventLoopGroup.any()),
-            logger: logger
+            request: request,
+            logger: logger,
+            metrics: metrics ?? Internals.RequestMetricsCollector(),
+            source: .revalidation
         ).response()
 
         return Internals.ResponseHead(

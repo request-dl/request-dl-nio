@@ -69,4 +69,51 @@ struct InternalsRequestMetricsCollectorTests {
         #expect(collector.transactions().count == 1)
         #expect(collector.transactions()[0].error == nil)
     }
+
+    @Test
+    func prepend_putsTransactionsInFrontOfTheOnesTheTransportRecords() {
+        // Given
+        let collector = Internals.RequestMetricsCollector()
+        collector.append(.init(source: .network))
+
+        // When
+        collector.prepend([.init(source: .revalidation)])
+
+        // Then
+        #expect(collector.transactions().map(\.source) == [.revalidation, .network])
+    }
+
+    @Test
+    func prepend_whenTheTransportRecordsAfterwards_keepsTheOrder() {
+        // Given
+        let collector = Internals.RequestMetricsCollector()
+
+        // When
+        collector.prepend([.init(source: .revalidation)])
+        collector.append(.init(source: .network))
+
+        // Then
+        #expect(collector.transactions().map(\.source) == [.revalidation, .network])
+    }
+
+    @Test
+    func prepend_doesNotMoveTheIndicesAppendHandedOut() {
+        // Given: `URLSession` learns a transaction's error after recording it, by the index it got.
+        let collector = Internals.RequestMetricsCollector()
+        let index = collector.append(.init(source: .network))
+
+        // When
+        collector.prepend([.init(source: .revalidation)])
+        collector.setError(FirstError(), at: index)
+
+        // Then: the error landed on the transaction it was meant for, not on the one in front of it.
+        let transactions = collector.transactions()
+        #expect(transactions[0].error == nil)
+        #expect(transactions[1].error is FirstError)
+    }
+
+    @Test
+    func transaction_whenNoSourceIsGiven_isANetworkOne() {
+        #expect(Internals.TransactionMetrics().source == .network)
+    }
 }

@@ -147,7 +147,9 @@ extension Internals {
         /// a bare `withCheckedThrowingContinuation` on its own.
         package func execute(
             request: URLRequest,
-            delegate: URLSessionTaskDelegate? = nil
+            delegate: URLSessionTaskDelegate? = nil,
+            metrics: Internals.RequestMetricsCollector? = nil,
+            metricsSource: Internals.TransactionMetrics.Source = .network
         ) async throws -> (head: Internals.ResponseHead, body: Data) {
             // Registered before the throttle wait below, not after: `Internals.ClientManager`'s
             // idle-cleanup sweep and its ceiling eviction path both treat `isRunning == false` as
@@ -181,7 +183,9 @@ extension Internals {
                 initialRequest: request,
                 proxyAuthorization: proxyAuthorization,
                 tls: tlsDelegate,
-                forwarding: delegate
+                forwarding: delegate,
+                metrics: metrics,
+                metricsSource: metricsSource
             )
 
             let box = CancellableTaskBox()
@@ -1238,6 +1242,9 @@ extension Internals.URLSessionClient {
         /// Where the transactions `URLSession` measured are reported. Set only by
         /// `executeSessionTask`, the one path whose result carries metrics to the caller.
         private let metrics: Internals.RequestMetricsCollector?
+        /// What the transactions this delegate reports are: `.network` for a request, and
+        /// `.revalidation` for the conditional one that asks whether a cached response still holds.
+        private let metricsSource: Internals.TransactionMetrics.Source
         /// Told about each transaction as `URLSession` reports it, for a `RequestMonitor`.
         private let observer: Internals.ExecutionObserver?
         private let lock = Lock()
@@ -1327,6 +1334,7 @@ extension Internals.URLSessionClient {
             onDownloadComplete: (@Sendable () -> Void)? = nil,
             makeBodyStream: (@Sendable () -> InputStream?)? = nil,
             metrics: Internals.RequestMetricsCollector? = nil,
+            metricsSource: Internals.TransactionMetrics.Source = .network,
             observer: Internals.ExecutionObserver? = nil
         ) {
             self.redirectConfiguration = redirectConfiguration
@@ -1338,6 +1346,7 @@ extension Internals.URLSessionClient {
             self.onDownloadComplete = onDownloadComplete
             self.makeBodyStream = makeBodyStream
             self.metrics = metrics
+            self.metricsSource = metricsSource
             self.observer = observer
             self.bodyLength = initialRequest.value(forHTTPHeaderField: "Content-Length")
             self._lastRequest = initialRequest
@@ -1595,6 +1604,10 @@ extension Internals.URLSessionClient {
         ) {
             if let collector = self.metrics {
                 var transactions = metrics.transactionMetrics.map(Internals.TransactionMetrics.init)
+
+                for index in transactions.indices {
+                    transactions[index].source = metricsSource
+                }
 
                 lock.withLock {
                     // The task ended with an error before its metrics arrived: it is the last

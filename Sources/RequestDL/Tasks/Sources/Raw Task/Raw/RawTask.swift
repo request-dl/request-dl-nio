@@ -427,8 +427,8 @@ struct RawTask<Content: Property>: RequestTask {
             switch await cacheControl(client) {
             case .task(let task):
                 return (task, nil)
-            case .cache(let cache):
-                return try await Self.executeTraced(
+            case .cache(let cache, let revalidation):
+                let result = try await Self.executeTraced(
                     resolved: resolved,
                     client: client,
                     isURLSessionExecutor: isURLSessionExecutor,
@@ -436,6 +436,12 @@ struct RawTask<Content: Property>: RequestTask {
                     logger: logger,
                     transferControl: transferControl
                 )
+
+                // The conditional request that asked whether the cache still held, and said it did
+                // not, came before this one.
+                result.task.metrics?.prepend(revalidation)
+
+                return result
             }
         }
 

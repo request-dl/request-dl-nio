@@ -149,6 +149,28 @@ public struct RequestMetrics: Sendable, Equatable {
     /// share a type and a description therefore compare equal.
     public struct Transaction: Sendable, Equatable {
 
+        /// Where the response of a transaction came from.
+        public enum Source: Sendable, Hashable {
+
+            /// An exchange on the wire that carried the request itself.
+            case network
+
+            /// A response served from the cache, with nothing exchanged on the wire. Such a transaction has
+            /// no ``connection``, and the dates only say when the cache was consulted and served.
+            case cache
+
+            /// The conditional request that asked whether a cached response was still valid.
+            ///
+            /// It is a request of its own, not the one the caller made, so it is not counted in the
+            /// time of that request: filter it out by this source when adding the transactions up. It
+            /// comes before the transaction that follows from its answer: ``cache`` when the cached
+            /// response still held, ``network`` when it did not and the request went out.
+            case revalidation
+        }
+
+        /// Where the response of this transaction came from.
+        public let source: Source
+
         /// The URL this transaction was sent to.
         public let url: URL?
 
@@ -210,6 +232,7 @@ public struct RequestMetrics: Sendable, Equatable {
         public let error: (any Error)?
 
         public init(
+            source: Source = .network,
             url: URL? = nil,
             fetchStart: Date? = nil,
             queued: Date? = nil,
@@ -226,6 +249,7 @@ public struct RequestMetrics: Sendable, Equatable {
             connection: Connection? = nil,
             error: (any Error)? = nil
         ) {
+            self.source = source
             self.url = url
             self.fetchStart = fetchStart
             self.queued = queued
@@ -246,7 +270,8 @@ public struct RequestMetrics: Sendable, Equatable {
         // MARK: - Public static methods
 
         public static func == (lhs: Transaction, rhs: Transaction) -> Bool {
-            lhs.url == rhs.url
+            lhs.source == rhs.source
+                && lhs.url == rhs.url
                 && lhs.fetchStart == rhs.fetchStart
                 && lhs.queued == rhs.queued
                 && lhs.requestStart == rhs.requestStart
@@ -321,6 +346,7 @@ extension RequestMetrics.Transaction {
 
     init(_ transaction: Internals.TransactionMetrics) {
         self.init(
+            source: Source(transaction.source),
             url: transaction.url,
             fetchStart: transaction.fetchStart,
             queued: transaction.queued,
@@ -393,6 +419,20 @@ extension RequestMetrics.TLSVersion {
             self = .tls12
         case .tls13:
             self = .tls13
+        }
+    }
+}
+
+extension RequestMetrics.Transaction.Source {
+
+    fileprivate init(_ source: Internals.TransactionMetrics.Source) {
+        switch source {
+        case .network:
+            self = .network
+        case .cache:
+            self = .cache
+        case .revalidation:
+            self = .revalidation
         }
     }
 }

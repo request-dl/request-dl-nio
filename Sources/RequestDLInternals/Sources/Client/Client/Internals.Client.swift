@@ -172,6 +172,24 @@ extension Internals {
             )
         }
 
+        /// The same, recording the transaction it ran as in `metrics`, marked with `source`.
+        package func execute(
+            request: HTTPClient.Request,
+            logger: TaskLogger?,
+            metrics: Internals.RequestMetricsCollector,
+            source: Internals.TransactionMetrics.Source
+        ) async throws -> UnsafeTask<HTTPClient.Response> {
+            try await execute(
+                request: request,
+                delegate: MetricsCollectingAccumulator(
+                    request: request,
+                    metrics: metrics,
+                    source: source
+                ),
+                logger: logger
+            )
+        }
+
         package func execute<Delegate: HTTPClientResponseDelegate>(
             request: HTTPClient.Request,
             delegate: Delegate,
