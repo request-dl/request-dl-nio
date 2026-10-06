@@ -66,7 +66,8 @@ private final class Handler: ChannelInboundHandler, @unchecked Sendable {
 
             var headers = HTTPHeaders()
             headers.add(name: "Content-Length", value: String(remaining))
-            context.write(wrapOutboundOut(.head(HTTPResponseHead(version: .http1_1, status: .ok, headers: headers))), promise: nil)
+            let head = HTTPResponseHead(version: .http1_1, status: .ok, headers: headers)
+            context.write(wrapOutboundOut(.head(head)), promise: nil)
             writeChunks(context: context)
             return
         }
@@ -74,7 +75,8 @@ private final class Handler: ChannelInboundHandler, @unchecked Sendable {
         let body = uri.hasPrefix("/upload") ? "received=\(received)" : "ok"
         var headers = HTTPHeaders()
         headers.add(name: "Content-Length", value: String(body.utf8.count))
-        context.write(wrapOutboundOut(.head(HTTPResponseHead(version: .http1_1, status: .ok, headers: headers))), promise: nil)
+        let head = HTTPResponseHead(version: .http1_1, status: .ok, headers: headers)
+        context.write(wrapOutboundOut(.head(head)), promise: nil)
         context.write(wrapOutboundOut(.body(.byteBuffer(ByteBuffer(string: body)))), promise: nil)
         context.writeAndFlush(wrapOutboundOut(.end(nil)), promise: nil)
     }
