@@ -445,11 +445,35 @@ struct DiskStorage: Sendable {
             }
 
             if attempt + 1 < attempts {
+                retryCounter.increment()
                 try? await Task.sleep(nanoseconds: retryDelay)
             }
         }
 
         return nil
+    }
+
+    /// How many times an operation was tried again, over the life of the process. What a test reads
+    /// to tell that a lookup spent its retry budget without having to time it, which a runner
+    /// that stalls for seconds at a time makes unreliable in either direction.
+    static var retryCount: Int {
+        retryCounter.value
+    }
+
+    private static let retryCounter = RetryCounter()
+
+    private final class RetryCounter: @unchecked Sendable {
+
+        var value: Int {
+            lock.withLock { _value }
+        }
+
+        func increment() {
+            lock.withLock { _value += 1 }
+        }
+
+        private let lock = Lock()
+        private var _value = 0
     }
 
     func remove(_ key: String) async {

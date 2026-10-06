@@ -4,7 +4,7 @@
 
 import Testing
 
-@testable import RequestDL
+@_spi(Private) @testable import RequestDL
 @testable import RequestDLInternals
 @testable import RequestDLTestSupport
 
@@ -139,7 +139,7 @@ struct ResumableUploadExecutionTests {
             server.expiresUploadsBeforeNextRequest = true
 
             // Then
-            await #expect(throws: ResumableUploadError(reason: .uploadLost(status: 404))) {
+            await #expect(throws: UploadResumptionError(.uploadLost(status: 404))) {
                 _ = try await Self.upload(to: server, scenario).result()
             }
 
@@ -191,7 +191,7 @@ struct ResumableUploadExecutionTests {
             server.headStatuses = Array(repeating: 503, count: 10)
 
             // Then: the budget runs out, and what ends it is the answer of the server.
-            await #expect(throws: ResumableUploadTransientResponse.self) {
+            await #expect(throws: UploadResumptionError(.serverUnavailable(status: 503))) {
                 _ = try await Self.upload(to: server, scenario, attempts: 2).result()
             }
 
@@ -207,7 +207,7 @@ struct ResumableUploadExecutionTests {
             server.headOmitsOffset = true
 
             // Then
-            await #expect(throws: ResumableUploadError(reason: .offsetRejected(status: 204))) {
+            await #expect(throws: UploadResumptionError(.offsetRejected(status: 204))) {
                 _ = try await Self.upload(to: server, scenario).result()
             }
         }
@@ -221,7 +221,7 @@ struct ResumableUploadExecutionTests {
             server.headOverstatesOffsetBy = Self.size
 
             // Then
-            await #expect(throws: ResumableUploadError.self) {
+            await #expect(throws: UploadResumptionError.self) {
                 _ = try await Self.upload(to: server, scenario).result()
             }
         }
@@ -234,12 +234,29 @@ struct ResumableUploadExecutionTests {
             server.rejectsEveryPatchWithConflict = true
 
             // Then
-            await #expect(throws: ResumableUploadError(reason: .conflictingOffsets)) {
+            await #expect(throws: UploadResumptionError(.conflictingOffsets)) {
                 _ = try await Self.upload(to: server, scenario, attempts: 2).result()
             }
 
             // The first, and the two that follow it, which is what was allowed.
             #expect(server.requests.filter { $0.method == "PATCH" }.count == 3)
+        }
+    }
+
+    @Test(arguments: cases)
+    private func anUploadThatIsGoneWhenTheServerIsAsked_failsWithoutSendingItAgain(_ scenario: Case) async throws {
+        try await Self.withUploadServer(scenario) { server in
+            // Given: the connection is lost, and the server no longer has the upload by the time it
+            // is asked where it stands.
+            server.uploadDropPlan = [100_000]
+            server.headStatuses = [404]
+
+            // Then
+            await #expect(throws: UploadResumptionError(.uploadLost(status: 404))) {
+                _ = try await Self.upload(to: server, scenario).result()
+            }
+
+            #expect(server.requests.filter { $0.method == "PATCH" }.count == 1)
         }
     }
 
@@ -286,7 +303,7 @@ struct ResumableUploadExecutionTests {
             server.omitsLocationOnCreation = true
 
             // Then
-            await #expect(throws: ResumableUploadError(reason: .notSupported)) {
+            await #expect(throws: UploadResumptionError(.notSupported)) {
                 _ = try await Self.upload(to: server, scenario).result()
             }
         }
@@ -303,7 +320,7 @@ struct ResumableUploadExecutionTests {
             switch scenario.kind {
             case .ietf:
                 // The response is the application's, and nothing else says what it was.
-                await #expect(throws: ResumableUploadError(reason: .completedWithoutResponse)) {
+                await #expect(throws: UploadResumptionError(.completedWithoutResponse)) {
                     _ = try await Self.upload(to: server, scenario).result()
                 }
             case .tus:
@@ -451,7 +468,7 @@ struct ResumableUploadExecutionTests {
             }
 
             let running = _Concurrency.Task {
-                try await Self.upload(to: server, scenario, delay: 400_000_000)
+                try await Self.upload(to: server, scenario, delay: 0.4)
                     .monitor(monitor)
                     .controller(controller)
                     .result()
@@ -503,6 +520,62 @@ struct ResumableUploadExecutionTests {
         }
     }
 
+    // MARK: - Cancelling, and what the server is told
+
+    @Test(arguments: cases)
+    private func cancelling_tellsTheServerTheUploadIsAbandoned(_ scenario: Case) async throws {
+        try await Self.withUploadServer(scenario) { server in
+            // Given
+            server.uploadReadDelay = 2_000
+
+            let running = _Concurrency.Task {
+                try await Self.upload(to: server, scenario, payload: Data(Self.body(size: 6 * 1_048_576))).result()
+            }
+
+            try await eventually { server.uploadBytesReceived >= 100_000 }
+
+            // When
+            running.cancel()
+            _ = try? await running.value
+
+            // Then: it is told, and what it held of the upload is gone.
+            try await eventually { server.requests.contains { $0.method == "DELETE" } }
+            #expect(server.requests.filter { $0.method == "DELETE" }.count == 1)
+            #expect(server.requests.filter { $0.method == "DELETE" }.first?.path == "/uploads/1")
+            #expect(server.heldUploads[1] == nil)
+        }
+    }
+
+    @Test(arguments: cases)
+    private func cancelling_whenAskedToKeepTheUpload_leavesItOnTheServer(_ scenario: Case) async throws {
+        try await Self.withUploadServer(scenario) { server in
+            // Given
+            server.uploadReadDelay = 2_000
+
+            let running = _Concurrency.Task {
+                try await Self.upload(
+                    to: server,
+                    scenario,
+                    cancellation: .keepOnServer,
+                    payload: Data(Self.body(size: 6 * 1_048_576))
+                )
+                .result()
+            }
+
+            try await eventually { server.uploadBytesReceived >= 100_000 }
+
+            // When
+            running.cancel()
+            _ = try? await running.value
+            _ = try await server.settled { server.uploadBytesReceived }
+            try await _Concurrency.Task.sleep(nanoseconds: 700_000_000)
+
+            // Then
+            #expect(server.requests.filter { $0.method == "DELETE" }.isEmpty)
+            #expect(server.heldUploads[1] != nil)
+        }
+    }
+
     // MARK: - Not an upload
 
     @Test(arguments: Executor.allCases)
@@ -514,7 +587,7 @@ struct ResumableUploadExecutionTests {
                 Path("/resource")
                 executor.session
             }
-            .resumingUploads(using: ResumableUploadSetup(dialect: IETFResumableUploadDialect()))
+            .resumingUploads(.ietf)
             .result()
 
             // Then
@@ -550,25 +623,18 @@ struct ResumableUploadExecutionTests {
         }
     }
 
-    private static func setup(_ scenario: Case, attempts: Int = 3, delay: UInt64 = 10_000_000) -> ResumableUploadSetup {
-        ResumableUploadSetup(
-            dialect: scenario.kind.dialect,
-            maximumAttemptsWithoutProgress: attempts,
-            delay: delay
-        )
-    }
-
     private static func upload(
         to server: TransferServer,
         _ scenario: Case,
         attempts: Int = 3,
-        delay: UInt64 = 10_000_000,
+        delay: Double = 0.01,
+        cancellation: UploadCancellation = .terminate,
         payload: Data? = nil,
         compressed: Bool = false
     ) -> AnyTask<TaskResult<Data>> {
         let payload = payload ?? Data(body())
 
-        return UploadTask {
+        let task = UploadTask {
             BaseURL(.http, host: "127.0.0.1:\(server.port)")
             Path("/files/report.bin")
             RequestMethod(.put)
@@ -582,7 +648,23 @@ struct ResumableUploadExecutionTests {
             }
         }
         .collectData()
-        .resumingUploads(using: setup(scenario, attempts: attempts, delay: delay))
+
+        switch scenario.kind {
+        case .ietf:
+            return task.resumingUploads(
+                .ietf,
+                maximumAttemptsWithoutProgress: attempts,
+                delay: delay,
+                onCancellation: cancellation
+            )
+        case .tus:
+            return task.resumingUploads(
+                .tus,
+                maximumAttemptsWithoutProgress: attempts,
+                delay: delay,
+                onCancellation: cancellation
+            )
+        }
     }
 
     private static func compressed(_ payload: Data) async throws -> Data {

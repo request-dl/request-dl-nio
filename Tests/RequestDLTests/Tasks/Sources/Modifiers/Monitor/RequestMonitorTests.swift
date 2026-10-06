@@ -32,6 +32,8 @@ final class RecordingMonitor: RequestMonitor, @unchecked Sendable {
     private var _uploads: [Transfer] = []
     private var _downloads: [Transfer] = []
     private var _states: [(execution: RequestExecution, state: RequestState)] = []
+    private var _timeline: [String] = []
+    private let createdAt = DispatchTime.now().uptimeNanoseconds
 
     /// Microseconds each progress call takes, to model a monitor slower than the network.
     let progressDelay: UInt32
@@ -96,8 +98,17 @@ final class RecordingMonitor: RequestMonitor, @unchecked Sendable {
         }
     }
 
+    /// Each state change with how long after this monitor was created it was heard, to say what
+    /// happened when a test that waits for the end of a request doesn't see one.
+    var timeline: [String] { lock.withLock { _timeline } }
+
     func request(_ execution: RequestExecution, didChange state: RequestState) {
-        lock.withLock { _states.append((execution, state)) }
+        let elapsed = Double(DispatchTime.now().uptimeNanoseconds - createdAt) / 1_000_000_000
+
+        lock.withLock {
+            _states.append((execution, state))
+            _timeline.append("\(Self.name(state)) +\(elapsed)s")
+        }
     }
 
     static func name(_ state: RequestState) -> String {
@@ -315,32 +326,125 @@ struct RequestMonitorTests {
         }
     }
 
-    @Test(arguments: Executor.allCases)
-    private func aRequestThatNeverGetsSent_isReportedAsStartedThenFailed(_ executor: Executor) async throws {
-        // Given: nothing listens on this port.
+    /// A hook that fails before the request is sent is a failed request all the same: the monitor
+    /// hears it started and hears it failed, like any other.
+    @Test
+    func aRequestThatFailsBeforeItsExecutorIsChosen_isReportedAsStartedThenFailed() async throws {
+        // Given
+        struct Failing: TaskDescriptor {
+            struct Failure: Error {}
+
+            func describe(_ context: TaskDescriptorContext) async throws -> Bool {
+                throw Failure()
+            }
+        }
+
         let monitor = RecordingMonitor()
 
         // When
-        await #expect(throws: (any Error).self) {
+        await #expect(throws: Failing.Failure.self) {
             _ = try await DataTask {
-                BaseURL(.http, host: "127.0.0.1:1")
-                Path("/resource")
-                executor.session
-
-                // Some transports keep retrying a refused connection for a while; the request is
-                // failing either way, and this only keeps the test from waiting on them.
-                Timeout(.seconds(3), for: .resource)
+                BaseURL("example.com")
             }
+            .description(Failing()) { _ in }
             .monitor(monitor)
             .result()
         }
 
-        // Generous: the request above is itself bounded by a 3s budget, yet on a saturated runner
-        // that budget has been seen to take over a minute to fire, and the end is only reported after.
         try await eventually(timeout: 120) { monitor.hasEnded }
 
         // Then
         #expect(monitor.states() == ["started", "failed"])
+        #expect(monitor.failure is Failing.Failure)
+    }
+
+    /// The same for a budget that runs out before there is a client to send it with, which is where
+    /// a request that is too slow to even start ends.
+    @Test
+    func aRequestWhoseBudgetRunsOutBeforeItIsSent_isReportedAsStartedThenFailed() async throws {
+        // Given
+        struct Stalling: TaskDescriptor {
+            func describe(_ context: TaskDescriptorContext) async throws -> Bool {
+                try await _Concurrency.Task.sleep(nanoseconds: 30_000_000_000)
+                return true
+            }
+        }
+
+        let monitor = RecordingMonitor()
+
+        // When
+        await #expect(throws: ResourceTimeoutError.self) {
+            _ = try await DataTask {
+                BaseURL("example.com")
+                Timeout(.milliseconds(200), for: .resource)
+            }
+            .description(Stalling()) { _ in }
+            .monitor(monitor)
+            .result()
+        }
+
+        try await eventually(timeout: 120) { monitor.hasEnded }
+
+        // Then
+        #expect(monitor.states() == ["started", "failed"])
+        #expect(monitor.failure is ResourceTimeoutError)
+    }
+
+    @Test(arguments: Executor.allCases)
+    private func aRequestThatNeverGetsSent_isReportedAsStartedThenFailed(_ executor: Executor) async throws {
+        // Given: a port nothing listens on any more. One a server held a moment ago, so that the
+        // connection is refused, and not a well-known one (`1` is `tcpmux`), whose treatment is up
+        // to whatever machine runs this.
+        let port = try await withTransferServer(.init(length: 1)) { $0.port }
+        let monitor = RecordingMonitor()
+        let start = DispatchTime.now().uptimeNanoseconds
+
+        // When: the request is bounded by a 3s budget, and so is this wait for it. A transport that
+        // doesn't honour the budget fails the test here, saying what it did, instead of holding
+        // every other test of the run back for as long as it takes to give up on its own.
+        let outcome = await withTaskGroup(of: String.self) { group in
+            group.addTask {
+                do {
+                    _ = try await DataTask {
+                        BaseURL(.http, host: "127.0.0.1:\(port)")
+                        Path("/resource")
+                        executor.session
+
+                        // Some transports keep retrying a refused connection for a while; the
+                        // request is failing either way, and this only keeps the test from
+                        // waiting on them.
+                        Timeout(.seconds(3), for: .resource)
+                    }
+                    .monitor(monitor)
+                    .result()
+
+                    return "succeeded"
+                } catch {
+                    return "failed: \(error)"
+                }
+            }
+
+            group.addTask {
+                try? await _Concurrency.Task.sleep(nanoseconds: 90_000_000_000)
+                return "still running after 90s"
+            }
+
+            defer { group.cancelAll() }
+            return await group.next() ?? "nothing"
+        }
+
+        let requestElapsed = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000_000
+
+        // The end of the request is reported after the request itself fails.
+        for _ in 0..<300 where !monitor.hasEnded {
+            try await _Concurrency.Task.sleep(nanoseconds: 100_000_000)
+        }
+
+        // Then
+        let report = "\(executor.testDescription): the request \(outcome) after \(requestElapsed)s; \(monitor.timeline)"
+
+        #expect(outcome.hasPrefix("failed"), Comment(rawValue: report))
+        #expect(monitor.states() == ["started", "failed"], Comment(rawValue: report))
     }
 
     // MARK: - Defaults, rejection and the cache
