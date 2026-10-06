@@ -124,7 +124,12 @@ struct InternalsClientManagerExecutorTests {
         // Given: a real client, resolved and used once -- advancing its
         // `operationGeneration` past what the table recorded when it was checked out -- plus a
         // second, decoy entry that never ran anything at all.
-        let manager = Internals.ClientManager(lifetime: 5 * 60 * 1_000_000_000, maximumCount: 1)
+        // An entry is expired once `now - readAt > lifetime`, `now` being the machine's uptime and
+        // `readAt` what this test backdates to `0` and `1` below. That is only ever true on a
+        // machine that has been up for longer than the lifetime, which a CI runner that was just
+        // started has not, so the lifetime is the usual five minutes only when there is room for it.
+        let lifetime = min(5 * 60 * 1_000_000_000, Int64(Internals.ClientManager.monotonicNow()) / 2)
+        let manager = Internals.ClientManager(lifetime: lifetime, maximumCount: 1)
         let provider = Internals.SharedSessionProvider()
         let protectedConfiguration = Internals.Session.Configuration()
 

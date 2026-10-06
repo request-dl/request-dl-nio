@@ -1,15 +1,16 @@
 # Suspending and resuming requests
 
-Pause a transfer that is in progress and continue it later, and let a download carry on after its connection drops.
+Pause a transfer that is in progress and continue it later, and let a download or an upload carry on after its connection drops.
 
 ## Overview
 
-Two independent features cover the two ways a transfer can stop:
+Independent features cover the ways a transfer can stop:
 
 - ``RequestController`` pauses and resumes a request on purpose, while its connection stays open.
 - ``RequestTask/resumingDownloads(_:)`` reconnects a download whose connection was lost, and continues it from where it stopped.
+- ``RequestTask/resumingUploads(_:maximumAttemptsWithoutProgress:delay:onCancellation:)`` does the same for an upload, by asking the server how much of it holds and sending the rest.
 
-Neither changes a request that doesn't ask for it. Both work with ``DataTask``, ``DownloadTask`` and ``UploadTask`` (reconnection applies to downloads only), on every executor.
+Neither changes a request that doesn't ask for it. All of them work on every executor.
 
 ### Suspending and resuming with a controller
 
@@ -136,9 +137,52 @@ It works with ``DownloadTask`` and ``DataTask``, and combines with ``RequestTask
 
 > Note: For a transfer that has to keep going while the application isn't running, use ``BackgroundDownloadTask``, which the operating system runs.
 
+### Continuing an upload after a lost connection
+
+An upload that loses its connection fails, and sending it again means sending all of it. A server that supports *resumable uploads* can say how much of the body it already has, and ``RequestTask/resumingUploads(_:maximumAttemptsWithoutProgress:delay:onCancellation:)`` uses that to send only the rest:
+
+```swift
+try await UploadTask {
+    BaseURL("https://example.com")
+    Path("/files/report.bin")
+    RequestMethod(.put)
+    Payload(url: reportURL)
+}
+.resumingUploads(.tus)
+.collectData()
+.result()
+```
+
+There are two protocols, and the server has to speak the one that is asked for: it is never negotiated, since an upload that was created for a protocol the server doesn't speak isn't one it can be asked about afterwards.
+
+- ``IETFResumableUpload``, written `.ietf`, is the one of the IETF HTTP working group (`draft-ietf-httpbis-resumable-upload`, written against revision 12). It is what `.resumingUploads()` uses when no protocol is given. The request you wrote is the one that creates the upload, and the response to the request that completes it is the response to the request you wrote.
+- ``TUSResumableUpload``, written `.tus`, is tus 1.0. The upload is created by a `POST` to the URL of the request you wrote, whatever its method, and the response is tus's: it has no body, and it isn't a response of your application.
+
+> Important: The IETF draft is not an RFC and can still change, so ``IETFResumableUpload`` is experimental.
+
+What happens:
+
+1. The upload is created, which is one more request, and the server answers with where it is. If the server answers the request you wrote with something that isn't a success (a `401`, say), that is the response of the upload, as it would be without any of this. If it doesn't say where the upload is, the task fails with ``UploadResumptionError/Reason/notSupported``.
+2. The body is sent to the upload.
+3. When the connection is lost, or the server answers that it can't say where the upload stands right now (a `5xx`, `408`, `425` or `429`), the request waits while a ``RequestController`` it is attached to is suspended, waits `delay` seconds, asks the server how much it holds, and sends the rest. A server that disagrees about where to continue from is believed.
+
+`maximumAttemptsWithoutProgress` is how many attempts after a loss may end without the server holding a single new byte before the upload fails for good, with the failure of the last one. Any progress starts the count over, so a long upload over a flaky network is not capped.
+
+What to know:
+
+- Only a request with a body is an upload. A request without one is sent as it is.
+- A body that is compressed as it is sent (see ``Property/compression(_:onDuplicateHeader:shouldCompressBodyData:)``) is compressed first, once, so that the offset the server holds means the same bytes for every attempt, and so that its length is known when the upload is created (tus declares it). It is kept in memory up to 8 MiB and in a temporary file beyond that, which goes away with the request.
+- Upload progress, in a ``RequestMonitor``, counts what crossed the network, so the bytes that had to be sent again count again, and `total` can pass `expected` after a retry. Clamp it if you divide one by the other. The monitor sees one request: it starts once, reports `reconnecting(attempt:)` for each retry, and ends once.
+- When the server holds the whole body but the response to the request that completed it was lost, a tus upload ends normally (the answer about the offset says as much), and an IETF upload fails with ``UploadResumptionError/Reason/completedWithoutResponse``: the response was your application's, and nothing else the server says takes its place.
+- Nothing is kept between launches of the application. An upload that is abandoned stays on the server until it expires, so the server has to expire them.
+
+When the request is cancelled, the server is told the upload is abandoned (an HTTP `DELETE`, the IETF draft's cancellation and tus's termination extension), so that it can free what it holds. This is best effort and never in the way of the cancellation: it is sent in the background, only for an upload that was created and isn't complete, and a failure leaves the upload to expire. Pass ``UploadCancellation/keepOnServer`` as `onCancellation` to leave it there instead.
+
+A failure that is about the upload itself is an ``UploadResumptionError``; a failure of the connection that ends the last attempt is thrown as it is.
+
 ### Using both together
 
-The two combine. A controller that is suspended also holds back reconnection: a paused transfer never opens a new connection behind your back. If the pause outlives the connection, the download reconnects when you resume.
+The two combine. A controller that is suspended also holds back reconnection, for a download and for an upload: a paused transfer never opens a new connection behind your back. If the pause outlives the connection, the transfer reconnects when you resume.
 
 ```swift
 DownloadTask { ... }
@@ -157,3 +201,10 @@ To follow a request being suspended, resumed and reconnected as it happens, atta
 - ``RequestTask/continuingDownload(from:)``
 - ``DownloadResumptionPoint``
 - ``DownloadResumptionError``
+- ``RequestTask/resumingUploads(_:maximumAttemptsWithoutProgress:delay:onCancellation:)``
+- ``RequestTask/resumingUploads(maximumAttemptsWithoutProgress:delay:onCancellation:)``
+- ``ResumableUploadProtocol``
+- ``IETFResumableUpload``
+- ``TUSResumableUpload``
+- ``UploadCancellation``
+- ``UploadResumptionError``

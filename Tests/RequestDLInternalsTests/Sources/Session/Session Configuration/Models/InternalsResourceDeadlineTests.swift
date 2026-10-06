@@ -18,14 +18,18 @@ import Testing
 /// runs, where the whole suite (1000+ tests) still finished in under two minutes and named this
 /// exact test as one of only a handful of real failures, not a hang or crash.
 ///
-/// 120s gives headroom over the worst observed stall (64s) with room to spare, while every
-/// non-simulator platform keeps the original tight 10s: loosening it there would only slow down
-/// catching a genuine regression on runners that were never the problem.
+/// 120s gives headroom over the worst observed stall (64s) with room to spare on those. The runners
+/// that were never the problem don't need that much, but they aren't immune either: a macOS runner
+/// has been seen stalling this operation for 17s (the "URLSession-only" job, whose whole suite
+/// still finished in a few minutes), and a Linux one for 8s, which is more than the 10s they used
+/// to get once the rest of a run is counted. They get 60s: far above any stall seen there, and a
+/// genuine regression (the seed being cancelled for an operation that finished in 10ms) is just
+/// as visible with it.
 private let raceMarginNanoseconds: Int64 = {
     #if (os(iOS) && !targetEnvironment(macCatalyst)) || os(tvOS) || os(watchOS) || os(visionOS)
     return 120_000_000_000
     #else
-    return 10_000_000_000
+    return 60_000_000_000
     #endif
 }()
 

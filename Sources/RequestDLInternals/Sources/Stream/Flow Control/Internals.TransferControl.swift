@@ -92,6 +92,7 @@ extension Internals {
 
         private var _isSuspended = false
         private var _windows: [Internals.FlowControlWindow] = []
+        private var _followers: [TransferControl] = []
 
         // MARK: - Inits
 
@@ -120,6 +121,30 @@ extension Internals {
             }
         }
 
+        /// Makes `follower`, the control of one exchange of this execution, follow this one's
+        /// suspension, starting with its current state.
+        ///
+        /// For an execution that is more than one exchange (a resumable upload creates the upload,
+        /// then sends its body, then asks where the server is, then sends the rest): each exchange
+        /// has a control of its own, which its executor releases once that exchange is over, while
+        /// this one is what a `RequestController` holds and is released only with the execution.
+        package func attach(_ follower: TransferControl) {
+            lock.withLock {
+                _followers.append(follower)
+
+                if _isSuspended {
+                    follower.suspend()
+                }
+            }
+        }
+
+        /// Stops following `follower`, whose exchange is over.
+        package func detach(_ follower: TransferControl) {
+            lock.withLock {
+                _followers.removeAll { $0 === follower }
+            }
+        }
+
         /// Stops every producer of this execution at its next step, until ``resume()``.
         ///
         /// Idempotent. Recorded even once the exchange is over, where it no longer has anything
@@ -137,6 +162,10 @@ extension Internals {
                     window.suspend()
                 }
 
+                for follower in _followers {
+                    follower.suspend()
+                }
+
                 // Only recorded here: the observer delivers from a task of its own, so nothing of
                 // an observer's runs under this lock.
                 observer?.didChange(.suspended)
@@ -151,6 +180,10 @@ extension Internals {
 
                 for window in _windows {
                     window.resume()
+                }
+
+                for follower in _followers {
+                    follower.resume()
                 }
 
                 observer?.didChange(.resumed)
