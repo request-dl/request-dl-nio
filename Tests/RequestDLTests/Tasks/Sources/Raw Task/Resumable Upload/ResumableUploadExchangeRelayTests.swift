@@ -41,6 +41,8 @@ struct ResumableUploadExchangeRelayTests {
                 name = "failed"
             case .state:
                 name = "state"
+            case .head:
+                name = "head"
             case .metrics:
                 name = "metrics"
             }

@@ -83,6 +83,7 @@ try await DataTask {
 - [x] [Suspending and resuming requests](<doc:Suspending-and-Resuming-Requests>);
 - [x] [Building without SwiftNIO](<doc:Disabling-the-NIOTransport-Trait>) (Apple platforms only);
 - [x] [Distributed tracing](<doc:Distributed-tracing>);
+- [x] [Emitting metrics](<doc:Emitting-metrics>) (via swift-metrics);
 - [x] [Configuration-driven requests](<doc:Configuration-driven-requests>) (via swift-configuration);
 - [x] [cURL support](<doc:CURL-support>) — parse a curl command into a request, or describe a request as one;
 
