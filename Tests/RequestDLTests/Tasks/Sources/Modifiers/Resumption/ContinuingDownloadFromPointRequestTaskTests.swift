@@ -357,6 +357,148 @@ struct ContinuingDownloadFromPointRequestTaskTests {
         }
     }
 
+    // MARK: - Starting over when the resource isn't the same
+
+    @Test(arguments: Executor.allCases)
+    private func restarting_aResourceThatChanged_isTheWholeNewResource(_ executor: Executor) async throws {
+        try await withTransferServer(.init(length: Self.length)) { server in
+            // Given: a point of one version, and the server now holding another.
+            let point = try await Self.point(from: server, executor: executor, offset: 1_000_000)
+            server.resource = .init(length: Self.length, seed: 7, validator: .entityTag("\"v2\""))
+
+            // When
+            let result = try await Self.download(from: server, executor: executor)
+                .continuingDownload(from: point, whenChanged: .restart)
+                .result()
+
+            // Then: the new resource from its first byte, whole, and a `200` to say so.
+            #expect(result.head.status.code == 200)
+
+            let (count, isIntact) = try await Self.read(result, from: 0, seed: 7)
+            #expect(count == Self.length)
+            #expect(isIntact)
+
+            // The continuation was asked for first, and then the whole resource, which carries
+            // neither header.
+            let requests = server.requests.suffix(2)
+            #expect(requests.first?.header("Range") != nil)
+            #expect(requests.first?.header("If-Range") == "\"v1\"")
+            #expect(requests.last?.header("Range") == nil)
+            #expect(requests.last?.header("If-Range") == nil)
+        }
+    }
+
+    @Test(arguments: Executor.allCases)
+    private func restarting_aServerWithoutRangeSupport_isTheWholeResource(_ executor: Executor) async throws {
+        try await withTransferServer(.init(length: Self.length)) { server in
+            // Given
+            let point = try await Self.point(from: server, executor: executor, offset: 1_000_000)
+            server.resource = .init(length: Self.length, supportsRanges: false)
+
+            // When
+            let result = try await Self.download(from: server, executor: executor)
+                .continuingDownload(from: point, whenChanged: .restart)
+                .result()
+
+            // Then
+            #expect(result.head.status.code == 200)
+
+            let (count, isIntact) = try await Self.read(result, from: 0)
+            #expect(count == Self.length)
+            #expect(isIntact)
+        }
+    }
+
+    @Test(arguments: Executor.allCases)
+    private func restarting_aPointPastTheEnd_isTheWholeResource(_ executor: Executor) async throws {
+        try await withTransferServer(.init(length: Self.length)) { server in
+            // Given: the resource turned out shorter than the partial download.
+            let point = try await Self.point(from: server, executor: executor, offset: Self.length + 4_096)
+
+            // When
+            let result = try await Self.download(from: server, executor: executor)
+                .continuingDownload(from: point, whenChanged: .restart)
+                .result()
+
+            // Then
+            #expect(result.head.status.code == 200)
+
+            let (count, isIntact) = try await Self.read(result, from: 0)
+            #expect(count == Self.length)
+            #expect(isIntact)
+        }
+    }
+
+    @Test(arguments: Executor.allCases)
+    private func restarting_aResourceThatIsTheSame_stillIsOnlyTheRest(_ executor: Executor) async throws {
+        try await withTransferServer(.init(length: Self.length)) { server in
+            // Given
+            let offset = 3_000_000
+            let point = try await Self.point(from: server, executor: executor, offset: offset)
+
+            // When
+            let result = try await Self.download(from: server, executor: executor)
+                .continuingDownload(from: point, whenChanged: .restart)
+                .result()
+
+            // Then: nothing changed, so there is nothing to start over.
+            #expect(result.head.status.code == 206)
+
+            let (count, isIntact) = try await Self.read(result, from: offset)
+            #expect(count == Self.length - offset)
+            #expect(isIntact)
+        }
+    }
+
+    @Test(arguments: Executor.allCases)
+    private func restarting_neverHidesWhatIsNotAChange(_ executor: Executor) async throws {
+        try await withTransferServer(.init(length: Self.length)) { server in
+            // A point at the end: there is nothing left, which is not a reason to download it all.
+            let end = try await Self.point(from: server, executor: executor, offset: Self.length)
+
+            let complete = await Self.resumptionError(
+                of: Self.download(from: server, executor: executor)
+                    .continuingDownload(from: end, whenChanged: .restart)
+            )
+
+            #expect(complete?.reason == .alreadyComplete)
+
+            // A request that can't be continued at all is refused, and not sent.
+            let connections = server.acceptedConnections
+
+            let notResumable = await Self.resumptionError(
+                of: DownloadTask {
+                    BaseURL(.http, host: "127.0.0.1:\(server.port)")
+                    Path("/resource")
+                    RequestMethod(.post)
+                    executor.session
+                }
+                .continuingDownload(from: try Self.offlinePoint(offset: 100), whenChanged: .restart)
+            )
+
+            #expect(notResumable?.reason == .requestNotResumable)
+            #expect(server.acceptedConnections == connections)
+        }
+    }
+
+    @Test(arguments: Executor.allCases)
+    private func notRestarting_isWhatTheDefaultDoes(_ executor: Executor) async throws {
+        try await withTransferServer(.init(length: Self.length)) { server in
+            // Given
+            let point = try await Self.point(from: server, executor: executor, offset: 1_000_000)
+            server.resource = .init(length: Self.length, seed: 7, validator: .entityTag("\"v2\""))
+
+            // When
+            let failing = await Self.resumptionError(
+                of: Self.download(from: server, executor: executor)
+                    .continuingDownload(from: point, whenChanged: .fail)
+            )
+
+            // Then
+            #expect(failing?.reason == .representationChanged)
+        }
+    }
+
     // MARK: - Requests that can't be continued
 
     @Test(arguments: Executor.allCases)

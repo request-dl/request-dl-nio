@@ -123,10 +123,11 @@ The library doesn't store a partial download: `offset` is the size of what you k
 
 ``DownloadResumptionPoint/init(head:offset:)`` returns `nil` when the download can't be continued safely, for the same reasons a reconnection wouldn't: the response has no strong validator, it carries a content coding, or it isn't a plain `200`. Check for `nil` and fall back to downloading again.
 
-``RequestTask/continuingDownload(from:)`` asks the server for the rest, with `Range` and `If-Range`, and checks the answer before a single byte of it reaches you:
+``RequestTask/continuingDownload(from:whenChanged:)`` asks the server for the rest, with `Range` and `If-Range`, and checks the answer before a single byte of it reaches you:
 
 - The result is the *rest* of the resource: what comes after the offset. Its head is the `206` the server answered with.
-- If the resource changed since the point was taken, the server sends it whole instead, and the task fails with a ``DownloadResumptionError``. Start the download again from the beginning.
+- If the resource changed since the point was taken (or the server doesn't support asking for a part), the server sends it whole instead, and by default the task fails with a ``DownloadResumptionError``: whatever you hold is yours to decide about, and nothing of the new resource reaches you. Start the download again from the beginning.
+- Pass ``ChangedDownloadBehavior/restart`` as `whenChanged` to have the task ask again for the whole resource instead, which is what a browser does: `.continuingDownload(from: point, whenChanged: .restart)`. The result is then the whole new resource, and its head is a `200` where the rest is a `206`, which is how you tell them apart: on a `200`, discard what you held and write what comes from byte zero. A point that is already at the end, a request that can't be continued, and a server that refuses outright still fail, and so does a resource that changes later, while ``RequestTask/resumingDownloads(_:)`` reconnects, since by then bytes of the new one have already been handed on.
 - A point already at the end of the resource fails with ``DownloadResumptionError/Reason/alreadyComplete``, which isn't a failure: the file is complete. ``DownloadResumptionPoint/isComplete`` says so beforehand when the length is known.
 - It always goes to the network, whatever the cache strategy: a cached copy of the whole resource isn't the rest of it.
 - The request has to be a `GET` without a `Range` of its own, or it fails with ``DownloadResumptionError/Reason/requestNotResumable`` without being sent.
@@ -198,8 +199,9 @@ To follow a request being suspended, resumed and reconnected as it happens, atta
 - ``RequestTask/controller(_:)``
 - ``RequestTask/resumingDownloads(_:)``
 - ``DownloadResumptionPolicy``
-- ``RequestTask/continuingDownload(from:)``
+- ``RequestTask/continuingDownload(from:whenChanged:)``
 - ``DownloadResumptionPoint``
+- ``ChangedDownloadBehavior``
 - ``DownloadResumptionError``
 - ``RequestTask/resumingUploads(_:maximumAttemptsWithoutProgress:delay:onCancellation:)``
 - ``RequestTask/resumingUploads(maximumAttemptsWithoutProgress:delay:onCancellation:)``
