@@ -199,6 +199,8 @@ struct InternalsExecutionObserverTests {
                 return "progress"
             case .state(let state):
                 return Recorder.name(state)
+            case .head:
+                return "head"
             case .metrics:
                 return "metrics"
             }
@@ -230,6 +232,8 @@ struct InternalsExecutionObserverTests {
                 return "progress"
             case .state(let state):
                 return Recorder.name(state)
+            case .head:
+                return "head"
             case .metrics:
                 return "metrics"
             }
@@ -315,14 +319,40 @@ struct InternalsExecutionObserverTests {
 
     // MARK: - Expected download size
 
-    private func head(_ headers: [(String, String)]) -> Internals.ResponseHead {
+    private func head(_ headers: [(String, String)], status: UInt = 200) -> Internals.ResponseHead {
         Internals.ResponseHead(
             url: "http://localhost/",
-            status: .init(code: 200, reason: "OK"),
+            status: .init(code: status, reason: ""),
             version: .init(minor: 1, major: 1),
             headers: headers.map { .init(name: $0.0, value: $0.1) },
             isKeepAlive: true
         )
+    }
+
+    @Test
+    func everyHead_isDeliveredInOrder_withItsStatus() async throws {
+        // Given
+        let (observer, recorder) = makeObserver()
+
+        // When: a head, and then another one (a redirect's, say), with progress in between.
+        observer.didChange(.started)
+        observer.didReceiveHead(head([], status: 302))
+        observer.didReceive(10)
+        observer.didReceiveHead(head([], status: 200))
+        observer.didChange(.finished)
+
+        // Then
+        try await eventually { recorder.states.last == "finished" }
+
+        let heads = recorder.events.compactMap { event -> Int? in
+            if case .head(let statusCode) = event {
+                return statusCode
+            }
+
+            return nil
+        }
+
+        #expect(heads == [302, 200])
     }
 
     @Test

@@ -104,6 +104,32 @@ extension BackgroundDownloads {
             task.resume()
         }
 
+        /// Continues a download that stopped early, from the resume data `URLSession` produced for
+        /// it. What is asked for comes from there, and not from a request: `host` is only the one
+        /// a client identity is bound to, as in `schedule(request:...)`.
+        func schedule(
+            resumeData: BackgroundDownloadResumeData,
+            id: String,
+            destination: URL,
+            serverTrust: Internals.ServerTrustPolicy.Descriptor? = nil,
+            clientIdentity: Internals.ClientIdentityDescriptor? = nil,
+            host: String? = nil
+        ) {
+            let task = Self.makeTask(
+                in: urlSession(),
+                resumingFrom: resumeData,
+                description: Self.encode(
+                    id: id,
+                    destination: destination,
+                    serverTrust: serverTrust,
+                    clientIdentity: clientIdentity,
+                    clientIdentityHost: clientIdentity == nil ? nil : host
+                )
+            )
+
+            task.resume()
+        }
+
         /// Forwarded from `application(_:handleEventsForBackgroundURLSession:completionHandler:)`.
         /// Ignores any identifier other than this type's own, in case the app also manages its
         /// own, unrelated background sessions.
@@ -152,6 +178,88 @@ extension BackgroundDownloads {
 
             match.cancel()
             return true
+        }
+
+        /// What ``control(id:_:)`` does to a download.
+        enum Control {
+            case suspend
+            case resume
+        }
+
+        /// Pauses or lets go on the download with this `id`, found the same way ``cancel(id:)``
+        /// finds one, with nothing kept about it.
+        ///
+        /// - Returns: `true` if a matching download was found, `false` if none was.
+        func control(id: String, _ action: Control) async -> Bool {
+            guard let urlSession = lock.withLock({ _urlSession }) else {
+                return false
+            }
+
+            guard let match = Self.firstTask(matching: id, in: await urlSession.allTasks) else {
+                return false
+            }
+
+            Self.apply(action, to: match)
+            return true
+        }
+
+        /// Cancels the download with this `id` and hands back what `URLSession` kept to continue
+        /// it. `nil` when there was no such download, or nothing to continue from.
+        func cancelProducingResumeData(id: String) async -> BackgroundDownloadResumeData? {
+            guard let urlSession = lock.withLock({ _urlSession }) else {
+                return nil
+            }
+
+            guard
+                let match = Self.firstTask(matching: id, in: await urlSession.allTasks),
+                let download = match as? URLSessionDownloadTask
+            else {
+                return nil
+            }
+
+            return await Self.cancelProducingResumeData(of: download)
+        }
+
+        // MARK: - Static methods
+
+        static func apply(_ action: Control, to task: URLSessionTask) {
+            switch action {
+            case .suspend:
+                task.suspend()
+            case .resume:
+                task.resume()
+            }
+        }
+
+        static func cancelProducingResumeData(of task: URLSessionDownloadTask) async -> BackgroundDownloadResumeData? {
+            await withCheckedContinuation { continuation in
+                task.cancel(byProducingResumeData: { data in
+                    continuation.resume(returning: data.map(BackgroundDownloadResumeData.init(data:)))
+                })
+            }
+        }
+
+        /// What a failed download's error carries to continue it from where it got to, where
+        /// `URLSession` puts it: as the error's own property when it is a `URLError`, and in its
+        /// `userInfo` otherwise.
+        static func resumeData(from error: any Error) -> BackgroundDownloadResumeData? {
+            let data =
+                (error as? URLError)?.downloadTaskResumeData
+                ?? (error as NSError).userInfo[NSURLSessionDownloadTaskResumeData] as? Data
+
+            return data.map(BackgroundDownloadResumeData.init(data:))
+        }
+
+        /// The task that continues a download from `resumeData`, ready to be resumed, with
+        /// `description` as what tells every callback about it which download it is.
+        static func makeTask(
+            in session: URLSession,
+            resumingFrom resumeData: BackgroundDownloadResumeData,
+            description: String?
+        ) -> URLSessionDownloadTask {
+            let task = session.downloadTask(withResumeData: resumeData.data)
+            task.taskDescription = description
+            return task
         }
 
         // MARK: - Private methods

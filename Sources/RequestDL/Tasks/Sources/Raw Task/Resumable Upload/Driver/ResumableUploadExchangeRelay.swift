@@ -147,6 +147,11 @@ final class ResumableUploadExchangeRelay: @unchecked Sendable {
                     break
                 }
 
+            case .head:
+                // The head of the response of the upload is handed on by `decide(final:)`, which is
+                // what says which exchange that is.
+                break
+
             case .metrics(let transaction):
                 // Whatever this exchange turned out to be, it went over the wire, and a monitor
                 // hears every transaction that did. It does not wait on the decision: it is not

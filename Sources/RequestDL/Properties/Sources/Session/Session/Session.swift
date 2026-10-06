@@ -2,6 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Metrics
 import RequestDLInternals
 import Tracing
 
@@ -443,6 +444,23 @@ public struct Session: Property {
     ///
     public func tracer(_ tracer: any Tracer) -> Self {
         edit { $0.tracer = tracer }
+    }
+
+    ///
+    /// Sets the metrics factory RequestDL reports what it measured of each request to, through this
+    /// session: how long it took, how much was sent and how much was received.
+    ///
+    /// When not set, nothing is reported: the session does not fall back to the factory the process
+    /// may have bootstrapped with `MetricsSystem.bootstrap(_:)`. Reporting is opt-in per session,
+    /// not ambient. To use the bootstrapped one, pass `MetricsSystem.factory`.
+    ///
+    /// See <doc:Emitting-metrics> for what is reported, and under which labels.
+    ///
+    /// - Parameter factory: The factory the measurements are created with.
+    /// - Returns: The modified `Session` instance with the metrics factory configured.
+    ///
+    public func metricsFactory(_ factory: any MetricsFactory) -> Self {
+        edit { $0.metricsFactory = factory }
     }
 
     // MARK: - Private properties
