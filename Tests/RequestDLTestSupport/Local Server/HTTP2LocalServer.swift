@@ -77,22 +77,26 @@ final class HTTP2LocalServer: @unchecked Sendable {
         sslContext: NIOSSLContext,
         recorder: Recorder
     ) -> EventLoopFuture<Void> {
-        let handlers: [ChannelHandler] = [NIOSSLServerHandler(context: sslContext)]
+        // Runs on the channel's event loop, so the synchronous pipeline operations apply: they
+        // take the (deliberately non-`Sendable`) handlers directly instead of sending them
+        // across an isolation boundary.
+        channel.eventLoop.makeCompletedFuture {
+            let operations = channel.pipeline.syncOperations
 
-        return channel.pipeline.addHandlers(handlers).flatMap { () -> EventLoopFuture<Void> in
-            let multiplexer = channel.configureHTTP2Pipeline(
+            try operations.addHandler(NIOSSLServerHandler(context: sslContext))
+            _ = try operations.configureHTTP2Pipeline(
                 mode: .server,
                 connectionConfiguration: .init(),
                 streamConfiguration: .init(),
                 inboundStreamInitializer: { stream in
-                    stream.pipeline.addHandlers([
-                        HTTP2FramePayloadToHTTP1ServerCodec(),
-                        StreamHandler(recorder),
-                    ])
+                    stream.eventLoop.makeCompletedFuture {
+                        try stream.pipeline.syncOperations.addHandlers([
+                            HTTP2FramePayloadToHTTP1ServerCodec(),
+                            StreamHandler(recorder),
+                        ])
+                    }
                 }
             )
-
-            return multiplexer.map { _ in }
         }
     }
 
