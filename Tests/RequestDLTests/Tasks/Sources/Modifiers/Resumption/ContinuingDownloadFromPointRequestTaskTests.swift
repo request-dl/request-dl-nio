@@ -16,7 +16,14 @@ import Foundation
 /// `.continuingDownload(from:)` through the public API, against a real ``TransferServer`` on each
 /// executor: asking for the rest of a download from a saved point, and refusing anything that isn't
 /// exactly that.
-@Suite(.serialized, .concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog)
+@Suite(
+    .serialized,
+    .concurrent(watchdogAffectedPlatformConcurrencyLimit),
+    .nonFatalWatchdog,
+    .toleratingSimulatorFlake(
+        "It cuts connections of multi-megabyte transfers and waits on the server to record them, which a simulator runner starved of CPU for minutes (this suite has taken over 520s there) can't promise; the other platforms are what catch a regression"
+    )
+)
 struct ContinuingDownloadFromPointRequestTaskTests {
 
     private static let length = 8 * 1_048_576
