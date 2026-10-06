@@ -6,6 +6,8 @@ This is a package of its own and nothing builds it but you: it is not part of th
 
 ## Running it
 
+It runs on macOS and on Linux. The summary at the end needs `python3`; without it, everything still runs and what it measured is in `results-*.jsonl`, which `aggregate.py` can summarise wherever there is one. (The `swift:6.2` image has no `python3`, so inside a container the summary is the part to do outside.)
+
 ```bash
 cd Benchmarks
 ./run.sh                       # the real thing: 6 rounds, full sizes

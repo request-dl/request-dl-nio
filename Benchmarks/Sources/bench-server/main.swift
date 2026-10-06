@@ -45,6 +45,12 @@ private final class Handler: ChannelInboundHandler, @unchecked Sendable {
         }
     }
 
+    func errorCaught(context: ChannelHandlerContext, error: Error) {
+        print("connection error: \(error)")
+        fflush(stdout)
+        context.close(promise: nil)
+    }
+
     func channelWritabilityChanged(context: ChannelHandlerContext) {
         if isStreaming, context.channel.isWritable {
             writeChunks(context: context)
@@ -108,11 +114,18 @@ let bootstrap = ServerBootstrap(group: group)
     .serverChannelOption(.backlog, value: 256)
     .serverChannelOption(.socketOption(.so_reuseaddr), value: 1)
     .childChannelInitializer { channel in
-        channel.pipeline.configureHTTPServerPipeline().flatMap {
+        let result = channel.pipeline.configureHTTPServerPipeline().flatMap {
             channel.pipeline.addHandler(Handler(chunk: chunk))
         }
+
+        result.whenFailure { error in
+            print("initializer failed: \(error)")
+            fflush(stdout)
+        }
+
+        return result
     }
-    .childChannelOption(.socketOption(.tcp_nodelay), value: 1)
+    .childChannelOption(ChannelOptions.tcpOption(.tcp_nodelay), value: 1)
 
 let channel = try bootstrap.bind(host: "127.0.0.1", port: port).wait()
 print("listening on 127.0.0.1:\(port)")

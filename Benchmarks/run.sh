@@ -69,4 +69,8 @@ for round in $(seq 1 "$ROUNDS"); do
     done
 done
 
-python3 aggregate.py "$OUT" --old "$OLD" --new "$NEW"
+if command -v python3 > /dev/null; then
+    python3 aggregate.py "$OUT" --old "$OLD" --new "$NEW"
+else
+    echo "python3 not found: what ran is in $OUT, and aggregate.py can summarise it where there is one."
+fi

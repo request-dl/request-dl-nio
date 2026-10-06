@@ -88,7 +88,13 @@ private struct Chunks: AsyncSequence, Sendable {
 
 private func cpuSeconds() -> Double {
     var usage = rusage()
+
+    // Glibc imports `RUSAGE_SELF` as an enum, where the function takes an `Int32`.
+    #if os(Linux)
+    getrusage(Int32(RUSAGE_SELF.rawValue), &usage)
+    #else
     getrusage(RUSAGE_SELF, &usage)
+    #endif
 
     func seconds(_ value: timeval) -> Double {
         Double(value.tv_sec) + Double(value.tv_usec) / 1_000_000
