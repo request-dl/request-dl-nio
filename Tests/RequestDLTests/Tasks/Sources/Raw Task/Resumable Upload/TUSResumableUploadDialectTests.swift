@@ -4,7 +4,7 @@
 
 import Testing
 
-@testable import RequestDL
+@_spi(Private) @testable import RequestDL
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -140,5 +140,14 @@ struct TUSResumableUploadDialectTests {
     @Test
     func outcome_whenTheOffsetDisagrees_leavesTheOffsetToBeAsked() {
         #expect(dialect.outcome(of: Fixtures.head(409), offset: 5, length: 10) == .conflict(offset: nil))
+    }
+
+    @Test
+    func completionResponse_isWhatTheServerSaidAboutTheUpload() {
+        // Given
+        let head = Fixtures.head(204, [("Upload-Offset", "10"), ("Upload-Length", "10")])
+
+        // Then
+        #expect(dialect.completionResponse(from: head) == head)
     }
 }

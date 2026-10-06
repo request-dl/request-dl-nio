@@ -613,17 +613,17 @@ struct DiskStorageTests {
 
             // When: a cold lookup for the *complete* key forces a full directory scan.
             let coldStorage = DiskStorage(directory: directoryURL)
-            let clock = ContinuousClock()
-            let start = clock.now
+            let retriesBefore = DiskStorage.retryCount
             let found = await coldStorage["complete"]
-            let elapsed = clock.now - start
+            let retries = DiskStorage.retryCount - retriesBefore
 
-            // Then: it resolves, and nowhere near the 15s the incomplete neighbor used to cost.
-            // 8s rather than a tighter margin for the same reason `removeAll`'s sibling test
-            // uses it: CI Simulator scheduler contention. Still a wide gap below the budget a
-            // regression here would actually hit.
+            // Then: it resolves, and without spending the retry budget on the neighbor. That budget
+            // is 299 retries of 50ms, the 15s the incomplete neighbor used to cost. Counted, not
+            // timed: a CI runner under contention has taken 12.7s over a lookup that takes a few
+            // milliseconds when nothing else is running. The margin allows for retries that tests
+            // running at the same time do, which the count includes.
             #expect(found != nil)
-            #expect(elapsed < .seconds(8))
+            #expect(retries < 100)
         }
     }
 

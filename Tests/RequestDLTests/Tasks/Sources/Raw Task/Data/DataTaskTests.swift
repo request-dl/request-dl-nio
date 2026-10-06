@@ -176,7 +176,8 @@ struct DataTaskTests {
         // waiting the stall out in full, not missing the deadline by a hair -- and cancelling a
         // `Task.sleep` still has to wait for a free cooperative-pool thread, which a contended CI
         // simulator can stretch to several seconds on its own (see e.g. the O(n²) DiskStorage
-        // fixes' own notes on simulator contention).
-        #expect(elapsed < .seconds(15))
+        // fixes' own notes on simulator contention). 25s rather than 15s: a macOS runner has taken
+        // 15.9s over this, and the stall a regression waits out is 30s.
+        #expect(elapsed < .seconds(25))
     }
 }

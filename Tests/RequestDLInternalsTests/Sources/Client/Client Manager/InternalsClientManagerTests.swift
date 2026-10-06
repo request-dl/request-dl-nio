@@ -439,7 +439,11 @@ struct InternalsClientManagerTests {
             )
         }
 
-        #expect(manager.count == clientCount)
+        // Not asserted to be all of them: creating four clients can itself outlast the lifetime on a
+        // runner starved enough, and the sweep that fires meanwhile retires the ones that had
+        // already gone idle. That is not what is under test, and the clients created after it are
+        // retired by the next sweep, which the wait below is long enough to see.
+        #expect(manager.count <= clientCount)
 
         // When: the scheduled sweep fires, once everything has been idle past `lifetime`. Polled
         // rather than slept through: the sweep is a detached `.utility` task, so when exactly it

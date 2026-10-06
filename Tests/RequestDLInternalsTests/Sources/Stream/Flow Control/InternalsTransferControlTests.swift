@@ -214,6 +214,82 @@ struct InternalsTransferControlTests {
 
     /// Releasing the control opens its gate for good (freeing an upload or a reconnection parked
     /// on it), and leaves the attached windows to their own terminal paths.
+    // MARK: - Followers
+
+    @Test
+    func transferControl_aFollower_suspendsAndResumesWithTheControlItFollows() {
+        // Given
+        let parent = Internals.TransferControl()
+        let follower = Internals.TransferControl()
+        let window = Internals.FlowControlWindow()
+
+        follower.attach(window)
+        parent.attach(follower)
+
+        // When
+        parent.suspend()
+
+        // Then: everything the follower holds is held, including what its executor attached.
+        #expect(follower.isSuspended)
+        #expect(!follower.gate.isWritable)
+        #expect(window.isSuspended)
+
+        parent.resume()
+        #expect(!follower.isSuspended)
+        #expect(follower.gate.isWritable)
+        #expect(!window.isSuspended)
+    }
+
+    @Test
+    func transferControl_aFollowerAttachedWhileSuspended_startsSuspended() {
+        // Given
+        let parent = Internals.TransferControl()
+        let follower = Internals.TransferControl()
+
+        parent.suspend()
+
+        // When
+        parent.attach(follower)
+
+        // Then
+        #expect(follower.isSuspended)
+    }
+
+    @Test
+    func transferControl_aFollowerThatEnded_isNoLongerAffected() {
+        // Given
+        let parent = Internals.TransferControl()
+        let follower = Internals.TransferControl()
+        parent.attach(follower)
+
+        // When
+        parent.detach(follower)
+        parent.suspend()
+
+        // Then
+        #expect(parent.isSuspended)
+        #expect(!follower.isSuspended)
+    }
+
+    /// The reason a follower exists at all: the executor of one exchange releases the control it
+    /// is given when that exchange ends, and that must not free what the execution holds.
+    @Test
+    func transferControl_releasingAFollower_leavesTheControlItFollowsHeld() {
+        // Given
+        let parent = Internals.TransferControl()
+        let follower = Internals.TransferControl()
+        parent.attach(follower)
+        parent.suspend()
+
+        // When
+        follower.release()
+
+        // Then
+        #expect(follower.gate.isWritable)
+        #expect(!parent.gate.isWritable)
+        #expect(parent.isSuspended)
+    }
+
     @Test
     func transferControl_release_opensTheGateForGood() async throws {
         // Given
