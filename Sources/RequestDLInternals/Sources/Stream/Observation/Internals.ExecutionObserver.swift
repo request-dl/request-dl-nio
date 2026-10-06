@@ -65,6 +65,8 @@ extension Internals {
         package enum Event: Sendable {
             case progress(upload: Transfer?, download: Transfer?)
             case state(State)
+            /// A transaction the transport has finished measuring.
+            case metrics(TransactionMetrics)
         }
 
         // MARK: - Private properties
@@ -190,6 +192,24 @@ extension Internals {
                     _isClosed = true
                 }
 
+                return startDelivering()
+            }
+
+            if shouldStart {
+                spawn()
+            }
+        }
+
+        /// A transaction of this execution was measured.
+        ///
+        /// Unlike everything else, this is still delivered once the observer is closed: a transport
+        /// reports what it measured when it is done with the transaction, which for `URLSession` is
+        /// after the response body has ended, and so after the ending this observer closed on. It
+        /// goes after whatever is already queued, so it never overtakes the ending it follows.
+        package func didCollect(_ transaction: TransactionMetrics) {
+            let shouldStart = lock.withLock { () -> Bool in
+                flushProgress()
+                _entries.append(.metrics(transaction))
                 return startDelivering()
             }
 

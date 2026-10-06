@@ -105,7 +105,10 @@ extension Internals {
 
         /// A continuation is a transaction of its own, recorded after the ones before it.
         func recordMetrics(_ transaction: HTTPClientTransactionMetrics) {
-            metrics?.append(Internals.TransactionMetrics(transaction))
+            let transaction = Internals.TransactionMetrics(transaction)
+
+            metrics?.append(transaction)
+            transferControl.observer?.didCollect(transaction)
         }
 
         func didDeliver(_ bytes: Int) {
