@@ -11,13 +11,23 @@ struct ContinuingDownloadFromPointRequestTask<Task: RequestTask>: RequestTask {
 
     let task: Task
     let point: DownloadResumptionPoint
+    let whenChanged: ChangedDownloadBehavior
 
     // MARK: - Internal methods
 
     func _result(environment: RequestEnvironmentValues) async throws -> Task.Element {
-        var environment = environment
-        environment.downloadResumptionStart = point
-        return try await task._result(environment: environment)
+        var continuing = environment
+        continuing.downloadResumptionStart = point
+
+        do {
+            return try await task._result(environment: continuing)
+        } catch let error as DownloadResumptionError where whenChanged == .restart && error.reason.isAChange {
+            // The head of the continuation was refused before a byte of it reached anyone, so the
+            // same request without the point asks for the whole resource, as it would have.
+            var restarting = environment
+            restarting.downloadResumptionStart = nil
+            return try await task._result(environment: restarting)
+        }
     }
 }
 
@@ -45,14 +55,23 @@ extension RequestTask {
     /// Works with ``DownloadTask`` and ``DataTask``, anywhere in a task chain, and together with
     /// ``resumingDownloads(_:)``, which then reconnects from wherever this one got to.
     ///
-    /// - Parameter point: Where the partial download stopped.
+    /// - Parameters:
+    ///   - point: Where the partial download stopped.
+    ///   - whenChanged: What to do when the server doesn't answer with the rest of the same
+    ///   resource. ``ChangedDownloadBehavior/fail``, the default, fails the task;
+    ///   ``ChangedDownloadBehavior/restart`` asks again for the whole resource, which is then the
+    ///   result, with a `200` in its head where the rest has a `206`.
     /// - Returns: A task that produces the rest of the download.
     /// - Throws: ``DownloadResumptionError``, when the request can't be continued, or the server's
-    /// answer isn't exactly the rest of the same resource. ``DownloadResumptionError/Reason/alreadyComplete``
+    /// answer isn't exactly the rest of the same resource and ``ChangedDownloadBehavior/restart``
+    /// wasn't asked for. ``DownloadResumptionError/Reason/alreadyComplete``
     /// is not a failure: it says there was nothing left to download.
     ///
-    public func continuingDownload(from point: DownloadResumptionPoint) -> AnyTask<Element> {
-        ContinuingDownloadFromPointRequestTask(task: self, point: point)
+    public func continuingDownload(
+        from point: DownloadResumptionPoint,
+        whenChanged: ChangedDownloadBehavior = .fail
+    ) -> AnyTask<Element> {
+        ContinuingDownloadFromPointRequestTask(task: self, point: point, whenChanged: whenChanged)
             .eraseToAnyTask()
     }
 }

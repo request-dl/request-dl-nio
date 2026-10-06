@@ -15,7 +15,14 @@ import Testing
 /// Aimed at the handful of places where a suspension meets a producer's own bookkeeping: the `.nio`
 /// paused body part (completed by the window *or* by a hand-over to a continuation), the
 /// `.urlSession` upload pump's gate registration, and a reconnection waiting on the gate.
-@Suite(.serialized, .concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog)
+@Suite(
+    .serialized,
+    .concurrent(watchdogAffectedPlatformConcurrencyLimit),
+    .nonFatalWatchdog,
+    .toleratingSimulatorFlake(
+        "It moves many transfers at once and holds them still, which a simulator runner starved of CPU for minutes (this suite has taken over 260s there, and a job has been lost to it) can't promise; the other platforms are what catch a regression"
+    )
+)
 struct InternalsTransferControlStressTests {
 
     @Test(arguments: TransferExecutor.allCases)

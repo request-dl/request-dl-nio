@@ -11,7 +11,7 @@ private struct DownloadResumptionStartRequestEnvironmentKey: RequestEnvironmentK
 
 extension RequestEnvironmentValues {
 
-    /// Set by ``RequestTask/continuingDownload(from:)``; never touched directly.
+    /// Set by ``RequestTask/continuingDownload(from:whenChanged:)``; never touched directly.
     ///
     /// `RawTask` is the only thing that ever reads this: it asks the server for the rest of the
     /// resource from there, and checks the answer before anything of it is handed on. The modifier

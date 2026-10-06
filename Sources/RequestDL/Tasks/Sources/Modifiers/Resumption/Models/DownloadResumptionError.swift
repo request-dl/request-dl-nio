@@ -55,3 +55,18 @@ public struct DownloadResumptionError: Error, Sendable, Hashable, CustomStringCo
         self.reason = reason
     }
 }
+
+extension DownloadResumptionError.Reason {
+
+    /// Whether the answer is not the rest of the resource the point was taken from, as opposed to
+    /// a request that couldn't be continued at all, a download that is already whole, or a server
+    /// that refused: the cases in which asking for the whole resource is what is left to do.
+    var isAChange: Bool {
+        switch self {
+        case .representationChanged, .validatorMismatch, .contentRangeMismatch, .contentCoded, .unsatisfiableRange:
+            return true
+        case .alreadyComplete, .requestNotResumable, .unexpectedStatus:
+            return false
+        }
+    }
+}

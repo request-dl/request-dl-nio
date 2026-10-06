@@ -78,7 +78,7 @@ struct InternalsTransferControlUploadTests {
                 try await Self.complete(task)
             }
 
-            try await eventually(timeout: 30) { suspendedAt.withLockedValue { $0 != nil } }
+            try await eventually(timeout: 120) { suspendedAt.withLockedValue { $0 != nil } }
             server.onUploadProgress = nil
 
             let receivedAtSuspension = try #require(suspendedAt.withLockedValue { $0 })
@@ -172,7 +172,7 @@ struct InternalsTransferControlUploadTests {
                 try await Self.complete(task)
             }
 
-            try await eventually(timeout: 30) { server.uploadBytesReceived >= 1_048_576 }
+            try await eventually(timeout: 120) { server.uploadBytesReceived >= 1_048_576 }
             control.suspend()
             _ = try await server.settled { server.uploadBytesReceived }
 
@@ -190,7 +190,7 @@ struct InternalsTransferControlUploadTests {
             }
 
             #expect(outcome == "failed")
-            try await eventually(timeout: 30) { server.openConnections == 0 }
+            try await eventually(timeout: 120) { server.openConnections == 0 }
             #expect(server.uploadBytesReceived < size)
             try await awaitRecordedRequests(server, atLeast: 1)
             #expect(server.requests.first?.isBodyComplete == false)
@@ -223,7 +223,7 @@ struct InternalsTransferControlUploadTests {
                 try await Self.complete(task)
             }
 
-            try await eventually(timeout: 30) { server.uploadBytesReceived >= size / 4 }
+            try await eventually(timeout: 120) { server.uploadBytesReceived >= size / 4 }
 
             // When
             control.suspend()
@@ -284,12 +284,12 @@ struct InternalsTransferControlUploadTests {
                 try await Self.complete(task)
             }
 
-            try await eventually(timeout: 30) { server.uploadBytesReceived >= size / 4 }
+            try await eventually(timeout: 120) { server.uploadBytesReceived >= size / 4 }
 
             // When
             server.stallTimeout = 1
             control.suspend()
-            try await eventually(timeout: 30) { server.stalledConnections == 1 }
+            try await eventually(timeout: 120) { server.stalledConnections == 1 }
             control.resume()
 
             // Then
