@@ -344,7 +344,7 @@ extension RequestMetrics {
 
 extension RequestMetrics.Transaction {
 
-    fileprivate init(_ transaction: Internals.TransactionMetrics) {
+    init(_ transaction: Internals.TransactionMetrics) {
         self.init(
             source: Source(transaction.source),
             url: transaction.url,

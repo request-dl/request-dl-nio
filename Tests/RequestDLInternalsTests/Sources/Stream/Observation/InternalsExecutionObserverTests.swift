@@ -199,11 +199,68 @@ struct InternalsExecutionObserverTests {
                 return "progress"
             case .state(let state):
                 return Recorder.name(state)
+            case .metrics:
+                return "metrics"
             }
         }
 
         #expect(kinds == ["started", "progress", "suspended", "progress", "resumed", "finished"])
         #expect(recorder.downloads.map(\.total) == [10, 15])
+    }
+
+    // MARK: - Metrics
+
+    @Test
+    func metrics_areDeliveredInOrder_afterTheProgressRecordedBeforeThem() async throws {
+        // Given
+        let (observer, recorder) = makeObserver()
+
+        // When
+        observer.didChange(.started)
+        observer.didReceive(10)
+        observer.didCollect(.init())
+        observer.didChange(.finished)
+
+        // Then
+        try await eventually { recorder.states.last == "finished" }
+
+        let kinds = recorder.events.map { event -> String in
+            switch event {
+            case .progress:
+                return "progress"
+            case .state(let state):
+                return Recorder.name(state)
+            case .metrics:
+                return "metrics"
+            }
+        }
+
+        #expect(kinds == ["started", "progress", "metrics", "finished"])
+    }
+
+    @Test
+    func metrics_areStillDeliveredOnceTheObserverHasClosed() async throws {
+        // Given: `URLSession` reports a task's metrics after the body ended, so after the ending.
+        let (observer, recorder) = makeObserver()
+        observer.didChange(.started)
+        observer.didChange(.finished)
+        try await eventually { recorder.states.last == "finished" }
+
+        // When
+        observer.didCollect(.init())
+
+        // Then: the ending is not repeated, and what follows it is not dropped.
+        try await eventually { recorder.events.count == 3 }
+
+        let isMetrics: Bool
+        if case .metrics = try #require(recorder.events.last) {
+            isMetrics = true
+        } else {
+            isMetrics = false
+        }
+
+        #expect(isMetrics)
+        #expect(recorder.states == ["started", "finished"])
     }
 
     @Test

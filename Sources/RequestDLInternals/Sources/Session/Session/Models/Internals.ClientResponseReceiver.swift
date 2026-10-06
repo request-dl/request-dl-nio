@@ -107,7 +107,10 @@ extension Internals {
         /// `didReceiveError(task:_:)` on a failure), so by the time the body ends, the
         /// transaction is already recorded.
         package func didCollectMetrics(task: HTTPClient.Task<Response>, _ metrics: HTTPClientTransactionMetrics) {
-            self.metrics?.append(Internals.TransactionMetrics(metrics))
+            let transaction = Internals.TransactionMetrics(metrics)
+
+            self.metrics?.append(transaction)
+            transferControl?.observer?.didCollect(transaction)
         }
 
         package func didSendRequest(task: HTTPClient.Task<Response>) {

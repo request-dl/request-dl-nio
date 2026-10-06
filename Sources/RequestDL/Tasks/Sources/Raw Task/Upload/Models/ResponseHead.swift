@@ -112,6 +112,12 @@ public struct ResponseHead: Sendable, Hashable {
     public let status: Status
 
     /// The version of the HTTP protocol used in the response.
+    ///
+    /// - Note: Under `URLSession` this is nominal and always HTTP/1.1: `HTTPURLResponse` does not
+    ///   say which version was negotiated, and `URLSession` only reports it afterwards, in the
+    ///   metrics of the task. For the protocol that was really used, whichever executor ran the
+    ///   request, read ``RequestMetrics/Connection/negotiatedProtocol`` from
+    ///   ``TaskResult/metrics``, or from the transactions a ``RequestMonitor`` is told about.
     public let version: Version
 
     /// The headers of the response.
