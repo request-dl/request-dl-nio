@@ -39,6 +39,11 @@ import class Foundation.ProcessInfo
 /// verification (`LocalServer.TLSOption.client`, not implemented on the portable `NWListener`
 /// backend), lives in `RawTaskExecutorDispatchTests+NIO.swift`, which needs NIOCore to exist at
 /// all.
+@Suite(
+    .toleratingSimulatorFlake(
+        "Several of its tests assert that cancelling reached a URLSession task within a fixed wait, which a simulator runner starved of CPU (one has taken 15s over one of them) can't promise; the other platforms are what catch a regression"
+    )
+)
 struct RawTaskExecutorDispatchTests {
 
     @Test
@@ -434,11 +439,7 @@ struct RawTaskExecutorDispatchTests {
     /// that's demonstrably still open, the same technique
     /// `downloadTask_whenResponseDroppedMidFlight_actuallyCancelsTheUnderlyingURLSessionClient`
     /// above uses to prove cancellation for real instead of merely asserting an error type.
-    @Test(
-        .toleratingSimulatorFlake(
-            "Asserts that cancelling reached the URLSession task within a fixed wait, which a simulator runner starved of CPU can't promise; the other platforms are what catch a regression"
-        )
-    )
+    @Test
     func dataTask_whenResourceTimeoutFiresMidFlightUnderRequiredURLSession_cancelsTheUnderlyingURLSessionTaskAndThrows()
         async throws
     {
