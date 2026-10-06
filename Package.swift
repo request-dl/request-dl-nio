@@ -48,6 +48,10 @@ let package = Package(
             from: "1.35.1"
         ),
         .package(
+            url: "https://github.com/apple/swift-nio-http2",
+            from: "1.36.0"
+        ),
+        .package(
             url: "https://github.com/apple/swift-nio-ssl",
             from: "2.37.5"
         ),
@@ -203,6 +207,7 @@ let package = Package(
                 ),
                 .product(name: "NIOPosix", package: "swift-nio", condition: .when(traits: ["NIOTransport"])),
                 .product(name: "NIOHTTP1", package: "swift-nio", condition: .when(traits: ["NIOTransport"])),
+                .product(name: "NIOHTTP2", package: "swift-nio-http2", condition: .when(traits: ["NIOTransport"])),
                 .product(name: "NIOSSL", package: "swift-nio-ssl", condition: .when(traits: ["NIOTransport"])),
                 .product(
                     name: "NIOTransportServices",
