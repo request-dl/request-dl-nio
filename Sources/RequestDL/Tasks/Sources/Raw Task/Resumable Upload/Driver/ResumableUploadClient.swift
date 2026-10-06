@@ -57,8 +57,9 @@ struct ResumableUploadClient: RequestExecutingClient {
 
     func revalidationHead(
         configuration: RequestConfiguration,
-        logger: Internals.TaskLogger?
+        logger: Internals.TaskLogger?,
+        metrics: Internals.RequestMetricsCollector?
     ) async throws -> Internals.ResponseHead {
-        try await base.revalidationHead(configuration: configuration, logger: logger)
+        try await base.revalidationHead(configuration: configuration, logger: logger, metrics: metrics)
     }
 }
