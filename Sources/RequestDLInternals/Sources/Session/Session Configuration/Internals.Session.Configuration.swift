@@ -2,6 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Metrics
 import Tracing
 
 #if canImport(NIOCore)
@@ -41,6 +42,18 @@ extension Internals.Session {
         /// factor into `==`), two sessions differing only in tracer are fine sharing a pooled
         /// client -- a tracer is an observability sink, not a transport-affecting credential.
         package var tracer: any Tracer = NoOpTracer()
+
+        /// Where RequestDL reports what it measured of each request, when asked to: `nil` reports
+        /// nothing.
+        ///
+        /// `nil` rather than `MetricsSystem.factory`, for the reason `tracer` defaults to a no-op:
+        /// RequestDL's API is declarative, so a caller that never calls `.metricsFactory(_:)`
+        /// shouldn't have its requests counted just because some other part of the process
+        /// bootstrapped a metrics backend for unrelated reasons.
+        ///
+        /// Excluded from `Equatable`, like `tracer`: it is an observability sink, and two sessions
+        /// differing only in it are fine sharing a pooled client.
+        package var metricsFactory: (any MetricsFactory)?
 
         /// Off by default on every platform: decompression is opt-in, matching the fact that
         /// the risky posture is decompressing unbounded, not leaving compressed bytes alone.

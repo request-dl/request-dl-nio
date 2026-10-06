@@ -26,6 +26,10 @@ Discover the possibilities to execute your request and manipulate the received d
 
 - <doc:Distributed-tracing>
 
+### Emitting metrics
+
+- <doc:Emitting-metrics>
+
 ### cURL support
 
 - <doc:CURL-support>

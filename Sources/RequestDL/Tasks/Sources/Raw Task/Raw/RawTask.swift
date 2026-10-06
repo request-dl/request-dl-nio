@@ -273,15 +273,22 @@ struct RawTask<Content: Property>: RequestTask {
         environment: RequestEnvironmentValues
     ) -> Internals.ExecutionObserver? {
         let monitors = environment.requestMonitors
-
-        guard !monitors.isEmpty else {
-            return nil
-        }
-
         let configuration = resolved.requestConfiguration
         let execution = RequestExecution(url: configuration.url, method: configuration.method ?? "GET")
 
+        // A session that was given a metrics factory has its requests observed too, with or
+        // without a monitor.
+        let reporter = resolved.session.configuration.metricsFactory.map {
+            RequestMetricsReporter(factory: $0, execution: execution)
+        }
+
+        guard !monitors.isEmpty || reporter != nil else {
+            return nil
+        }
+
         let observer = Internals.ExecutionObserver { event in
+            reporter?.receive(event)
+
             switch event {
             case .progress(let upload, let download):
                 for monitor in monitors {
@@ -310,6 +317,10 @@ struct RawTask<Content: Property>: RequestTask {
                 for monitor in monitors {
                     monitor.request(execution, didChange: state)
                 }
+
+            case .head:
+                // What a monitor hears of the head is in the progress it sets the expectation of.
+                break
 
             case .metrics(let transaction):
                 let transaction = RequestMetrics.Transaction(transaction)

@@ -65,6 +65,8 @@ extension Internals {
         package enum Event: Sendable {
             case progress(upload: Transfer?, download: Transfer?)
             case state(State)
+            /// The head of the response came in: its status code.
+            case head(statusCode: Int)
             /// A transaction the transport has finished measuring.
             case metrics(TransactionMetrics)
         }
@@ -148,12 +150,24 @@ extension Internals {
             // Conflicting lengths mean it isn't known, not that any of them is.
             let length = lengths.count == 1 ? lengths.first.flatMap { Int($0) } : nil
 
-            lock.withLock {
-                guard !_isClosed, _expectedDownload == nil else {
-                    return
+            let shouldStart = lock.withLock { () -> Bool in
+                guard !_isClosed else {
+                    return false
                 }
 
-                _expectedDownload = isEncoded ? nil : length
+                // Every head is told, in order with the rest: the last one is the response.
+                flushProgress()
+                _entries.append(.head(statusCode: Int(head.status.code)))
+
+                if _expectedDownload == nil {
+                    _expectedDownload = isEncoded ? nil : length
+                }
+
+                return startDelivering()
+            }
+
+            if shouldStart {
+                spawn()
             }
         }
 

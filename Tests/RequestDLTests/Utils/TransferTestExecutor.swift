@@ -74,7 +74,7 @@ enum TransferTestExecutor: Sendable, CaseIterable, CustomTestStringConvertible {
 
     /// A session that can only run on this executor: a request that would fall back to another one
     /// fails instead of passing for the wrong reason.
-    private var pinnedSession: Session {
+    var pinnedSession: Session {
         switch self {
         #if canImport(NIOCore)
         case .nio:

@@ -80,6 +80,10 @@ let package = Package(
             from: "1.5.0"
         ),
         .package(
+            url: "https://github.com/apple/swift-metrics",
+            from: "2.11.0"
+        ),
+        .package(
             url: "https://github.com/apple/swift-configuration",
             from: "1.2.1",
             traits: []
@@ -132,6 +136,7 @@ let package = Package(
                 .product(name: "SystemPackage", package: "swift-system"),
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "Tracing", package: "swift-distributed-tracing"),
+                .product(name: "Metrics", package: "swift-metrics"),
                 .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "_CryptoExtras", package: "swift-crypto"),
                 .product(name: "X509", package: "swift-certificates"),
@@ -178,6 +183,7 @@ let package = Package(
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "Collections", package: "swift-collections"),
                 .product(name: "Tracing", package: "swift-distributed-tracing"),
+                .product(name: "Metrics", package: "swift-metrics"),
                 .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "Configuration", package: "swift-configuration"),
             ],
@@ -224,6 +230,7 @@ let package = Package(
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
                 .product(name: "Configuration", package: "swift-configuration"),
                 .product(name: "SwiftAsyncTesting", package: "swift-async-stream"),
+                .product(name: "MetricsTestKit", package: "swift-metrics"),
             ],
             resources: [.process("Resources")]
         ),
