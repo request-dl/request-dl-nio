@@ -357,13 +357,7 @@ struct RawTaskExecutorDispatchTests {
 
             // Then: `didCompleteWithError:` releases the operation-queue slot asynchronously,
             // so poll briefly rather than asserting immediately after the scope above ends.
-            var stillRunning = client.isRunning
-            for _ in 0..<50 where stillRunning {
-                try await _Concurrency.Task.sleep(nanoseconds: 20_000_000)
-                stillRunning = client.isRunning
-            }
-
-            #expect(!stillRunning)
+            try await eventually(timeout: 15) { !client.isRunning }
         }
     }
 
@@ -413,13 +407,7 @@ struct RawTaskExecutorDispatchTests {
             #expect(observedRunningMidFlight)
 
             // Then: the release hops onto the request's event loop, so poll briefly.
-            var stillRunning = client.isRunning
-            for _ in 0..<50 where stillRunning {
-                try await _Concurrency.Task.sleep(nanoseconds: 20_000_000)
-                stillRunning = client.isRunning
-            }
-
-            #expect(!stillRunning)
+            try await eventually(timeout: 15) { !client.isRunning }
         }
     }
     #endif
@@ -471,13 +459,7 @@ struct RawTaskExecutorDispatchTests {
             // Then: not just an error thrown at the caller. The live `URLSessionTask` behind it
             // actually got torn down. `didCompleteWithError:` releases state asynchronously, so
             // poll briefly rather than asserting immediately.
-            var stillRunning = client.isRunning
-            for _ in 0..<50 where stillRunning {
-                try await _Concurrency.Task.sleep(nanoseconds: 20_000_000)
-                stillRunning = client.isRunning
-            }
-
-            #expect(!stillRunning)
+            try await eventually(timeout: 15) { !client.isRunning }
         }
     }
 

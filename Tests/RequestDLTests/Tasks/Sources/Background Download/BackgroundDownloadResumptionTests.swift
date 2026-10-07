@@ -26,6 +26,50 @@ struct BackgroundDownloadResumptionTests {
 
     // MARK: - Helpers
 
+    /// A loopback listener that never answers: the kernel completes the TCP handshake from the
+    /// listen backlog, so a task started against it connects, sends its request and then waits,
+    /// staying `.running` until it is cancelled. A closed port can't stand in for it: the
+    /// connection is refused in a few milliseconds and the task is already `.completed` by the
+    /// time a test looks at its state.
+    private final class SilentListener {
+
+        let url: URL
+        private let descriptor: Int32
+
+        init() throws {
+            let descriptor = socket(AF_INET, SOCK_STREAM, 0)
+            try #require(descriptor >= 0)
+
+            var address = sockaddr_in()
+            address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+            address.sin_family = sa_family_t(AF_INET)
+            address.sin_addr.s_addr = inet_addr("127.0.0.1")
+            address.sin_port = 0
+
+            let bound = withUnsafePointer(to: &address) {
+                $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                    bind(descriptor, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+                }
+            }
+            try #require(bound == 0 && listen(descriptor, 16) == 0)
+
+            var length = socklen_t(MemoryLayout<sockaddr_in>.size)
+            let named = withUnsafeMutablePointer(to: &address) {
+                $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                    getsockname(descriptor, $0, &length)
+                }
+            }
+            try #require(named == 0)
+
+            self.descriptor = descriptor
+            self.url = try #require(URL(string: "http://127.0.0.1:\(UInt16(bigEndian: address.sin_port))/resource"))
+        }
+
+        deinit {
+            close(descriptor)
+        }
+    }
+
     /// What an ordinary session's delegate says about one download.
     private final class Observer: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
 
@@ -163,9 +207,11 @@ struct BackgroundDownloadResumptionTests {
 
     @Test
     func suspendAndResume_actOnTheDownloadWithThatID_andOnNoOtherOne() throws {
-        // Given: two downloads, made as the background session makes them, neither started.
+        // Given: two downloads, made as the background session makes them, neither started, and
+        // a server that never answers so the one that is resumed stays running.
+        let server = try SilentListener()
         let session = URLSession(configuration: .ephemeral)
-        let url = URL(string: "http://127.0.0.1:1/resource")!
+        let url = server.url
 
         let wanted = session.downloadTask(with: url)
         wanted.taskDescription = BackgroundDownloads.Session.encode(
@@ -182,6 +228,7 @@ struct BackgroundDownloadResumptionTests {
         defer {
             wanted.cancel()
             other.cancel()
+            withExtendedLifetime(server) {}
         }
 
         let match = try #require(BackgroundDownloads.Session.firstTask(matching: "episode-42", in: [other, wanted]))
