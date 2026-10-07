@@ -971,12 +971,13 @@ package final class TransferServer: @unchecked Sendable {
         case .ietf where held.isComplete:
             let body = Array("done".utf8)
             status = 200
-            response = Self.head(
-                status: 200,
-                headers: [
-                    ("Content-Type", "text/plain"), ("X-Upload", "done"), ("Content-Length", String(body.count)),
-                ]
-            ) + body
+            response =
+                Self.head(
+                    status: 200,
+                    headers: [
+                        ("Content-Type", "text/plain"), ("X-Upload", "done"), ("Content-Length", String(body.count)),
+                    ]
+                ) + body
         case .ietf:
             status = 204
             response = Self.head(status: 204, headers: [("Upload-Offset", String(held.data.count))])
