@@ -34,6 +34,7 @@ struct BackgroundDownloadResumptionTests {
         private var _file: URL?
         private var _error: (any Error)?
         private var _isOver = false
+        private var _isHeld = false
         private let suspendAfter: Int64?
 
         init(suspendAfter: Int64? = nil) {
@@ -45,6 +46,11 @@ struct BackgroundDownloadResumptionTests {
         var error: (any Error)? { lock.withLock { _error } }
         var isOver: Bool { lock.withLock { _isOver } }
 
+        /// Whether `suspendAfter` was reached and the task is already suspended. It is only set
+        /// once `suspend()` has returned: a test that acts on the task as soon as `written` crosses
+        /// the threshold would otherwise do it concurrently with that very `suspend()`.
+        var isHeld: Bool { lock.withLock { _isHeld } }
+
         func urlSession(
             _ session: URLSession,
             downloadTask: URLSessionDownloadTask,
@@ -54,8 +60,11 @@ struct BackgroundDownloadResumptionTests {
         ) {
             lock.withLock { _written = totalBytesWritten }
 
-            if let suspendAfter, totalBytesWritten >= suspendAfter {
+            // Callbacks arrive serially, so this suspends exactly once: `suspend()` nests, and a
+            // second call would need a second `resume()` to undo.
+            if let suspendAfter, totalBytesWritten >= suspendAfter, !isHeld {
                 downloadTask.suspend()
+                lock.withLock { _isHeld = true }
             }
         }
 
@@ -75,6 +84,15 @@ struct BackgroundDownloadResumptionTests {
                 _isOver = true
             }
         }
+    }
+
+    /// A protocol that takes every request and never answers it, leaving the task in flight.
+    private final class PendingURLProtocol: URLProtocol {
+
+        override class func canInit(with request: URLRequest) -> Bool { true }
+        override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+        override func startLoading() {}
+        override func stopLoading() {}
     }
 
     /// Whether `file` is the resource the server serves, whole and in order.
@@ -164,7 +182,15 @@ struct BackgroundDownloadResumptionTests {
     @Test
     func suspendAndResume_actOnTheDownloadWithThatID_andOnNoOtherOne() throws {
         // Given: two downloads, made as the background session makes them, neither started.
-        let session = URLSession(configuration: .ephemeral)
+        // A request that is never answered, so `wanted` is still running when it is looked at.
+        // Pointing it at a closed port instead has the connection refused at once, and a task
+        // that already failed is neither `.running` nor, once suspended, `.suspended`.
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [PendingURLProtocol.self]
+
+        let session = URLSession(configuration: configuration)
+        defer { session.invalidateAndCancel() }
+
         let url = URL(string: "http://127.0.0.1:1/resource")!
 
         let wanted = session.downloadTask(with: url)
@@ -265,7 +291,7 @@ struct BackgroundDownloadResumptionTests {
 
             let task = session.downloadTask(with: Self.url(server))
             task.resume()
-            try await eventually(timeout: 120) { observer.written >= 2 * 1_048_576 }
+            try await eventually(timeout: 120) { observer.isHeld }
 
             // When
             let resumeData = try #require(await BackgroundDownloads.Session.cancelProducingResumeData(of: task))
@@ -299,7 +325,7 @@ struct BackgroundDownloadResumptionTests {
 
             let task = session.downloadTask(with: Self.url(server))
             task.resume()
-            try await eventually(timeout: 120) { observer.written >= 2 * 1_048_576 }
+            try await eventually(timeout: 120) { observer.isHeld }
 
             let resumeData = try #require(await BackgroundDownloads.Session.cancelProducingResumeData(of: task))
             server.resource = .init(length: Self.length, seed: 7, validator: .entityTag("\"v2\""))
