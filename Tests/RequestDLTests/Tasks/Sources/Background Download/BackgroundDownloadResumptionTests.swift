@@ -180,7 +180,7 @@ struct BackgroundDownloadResumptionTests {
     // MARK: - Pausing and resuming
 
     @Test
-    func suspendAndResume_actOnTheDownloadWithThatID_andOnNoOtherOne() throws {
+    func suspendAndResume_actOnTheDownloadWithThatID_andOnNoOtherOne() async throws {
         // Given: two downloads, made as the background session makes them, neither started.
         // A request that is never answered, so `wanted` is still running when it is looked at.
         // Pointing it at a closed port instead has the connection refused at once, and a task
@@ -216,15 +216,17 @@ struct BackgroundDownloadResumptionTests {
         // When
         BackgroundDownloads.Session.apply(.resume, to: match)
 
-        // Then
-        #expect(wanted.state == .running)
+        // Then: the state a task reports is not updated in the same call that asked for it, so
+        // wait for it instead of reading it back at once (`.suspend` was seen still reporting
+        // `.running` on a CI runner).
+        try await eventually(timeout: 10) { wanted.state == .running }
         #expect(other.state == .suspended)
 
         // When
         BackgroundDownloads.Session.apply(.suspend, to: match)
 
         // Then
-        #expect(wanted.state == .suspended)
+        try await eventually(timeout: 10) { wanted.state == .suspended }
     }
 
     @Test

@@ -74,6 +74,20 @@ jobs:
       # defaults: on, 12 minutes) already fail a genuinely stuck run well before 45 minutes,
       # independently of this budget.
       apple-tests-timeout-minutes: 45
+      # Same destinations the workflow runs by default, spelled out only to give visionOS a budget
+      # of its own. Its Simulator is the slowest of the set: when it finishes, it takes 21 to 44
+      # minutes, and 16 of the legs run over the last few days were cut off by the 45-minute cap
+      # ("exceeded the maximum execution time") while still working through the suite -- the last
+      # lines of their logs are tests passing, not a hang. A genuine hang is still caught long
+      # before this, by apple-tests-crash-watch-enabled above.
+      apple-tests-matrix: >-
+        [{"destination":"platform=iOS Simulator,arch=arm64,name=iPhone 17 Pro,OS=26.5","name":"iOS"},
+        {"destination":"platform=iOS Simulator,arch=arm64,name=iPad (A16),OS=26.5","name":"iPadOS"},
+        {"destination":"platform=watchOS Simulator,arch=arm64,name=Apple Watch Series 11 (42mm),OS=26.5","name":"watchOS"},
+        {"destination":"platform=tvOS Simulator,arch=arm64,name=Apple TV 4K (3rd generation) (at 1080p),OS=26.5","name":"tvOS"},
+        {"destination":"platform=visionOS Simulator,arch=arm64,name=Apple Vision Pro,OS=26.5","name":"visionOS","timeout":75},
+        {"destination":"platform=macOS,arch=arm64,name=My Mac","name":"macOS"},
+        {"destination":"platform=macOS,arch=arm64,variant=Mac Catalyst,name=My Mac","name":"macOS Catalyst"}]
 
       # Step 4 – Third Party
       enable-third-party-tests: true
@@ -98,6 +112,8 @@ jobs:
     # Skip draft PRs, matching the reusable "Swift CI" job's own guard above.
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: macos-26
+    # Takes 9 to 19 minutes; without a cap a stuck run holds a macOS runner for GitHub's six hours.
+    timeout-minutes: 30
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.6.app
     steps:

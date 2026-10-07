@@ -247,15 +247,12 @@ struct InternalsURLSessionClientSessionTaskTests {
         sessionTask.seed()
 
         // Then: `didCompleteWithError:` (cancellation included) is what releases the
-        // `operationQueue` slot `isRunning` reads, so this polls briefly instead of asserting
-        // immediately after an async cancel with no ordering guarantee of its own.
-        var stillRunning = client.isRunning
-        for _ in 0..<50 where stillRunning {
-            try await _Concurrency.Task.sleep(nanoseconds: 20_000_000)
-            stillRunning = client.isRunning
-        }
-
-        #expect(!stillRunning)
+        // `operationQueue` slot `isRunning` reads, so this polls instead of asserting
+        // immediately after an async cancel with no ordering guarantee of its own. A fixed
+        // one-second poll was not enough on a contended simulator runner, where that callback was
+        // seen arriving a minute and a half late; `eventually` stretches its budget there and
+        // ends as soon as the slot is released everywhere else.
+        try await eventually(timeout: 15) { !client.isRunning }
     }
 
     /// **Used to be a confirmed `withKnownIssue`.** The original `uploadTask(withStreamedRequest:)`
