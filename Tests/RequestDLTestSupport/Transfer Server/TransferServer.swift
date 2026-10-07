@@ -147,8 +147,8 @@ package final class TransferServer: @unchecked Sendable {
     }
 
     /// Microseconds to wait after every read of an upload body: a server slower than loopback,
-    /// so an upload is still mostly unsent -- rather than sitting whole in socket buffers --
-    /// when a test suspends it.
+    /// so an upload is still mostly unsent (rather than sitting whole in socket buffers) when a
+    /// test suspends it.
     package var uploadReadDelay: UInt32 {
         get { lock.withLock { _uploadReadDelay } }
         set { lock.withLock { _uploadReadDelay = newValue } }
@@ -651,8 +651,8 @@ package final class TransferServer: @unchecked Sendable {
 
         while sent < limit {
             // A chunk is framed for its full size even when a scripted drop cuts it short, so a
-            // drop lands mid-chunk -- where a client can tell the body is truncated -- unless it
-            // falls exactly on a chunk boundary.
+            // drop lands mid-chunk (where a client can tell the body is truncated) unless it falls
+            // exactly on a chunk boundary.
             let piece = min(16_384, count - sent)
             let taken = min(piece, limit - sent)
             let bytes = Array(Self.body(from: start + sent, count: taken, seed: resource.seed))
@@ -676,7 +676,7 @@ package final class TransferServer: @unchecked Sendable {
             sent += taken
         }
 
-        // Scripted drop: mid-body, or -- for a chunked body -- right after the last byte, before
+        // Scripted drop: mid-body, or (for a chunked body) right after the last byte, before
         // the terminating chunk that would have told the client the body was complete.
         guard sent == count, dropAfter.map({ $0 > count || !resource.isChunked }) ?? true else {
             record(head, bodyLength: sent, isIntact: true, isComplete: false, status: status)
@@ -914,9 +914,10 @@ package final class TransferServer: @unchecked Sendable {
                 headers.append(("Tus-Resumable", "1.0.0"))
             }
 
-            let isSent = isRead && io.send(Self.head(status: 409, headers: headers), counted: false)
+            // Recorded before it is sent: a client that has the response can already be asking
+            // what the server saw.
             record(head, bodyLength: 0, isIntact: true, isComplete: isRead, status: 409)
-            return isSent
+            return isRead && io.send(Self.head(status: 409, headers: headers), counted: false)
         }
 
         // What arrives is kept as it arrives, so an upload cut short holds the part that made it:
@@ -963,41 +964,35 @@ package final class TransferServer: @unchecked Sendable {
             return false
         }
 
-        let isSent: Bool
         let status: Int
+        let response: [UInt8]
 
         switch dialect {
         case .ietf where held.isComplete:
             let body = Array("done".utf8)
             status = 200
-            isSent = io.send(
+            response =
                 Self.head(
                     status: 200,
                     headers: [
                         ("Content-Type", "text/plain"), ("X-Upload", "done"), ("Content-Length", String(body.count)),
                     ]
-                ) + body,
-                counted: false
-            )
+                ) + body
         case .ietf:
             status = 204
-            isSent = io.send(
-                Self.head(status: 204, headers: [("Upload-Offset", String(held.data.count))]),
-                counted: false
-            )
+            response = Self.head(status: 204, headers: [("Upload-Offset", String(held.data.count))])
         case .tus:
             status = 204
-            isSent = io.send(
-                Self.head(
-                    status: 204,
-                    headers: [("Upload-Offset", String(held.data.count)), ("Tus-Resumable", "1.0.0")]
-                ),
-                counted: false
+            response = Self.head(
+                status: 204,
+                headers: [("Upload-Offset", String(held.data.count)), ("Tus-Resumable", "1.0.0")]
             )
         }
 
+        // Recorded before it is sent: a client that has the response can already be asking what
+        // the server saw.
         record(head, bodyLength: outcome.length, isIntact: true, isComplete: true, status: status)
-        return isSent
+        return io.send(response, counted: false)
     }
 
     // MARK: - Bookkeeping (called from `TransferServerIO`)

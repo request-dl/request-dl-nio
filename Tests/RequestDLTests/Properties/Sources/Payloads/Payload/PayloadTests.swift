@@ -24,7 +24,7 @@ import class Foundation.JSONSerialization
 
 struct PayloadTests {
 
-    // `Payload(_:options:contentType:)` only exists on Darwin — it is the one factory that
+    // `Payload(_:options:contentType:)` only exists on Darwin: it is the one factory that
     // takes `Any`, so it cannot avoid `JSONSerialization`, which is not part of
     // `FoundationEssentials`. The three tests below exist to cover that initializer
     // specifically, so unlike the rest of this file, they have no portable counterpart to fall
@@ -805,7 +805,7 @@ struct PayloadTests {
 
 extension PayloadTests {
 
-    // `Payload(_:options:contentType:)` only exists on Darwin — same reason as the block at the
+    // `Payload(_:options:contentType:)` only exists on Darwin, same reason as the block at the
     // top of this file: it is the one factory that takes `Any`, so it cannot avoid
     // `JSONSerialization`, which is not part of `FoundationEssentials`.
     #if canImport(Darwin)
@@ -905,12 +905,12 @@ extension PayloadTests {
         )
     }
 
-    /// Regression test: nodes run in declaration order, so `PayloadNode.make(_:)` used to decide
-    /// query-vs-body against whatever `requestConfiguration.method` held *at that point* in the
-    /// walk. `Payload` declared before `RequestMethod(.post)`, as here, meant `method` was still
-    /// `nil` when the payload ran -- indistinguishable from "no method configured at all", which
-    /// sends the fields as a query -- even though the method was about to become `POST`. The
-    /// fields must end up in the body regardless of which order these two are declared in.
+    /// Nodes run in declaration order, so `PayloadNode.make(_:)` must not decide query-vs-body
+    /// against whatever `requestConfiguration.method` held *at that point* in the walk. `Payload`
+    /// declared before `RequestMethod(.post)`, as here, would see `method` still `nil` when the
+    /// payload ran (indistinguishable from "no method configured at all", which sends the fields
+    /// as a query) even though the method is about to become `POST`. The fields must end up in
+    /// the body regardless of which order these two are declared in.
     @Test
     func payload_whenDeclaredBeforeRequestMethodPost_stillSendsAsBodyNotQuery() async throws {
         // Given
@@ -1119,7 +1119,7 @@ extension PayloadTests {
     func payload_whenGETInitEncodableFragmentWithURLEncoded() async throws {
         // Given
         // A top-level fragment (neither a JSON object nor a JSON array) cannot be exploded
-        // into query items, so it is sent as an already-encoded body instead — the same
+        // into query items, so it is sent as an already-encoded body instead, the same
         // fallback a non-form-urlencoded content type takes.
         let value = "just-a-string"
 
@@ -1283,7 +1283,7 @@ extension PayloadTests {
         )
     }
 
-    // `Payload(_:options:contentType:)` only exists on Darwin — same reason as the other
+    // `Payload(_:options:contentType:)` only exists on Darwin, same reason as the other
     // `Any`-based blocks in this file.
     #if canImport(Darwin)
 

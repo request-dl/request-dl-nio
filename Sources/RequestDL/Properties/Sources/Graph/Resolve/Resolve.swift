@@ -52,18 +52,17 @@ struct Resolve<Root: Property>: Sendable {
     }
 
     /// ``build()``, also handing back the deadline ``Timeout/Source/resource`` establishes for
-    /// this request — taken partway *through* resolution rather than after it.
+    /// this request, taken partway *through* resolution rather than after it.
     ///
     /// `sessionConfiguration(for:)` below can resolve a system proxy, which on Darwin means
-    /// fetching and running a PAC script over the network. That is unbounded, remote work, and
-    /// exactly the kind of thing a resource budget is supposed to cover; a deadline created only
-    /// once `build()` has returned starts counting after it, so a hung PAC lookup outlasts any
-    /// `.resource` the caller configured.
+    /// fetching and running a PAC script over the network. That is unbounded, remote work that
+    /// a resource budget should cover, and a deadline created only once `build()` has returned
+    /// starts counting after it, so a hung PAC lookup would outlast any `.resource` the caller
+    /// configured.
     ///
-    /// Resolution can't be bounded any earlier than this: the budget itself is declared by a
-    /// `Timeout` property, so it isn't known until `partiallyBuild()` has walked the graph. That
-    /// half is pure, in-process tree building with nothing remote in it, which is what makes the
-    /// split safe to draw here.
+    /// Resolution can't be bounded any earlier: the budget is declared by a `Timeout` property,
+    /// so it isn't known until `partiallyBuild()` has walked the graph. That half is pure,
+    /// in-process tree building with nothing remote in it, so the split is safe here.
     func buildBoundedByResourceDeadline() async throws -> (
         resolved: Resolved,
         deadline: Internals.ResourceDeadline

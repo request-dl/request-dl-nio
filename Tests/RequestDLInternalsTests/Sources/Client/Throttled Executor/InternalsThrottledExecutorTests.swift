@@ -36,8 +36,8 @@ struct InternalsThrottledExecutorTests {
     }
 
     /// `AsyncSemaphore.init(permits:)` preconditions on a non-negative count, which traps even
-    /// in release builds: a negative limit used to crash the process the first time a client
-    /// was built for the session.
+    /// in release builds, so a negative limit must not reach it when the first client is built
+    /// for the session.
     @Test
     func acquire_whenLimitIsNegative_isTreatedAsUnlimitedInsteadOfTrapping() async throws {
         // Given

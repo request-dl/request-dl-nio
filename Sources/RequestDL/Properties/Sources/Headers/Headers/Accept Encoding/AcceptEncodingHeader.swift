@@ -15,9 +15,9 @@ import RequestDLInternals
 /// ```
 ///
 /// > Important: There is no default value. Only advertise a coding something in the pipeline
-/// can actually decompress — either this package's own response decompression (see
-/// ``RequestDL/Session``, off by default and limited to `gzip`/`deflate`), or, for ``ContentCoding/brotli``,
-/// a decoder the caller runs itself against the raw response body.
+/// can actually decompress: either this package's own response decompression (see
+/// ``RequestDL/Session``, off by default and limited to `gzip`/`deflate`), or, for
+/// ``ContentCoding/brotli``, a decoder the caller runs itself against the raw response body.
 public struct AcceptEncodingHeader: Property {
 
     // MARK: - Public properties

@@ -3,12 +3,11 @@
 //
 
 // The `.nio` counterpart to `Internals.ServerTrustPolicy` (which only ever answers `.urlSession`'s
-// `SecTrust`-based challenge). AsyncHTTPClient no longer bundles SPKI pinning: `tlsPinning`/
-// `SPKIPinningConfiguration` were removed upstream in the fork's 1.38.0 release, replaced by two
-// thin, policy-free hooks (`HTTPClient.Configuration.tlsCustomVerification` for the NIOSSL backend,
-// `.tlsCustomVerificationNetworkFramework` for the Network.framework one) that let a caller fully
-// own the accept/reject decision. This type is what plugs RequestDL's own trust-root + SPKI pinning
-// logic into those hooks, so `.nio` keeps working exactly as before from a caller's perspective.
+// `SecTrust`-based challenge). AsyncHTTPClient doesn't bundle SPKI pinning: it offers two
+// thin, policy-free hooks (`HTTPClient.Configuration.tlsCustomVerification` for the NIOSSL
+// backend, `.tlsCustomVerificationNetworkFramework` for the Network.framework one) that let a
+// caller fully own the accept/reject decision. This type is what plugs RequestDL's own
+// trust-root + SPKI pinning logic into those hooks.
 
 // The whole file is .nio/.nioTransportServices-only (see the header comment above), since
 // .urlSession has Internals.ServerTrustPolicy instead.
@@ -78,10 +77,10 @@ extension Internals {
             // Mirrors the Darwin branch above: a `trustDecisionObserver` configured with no pins
             // must still install a portable evaluator, or it silently never fires at all off
             // Darwin. `makePortableEvaluator` below already calls `observer` unconditionally on
-            // every branch (`.validCertificate`/`.couldNotValidate`), so skipping this guard is
-            // the only thing standing between a caller's audit/observability hook and total
-            // silence — the connection still validates correctly via NIOSSL's native path either
-            // way, so nothing else about the request's success or failure depends on this.
+            // every branch (`.validCertificate`/`.couldNotValidate`), so skipping this guard is the
+            // only thing standing between a caller's audit/observability hook and total silence.
+            // The connection still validates correctly via NIOSSL's native path either way, so
+            // nothing else about the request's success or failure depends on this.
             guard !tlsPins.isEmpty || observer != nil else {
                 return nil
             }

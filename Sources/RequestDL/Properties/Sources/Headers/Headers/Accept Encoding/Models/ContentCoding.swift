@@ -12,11 +12,10 @@
 /// a string literal to initialize an instance of `ContentCoding`.
 ///
 /// > Note: This package's built-in response decompression (`Internals.Decompression`, over
-/// `AsyncHTTPClient`'s `NIOHTTPCompression`) only implements `gzip` and `deflate` — there is no
-/// Brotli support in NIO yet. Advertising ``brotli`` here does not need it: it only tells the
-/// server that a Brotli-encoded response is acceptable, and it is up to the caller to decode
-/// it — for example by disabling automatic decompression and reading the raw
-/// `Content-Encoding: br` body themselves.
+/// `AsyncHTTPClient`'s `NIOHTTPCompression`) only implements `gzip` and `deflate`, since NIO
+/// has no Brotli support yet. Advertising ``brotli`` doesn't need it: it only tells the server
+/// that a Brotli-encoded response is acceptable, and the caller decodes it, for example by
+/// disabling automatic decompression and reading the raw `Content-Encoding: br` body.
 public struct ContentCoding: Sendable, Hashable {
 
     // MARK: - Public static properties

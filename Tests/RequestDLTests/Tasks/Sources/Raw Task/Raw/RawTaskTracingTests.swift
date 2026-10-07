@@ -18,8 +18,8 @@ struct RawTaskTracingTests {
 
     // MARK: - url.full redaction
 
-    /// The regression: `url.full` used to carry `configuration.url` verbatim, which put the whole
-    /// query string on the span and made `setURLAttributes`' deliberate omission of `url.query`
+    /// `url.full` must not carry `configuration.url` verbatim, which would put the whole query
+    /// string on the span and make `setURLAttributes`' deliberate omission of `url.query`
     /// pointless.
     @Test
     func startRequestSpan_whenURLHasQuery_omitsItFromURLFull() async throws {
@@ -94,10 +94,10 @@ struct RawTaskTracingTests {
 
     // MARK: - Trace-context propagation
 
-    /// The regression: injecting with `add` appended a second `traceparent` field line when the
-    /// caller had already declared one (forwarding an upstream request's, say). Per W3C Trace
-    /// Context a receiver must treat multiple `traceparent`s as invalid and discard them, so the
-    /// trace is lost precisely in the case that was trying hardest to keep it.
+    /// Injecting with `add` would append a second `traceparent` field line when the caller had
+    /// already declared one (forwarding an upstream request's, say). Per W3C Trace Context a
+    /// receiver must treat multiple `traceparent`s as invalid and discard them, so the trace
+    /// would be lost precisely in the case that was trying hardest to keep it.
     @Test
     func startRequestSpan_whenTraceParentAlreadyDeclared_replacesItInsteadOfAppending() async throws {
         // Given

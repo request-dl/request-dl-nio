@@ -101,7 +101,7 @@ struct InternalsHashTableTests {
     }
 
     /// `Int.min` is a valid (if astronomically unlikely) `Hashable.hashValue` for any hashable
-    /// key, and `abs(Int.min)` traps — `-Int.min` cannot be represented as a positive `Int`.
+    /// key, and `abs(Int.min)` traps: `-Int.min` cannot be represented as a positive `Int`.
     /// `_index(forKey:)` must use `.magnitude`, not `abs(_:)`, to stay safe against it.
     private struct MinHashValueKey: Hashable {
         static func == (_ lhs: Self, _ rhs: Self) -> Bool { true }

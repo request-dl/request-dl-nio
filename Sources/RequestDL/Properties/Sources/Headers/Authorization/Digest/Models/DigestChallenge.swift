@@ -58,10 +58,10 @@ struct DigestChallenge: Sendable, Hashable {
 
         let opaque = parameters["opaque"]
 
-        // `realm`, `nonce`, and `opaque` are server-chosen and get echoed back, unescaped, into
-        // the client's own `Authorization` header by `DigestResponse.header(for:...)`. A `"`
-        // would break out of that header's quoted-parameter syntax, and a CR/LF would enable
-        // header injection — reject the whole challenge rather than forward either downstream.
+        // `realm`, `nonce`, and `opaque` are server-chosen and get echoed back, unescaped, into the
+        // client's own `Authorization` header by `DigestResponse.header(for:...)`. A `"` would
+        // break out of that header's quoted-parameter syntax and a CR/LF would enable header
+        // injection, so reject the whole challenge rather than forward either downstream.
         guard
             Self.isSafeQuotedValue(realm),
             Self.isSafeQuotedValue(nonce),

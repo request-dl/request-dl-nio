@@ -24,10 +24,9 @@ import struct Foundation.URL
 /// has; that path is not exercised here, the same way this suite's mTLS tests don't exercise a
 /// real Keychain round trip either.
 ///
-/// A file-backed client certificate is legitimately *accepted*
-/// now (no longer a rejection case); see `InternalsClientIdentityDescriptorTests` for that half,
-/// since proving it doesn't throw here would mean letting `result()` run all the way to
-/// `schedule(...)`.
+/// A file-backed client certificate is legitimately *accepted* (it is not a rejection case);
+/// see `InternalsClientIdentityDescriptorTests` for that half, since proving it doesn't throw
+/// here would mean letting `result()` run all the way to `schedule(...)`.
 struct BackgroundDownloadTaskTests {
 
     @Test

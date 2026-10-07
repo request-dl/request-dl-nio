@@ -4,7 +4,7 @@
 
 /// Splits a curl command line into shell-style tokens.
 ///
-/// Not a full POSIX shell — no variable expansion, no command substitution, no globbing — but it
+/// Not a full POSIX shell (no variable expansion, command substitution, or globbing), but it
 /// handles the quoting a "copy as cURL" export actually uses: single quotes (literal), double
 /// quotes (`\\`, `\"`, `\$`, `` \` `` escapes), backslash-escaping outside quotes, and bash's
 /// `$'...'` ANSI-C quoting (`\n \t \r \\ \' \" \xHH`). A trailing `\` at the end of a physical
@@ -105,7 +105,7 @@ enum CURLTokenizer {
 
     // MARK: - Private static methods
 
-    /// `\<newline>` (and `\<CRLF>`) removed outright — that is what a shell does before a
+    /// `\<newline>` (and `\<CRLF>`) removed outright. That is what a shell does before a
     /// command is ever tokenized, and it is how multi-line "copy as cURL" output is written.
     private static func removingLineContinuations(_ command: String) -> String {
         var result = ""

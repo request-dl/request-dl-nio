@@ -128,9 +128,9 @@ struct ProxyTests {
     @Test
     func proxy_whenHTTPConnectionWithConnectHeadersFromHeaderGroup() async throws {
         // Given
-        // Regression test: `HeaderGroup` used to wrap its resolved headers into an opaque leaf
-        // node, invisible to `Proxy`'s `search(for: HeaderNode.self)` over its `connectHeaders`
-        // content, so every header composed through it here silently disappeared.
+        // `HeaderGroup` must not wrap its resolved headers into an opaque leaf node, which
+        // would be invisible to `Proxy`'s `search(for: HeaderNode.self)` over its
+        // `connectHeaders` content, silently dropping every header composed through it here.
         let host = UUID().uuidString
         let port = 1_090
         let name = UUID().uuidString

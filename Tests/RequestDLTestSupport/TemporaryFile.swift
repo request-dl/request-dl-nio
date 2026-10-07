@@ -41,7 +41,7 @@ func withTemporaryFileURL<Result>(
     // The scratch root this call owns. Teardown removes *this*, never
     // `url.deletingLastPathComponent()`: with no path components that parent is the shared
     // system temporary directory itself, and removing it recursively wipes every other
-    // concurrently running test's scratch files — including the file-backed buffers
+    // concurrently running test's scratch files, including the file-backed buffers
     // `Internals.FileBufferURL.temporaryURL` places directly in there.
     let rootURL =
         temporaryDirectoryURL

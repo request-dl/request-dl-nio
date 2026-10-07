@@ -77,38 +77,36 @@ struct InternalsNIOTrustEvaluatorTests {
     }
     #endif
 
-    /// Regression coverage for the server-auth `extendedKeyUsage` check, on whichever platform
-    /// evaluator this compiles against:
+    /// The server-auth `extendedKeyUsage` check, on whichever platform evaluator this compiles
+    /// against:
     ///
     /// - On Darwin, `NIOTrustEvaluator+Darwin`'s plain (non-Network.framework)
-    ///   `tlsCustomVerification` closure used to build its from-scratch `SecTrust` with
-    ///   `SecPolicyCreateBasicX509()`, a bare chain-of-trust policy with no purpose/EKU checks at
-    ///   all. Because that closure always passes `skipsHostnameVerification: false` to
-    ///   `DarwinTrustEvaluation.prepare`, that method's own policy swap to a real SSL policy
-    ///   never triggered there (its `skipsHostnameVerification` branch never runs, and its
-    ///   `revocationPolicy` branch only *appends* to the existing, still-EKU-less array) — so a
-    ///   certificate lacking the server-auth `extendedKeyUsage` was silently accepted whenever
-    ///   this evaluator was installed (e.g. by SPKI pinning), unlike the equivalent
-    ///   `.urlSession`/Network.framework paths. See `InternalsDarwinTrustEvaluationTests`'s
+    ///   `tlsCustomVerification` closure builds its from-scratch `SecTrust` with a real SSL
+    ///   policy rather than `SecPolicyCreateBasicX509()`, a bare chain-of-trust policy with no
+    ///   purpose/EKU checks at all. The closure always passes `skipsHostnameVerification: false`
+    ///   to `DarwinTrustEvaluation.prepare`, so that method's own policy swap to a real SSL
+    ///   policy never triggers there (its `skipsHostnameVerification` branch never runs, and its
+    ///   `revocationPolicy` branch only *appends* to the existing, still-EKU-less array). A
+    ///   certificate lacking the server-auth `extendedKeyUsage` must therefore be rejected by the
+    ///   policy itself, as on the `.urlSession`/Network.framework paths. See
+    ///   `InternalsDarwinTrustEvaluationTests`'s
     ///   `prepare_whenSkipsHostnameVerification_stillEnforcesServerAuthExtendedKeyUsage`, which
-    ///   documents the same fix having already been made for the Network.framework closure.
+    ///   covers the same check for the Network.framework closure.
     /// - Off Darwin, `NIOTrustEvaluator+Portable`'s `tlsCustomVerification` closure validates
     ///   with `swift-certificates`' `RFC5280Policy` alone, which deliberately doesn't check
-    ///   purpose/EKU either (chain building, signature, validity period, basic constraints only)
-    ///   — installing this evaluator replaces BoringSSL's own default verification, which does
-    ///   enforce the `ssl_server` purpose, so the same gap existed there until
-    ///   `ServerAuthExtendedKeyUsagePolicy` was composed alongside `RFC5280Policy`.
+    ///   purpose/EKU either (chain building, signature, validity period, basic constraints only).
+    ///   Installing this evaluator replaces BoringSSL's own default verification, which does
+    ///   enforce the `ssl_server` purpose, so `ServerAuthExtendedKeyUsagePolicy` is composed
+    ///   alongside `RFC5280Policy` to close that gap.
     @Test
     func tlsCustomVerification_whenLeafLacksServerAuthExtendedKeyUsage_rejects() async throws {
-        // Given: `Self.ekuClientOnlyLeafPEM`, chaining to (not self-signed as) `Self.ekuRootPEM`
-        // — deliberately not this file's shared self-signed `rootPEM`/`Certificates(.pem)
+        // Given: `Self.ekuClientOnlyLeafPEM`, chaining to (not self-signed as) `Self.ekuRootPEM`,
+        // deliberately not this file's shared self-signed `rootPEM`/`Certificates(.pem)
         // .client()`-style single-node fixture. `BasicConstraintsPolicy` special-cases a
         // self-signed cert presented as the end-entity: it requires that cert to be marked as a
         // CA, which would reject it before this test's own `ServerAuthExtendedKeyUsagePolicy`
-        // check is ever reached, making the test pass for the wrong reason (confirmed by
-        // reverting the fix under test: it still failed on that unrelated ground). A real
-        // two-level chain sidesteps that special case entirely, isolating this test to the EKU
-        // check alone.
+        // check is ever reached, making the test pass for the wrong reason. A real two-level chain
+        // sidesteps that special case entirely, isolating this test to the EKU check alone.
         var secureConnection = Internals.SecureConnection()
         secureConnection.trustRoots = .certificates([.init(Array(Self.ekuRootPEM.utf8), format: .pem)])
         // An unrelated pin under `.audit` installs the evaluator without making the outcome
@@ -206,15 +204,14 @@ struct InternalsNIOTrustEvaluatorTests {
     #endif
 
     #if !canImport(Darwin)
-    /// Regression coverage, Linux/other-only: `resolve(from:)`'s portable branch used to guard on
-    /// `!tlsPins.isEmpty` alone, unlike its Darwin sibling above, which also triggers on a
-    /// `trustDecisionObserver` configured with no pins. A caller wiring `.trustDecisionObserver(_:)`
-    /// as an audit/observability hook with no pinning configured got it invoked on every Darwin
-    /// executor but silently never at all off Darwin -- `makePortableEvaluator` already calls
-    /// `observer` unconditionally on every branch, so the only thing missing was ever installing
-    /// the evaluator in the first place. Can't be exercised on this Darwin-only development
-    /// machine (no non-Darwin toolchain or container available here), same constraint prior
-    /// rounds noted for this exact file; verified by close reading and left for CI to run.
+    /// Linux/other-only: `resolve(from:)`'s portable branch must also install the evaluator for
+    /// a `trustDecisionObserver` configured with no pins, like its Darwin sibling above, instead
+    /// of guarding on `!tlsPins.isEmpty` alone. A caller wiring `.trustDecisionObserver(_:)` as
+    /// an audit/observability hook with no pinning configured would otherwise get it invoked on
+    /// every Darwin executor but silently never at all off Darwin: `makePortableEvaluator`
+    /// already calls `observer` unconditionally on every branch, so the only thing missing would
+    /// be installing the evaluator in the first place. Can't be exercised on Darwin-only
+    /// development machines (no non-Darwin toolchain available), so it is left for CI to run.
     private final class NoOpTrustDecisionObserver: TrustDecisionObserver, @unchecked Sendable {
         func callAsFunction(_ decision: TrustDecision) {}
     }

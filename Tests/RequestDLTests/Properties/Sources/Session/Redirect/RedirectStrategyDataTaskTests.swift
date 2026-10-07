@@ -201,10 +201,10 @@ struct RedirectStrategyDataTaskTests {
         #expect(result.head.status.code == 302)
     }
 
-    /// AsyncHTTPClient's delegate-based path used to fail the whole task for `.doNotFollow`
-    /// (resuming normal delivery of the response that triggered the redirect had no route back
-    /// from the state its response-delivery state machine had already committed to). Fixed by
-    /// asking the strategy the moment the response head arrives, before any body byte is read.
+    /// AsyncHTTPClient's delegate-based path must not fail the whole task for `.doNotFollow`
+    /// (resuming normal delivery of the response that triggered the redirect has no route back
+    /// from the state its response-delivery state machine has already committed to). The
+    /// strategy is asked the moment the response head arrives, before any body byte is read.
     /// See `RedirectHandler.earlyStrategyDecision(head:)` on the async-http-client fork.
     ///
     /// `.preferredExecutor(.nio)` only exists under `canImport(NIOCore)`; see the same note above.

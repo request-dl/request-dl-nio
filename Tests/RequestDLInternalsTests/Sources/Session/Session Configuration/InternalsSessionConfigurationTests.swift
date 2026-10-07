@@ -160,11 +160,11 @@ struct InternalsSessionConfigurationTests {
 
         // Then: SPKI pinning is enforced under Network.framework too, via
         // `Internals.NIOTrustEvaluator`/`HTTPClient.Configuration.tlsCustomVerificationNetworkFramework`
-        // (AsyncHTTPClient's fork, 1.38.0+), so it no longer needs to steer a session off that
-        // executor the way it did when pinning only worked through the NIOSSL backend. Network.framework
-        // doesn't exist at all off Darwin, so `isCompatibleWithNetworkFramework` itself stays
-        // unconditionally `false` there regardless of reasons, checked directly on Darwin, and via
-        // the platform-independent reasons list everywhere else.
+        // (AsyncHTTPClient's fork, 1.38.0+), so it doesn't need to steer a session off that
+        // executor. Network.framework doesn't exist at all off Darwin, so
+        // `isCompatibleWithNetworkFramework` itself stays unconditionally `false` there regardless
+        // of reasons, checked directly on Darwin, and via the platform-independent reasons list
+        // everywhere else.
         #if canImport(Darwin)
         #expect(configuration.isCompatibleWithNetworkFramework)
         #endif
@@ -186,9 +186,8 @@ struct InternalsSessionConfigurationTests {
     }
 
     #if canImport(Darwin)
-    /// Regression coverage: `minimumTLSVersion`/`maximumTLSVersion` used to be silently dropped
-    /// under `.urlSession`: no `URLSessionConfiguration` counterpart was ever set, despite both
-    /// being genuinely reachable via `tlsMinimumSupportedProtocolVersion`/
+    /// `minimumTLSVersion`/`maximumTLSVersion` must not be silently dropped under `.urlSession`:
+    /// both are reachable via `tlsMinimumSupportedProtocolVersion`/
     /// `tlsMaximumSupportedProtocolVersion` (public API since iOS 13/macOS 10.15, both already
     /// below this package's own deployment floor).
     @Test
@@ -230,11 +229,11 @@ struct InternalsSessionConfigurationTests {
         )
     }
 
-    /// Regression coverage, same bug class as the TLS-version pair above:
-    /// `Session.maximumConnectionsPerHost(_:)` reached AsyncHTTPClient's
-    /// `concurrentHTTP1ConnectionsPerHostSoftLimit` but was silently dropped under `.urlSession`,
-    /// despite `httpMaximumConnectionsPerHost` being an exact counterpart. Since `.urlSession` is
-    /// the default executor on Darwin, the modifier did nothing at all for most callers.
+    /// Same bug class as the TLS-version pair above: `Session.maximumConnectionsPerHost(_:)`
+    /// reaches AsyncHTTPClient's `concurrentHTTP1ConnectionsPerHostSoftLimit` and must not be
+    /// silently dropped under `.urlSession`, since `httpMaximumConnectionsPerHost` is an exact
+    /// counterpart. `.urlSession` is the default executor on Darwin, so otherwise the modifier
+    /// would do nothing at all for most callers.
     @Test
     func configuration_whenMaximumConnectionsPerHostSet_urlSessionConfigurationMatches() async throws {
         // Given
@@ -265,13 +264,13 @@ struct InternalsSessionConfigurationTests {
     }
 
     #if os(iOS)
-    /// Regression coverage: `multipathServiceType` (set via `Session.multipathServiceType(_:)`)
-    /// used to have no `.urlSession` counterpart at all -- only `enableMultipath` on the `.nio`
-    /// side -- so the setting silently did nothing under `.urlSession`, the default executor on
-    /// Darwin. `URLSessionConfiguration.multipathServiceType` itself only exists on iOS (which
-    /// Mac Catalyst compiles as) -- not macOS, tvOS, watchOS, or visionOS, confirmed by actual
-    /// compiler diagnostics, not just Apple's docs -- so this is gated the same way the
-    /// production mapping is.
+    /// `multipathServiceType` (set via `Session.multipathServiceType(_:)`) has a `.urlSession`
+    /// counterpart: without one, the setting would silently do nothing under `.urlSession`, the
+    /// default executor on Darwin, since only `enableMultipath` exists on the `.nio` side.
+    /// `URLSessionConfiguration.multipathServiceType` itself only exists on iOS (which Mac
+    /// Catalyst compiles as), not macOS, tvOS, watchOS, or visionOS, as confirmed by actual
+    /// compiler diagnostics, not just Apple's docs, so this is gated the same way the production
+    /// mapping is.
     @Test(
         arguments: [
             (Internals.MultipathServiceType.handover, URLSessionConfiguration.MultipathServiceType.handover),

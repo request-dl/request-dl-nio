@@ -33,7 +33,7 @@ extension Internals {
 
         /// Mirrors `Internals.ClientOperationQueue.generation`, read by
         /// `Internals.ClientManager`'s idle-cleanup sweep and ceiling eviction alongside
-        /// `isRunning` -- see that property's own doc comment.
+        /// `isRunning`, see that property's own doc comment.
         package var operationGeneration: UInt64 {
             operationQueue.generation
         }
@@ -128,18 +128,17 @@ extension Internals {
         /// concurrent test load, not this package's own delegate (`TaskDelegate`'s shared state
         /// is already lock-protected).
         ///
-        /// Bridged by hand instead, the same way the streamed-upload
-        /// overload below already does: build a plain `dataTask(with:)` with no completion
-        /// handler of its own, so `TaskDelegate` (already `URLSessionDataDelegate`-conforming) is
-        /// the *only* thing consuming the response/data, and let its own
-        /// `didCompleteWithError:`, which already knows how to turn `redirectError`/the
-        /// accumulated response into exactly this method's return shape, resolve `completion`
-        /// once the task finishes. (An earlier version of this fix instead read `data`/`response`
-        /// off a `dataTask(with:completionHandler:)` completion handler directly, alongside the
-        /// same delegate: reachable together, but not guaranteed to agree with each other.
-        /// Caught by `execute_whenRedirectChainExceedsMax_throwsRedirectLimitReachedError`, which
-        /// started failing with `MissingURLResponseError` instead of the expected
-        /// `RedirectLimitReachedError` once a redirect was actually refused.)
+        /// Bridged by hand instead, the same way the streamed-upload overload below already does:
+        /// build a plain `dataTask(with:)` with no completion handler of its own, so `TaskDelegate`
+        /// (already `URLSessionDataDelegate`-conforming) is the *only* thing consuming the
+        /// response/data, and let its own `didCompleteWithError:`, which already knows how to turn
+        /// `redirectError`/the accumulated response into exactly this method's return shape,
+        /// resolve `completion` once the task finishes. Reading `data`/`response` off a
+        /// `dataTask(with:completionHandler:)` completion handler directly, alongside the same
+        /// delegate, is reachable together but not guaranteed to agree with each other:
+        /// `execute_whenRedirectChainExceedsMax_throwsRedirectLimitReachedError` would fail with
+        /// `MissingURLResponseError` instead of the expected `RedirectLimitReachedError` once a
+        /// redirect was actually refused.
         ///
         /// `session.data(for:delegate:)` also cancelled its underlying `URLSessionTask`
         /// automatically when the awaiting Swift `Task` was cancelled: a guarantee this hand
@@ -491,18 +490,16 @@ extension Internals {
         ///
         /// ## Why `bytes(for:delegate:)`
         ///
-        /// Back pressure. The `didReceive data:` delegate the other overloads use has no way to
-        /// say "not yet": CFNetwork keeps reading the socket and delivering whatever it read,
-        /// regardless of how far behind the reader is, so a large or slowly-read body piles up in
-        /// memory without bound. `URLSessionTask.suspend()` looks like the answer and is not:
-        /// under ordinary CPU load (measured with the session's delegate queue held up for
-        /// 200 ms), CFNetwork went on delivering the *entire* body to a task reporting
-        /// `.suspended`, every time. `URLSession.AsyncBytes` is the one public mechanism that
-        /// holds: Foundation feeds it through a data-delivery callback CFNetwork waits on before
-        /// delivering more, so a reader that stops pulling stalls the connection itself, a few MiB
-        /// past what it read, under the same load. See `pumpResponseBody` for how that is wired
-        /// into `downloadBuffer`'s `Internals.FlowControlWindow`, and
-        /// `InternalsURLSessionClientBackPressureTests` for the measurements this relies on.
+        /// Back pressure. The `didReceive data:` delegate the other overloads use has no way to say
+        /// "not yet": CFNetwork keeps reading the socket and delivering whatever it read, so a
+        /// large or slowly-read body piles up in memory without bound. `URLSessionTask.suspend()`
+        /// is not the answer: under ordinary CPU load (measured with the session's delegate queue
+        /// held up for 200 ms), CFNetwork went on delivering the *entire* body to a task reporting
+        /// `.suspended`. `URLSession.AsyncBytes` is the one public mechanism that holds: a reader
+        /// that stops pulling stalls the connection itself, a few MiB past what it read, under the
+        /// same load. See `pumpResponseBody` for how that is wired into `downloadBuffer`'s
+        /// `Internals.FlowControlWindow`, and `InternalsURLSessionClientBackPressureTests` for the
+        /// measurements.
         ///
         /// ## What `bytes(for:delegate:)` changes, and what it doesn't
         ///
@@ -517,11 +514,12 @@ extension Internals {
         /// - The response head comes back from `bytes(for:delegate:)` itself, and the end of the
         ///   exchange (success, failure, cancellation) from the body's `AsyncBytes` ending or
         ///   throwing, rather than from `didReceive response:`/`didCompleteWithError:`.
-        /// - The request body can no longer go through `uploadTask(with:from:)`/
-        ///   `uploadTask(with:fromFile:)`, which `bytes(for:delegate:)` has no counterpart for. The
-        ///   body is still materialized exactly as before (`Internals.URLSessionUploadFile`), and
-        ///   then attached to the request itself: see `attachUploadBody(_:to:)`, or, when the
-        ///   execution can be suspended, `Internals.URLSessionUploadBodyPump`.
+        /// - The request body can't go through
+        /// `uploadTask(with:from:)`/`uploadTask(with:fromFile:)`,
+        ///   which `bytes(for:delegate:)` has no counterpart for. The body is still materialized
+        ///   (`Internals.URLSessionUploadFile`), and then attached to the request itself: see
+        ///   `attachUploadBody(_:to:)`, or, when the execution can be suspended,
+        ///   `Internals.URLSessionUploadBodyPump`.
         ///
         /// ## Suspension and reconnection
         ///
@@ -551,11 +549,11 @@ extension Internals {
             let operation = operationQueue.operation()
             let release = await throttledExecutor.acquire()
 
-            // See the equivalent comment in `execute(request:delegate:)`: a cancelled caller
-            // must not have its request dispatched once a slot frees up. Both the operation slot
-            // and the throttle permit are handed back here, since neither is tied to a `defer`
-            // in this overload -- their usual release path (`onDownloadComplete`, wired up
-            // below) never runs when the request is never actually dispatched.
+            // See the equivalent comment in `execute(request:delegate:)`: a cancelled caller must
+            // not have its request dispatched once a slot frees up. Both the operation slot and the
+            // throttle permit are handed back here, since neither is tied to a `defer` in this
+            // overload, and their usual release path (`onDownloadComplete`, wired up below) never
+            // runs when the request is never actually dispatched.
             guard !Task.isCancelled else {
                 release()
                 operation.complete()
@@ -751,7 +749,7 @@ extension Internals {
         }
 
         /// Runs one request for `executeSessionTask`, from sending it to the end of the response
-        /// body, resolving `head` and ending `downloadBuffer` exactly once whichever way it goes --
+        /// body, resolving `head` and ending `downloadBuffer` exactly once whichever way it goes,
         /// over as many exchanges as reconnecting a lost download takes, when `resumption` allows
         /// it.
         private static func runExchange(
@@ -790,12 +788,12 @@ extension Internals {
 
             do {
                 // Ordinarily just one request. Loops only when `TaskDelegate` deferred a redirect
-                // to here instead of handing it back to `URLSession` -- see
-                // `completeRedirect(with:_:)`'s doc comment for why (a file-backed body resend
-                // `URLSession` itself won't reliably carry out, observed directly on watchOS).
-                // Each pass is a genuinely new task, sharing `taskDelegate` so redirect counting,
-                // history and error state keep accumulating exactly as they would across
-                // `URLSession`'s own automatic follows.
+                // to here instead of handing it back to `URLSession` (see
+                // `completeRedirect(with:_:)`'s doc comment for why: a file-backed body resend
+                // `URLSession` itself won't reliably carry out, seen on watchOS). Each pass is a
+                // genuinely new task, sharing `taskDelegate` so redirect counting, history and
+                // error state keep accumulating as they would across `URLSession`'s own automatic
+                // follows.
                 func resolveExchange() async throws -> (URLSession.AsyncBytes, URLResponse) {
                     var currentRequest = request
 
@@ -938,9 +936,9 @@ extension Internals {
         /// before a single byte of its body reaches `downloadBuffer`; anything but exactly the
         /// rest of the same representation ends the download with the mismatch.
         ///
-        /// A failure while suspended -- typically the request timing out because nothing moved
-        /// for `timeoutIntervalForRequest` -- only reconnects once the execution is resumed:
-        /// a new connection would otherwise just idle out the same way.
+        /// A failure while suspended (typically the request timing out because nothing moved for
+        /// `timeoutIntervalForRequest`) only reconnects once the execution is resumed: a new
+        /// connection would otherwise just idle out the same way.
         ///
         /// - Returns: Once the body is complete.
         /// - Throws: Whatever should end the download: the last transport failure once the budget
@@ -1040,8 +1038,8 @@ extension Internals {
             }
         }
 
-        /// Whether `error` means the connection was lost or couldn't be (re)established -- the
-        /// failures a download continuation can recover from -- as opposed to a cancellation, a
+        /// Whether `error` means the connection was lost or couldn't be (re)established (the
+        /// failures a download continuation can recover from) as opposed to a cancellation, a
         /// TLS/trust or redirect-policy failure, or a malformed response, which it can't.
         package static func isTransientTransportFailure(_ error: Error) -> Bool {
             guard let error = error as? URLError else {
@@ -1093,9 +1091,9 @@ extension Internals {
                 fileURL = url
             }
 
-            // Checked up front, not left to the stream: `uploadTask(with:fromFile:)` used to send
-            // a file that had gone missing as an empty body, with a `Content-Length: 0`, and
-            // report success.
+            // Checked up front, not left to the stream: `uploadTask(with:fromFile:)` would send a
+            // file that had gone missing as an empty body, with a `Content-Length: 0`, and report
+            // success.
             let attributes = try FileManager.default.attributesOfItem(atPath: fileURL.path)
 
             guard
@@ -1461,19 +1459,18 @@ extension Internals.URLSessionClient {
 
         /// Hands `request` to `URLSession` to follow automatically, unless this task's body is
         /// file-backed and `request` still carries one (i.e. its method wasn't downgraded to
-        /// `GET`/`HEAD`) -- observed directly, on watchOS specifically: `URLSession` there
-        /// neither calls `needNewBodyStream` for such a resend nor honours a stream attached to
-        /// the request returned from this very delegate method, and instead silently resends the
-        /// *original* request's stream, already exhausted by the first send. Every other tested
-        /// platform (macOS, iOS, iPadOS, tvOS, Catalyst) does call `needNewBodyStream` here on
-        /// its own and sends the body correctly.
+        /// `GET`/`HEAD`). On watchOS, `URLSession` neither calls `needNewBodyStream` for such a
+        /// resend nor honours a stream attached to the request returned from this delegate method,
+        /// and instead silently resends the *original* request's stream, already exhausted by the
+        /// first send. Every other tested platform (macOS, iOS, iPadOS, tvOS, Catalyst) calls
+        /// `needNewBodyStream` here on its own and sends the body correctly.
         ///
-        /// So for this one combination, this refuses the automatic follow (`completionHandler(nil)`,
-        /// same as `.disallow`) and defers to `runExchange`, which takes `request` from
-        /// `takePendingManualBodyRedirect()`, attaches a fresh stream itself, and reissues it as a
-        /// brand new `bytes(for:delegate:)` call -- a genuinely new task, not a continuation of
-        /// the redirected one, so the platform quirk above (specific to *resending* a stream on
-        /// the same continuing exchange) never applies to it.
+        /// So for this one combination, this refuses the automatic follow
+        /// (`completionHandler(nil)`, same as `.disallow`) and defers to `runExchange`, which takes
+        /// `request` from `takePendingManualBodyRedirect()`, attaches a fresh stream itself, and
+        /// reissues it as a brand new `bytes(for:delegate:)` call. That is a genuinely new task,
+        /// not a continuation of the redirected one, so the platform quirk above never applies to
+        /// it.
         private func completeRedirect(with request: URLRequest, _ completionHandler: (URLRequest?) -> Void) {
             guard
                 makeBodyStream != nil,
@@ -1554,7 +1551,7 @@ extension Internals.URLSessionClient {
 
             // `tlsDelegate`/`identityPolicy` hold the trust configuration (pinning, custom trust
             // roots, revocation) resolved for the *destination* host, and are deliberately still
-            // consulted for a redirect target (a different destination host) -- see
+            // consulted for a redirect target (a different destination host). See
             // `URLSessionIdentityPolicy.handle`'s own doc comment. A proxy challenge is not that:
             // when the configured proxy terminates TLS itself (an HTTPS-inspecting forward proxy),
             // URLSession delivers a server-trust challenge for the *proxy's* own certificate, with
@@ -1712,8 +1709,8 @@ extension Internals.URLSessionClient {
 
         /// The redirect `willPerformHTTPRedirection` deferred to `runExchange` (see
         /// `_pendingManualBodyRedirect`'s own doc comment), with a fresh stream over
-        /// `makeBodyStream`'s stream already attached and ready to send -- `nil` when there's nothing
-        /// pending. Cleared so it's only ever taken once.
+        /// `makeBodyStream`'s stream already attached and ready to send, or `nil` when there's
+        /// nothing pending. Cleared so it's only ever taken once.
         ///
         /// - Throws: if the body's file is gone by the time of the resend, the same
         /// failure `attachUploadBody(_:to:)` raises for the initial request, rather than

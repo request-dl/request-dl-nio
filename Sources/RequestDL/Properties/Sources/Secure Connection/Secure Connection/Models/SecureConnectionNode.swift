@@ -152,7 +152,7 @@ struct SecureConnectionNode: PropertyNode {
     // MARK: - Internal methods
 
     func make(_ make: inout Make) async throws {
-        // Certificates, trust roots, TLS settings, and so on no longer require an enclosing
+        // Certificates, trust roots, TLS settings, and so on don't require an enclosing
         // `SecureConnection` to attach to: the base is created lazily, right here, the first
         // time any of them is actually resolved. `SecureConnection` itself is just one more way
         // to reach this same point (its own `Node` conforms to `SecureConnectionPropertyNode`

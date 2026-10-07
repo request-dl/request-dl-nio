@@ -159,7 +159,7 @@ struct InternalsDownloadBufferTests {
         #expect(receivedBytes == expectedBytes)
     }
 
-    // Regression test for the KMP-based separator scan: "aab" against "aaab" forces a failed
+    // KMP-based separator scan: "aab" against "aaab" forces a failed
     // match at index 2 (`aa` + `a` != `aab`'s 3rd byte `b`) that must fall back to a partial
     // match of length 1 (not reset straight to 0), or the following "ab" would be missed and
     // the whole input would come back as one unsplit chunk instead of two.

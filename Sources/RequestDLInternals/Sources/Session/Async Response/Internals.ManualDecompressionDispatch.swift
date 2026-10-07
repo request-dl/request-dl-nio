@@ -118,12 +118,12 @@ extension Internals.ManualDecompressionDispatch {
     ///
     /// `.skip` never does (either decompression is disabled, or a transport already decoded the
     /// body natively before these bytes were observed). `.dispatch` only does when the response's
-    /// own `Content-Encoding` names something beyond what's already natively decoded -- an absent
+    /// own `Content-Encoding` names something beyond what's already natively decoded: an absent
     /// or `identity` header, or one `resolvedStream(for:source:)` will itself pass straight
     /// through, answers `false` here too, for the same reason.
     ///
     /// `Internals.CacheControl`'s write-side tee attaches at the wire-byte level, upstream of
-    /// `resolvedStream(for:source:)` -- so wherever this answers `true`, whatever the tee would
+    /// `resolvedStream(for:source:)`, so wherever this answers `true`, whatever the tee would
     /// capture is still compressed, not the plain bytes a cache replay (which never re-runs
     /// decompression) would need. Callers use this to skip caching such a response outright
     /// rather than silently persisting the still-compressed body as if it were already decoded.
@@ -143,7 +143,7 @@ extension Internals.ManualDecompressionDispatch {
 
     /// Every `Content-Encoding` field line, comma-split and joined into one list. RFC 9110 §5.2
     /// makes several field lines of the same name exactly equivalent to one comma-joined line, so
-    /// a server is free to send either — and taking only `.first` of either shape means a body
+    /// a server is free to send either, and taking only `.first` of either shape means a body
     /// compressed twice is decoded once and handed back still compressed, with
     /// `Internals.CacheControl` storing those wrong bytes on the way past.
     ///
@@ -178,8 +178,8 @@ extension Internals.AsyncStream where Element == Internals.DataBuffer {
     /// and discarded the returned stream unread, or abandoned it mid-read: the task would run to
     /// completion regardless, decoding and, under `.untilFirstIteration`'s "buffer until the
     /// first read" contract, buffering without bound a body nobody asked for. The returned stream
-    /// carries a termination token for exactly this reason -- see `Internals.AsyncStream
-    /// .withTerminationToken(_:)`'s own doc comment -- so releasing it unread (or abandoning it
+    /// carries a termination token for exactly this reason (see `Internals.AsyncStream
+    /// .withTerminationToken(_:)`'s own doc comment), so releasing it unread (or abandoning it
     /// partway through) cancels this task instead.
     fileprivate static func decompressing(
         _ source: Internals.AsyncStream<Internals.DataBuffer>,
@@ -209,8 +209,8 @@ extension Internals.AsyncStream where Element == Internals.DataBuffer {
 
         let output = Internals.AsyncStream<Internals.DataBuffer>(flowControl: flowControl)
 
-        // Captures this untouched `output` -- not the token-carrying copy returned below -- so
-        // this task's own reference never keeps that token alive by itself. See
+        // Captures this untouched `output`, not the token-carrying copy returned below, so this
+        // task's own reference never keeps that token alive by itself. See
         // `Internals.AsyncStream.withTerminationToken(_:)`'s own "Important" note.
         let task = _Concurrency.Task {
             do {

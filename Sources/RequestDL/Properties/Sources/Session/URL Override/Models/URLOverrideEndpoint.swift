@@ -15,8 +15,8 @@ struct URLOverrideEndpoint: Sendable, Equatable {
     let scheme: String
     let host: String
     /// `nil` when the endpoint carries no explicit port (matches/rewrites regardless of the
-    /// other side's port). Kept distinct from `host` — unlike `URLComponents.host`, which never
-    /// includes it — so a rule origin/destination declaring a non-default port doesn't silently
+    /// other side's port). Kept distinct from `host`, which like `URLComponents.host` never
+    /// includes it, so a rule origin/destination declaring a non-default port doesn't silently
     /// match or rewrite to the wrong one. See `init(baseURL:)`.
     let port: Int?
     let pathComponents: [String]
@@ -27,7 +27,7 @@ extension URLOverrideEndpoint {
     /// Parses a user-supplied origin/destination string.
     ///
     /// A bare host (no `"scheme://"`) is rejected rather than defaulted, unlike ``BaseURL`` or
-    /// ``FlexibleURL`` — with two strings per rule instead of one, an implicit scheme would make
+    /// ``FlexibleURL``: with two strings per rule instead of one, an implicit scheme would make
     /// it ambiguous which side of the pair a validation failure came from.
     init(parsing url: String) throws {
         // `Character.isWhitespace` already covers newlines, so this is the whole of
@@ -64,12 +64,12 @@ extension URLOverrideEndpoint {
     /// `RequestConfiguration.baseURL`/``BaseURL``) for matching against a rule's origin.
     ///
     /// Returns `nil` instead of throwing for an empty/malformed value (e.g. no ``BaseURL``
-    /// declared) — this runs after the property tree has already fully resolved, past the point
-    /// where a `Property` can still fail the build; an unmatched request should just pass through.
+    /// declared), since this runs after the property tree has fully resolved, past the point
+    /// where a `Property` can still fail the build. An unmatched request should just pass through.
     init?(baseURL: String) {
         // Neither `range(of:)` (a Foundation member this file has no import for) nor
-        // `firstRange(of:)`/`contains(_:)` for a substring pattern (stdlib, but gated to
-        // macOS 13/iOS 16 — newer than this package's macOS 12/iOS 15 minimum). A single
+        // `firstRange(of:)`/`contains(_:)` for a substring pattern (stdlib, but gated to macOS
+        // 13/iOS 16, newer than this package's macOS 12/iOS 15 minimum) can be used. A single
         // `Character` lookup plus `hasPrefix` has neither restriction.
         guard let colonIndex = baseURL.firstIndex(of: ":") else {
             return nil
@@ -84,12 +84,12 @@ extension URLOverrideEndpoint {
         let scheme = String(baseURL[..<colonIndex])
         let hostAndPort = baseURL[baseURL.index(afterColon, offsetBy: 2)...]
 
-        // `FlexibleURLNode.constructBaseURLString` appends `":\(port)"` after the host when one
-        // was specified, so this reverses that: everything after the *last* colon, if it's a
-        // run of digits, is the port; otherwise there's none to split off. Scanning from the end
-        // (rather than the first colon) matters because a bracketed IPv6 host would otherwise
-        // split on one of its own colons instead — this still can't tell an IPv6 host without a
-        // port from one whose brackets got lost, but that ambiguity predates this initializer.
+        // `FlexibleURLNode.constructBaseURLString` appends `":\(port)"` after the host when one was
+        // specified, so this reverses that: everything after the *last* colon, if it's a run of
+        // digits, is the port; otherwise there's none to split off. Scanning from the end (rather
+        // than the first colon) matters because a bracketed IPv6 host would otherwise split on one
+        // of its own colons. This still can't tell an IPv6 host without a port from one whose
+        // brackets got lost.
         let host: String
         let port: Int?
 

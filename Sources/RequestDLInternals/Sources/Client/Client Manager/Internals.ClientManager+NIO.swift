@@ -115,12 +115,12 @@ extension Internals.ClientManager {
         )
         #endif
 
-        // Tracked even when `isPoolable` is `false` and nothing will ever match this entry
-        // again. The table is not only a reuse cache, it is also what owns a client for its
-        // lifetime: `Internals.Client.deinit` shuts the underlying `HTTPClient` down, and the
-        // caller's reference does not outlive the call that handed it out — it returns as soon
-        // as the response head arrives, with the body still streaming. Dropping the entry here
-        // therefore tore down the connection out from under the response that was using it.
+        // Tracked even when `isPoolable` is `false` and nothing will ever match this entry again.
+        // The table is not only a reuse cache, it is also what owns a client for its lifetime:
+        // `Internals.Client.deinit` shuts the underlying `HTTPClient` down, and the caller's
+        // reference does not outlive the call that handed it out (it returns as soon as the
+        // response head arrives, with the body still streaming). Dropping the entry here would tear
+        // down the connection out from under the response that is using it.
         //
         // Skipping the *scan* is what removes this configuration's real cost (see
         // `client(provider:sessionConfiguration:)`); `maximumCount`'s eviction is what keeps the

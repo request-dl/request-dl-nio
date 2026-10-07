@@ -157,9 +157,8 @@ extension InternalsSecureConnectionTests {
 
     /// `buildURLSessionConfiguration()` maps `maximumTLSVersion` straight onto
     /// `URLSessionConfiguration.tlsMaximumSupportedProtocolVersion`, so flagging it here would
-    /// force every such session onto NIO despite `.urlSession` handling it natively -- the same
-    /// class of bug already ruled out for `minimumTLSVersion` right below. A prior version of
-    /// this check incorrectly did flag it, making that mapping permanently unreachable.
+    /// force every such session onto NIO despite `.urlSession` handling it natively, the same
+    /// class of bug ruled out for `minimumTLSVersion` right below.
     @Test
     func secureConnection_whenMaximumTLSVersionSet_remainsCompatible() async throws {
         // Given

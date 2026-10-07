@@ -38,11 +38,11 @@ extension Internals {
         /// - Important: Strips embedded CR/LF from both `name` and `value`. These pairs feed
         /// `Internals.Proxy.connectHeaders` (a CONNECT tunnel's header block) and
         /// `Internals.RedirectRequest.headers` (replayed verbatim on the request that follows a
-        /// redirect), so a value that traces back to attacker-influenced input -- e.g. a header
-        /// copied by a custom `RedirectStrategy` from the redirect target's own response --
-        /// must never reach the wire with an embedded `\r\n`: left unstripped, it could end the
-        /// field line early and splice extra header lines into the outgoing request. This mirrors
-        /// the equivalent stripping in `RequestDL.HTTPHeaders`.
+        /// redirect), so a value that traces back to attacker-influenced input (e.g. a header
+        /// copied by a custom `RedirectStrategy` from the redirect target's own response) must
+        /// never reach the wire with an embedded `\r\n`: left unstripped, it could end the field
+        /// line early and splice extra header lines into the outgoing request. This mirrors the
+        /// equivalent stripping in `RequestDL.HTTPHeaders`.
         package mutating func add(name: String, value: String) {
             pairs.append((name: Self.strippingCRLF(name), value: Self.strippingCRLF(value)))
         }

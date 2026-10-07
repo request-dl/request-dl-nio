@@ -14,8 +14,9 @@ Discover the possibilities to execute your request and manipulate the received d
 
 - <doc:Modifiers-and-Interceptors>
 
-### Monitoring upload and download progress
+### Monitoring requests
 
+- <doc:Monitoring-requests>
 - <doc:Upload-and-download-progress>
 
 ### Loading images

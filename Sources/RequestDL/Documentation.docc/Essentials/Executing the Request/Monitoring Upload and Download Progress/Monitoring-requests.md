@@ -87,7 +87,7 @@ DownloadTask { ... }
     .collectData()
 ```
 
-### Topics
+## Topics
 
 - ``RequestMonitor``
 - ``RequestExecution``

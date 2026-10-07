@@ -33,13 +33,12 @@ extension Internals {
         /// instead of `.urlSession`. Neither goes through CFNetwork, and `NIOHTTPCompression`
         /// has no decoder for whatever such an algorithm stands in for.
         case decompressionRequiresURLSession
-        /// No longer produced by anything, and retained only so the public
+        /// Not produced by anything, and retained only so the public
         /// `ExecutorRequirementError.Reason` case mapped from it stays source-compatible.
         ///
-        /// `maximumTLSVersion` is reachable under URLSession after all, via
+        /// `maximumTLSVersion` is reachable under URLSession, via
         /// `URLSessionConfiguration.tlsMaximumSupportedProtocolVersion`; see
-        /// `Internals.SecureConnection.urlSessionIncompatibilityReasons()` for the evidence and
-        /// for the wrong premise this case originally rested on.
+        /// `Internals.SecureConnection.urlSessionIncompatibilityReasons()` for the evidence.
         case maximumTLSVersionUnderURLSession
         /// `URLSession` negotiates ALPN automatically and Info.plist has no key to override the
         /// protocol list it offers, so this has no reachable equivalent under URLSession at all.

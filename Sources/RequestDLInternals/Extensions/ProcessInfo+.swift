@@ -20,7 +20,7 @@ extension ProcessInfo {
     /// for the `User-Agent` and to name the on-disk cache directory, so it wants to be the same
     /// string across launches of the same program, not globally unique.
     ///
-    /// - Note: `processName` is sanitized to a valid RFC 9110 `token` — unlike a bundle
+    /// - Note: `processName` is sanitized to a valid RFC 9110 `token`. Unlike a bundle
     /// identifier, it is not guaranteed to already be one (it may contain spaces or other
     /// characters a shell or OS allows in an executable name).
     package var applicationIdentifier: String {
@@ -55,9 +55,9 @@ extension ProcessInfo {
     /// The operating system, not the machine.
     ///
     /// - Important: Must not be `hostName`. That puts the user's machine name into the
-    /// `User-Agent` of every outgoing request — on a laptop that is usually the owner's real
-    /// name, a privacy leak — and it is useless for the header's actual purpose anyway, since
-    /// a server cannot tell platforms apart from a machine name.
+    /// `User-Agent` of every outgoing request, which on a laptop is usually the owner's real
+    /// name (a privacy leak), and it is useless for the header's purpose anyway, since a server
+    /// cannot tell platforms apart from a machine name.
     private static var systemName: String {
         #if os(macOS)
         return "macOS"

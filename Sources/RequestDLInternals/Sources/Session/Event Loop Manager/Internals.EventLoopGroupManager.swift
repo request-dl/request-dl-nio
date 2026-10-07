@@ -14,14 +14,14 @@ extension Internals {
     /// are retired.
     ///
     /// `EventLoopGroupManager`'s table is a *cache*, not an owner. An entry can be dropped from
-    /// it — evicted for capacity, or superseded — while clients built on that group are still
+    /// it (evicted for capacity, or superseded) while clients built on that group are still
     /// running requests over it. Shutting the group down at that moment pulls the event loops out
     /// from under live connections, and an `AsyncHTTPClient.HTTPClient` on a dead group can never
     /// complete its own `shutdown()`: NIO reports the unfulfilled promise as a leaked promise and
     /// traps the process.
     ///
     /// So the group outlives the cache entry and is retired here instead, once the last holder of
-    /// this token — the manager while it is cached, plus every `Internals.Client` built on it —
+    /// this token (the manager while it is cached, plus every `Internals.Client` built on it)
     /// has let go.
     package final class EventLoopGroupToken: @unchecked Sendable {
 
@@ -77,8 +77,8 @@ extension Internals {
         /// Same shape and same reason as `Internals.Storage.maximumCount`: a ceiling, not a
         /// working limit, so that a workload producing a great many distinct session identifiers
         /// cannot grow the table without bound. It is set far below `Storage`'s, because an entry
-        /// here stands for a whole set of OS threads rather than a single cached value —
-        /// `Session(_:numberOfThreads:)` with a fresh identifier per request otherwise leaked a
+        /// here stands for a whole set of OS threads rather than a single cached value:
+        /// `Session(_:numberOfThreads:)` with a fresh identifier per request would otherwise leak a
         /// `MultiThreadedEventLoopGroup`, threads and all, for the life of the process.
         ///
         /// Evicting is never the same thing as shutting down: what actually retires a group is

@@ -261,12 +261,12 @@ extension Internals {
 
                 _dispatch(.success(dataBuffer))
 
-                // `clear()`, not a bare cursor reset: this same accumulation `buffer` is reused
-                // for every chunk over the whole life of the download/stream, so merely moving
-                // the cursors back to zero leaves the store's allocation pinned at whatever size
-                // it grew to for its single largest chunk -- e.g. one unusually large `.length`
-                // window, or one long line before a `.separator` -- for the connection's entire
-                // remaining lifetime. `clear()` actually releases that capacity between chunks.
+                // `clear()`, not a bare cursor reset: this same accumulation `buffer` is reused for
+                // every chunk over the whole life of the download/stream, so merely moving the
+                // cursors back to zero leaves the store's allocation pinned at whatever size it
+                // grew to for its single largest chunk (e.g. one unusually large `.length` window,
+                // or one long line before a `.separator`) for the connection's entire remaining
+                // lifetime. `clear()` actually releases that capacity between chunks.
                 await buffer.clear()
             }
 
@@ -320,13 +320,13 @@ extension Internals {
 
         /// - Parameter flowControl: Meters `stream` so its producer can be paused rather than run
         ///   arbitrarily far ahead of the reader. Only worth passing where the producer can
-        ///   actually honour it -- today that is `Internals.ClientResponseReceiver`, whose NIO
+        ///   actually honour it: today that is `Internals.ClientResponseReceiver`, whose NIO
         ///   delegate contract has a way to say "not yet", and
         ///   `Internals.URLSessionClient.pumpResponseBody`, which pulls from a
         ///   `URLSession.AsyncBytes` only while there is room. A producer that ignores the window
         ///   (the cached-response replay, the mocked task, the `URLSession` `didReceive data:`
-        ///   delegate behind the non-`SessionTask` overloads) gains nothing from one and keeps the
-        ///   previous, unmetered behaviour by passing `nil`.
+        ///   delegate behind the non-`SessionTask` overloads) gains nothing from one and passes
+        ///   `nil`, which leaves it unmetered.
         ///
         /// - Parameter observer: Counts every byte handed to ``append(_:)``, the one place both
         ///   executors (and a continuation after a lost connection) feed the response body
@@ -355,8 +355,8 @@ extension Internals {
             storage.failed(error)
         }
 
-        // No longer `mutating`: the state lives in a class, so requiring `var` at the call
-        // site only advertised a mutation that never happened.
+        // Not `mutating`: the state lives in a class, so requiring `var` at the call site would
+        // only advertise a mutation that never happens.
         package func cacheStream(_ cacheStream: Internals.AsyncStream<DataBuffer>) {
             storage.cacheStream(cacheStream)
         }

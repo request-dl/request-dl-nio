@@ -9,8 +9,8 @@ import SystemPackage
 ///
 /// ``Certificate``, ``Certificates``, ``TrustRoots``, ``AdditionalTrustRoots``, and ``PrivateKey``
 /// all accept a plain `String` path, which is handed to the underlying TLS library exactly as
-/// given. That library only ever reports a generic "failed to load" failure back, with no mention
-/// of which path it tried or why opening it failed — this type exists to close that gap.
+/// given. That library only reports a generic "failed to load" failure, with no mention of
+/// which path it tried or why opening it failed. This type exists to close that gap.
 public struct SecureFileError: Error, Sendable {
 
     /// The kind of resource RequestDL was trying to load from ``path``.
@@ -52,8 +52,8 @@ public struct SecureFileError: Error, Sendable {
     /// Whether ``path`` is relative, rather than an absolute path.
     ///
     /// A relative path is resolved by the underlying TLS library against the current process's
-    /// working directory — not your app's bundle, not the directory your source file lives in,
-    /// and on iOS/tvOS/watchOS not anywhere predictable at all. This is `true` whenever that is
+    /// working directory, not your app's bundle or the directory your source file lives in, and
+    /// on iOS/tvOS/watchOS not anywhere predictable at all. This is `true` whenever that is
     /// the likely cause of a ``Context/cantOpenFile(reason:)`` failure.
     public let isRelativePath: Bool
 

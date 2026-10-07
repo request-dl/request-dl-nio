@@ -70,8 +70,8 @@ struct ExecutorRequirementErrorTests {
     func reason_whenEveryInternalCaseMapped_hasNonEmptyDescription(
         _ internalReason: Internals.ExecutorIncompatibilityReason
     ) async throws {
-        // Given: `requiredExecutor` is incidental here -- only the reason's own description is
-        // checked below -- so `.urlSession` (the one case that exists in every build) is used
+        // Given: `requiredExecutor` is incidental here (only the reason's own description is
+        // checked below), so `.urlSession` (the one case that exists in every build) is used
         // rather than `.nio`, which doesn't exist without `canImport(NIOCore)`.
         let internalError = Internals.IncompatibleExecutorConfigurationError(
             requiredExecutor: .urlSession,

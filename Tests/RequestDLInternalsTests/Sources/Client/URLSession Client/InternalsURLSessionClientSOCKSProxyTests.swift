@@ -41,8 +41,8 @@ struct InternalsURLSessionClientSOCKSProxyTests {
     }
 
     // `LocalSOCKSProxy` (the SOCKS proxy fixture) is deliberately NIO-only, gated
-    // `#if canImport(NIOCore)` in `RequestDLTestSupport` — see `urlsession-only-trait-isolation`
-    // memory for why (no Network.framework port attempted).
+    // `#if canImport(NIOCore)` in `RequestDLTestSupport`: there is no Network.framework port of
+    // it.
     #if canImport(NIOCore)
     @Test
     func execute_whenSOCKSProxyConfigured_tunnelsUnlessPlatformBypassesLocalhost() async throws {

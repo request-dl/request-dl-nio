@@ -431,7 +431,7 @@ public struct HTTPHeaders: Sendable, Sequence, Codable, Hashable, ExpressibleByD
     ///
     /// - Important: Also strips embedded CR/LF, not just edge whitespace. Unlike a `Form` part
     /// header (`FormGroupBuilder.strippingCRLF`, which this mirrors), a top-level header line
-    /// here is written by whichever executor's own HTTP layer serializes the request --
+    /// here is written by whichever executor's own HTTP layer serializes the request:
     /// `NIOHTTP1.HTTPHeaders` under `.nio`, which validates ASCII but not the absence of CR/LF,
     /// or `URLRequest.addValue`/`setValue` under `.urlSession`, which silently drops a header
     /// containing either. Either way, a value carrying an embedded `\r\n` (e.g. attacker-

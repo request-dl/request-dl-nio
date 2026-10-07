@@ -47,9 +47,9 @@ extension RDLWrapper where Base: UIImageView {
     ///
     /// Loads the image at `url` and sets it on this image view once it arrives.
     ///
-    /// Cancels any load already in flight on this image view before starting — safe to call
-    /// from `tableView(_:cellForRowAt:)`/`collectionView(_:cellForItemAt:)` even when cells are
-    /// reused faster than their previous image finishes loading.
+    /// Cancels any load already in flight on this image view before starting, so it is safe to
+    /// call from `tableView(_:cellForRowAt:)`/`collectionView(_:cellForItemAt:)` even when cells
+    /// are reused faster than their previous image finishes loading.
     ///
     /// - Parameters:
     ///    - url: The URL of the image.
@@ -76,19 +76,19 @@ extension RDLWrapper where Base: UIImageView {
     ///
     /// Loads `task` and sets its image on this image view once it arrives.
     ///
-    /// Use this when the request needs more than a URL — custom headers, authentication, a
-    /// specific ``Property/cachePolicy(_:)``, and so on — by building `task` the same way a
+    /// Use this when the request needs more than a URL (custom headers, authentication, a
+    /// specific ``Property/cachePolicy(_:)``, and so on) by building `task` the same way a
     /// ``DataTask`` is built. Any ``RequestTask`` producing a ``TaskResult`` of `Data` works, so a
     /// ``MockedTask`` also drops in directly.
     ///
-    /// Cancels any load already in flight on this image view before starting — safe to call
-    /// from `tableView(_:cellForRowAt:)`/`collectionView(_:cellForItemAt:)` even when cells are
-    /// reused faster than their previous image finishes loading.
+    /// Cancels any load already in flight on this image view before starting, so it is safe to
+    /// call from `tableView(_:cellForRowAt:)`/`collectionView(_:cellForItemAt:)` even when cells
+    /// are reused faster than their previous image finishes loading.
     ///
     /// - Parameters:
     ///    - id: A stable identifier for the request, used to deduplicate concurrent loads. It
     ///    can't be derived automatically from an arbitrary ``RequestTask``, so callers supply it
-    ///    explicitly — typically the URL or endpoint the request resolves to.
+    ///    explicitly, typically the URL or endpoint the request resolves to.
     ///    - task: The task that performs the request, e.g. a ``DataTask``.
     ///    - placeholder: The image to set immediately, shown until the load finishes.
     ///    - loader: The ``RDLImageLoader`` performing the request. Defaults to ``RDLImageLoader/shared``.

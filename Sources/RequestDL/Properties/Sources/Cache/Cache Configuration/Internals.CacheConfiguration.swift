@@ -41,11 +41,10 @@ extension Internals {
 
         /// Builds the cache this configuration describes.
         ///
-        /// - Important: Must not build one `DataCache`, raise its capacities to the floor below,
-        /// then discard it and return a second one constructed with `memoryCapacity ?? .zero` —
-        /// that leaves the floor as dead code, and the common path, with both capacities unset,
-        /// would produce a cache with zero of each: caching off by default with nothing to say
-        /// so.
+        /// - Important: The capacity floor must be applied to the cache that is returned. Raising
+        /// one `DataCache`'s capacities and then returning a second one built from `memoryCapacity
+        /// ?? .zero` would leave the floor as dead code and, with both capacities unset, silently
+        /// disable caching.
         func build(logger: Logger?) -> DataCache {
             let directoryURL: URL
 

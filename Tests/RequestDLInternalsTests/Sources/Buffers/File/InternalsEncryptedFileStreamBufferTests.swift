@@ -51,12 +51,12 @@ struct InternalsEncryptedFileStreamBufferTests {
 
             let reader = await Internals.Buffer<Internals.EncryptedFileStreamBuffer>(addressing: url)
 
-            // Then: an empty resource still round-trips to zero readable bytes — `writtenBytes`
+            // Then: an empty resource still round-trips to zero readable bytes: `writtenBytes`
             // correctly reports the (empty) plaintext content, not the header-plus-tag bytes the
             // real file carries. `getData()` itself answers `nil` here rather than `Data()`,
-            // matching `Internals.FileStreamBuffer.readData(length:)`'s own `length > .zero`
-            // guard — an existing invariant of this whole buffer stack for any zero-byte
-            // resource, encrypted or not, not something specific to this type.
+            // matching `Internals.FileStreamBuffer.readData(length:)`'s own `length > .zero` guard,
+            // an existing invariant of this whole buffer stack for any zero-byte resource,
+            // encrypted or not, not something specific to this type.
             #expect(reader.readableBytes == .zero)
             #expect(await reader.getData() == nil)
         }
@@ -109,7 +109,8 @@ struct InternalsEncryptedFileStreamBufferTests {
             let url = makeURL(fileURL)
 
             // Given: three whole non-final chunks, plus whatever `close()` flushes as the final
-            // one — enough for two full, independently addressable non-final chunks to swap.
+            // one, which is enough for two full, independently addressable non-final chunks to
+            // swap.
             let expected = Data((0..<(chunkPlaintextSize * 3)).map { UInt8($0 % 256) })
 
             var writer = await Internals.Buffer<Internals.EncryptedFileStreamBuffer>(addressing: url)
@@ -179,10 +180,10 @@ struct InternalsEncryptedFileStreamBufferTests {
         }
     }
 
-    /// Mirrors `InternalsFileStreamBufferTests`' identical stress test — many independent
+    /// Mirrors `InternalsFileStreamBufferTests`' identical stress test: many independent
     /// instances, each with its own file and lock, exercising the cooperative-pool-saturation
-    /// shape that made disk-backed buffer writes flaky under `swift-testing`'s parallel execution
-    /// before offloading to `NIOThreadPool`.
+    /// shape that makes disk-backed buffer writes flaky under `swift-testing`'s parallel
+    /// execution unless they are offloaded to `NIOThreadPool`.
     @Test
     func manyInstances_whenRunningConcurrently_shouldAllCompleteWithoutStallingTheCooperativePool() async throws {
         let expected = Data(repeating: 0x2A, count: 4_096)

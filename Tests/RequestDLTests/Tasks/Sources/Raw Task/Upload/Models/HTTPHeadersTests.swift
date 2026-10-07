@@ -443,11 +443,12 @@ struct HTTPHeadersTests {
         #expect(index2 == headers.index(headers.endIndex, offsetBy: -1))
     }
 
-    /// Regression coverage: `set`/`add` only trimmed edge whitespace, not an *embedded* CR/LF.
-    /// A value like `"1\r\nX-Injected: evil"` passed straight through to whatever serializes the
-    /// request (`NIOHTTP1.HTTPHeaders` under `.nio`, which validates ASCII but not CR/LF absence)
-    /// -- a real header-injection vector for attacker-influenced input reaching a `CustomHeader`.
-    /// Mirrors the CRLF stripping `FormGroupBuilder` already does for `Form` part headers.
+    /// `set`/`add` must strip an *embedded* CR/LF, not only edge whitespace. A value like
+    /// `"1\r\nX-Injected: evil"` would otherwise pass straight through to whatever serializes the
+    /// request (`NIOHTTP1.HTTPHeaders` under `.nio`, which validates ASCII but not CR/LF
+    /// absence), a real header-injection vector for attacker-influenced input reaching a
+    /// `CustomHeader`. Mirrors the CRLF stripping `FormGroupBuilder` already does for `Form` part
+    /// headers.
     @Test
     func headers_whenValueContainsEmbeddedCRLF_stripsIt() throws {
         // Given

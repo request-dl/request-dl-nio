@@ -34,7 +34,7 @@ extension Internals.ClientManager {
             }
         }
 
-        /// Mirrors the concrete client's own `operationGeneration` -- see
+        /// Mirrors the concrete client's own `operationGeneration`. See
         /// `Internals.ClientOperationQueue.generation`'s doc comment.
         package var operationGeneration: UInt64 {
             switch self {

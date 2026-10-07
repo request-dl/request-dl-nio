@@ -19,8 +19,8 @@
 /// .description(.cURL)
 /// ```
 ///
-/// A custom descriptor conforms the same way any other strategy type in RequestDL does — see
-/// ``RequestTaskModifier``/``RequestTaskInterceptor`` for the same shape — and picks up whatever
+/// A custom descriptor conforms the same way any other strategy type in RequestDL does (see
+/// ``RequestTaskModifier``/``RequestTaskInterceptor`` for the same shape) and picks up whatever
 /// ``TaskDescriptorContext`` already carries. There is nothing curl-specific about the mechanism
 /// itself.
 public protocol TaskDescriptor<Output>: Sendable {

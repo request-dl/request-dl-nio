@@ -25,15 +25,14 @@ import struct Foundation.Data
 
 /// End-to-end coverage for `Internals.ClientResponseReceiver.didReceiveBodyPart(task:_:)`'s back
 /// pressure: a reader slower than the network must hold the *connection* back, not have the
-/// body pile up in memory -- and no way of abandoning such a reader may leave the request hung.
+/// body pile up in memory, and no way of abandoning such a reader may leave the request hung.
 ///
 /// Every test observes the server rather than trusting the client's own bookkeeping alone:
 /// `StreamingServer` only writes while the socket accepts more, and counts what the kernel
 /// actually took. Once the client stops reading from the socket, that count stalls a few
 /// megabytes in, at whatever the kernel's socket buffers hold. With nothing pausing the
 /// client, it instead races to the full body regardless of the reader, which is exactly what
-/// each test's "the connection really paused" precondition rules out, so every one of them fails
-/// against the unbounded receiver, not just the one asserting the bound.
+/// each test's "the connection really paused" precondition rules out.
 @Suite(.serialized, .concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog)
 struct InternalsClientResponseReceiverBackPressureTests {
 
@@ -206,8 +205,8 @@ struct InternalsClientResponseReceiverBackPressureTests {
         }
     }
 
-    /// The reader reads a little and then goes away for good -- a `break`, or the task running
-    /// the loop being cancelled -- while the response itself is kept. Its iterator going away
+    /// The reader reads a little and then goes away for good (a `break`, or the task running
+    /// the loop being cancelled) while the response itself is kept. Its iterator going away
     /// releases the window, so the request runs to completion instead of staying paused forever
     /// for a reader that can never come back.
     @Test
@@ -247,9 +246,9 @@ struct InternalsClientResponseReceiverBackPressureTests {
     }
 
     /// The caller cancels the request while it is paused behind a reader that is still there.
-    /// The window is released right away, by the cancellation itself -- not only once the
+    /// The window is released right away, by the cancellation itself, not only once the
     /// cancellation reaches `didReceiveError`, which AsyncHTTPClient defers until after a pending
-    /// body part future completes whenever the response's end has already arrived -- and the
+    /// body part future completes whenever the response's end has already arrived. The
     /// reader then gets the failure instead of waiting for bytes that will never come.
     @Test
     func requestCancelledWhileParked_failsTheReaderInsteadOfHanging() async throws {
@@ -298,10 +297,9 @@ struct InternalsClientResponseReceiverBackPressureTests {
     /// In that state AsyncHTTPClient does *not* report the cancellation to the delegate straight
     /// away: it discards its buffer and holds the error back until the pending body part future
     /// completes (`RequestBag.StateMachine.fail(_:)`, `.buffering(_, next: .eof)`). A window
-    /// released only from `didReceiveError` therefore stayed shut -- observed directly with that
-    /// release removed from the cancellation path: `waitingCountForTesting` stuck at 1, and
-    /// `didReceiveError` never called -- leaving a request that could never finish, and a
-    /// promise that could never be fulfilled, for as long as anything referenced it.
+    /// released only from `didReceiveError` would therefore stay shut, leaving a request that
+    /// could never finish (`waitingCountForTesting` stuck at 1, `didReceiveError` never called)
+    /// and a promise that could never be fulfilled, for as long as anything referenced it.
     ///
     /// Made deterministic with a window far smaller than a body that fits in a single write: the
     /// head, the whole body and its end then reach AsyncHTTPClient in one read, so by the time
@@ -536,8 +534,8 @@ private final class StreamingServer: @unchecked Sendable {
         lock.withLock { _channel }?.close(promise: nil)
     }
 
-    /// Waits for the count of bytes the kernel accepted to stop moving for half a second -- or to
-    /// reach the whole body -- and returns it.
+    /// Waits for the count of bytes the kernel accepted to stop moving for half a second, or to
+    /// reach the whole body, and returns it.
     func settledBytesWritten() async throws -> Int {
         var last = -1
         var quietPolls = 0

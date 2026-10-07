@@ -160,12 +160,12 @@ struct FlexibleURLTests {
         #expect(resolved.requestConfiguration.url == expectedUrl)
     }
 
-    /// Regression coverage: classification used to search the *entire* normalized string for
-    /// `"://"`, including the query, so an ordinary relative path whose query value happens to
-    /// contain it (a redirect URL, say) was misread as a complete URL. Once parsed, that string
-    /// has no `host`, so `baseURL` stayed untouched, but the path/query still appended with
-    /// `fromStart: true` (the complete-URL branch's behavior) instead of `fromStart: false`,
-    /// prepending "search" ahead of the existing "v1" path instead of after it.
+    /// Classification must not search the *entire* normalized string for `"://"`, including
+    /// the query: an ordinary relative path whose query value happens to contain it (a redirect
+    /// URL, say) would be misread as a complete URL. Once parsed, that string has no `host`, so
+    /// `baseURL` stays untouched, but the path/query would append with `fromStart: true` (the
+    /// complete-URL branch's behavior) instead of `fromStart: false`, prepending "search" ahead
+    /// of the existing "v1" path instead of after it.
     @Test func relativePathWithQueryValueContainingSchemeSeparator_appendsAfterExistingPath() async throws {
         // Given
         let endpointPath = "/search?redirect=http://evil.example.com"

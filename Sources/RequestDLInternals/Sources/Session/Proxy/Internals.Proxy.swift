@@ -86,8 +86,8 @@ extension Internals.Proxy: Hashable {
 
     // `connectHeaders` matters here: `Internals.Session.Configuration.==` uses this as part of
     // `Internals.ClientManager`'s pooled-client cache key. Omitting it would let two sessions
-    // whose proxy differs only in CONNECT headers -- commonly where proxy-auth secrets, distinct
-    // per session, actually live -- be treated as interchangeable, sharing (and thereby leaking
+    // whose proxy differs only in CONNECT headers (commonly where proxy-auth secrets, distinct
+    // per session, actually live) be treated as interchangeable, sharing (and thereby leaking
     // across sessions) whichever one first built the pooled client.
     package static func == (_ lhs: Self, _ rhs: Self) -> Bool {
         lhs.host == rhs.host

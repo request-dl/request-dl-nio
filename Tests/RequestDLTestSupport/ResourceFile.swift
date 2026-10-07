@@ -12,8 +12,8 @@ import struct Foundation.URL
 #endif
 
 /// The checked-in `Resources` directory, located relative to this source file rather than
-/// through `Bundle.module` — the resource bundle machinery needs `Foundation`, which is not
-/// part of `FoundationEssentials`.
+/// through `Bundle.module`, since the resource bundle machinery needs `Foundation`, which is
+/// not part of `FoundationEssentials`.
 ///
 /// Anchored on the `Tests` path component rather than a fixed number of
 /// `deletingLastPathComponent()` calls, so a fixture consumer moving to a different

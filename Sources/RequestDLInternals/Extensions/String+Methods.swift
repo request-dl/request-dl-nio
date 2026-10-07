@@ -95,7 +95,7 @@ extension StringProtocol {
     /// Replaces every character outside the RFC 9110 `token` grammar with `-`, so the result is
     /// safe to use unquoted as a `product` token in headers like `User-Agent`.
     ///
-    /// - Note: Falls back to `"-"` when nothing survives — an empty or fully non-ASCII input —
+    /// - Note: Falls back to `"-"` when nothing survives (an empty or fully non-ASCII input),
     /// since an empty token would leave a stray `/` in `product/version`.
     package var sanitizedAsRFC9110Token: String {
         let sanitized = String(map { $0.isRFC9110TokenAllowed ? $0 : "-" })

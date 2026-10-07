@@ -29,45 +29,28 @@ extension Internals {
     /// Compresses through the same codec `NIOHTTPRequestCompressor` applies on the wire for the
     /// `.nio` executor, driven through a persistent `EmbeddedChannel` rather than a live
     /// connection pipeline, so it can be fed incrementally, one `callAsFunction(compressing:)`
-    /// call per chunk, across the lifetime of a single request, rather than only in one big
-    /// write-all/read-all round trip.
-    ///
-    /// Reusing the handler itself (rather than binding `CNIOExtrasZlib` directly, which isn't a
-    /// public product of `swift-nio-extras`) keeps this byte-for-byte identical to what
-    /// `NIOHTTPRequestCompressor` running in a live connection pipeline would produce.
+    /// call per chunk, across the lifetime of a single request. Reusing the handler itself
+    /// (rather than binding `CNIOExtrasZlib` directly, which isn't a public product of
+    /// `swift-nio-extras`) keeps this byte-for-byte identical to what the live pipeline produces.
     ///
     /// - Important: `EmbeddedChannel`/`EmbeddedEventLoop` require every call to happen on the
-    /// exact OS thread that created them. This type is driven from
-    /// `Internals.CompressingByteSequence.AsyncIterator.next()`, which resumes after each `await
-    /// sourceIterator.next()` on whatever thread Swift Concurrency's
-    /// cooperative pool happens to pick, not necessarily the one that created this stream.
-    ///
-    /// Every touch of `channel` is therefore routed through `eventLoop` (one real,
-    /// persistent-thread loop captured once at `init`), so `channel` is always created and
-    /// always operated on that same single thread no matter which thread `callAsFunction`/
-    /// `finish` themselves get called from.
-    ///
+    /// exact OS thread that created them, but this type is driven from
+    /// `Internals.CompressingByteSequence.AsyncIterator.next()`, which resumes on whatever thread
+    /// Swift Concurrency's cooperative pool picks. Every touch of `channel` is therefore routed
+    /// through `eventLoop` (one real, persistent-thread loop captured once at `init`).
     /// `CompressorStream` is a synchronous protocol (mirroring the public, sync-by-design
-    /// `RequestDL.CompressorStream`), so this hops over with a blocking `.wait()` rather than
-    /// `async`/`await`. That's safe here because `eventLoop` is backed by a genuine OS thread
-    /// entirely outside Swift Concurrency's cooperative pool, and each call is a
-    /// microsecond-scale zlib operation, not a real wait.
+    /// `RequestDL.CompressorStream`), so this hops over with a blocking `.wait()`, which is safe
+    /// because `eventLoop` is backed by a genuine OS thread outside Swift Concurrency's
+    /// cooperative pool and each call is a microsecond-scale zlib operation.
     ///
-    /// - Important: Thread affinity isn't only a concern for the calls above: `EmbeddedChannel`
-    /// itself does real work in `deinit` (resolving its close promise), which also asserts the
-    /// creating thread.
-    ///
-    /// Ordinarily `finish()` is always the last thing that happens to a stream
-    /// (see `Internals.CompressingByteSequence.AsyncIterator.next()`), and it already nils out
-    /// `Box.channel` from within its own `eventLoop.submit`, so the *stored* reference is gone
-    /// before this value (or the existential box wrapping it) is ever deallocated off-thread.
-    ///
-    /// But if a request is cancelled or fails mid-upload, `finish()` may never run, and ARC then
-    /// drops the last reference to `Box`, and transitively to `channel`, from whatever thread
-    /// happens to release it. `Box.deinit` guards that path: it moves the one remaining reference
-    /// into an `Unmanaged` handle (invisible to ARC's automatic, scope-exit release) and only
-    /// releases it from inside `eventLoop.submit`, so the *actual* deallocation, wherever it's
-    /// triggered from, always lands on the thread `channel` was created on.
+    /// - Important: Thread affinity also matters for `deinit`: `EmbeddedChannel` does real work
+    /// there (resolving its close promise) and asserts the creating thread. Ordinarily `finish()`
+    /// is the last thing that happens to a stream and nils out `Box.channel` from within its own
+    /// `eventLoop.submit`. But if a request is cancelled or fails mid-upload, `finish()` may never
+    /// run, and ARC would drop the last reference to `channel` from whatever thread releases it.
+    /// `Box.deinit` guards that path: it moves the remaining reference into an `Unmanaged` handle
+    /// (invisible to ARC's automatic release) and releases it from inside `eventLoop.submit`, so
+    /// the actual deallocation always lands on the thread `channel` was created on.
     package struct NIOHTTPCompressorStream: Internals.CompressorStream {
 
         /// `@unchecked`: `channel` is only ever read or mutated from inside a closure submitted

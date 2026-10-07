@@ -2,8 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
-// Darwin only, like `Internals.URLSessionClient` itself. Deliberately free of NIO on both ends --
-// the server below is plain BSD sockets -- so this suite also runs, and matters most, under
+// Darwin only, like `Internals.URLSessionClient` itself. Deliberately free of NIO on both
+// ends (the server below is plain BSD sockets), so this suite also runs, and matters most,
 // `--disable-default-traits`, where `.urlSession` is the only executor there is.
 #if canImport(Darwin)
 
@@ -17,21 +17,20 @@ import Testing
 
 /// End-to-end coverage for the back pressure in `Internals.URLSessionClient`'s `SessionTask`
 /// path: the `.urlSession` counterpart to `InternalsClientResponseReceiverBackPressureTests`. A
-/// reader slower than the network must hold the *connection* back -- here by the body being
-/// pulled from `URLSession.AsyncBytes` only as the reader drains the window -- not have the body
+/// reader slower than the network must hold the *connection* back (here by the body being
+/// pulled from `URLSession.AsyncBytes` only as the reader drains the window), not have the body
 /// pile up in memory, and no way of abandoning such a reader may leave the request hung.
 ///
 /// Every test observes the server rather than trusting the client's own bookkeeping alone:
 /// `RawStreamingServer` writes with blocking `send(2)` into a small send buffer and counts what the
 /// kernel actually accepted. If the client kept reading the socket regardless of the reader, that
 /// count would race to the full body, which is exactly what each test's "the connection really
-/// paused" precondition rules out. Against the `didReceive data:` delegate this path used before,
-/// every one of those preconditions fails.
+/// paused" precondition rules out.
 ///
 /// Unlike on the `.nio` path, the backlog in memory is not just the window: CFNetwork reads
 /// ahead of `AsyncBytes` by up to about the socket's receive ceiling before it stops, and none of
 /// that is visible to the window. So these tests bound the window itself tightly and the whole
-/// backlog -- what the server got out minus what the reader took -- by that ceiling.
+/// backlog (what the server got out minus what the reader took) by that ceiling.
 @Suite(
     .serialized,
     .concurrent(watchdogAffectedPlatformConcurrencyLimit),
@@ -84,8 +83,8 @@ struct InternalsURLSessionClientBackPressureTests {
             #expect(window.waitingCountForTesting == 1)
 
             // And once the reader resumes, the whole body arrives, intact, still within the window
-            // -- over many pauses, since the reader only ever drains down to the low watermark
-            // before the next one.
+            // (over many pauses, since the reader only ever drains down to the low watermark before
+            // the next one).
             let (verified, _) = try await completing(within: 60) { [iterator, verifier] in
                 var iterator = iterator
                 var verifier = verifier
@@ -319,8 +318,8 @@ struct InternalsURLSessionClientBackPressureTests {
         }
     }
 
-    /// The reader reads a little and then goes away for good -- a `break`, or the task running
-    /// the loop being cancelled -- while the response itself is kept. Its iterator going away
+    /// The reader reads a little and then goes away for good (a `break`, or the task running
+    /// the loop being cancelled) while the response itself is kept. Its iterator going away
     /// releases the window, so the request runs to completion instead of staying paused forever
     /// for a reader that can never come back.
     @Test
@@ -408,13 +407,12 @@ struct InternalsURLSessionClientBackPressureTests {
     }
 
     /// The same cancellation, but with the server already done: the whole (small) body has been
-    /// written, most of it -- its end included -- sitting unread in the sockets and CFNetwork
-    /// behind the paused pump. On the `.nio` path this was the state where AsyncHTTPClient held
-    /// the cancellation back until the paused part completed. The guarantee here has to be the
-    /// same: the window released by the cancellation itself, and the reader never handed a clean
-    /// end of a truncated body. A complete, intact body is an acceptable answer (whatever
-    /// `URLSession` already handed over before the cancellation landed); a *short* one ending
-    /// cleanly never is.
+    /// written, most of it (its end included) sitting unread in the sockets and CFNetwork behind
+    /// the paused pump. On the `.nio` path this is the state where AsyncHTTPClient holds the
+    /// cancellation back until the paused part completes. The guarantee here has to be the same:
+    /// the window released by the cancellation itself, and the reader never handed a clean end of
+    /// a truncated body. A complete, intact body is an acceptable answer (whatever `URLSession`
+    /// already handed over before the cancellation landed); a *short* one ending cleanly never is.
     @Test
     func requestCancelledWithTheRestOfTheBodyAlreadySent_neverEndsATruncatedBodyCleanly() async throws {
         let totalBytes = 458_752
@@ -545,7 +543,7 @@ struct InternalsURLSessionClientBackPressureTests {
     /// `URLSessionConfiguration.timeoutIntervalForRequest` once it has received nothing for that
     /// long. So a reader that stops for longer than the request timeout, with more than the
     /// window (plus CFNetwork's read-ahead) left, fails with `.timedOut` once it reads again,
-    /// where the unbounded delegate used to buffer the whole body for it.
+    /// instead of buffering the whole body for it.
     /// `URLSessionConfiguration`'s default is 60 seconds; `URLSession.bytes(for:)` used on its own
     /// behaves exactly the same way.
     ///
@@ -601,8 +599,8 @@ struct InternalsURLSessionClientBackPressureTests {
 
     /// A body past `Internals.URLSessionUploadFile.inMemoryThreshold` spills to a temporary file,
     /// and reaches the wire as a stream over that file with its exact `Content-Length`. The file
-    /// has to outlive the upload itself -- a redirect or retry resends from it for as long as the
-    /// exchange runs -- and be gone once the exchange ends.
+    /// has to outlive the upload itself (a redirect or retry resends from it for as long as the
+    /// exchange runs) and be gone once the exchange ends.
     @Test
     func spilledUpload_isSentWhole_andItsFileRemovedOnlyOnceTheExchangeEnds() async throws {
         // An odd size, so the spilled file is recognizable among whatever else is in the shared
@@ -660,14 +658,15 @@ struct InternalsURLSessionClientBackPressureTests {
     /// makes the request go out again with the same body: the destination has to get all of it,
     /// and the caller's file has to be left alone afterwards.
     ///
-    /// Handled entirely by `TaskDelegate.completeRedirect(with:_:)`/`takePendingManualBodyRedirect()`
-    /// -- a manual resend with a fresh stream over `bodyFileURL`, not `URLSession`'s own
-    /// `needNewBodyStream`. Verified directly, on watchOS specifically: `URLSession` there calls
-    /// neither `needNewBodyStream` for this resend nor honours a stream attached to the request
-    /// returned from `willPerformHTTPRedirection`, and instead resends the *original* request's
-    /// already-exhausted stream, silently sending an empty body. Every other platform tested
-    /// (macOS, iOS, iPadOS, tvOS, Catalyst) does call `needNewBodyStream` correctly on its own --
-    /// this test would still pass either way, since the manual path runs uniformly regardless.
+    /// Handled entirely by
+    /// `TaskDelegate.completeRedirect(with:_:)`/`takePendingManualBodyRedirect()`: a manual resend
+    /// with a fresh stream over `bodyFileURL`, not `URLSession`'s own `needNewBodyStream`. On
+    /// watchOS, `URLSession` calls neither `needNewBodyStream` for this resend nor honours a stream
+    /// attached to the request returned from `willPerformHTTPRedirection`, and instead resends the
+    /// *original* request's already-exhausted stream, silently sending an empty body. Every other
+    /// platform tested (macOS, iOS, iPadOS, tvOS, Catalyst) does call `needNewBodyStream` correctly
+    /// on its own, so this test would pass either way, since the manual path runs uniformly
+    /// regardless.
     @Test
     func existingFileUpload_resentOnA307_arrivesWholeAtTheDestination() async throws {
         let payload = Data((0..<3_000_001).map { UInt8(truncatingIfNeeded: $0 &* 13) })
@@ -1036,8 +1035,8 @@ private final class RawStreamingServer: @unchecked Sendable {
         closeConnection()
     }
 
-    /// Waits for the count of bytes the kernel accepted to stop moving for half a second -- or to
-    /// reach the whole body -- and returns it.
+    /// Waits for the count of bytes the kernel accepted to stop moving for half a second, or to
+    /// reach the whole body, and returns it.
     func settledBytesWritten() async throws -> Int {
         var last = -1
         var quietPolls = 0
@@ -1219,7 +1218,7 @@ private final class RawStreamingServer: @unchecked Sendable {
     }
 }
 
-/// Reads one request -- head, then a body framed by `Content-Length` or chunked encoding -- off a
+/// Reads one request (head, then a body framed by `Content-Length` or chunked encoding) off a
 /// blocking socket.
 private struct RequestReader {
 

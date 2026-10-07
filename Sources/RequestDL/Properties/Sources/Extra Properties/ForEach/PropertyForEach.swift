@@ -125,15 +125,14 @@ where Data: Sequence & Sendable, ID: Hashable & Sendable, Content: Property {
 
         var group = ChildrenNode()
 
-        // One seed for this whole `PropertyForEach` -- exactly what a single ordinary
-        // `@StoredObject`-holding sibling would itself consume at this same point in the tree.
-        // This, not `property.pathway` alone, is what tells two sibling instances of the same
-        // reusable component (each with their own internal `PropertyForEach`) apart: `pathway`
-        // is purely type/id-based and collides for two structurally-identical siblings with no
-        // distinguishing id anywhere, which is exactly why `SeedFactory`'s visit-order counter
-        // exists in the first place (see `IdentifiedGraphValue.pathway`'s own doc comment). Drawn
-        // once, before iterating, rather than once per element: that "turn" is this ForEach's
-        // own place in the surrounding visit order, not a per-element concern.
+        // One seed for this whole `PropertyForEach`, exactly what a single ordinary
+        // `@StoredObject`-holding sibling would consume at this point in the tree. This, not
+        // `property.pathway` alone, tells two sibling instances of the same reusable component
+        // (each with its own internal `PropertyForEach`) apart: `pathway` is purely type/id-based
+        // and collides for structurally identical siblings with no distinguishing id, which is why
+        // `SeedFactory`'s visit-order counter exists (see `IdentifiedGraphValue.pathway`). Drawn
+        // once, before iterating, because that "turn" is this ForEach's place in the surrounding
+        // visit order, not a per-element concern.
         let turn = inputs.seedFactory(inputs.namespaceID)
 
         for element in property.data {
@@ -142,9 +141,9 @@ where Data: Sequence & Sendable, ID: Hashable & Sendable, Content: Property {
 
             var elementInputs = inputs
             // Scopes every `@StoredObject` this element's `content` declares to a namespace keyed
-            // by `id` -- not by visit order within this iteration. See
-            // `elementNamespaceID(outer:turn:id:)`'s own doc comment for why that distinction
-            // matters, and why `turn`, not `property.pathway`, is folded in here.
+            // by `id`, not by visit order within this iteration. See
+            // `elementNamespaceID(outer:turn:id:)` for why, and why `turn`, not `property.pathway`,
+            // is folded in here.
             elementInputs.namespaceID = Self.elementNamespaceID(
                 outer: inputs.namespaceID,
                 turn: turn,
@@ -171,27 +170,24 @@ where Data: Sequence & Sendable, ID: Hashable & Sendable, Content: Property {
     /// from each other) crossed with one element's own `id`.
     ///
     /// `@StoredObject` identity is otherwise keyed by structural visit order alone (see
-    /// `SeedFactory`): correct for a fixed, statically-declared sibling sequence, where "the Nth
-    /// stored object visited" and "which declaration this is" coincide and stay coincident across
-    /// re-resolves. Neither holds for one `PropertyForEach`'s own elements: the whole point of its
-    /// `id:` parameter -- the caller's explicit, `SwiftUI.ForEach`-style stability contract -- is
-    /// that the *data*, not its position within this one iteration, determines identity. Without
-    /// this override, reordering, filtering, or re-fetching the same logical collection in a
-    /// different order silently handed one element's cached `@StoredObject` state (a session, a
-    /// token, cookies) to a different element, since the Nth element visited always drew the Nth
-    /// seed regardless of which logical item it now was.
+    /// `SeedFactory`). That is correct for a fixed, statically declared sibling sequence, where
+    /// "the Nth stored object visited" and "which declaration this is" coincide across
+    /// re-resolves. Neither holds for one `PropertyForEach`'s elements: its `id:` parameter is
+    /// the caller's explicit, `SwiftUI.ForEach`-style stability contract, meaning the *data*,
+    /// not its position in the iteration, determines identity. Without this override,
+    /// reordering, filtering, or re-fetching the same collection in a different order would
+    /// hand one element's cached `@StoredObject` state (a session, a token, cookies) to another
+    /// element, since the Nth element visited always drew the Nth seed.
     ///
-    /// `turn` is what keeps this reproducible across re-resolves of the identical tree despite
-    /// being seed-derived: `SeedFactory` starts fresh every top-level resolution (see `Resolve
-    /// .init`'s own doc comment), and the same structural position, visited in the same order,
-    /// always draws the same sequence of seeds -- so re-resolving the identical declaration
-    /// reproduces the identical `turn`, and therefore the identical per-element namespace, letting
-    /// `Internals.Storage`'s process-wide cache correctly recognize it as the same element again.
+    /// `turn` stays reproducible across re-resolves of the identical tree because `SeedFactory`
+    /// starts fresh every top-level resolution (see `Resolve.init`), and the same structural
+    /// position, visited in the same order, always draws the same sequence of seeds. The
+    /// identical declaration therefore gets the identical `turn` and per-element namespace, so
+    /// `Internals.Storage`'s process-wide cache recognizes the element again.
     ///
-    /// Scoped to exactly this `PropertyForEach`'s own elements, not adopted globally: a plain
-    /// sibling sequence (no `PropertyForEach` involved) has no `id:` to honor in the first place,
-    /// and still needs visit order alone to disambiguate same-type-but-different-instance siblings
-    /// whose `GraphID` otherwise collides.
+    /// Scoped to this `PropertyForEach`'s elements, not adopted globally: a plain sibling
+    /// sequence has no `id:` to honor, and still needs visit order to disambiguate siblings of
+    /// the same type whose `GraphID` otherwise collides.
     private static func elementNamespaceID(
         outer: PropertyNamespace.ID,
         turn: Seed,

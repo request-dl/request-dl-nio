@@ -111,7 +111,7 @@ extension Internals {
 
         /// Observes the request's failure without keeping it alive.
         ///
-        /// Registers on the future directly, capturing only the `HTTPClient.Task` — never
+        /// Registers on the future directly, capturing only the `HTTPClient.Task`, never
         /// `seed`. Dropping the response is what cancels a still-running request (via the
         /// seed's `deinit`), so anything that retains the seed until the request finishes on its
         /// own (an unstructured `Task` awaiting ``response()``, say) makes that cancellation

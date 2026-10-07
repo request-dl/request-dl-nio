@@ -191,10 +191,10 @@ struct DigestResponseTests {
         #expect(!header.contains(#"uri="/resource","#))
     }
 
-    /// Regression coverage for a caller-supplied `uri` containing CR/LF: unescapable inside a
-    /// `quoted-pair` (RFC 7230 §3.2.6), so it must be stripped rather than forwarded — otherwise
-    /// it would let external data reaching a `Path`/`Query` component inject arbitrary additional
-    /// header lines into the client's own outgoing request.
+    /// A caller-supplied `uri` containing CR/LF: unescapable inside a `quoted-pair`
+    /// (RFC 7230 §3.2.6), so it must be stripped rather than forwarded, otherwise it would let
+    /// external data reaching a `Path`/`Query` component inject arbitrary additional header
+    /// lines into the client's own outgoing request.
     @Test
     func header_whenURIContainsCRLF_stripsIt() throws {
         // Given

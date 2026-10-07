@@ -54,7 +54,7 @@ struct InternalsClientConcurrencyLimitTests {
 
                 // Deterministic rather than sleep-based: waits until exactly
                 // `requestCount - 2` requests are queued behind the semaphore, which can only
-                // happen once the other 2 have already acquired a permit — i.e. once the
+                // happen once the other 2 have already acquired a permit, i.e. once the
                 // concurrency limit is actually in effect, not after a guessed wall-clock
                 // delay that a loaded CI runner can blow through.
                 try await client.connectionSemaphoreForTesting?.waitForWaiters(requestCount - 2, timeout: 5)

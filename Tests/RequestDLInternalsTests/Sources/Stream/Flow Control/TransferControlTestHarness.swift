@@ -390,8 +390,8 @@ struct ErrorBox: @unchecked Sendable {
     }
 }
 
-/// Reads a body in the background as fast as it arrives -- an eager app, so whatever holds the
-/// transfer back is the suspension, never the reader -- checking it as it goes.
+/// Reads a body in the background as fast as it arrives (an eager app, so whatever holds the
+/// transfer back is the suspension, never the reader), checking it as it goes.
 final class BackgroundReader: Sendable {
 
     private struct State {

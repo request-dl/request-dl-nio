@@ -434,10 +434,10 @@ struct SecureConnectionTests {
     @Test
     func secure_whenNestedInsideAnotherSecureConnection_shouldBeDiscovered() async throws {
         // Given
-        // Regression test: `SecureConnection` used to wrap its resolved output into a private
-        // leaf node distinct from `SecureConnectionNode`, so an outer `SecureConnection`'s own
-        // `search(for: SecureConnectionNode.self)` never found a nested one: every certificate
-        // and TLS setting the inner `SecureConnection` configured was silently dropped.
+        // `SecureConnection` must not wrap its resolved output into a private leaf node distinct
+        // from `SecureConnectionNode`, which an outer `SecureConnection`'s own
+        // `search(for: SecureConnectionNode.self)` would never find in a nested one, silently
+        // dropping every certificate and TLS setting the inner `SecureConnection` configured.
 
         // When
         let resolved = try await resolve(

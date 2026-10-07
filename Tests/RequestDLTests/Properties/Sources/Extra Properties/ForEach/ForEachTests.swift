@@ -98,10 +98,10 @@ struct ForEachTests {
         )
     }
 
-    /// Regression coverage: a `@StoredObject` declared inside a `PropertyForEach` element's own
-    /// content used to be keyed by visit order alone, the same as any other sibling property --
-    /// so reordering the same collection reassigned each element's stored state by its new
-    /// position instead of keeping it with the data it actually belongs to.
+    /// A `@StoredObject` declared inside a `PropertyForEach` element's own content must not be
+    /// keyed by visit order alone, as any other sibling property is: reordering the same
+    /// collection would then reassign each element's stored state by its new position instead of
+    /// keeping it with the data it actually belongs to.
     @Test
     func forEach_whenElementsReordered_storedObjectIdentityFollowsIDNotPosition() async throws {
         // Given
@@ -139,8 +139,8 @@ struct ForEachTests {
             }
         )
 
-        // Then: exactly three `Factory` instances exist in total, and each id's own instance --
-        // so each id's own `rawValue` -- travels with it regardless of position, instead of a
+        // Then: exactly three `Factory` instances exist in total, and each id's own instance,
+        // so each id's own `rawValue`, travels with it regardless of position, instead of a
         // new one being minted per position or an unrelated id's state being reused instead.
         #expect(Factory.producer.index == 3)
         #expect(resolved1.requestConfiguration.url == "https://www.apple.com/a-0/b-1/c-2")

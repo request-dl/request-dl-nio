@@ -155,27 +155,24 @@ struct InternalsClientIdentityDescriptorTests {
 
     // MARK: - makeIdentity() (real handshake, rebuilt identity)
 
-    /// The whole point of splitting this type out: an identity rebuilt from nothing but a
-    /// `Descriptor` (just a certificate/key file path on disk, no `Internals.SecureConnection`,
-    /// no `Property` tree) still has to genuinely authenticate against a real server requiring
-    /// a client certificate, not just hold the right bytes in memory.
+    /// An identity rebuilt from nothing but a `Descriptor` (just a certificate/key file path on
+    /// disk, no `Internals.SecureConnection`, no `Property` tree) still has to genuinely
+    /// authenticate against a real server requiring a client certificate, not just hold the right
+    /// bytes in memory.
     ///
-    /// The Keychain round trip this needs genuinely succeeds on real macOS (bare `swift test` or
-    /// an Xcode-run macOS test bundle) once `Internals.RawBytesIdentityBuilder.makeIdentity(_:_:)`
-    /// sets `kSecAttrApplicationLabel` correctly -- confirmed, not assumed, and no longer a known
-    /// issue there. Every other Apple platform's Simulator, reached only via `xcodebuild test`
-    /// against SwiftPM's auto-generated scheme, has no `.entitlements` file to add Keychain
-    /// Sharing to at all, so `SecItemAdd` there fails with `errSecMissingEntitlement` before
-    /// identity pairing is ever reached -- a genuinely different, still-open gap, confirmed
-    /// directly on iOS/tvOS/watchOS Simulator CI runs.
+    /// The Keychain round trip this needs succeeds on real macOS (bare `swift test` or an
+    /// Xcode-run macOS test bundle) because `Internals.RawBytesIdentityBuilder
+    /// .makeIdentity(_:_:)` sets `kSecAttrApplicationLabel` correctly. Every other Apple
+    /// platform's Simulator, reached only via `xcodebuild test` against SwiftPM's auto-generated
+    /// scheme, has no `.entitlements` file to add Keychain Sharing to at all, so `SecItemAdd`
+    /// there fails with `errSecMissingEntitlement` before identity pairing is ever reached.
     @Test
     func rebuiltIdentity_whenPresentedToServerRequiringClientCertificate_completesHandshake() async throws {
         // `LocalServer.TLSOption.client(_:)` (server-side mTLS verification, needed to even
         // construct the `LocalServer` this test drives against) has no Network.framework
-        // equivalent under a NIOCore-free build -- see that type's own doc comment. Under
-        // NIOCore this whole body runs for real; without it, everything from construction
-        // onward is expected to throw, so it is wrapped wholesale rather than gated
-        // piecemeal.
+        // equivalent under a NIOCore-free build (see that type's own doc comment). Under NIOCore
+        // this whole body runs for real; without it, everything from construction onward is
+        // expected to throw, so it is wrapped wholesale rather than gated piecemeal.
         func run() async throws {
             // Given
             let server = Certificates().server()

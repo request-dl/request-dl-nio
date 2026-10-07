@@ -26,22 +26,19 @@ import struct Foundation.Data
 /// header, trailer and checksum itself, instead of hand-rolling a wrapper around Apple's
 /// `Compression` framework.
 ///
-/// - Note: `z_stream`'s `state` field is a zlib-owned, heap-allocated pointer for the lifetime
-/// between `deflateInit2_` and `deflateEnd`. Wrapped in a `final class`, not held as a `struct`
-/// value directly on ``PortableDeflateCompressorStream``/``PortableGzipCompressorStream``: a
-/// Swift-level copy of a struct holding the `z_stream` value directly would copy that pointer
-/// too, letting two independent-looking values alias the same zlib state and free it out from
-/// under each other the moment either one's `finish()` runs `deflateEnd`. Same discipline
-/// `ZeroingBytes` uses for its own manually-managed buffer.
+/// - Note: `z_stream`'s `state` field is a zlib-owned, heap-allocated pointer that lives
+/// between `deflateInit2_` and `deflateEnd`. It's wrapped in a `final class` rather than held
+/// as a `struct` value: copying a struct would copy that pointer too, letting two values
+/// alias the same zlib state and free it from under each other when either `finish()` runs
+/// `deflateEnd`. `ZeroingBytes` follows the same discipline for its own buffer.
 ///
-/// - Note: `@unchecked Sendable` with no internal lock, unlike most other mutable state in this
-/// package: `strm`/`chunk`/`isOpen` are never actually touched from more than one thread at a
-/// time. `Compressor.callAsFunction()`'s own contract creates exactly one fresh stream per
-/// request (never shared or reused across requests), and the only consumer,
-/// `Internals.CompressingByteSequence.AsyncIterator`, drives it from a single sequential
-/// `await`-separated loop within one `Task`. Structured concurrency's happens-before guarantee
-/// across that `Task`'s suspension points is what makes the lack of a lock safe, not an
-/// oversight — add a second concurrent driver and this stops being true.
+/// - Note: `@unchecked Sendable` with no internal lock, unlike most other mutable state in
+/// this package: `strm`/`chunk`/`isOpen` are never touched from more than one thread at a
+/// time. `Compressor.callAsFunction()` creates exactly one fresh stream per request, and the
+/// only consumer, `Internals.CompressingByteSequence.AsyncIterator`, drives it from a single
+/// sequential `await`-separated loop within one `Task`. That `Task`'s happens-before
+/// guarantee across suspension points is what makes the lack of a lock safe, so adding a
+/// second concurrent driver would break it.
 final class PortableZlibCompressorStream: @unchecked Sendable {
 
     // MARK: - Private static properties

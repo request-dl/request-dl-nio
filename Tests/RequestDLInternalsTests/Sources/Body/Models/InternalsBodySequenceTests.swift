@@ -152,15 +152,15 @@ struct InternalsBodySequenceTests {
         // Then
         #expect(sequence == expecting)
 
-        // Regression guard, asserted on purpose and separately from the contract above: twenty
-        // kilobytes must not go out as ten thousand two byte chunks.
+        // Asserted on purpose and separately from the contract above: twenty kilobytes must not go
+        // out as ten thousand two byte chunks.
         #expect(bodySequence.chunkSize == 16 * 1_024)
         #expect(sequence.count == 2)
     }
 
-    /// Regression test: an explicit non-positive `chunkSize` used to be taken as-is instead of
-    /// falling back to `defaultChunkSize`, so `AsyncIterator.next()`'s `guard chunkSize > .zero`
-    /// yielded no chunks at all — an empty body sent under a non-empty declared `totalSize`.
+    /// An explicit non-positive `chunkSize` falls back to `defaultChunkSize`. Taken as-is,
+    /// `AsyncIterator.next()`'s `guard chunkSize > .zero` would yield no chunks at all, sending
+    /// an empty body under a non-empty declared `totalSize`.
     @Test
     func bodySequence_whenChunkSizeIsZeroOrNegative_fallsBackToDefaultPolicy() async throws {
         // Given
@@ -182,16 +182,16 @@ struct InternalsBodySequenceTests {
         }
     }
 
-    /// Regression test for a fatal crash.
+    /// A file backed `Internals.Buffer` under heavy concurrent I/O must not crash a
+    /// `BodySequence` draining it.
     ///
-    /// The crash (`Internals.assertionFailure` at `Internals.BodySequence.swift:75`) never came
-    /// from a `BodySequence` test run in isolation — it only ever surfaced when a file backed
-    /// `Internals.Buffer` was under heavy concurrent I/O from elsewhere in the process at the
-    /// same time a `BodySequence` was draining it, which `Internals.Buffer.Storage.
-    /// _isResourceAvailable()` now retries instead of trusting a single "unavailable" answer.
-    /// This pairs `BodySequence` consumption with the same 1,024-way concurrent pressure
-    /// `fileBuffer_whenRacingImmutable` applies, both against the one shared file, so the fatal
-    /// path has direct coverage instead of only showing up as flakiness across the whole suite.
+    /// The failure (`Internals.assertionFailure` in `Internals.BodySequence`) never showed up
+    /// from a `BodySequence` test run in isolation, only when the buffer was under heavy
+    /// concurrent I/O from elsewhere in the process while a `BodySequence` drained it.
+    /// `Internals.Buffer.Storage._isResourceAvailable()` retries instead of trusting a single
+    /// "unavailable" answer. This pairs `BodySequence` consumption with the same 1,024-way
+    /// concurrent pressure `fileBuffer_whenRacingImmutable` applies, both against the one shared
+    /// file, so that path has direct coverage instead of only showing up as flakiness.
     @Test
     func bodySequence_whenReadingFileBufferUnderConcurrentPressure_shouldNotReportBug() async throws {
         // Given
@@ -227,14 +227,13 @@ struct InternalsBodySequenceTests {
         #expect(chunks.resolveData().reduce(Data(), +) == data)
     }
 
-    /// Regression test for `AsyncIterator.next()` dropping consumed buffers with
-    /// `Array.removeFirst()`, which shifts every remaining element on every call -- O(*n*) per
-    /// drop, O(*n*²) over a body assembled from many small parts, exactly the shape a multipart
-    /// form with many fields produces (`FormGroupBuilder` emits several tiny buffers per field).
-    /// This doesn't assert on timing (flaky under CI load), but a few thousand one-byte buffers
-    /// still exercises the same index-advancing path a shift-based implementation would have paid
-    /// quadratic cost walking, while asserting the fix didn't change what comes out the other
-    /// end: every byte, in order, nothing dropped or duplicated.
+    /// `AsyncIterator.next()` must not drop consumed buffers with `Array.removeFirst()`, which
+    /// shifts every remaining element on every call: O(*n*) per drop, O(*n*²) over a body
+    /// assembled from many small parts, exactly the shape a multipart form with many fields
+    /// produces (`FormGroupBuilder` emits several tiny buffers per field). This doesn't assert on
+    /// timing (flaky under CI load), but a few thousand one-byte buffers still exercise the
+    /// index-advancing path, while asserting that every byte comes out in order, nothing dropped
+    /// or duplicated.
     @Test
     func bodySequence_whenManySmallBuffers_streamsEveryByteInOrder() async throws {
         // Given

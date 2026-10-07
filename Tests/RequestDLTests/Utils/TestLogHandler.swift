@@ -9,9 +9,9 @@ import Logging
 
 extension Logger {
 
-    /// Builds a `Logger` backed by `TestLogHandler` and hands it directly to `operation` --
-    /// the caller wires it into whichever `RequestTask` it's exercising via
-    /// `.environment(\.logger, logger)`, since `RequestEnvironmentValues` no longer carries an
+    /// Builds a `Logger` backed by `TestLogHandler` and hands it directly to `operation`. The
+    /// caller wires it into whichever `RequestTask` it's exercising via
+    /// `.environment(\.logger, logger)`, since `RequestEnvironmentValues` carries no
     /// ambient/task-local logger.
     @discardableResult
     static func withTesting<Value: Sendable>(

@@ -93,8 +93,8 @@ struct InternalsAsyncQueueTests {
         }
         waiter.cancel()
 
-        // Observed from an unstructured task instead of awaited directly: a regression back to
-        // the old `try?`-only loop leaves `waiter` spinning until `release` is signalled below,
+        // Observed from an unstructured task instead of awaited directly: a loop that only
+        // used `try?` would leave `waiter` spinning until `release` is signalled below,
         // and polling a flag lets that be reported as a failure below rather than hanging the
         // suite the way joining `waiter` (directly or through `withTaskGroup`) would.
         _Concurrency.Task {

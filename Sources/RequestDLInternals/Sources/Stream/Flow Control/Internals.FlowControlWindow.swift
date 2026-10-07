@@ -9,33 +9,32 @@ extension Internals {
     /// A byte-counted credit window between a response body's producer and whoever ends up
     /// reading it, so the producer can be told to stop instead of buffering without bound.
     ///
-    /// Exists because nothing else in the pipeline can say "stop". `ReplaySubject`, behind every
-    /// `Internals.AsyncStream`, is synchronous on the producing side by design: its own
-    /// `SubjectBufferingPolicy` doc spells out that back pressure there "can only be applied by
-    /// discarding", and discarding a response body is not an option. `.untilFirstIteration`
-    /// bounds nothing either: it only stops retaining chunks the reader has already been handed.
-    /// So this sits *beside* the stream rather than inside it: the stream charges it as chunks go
-    /// in (see `Internals.AsyncStream.init(bufferingPolicy:flowControl:)`), its reader credits it
-    /// as chunks come out, and the producer asks it whether to keep going.
+    /// Nothing else in the pipeline can say "stop". `ReplaySubject`, behind every
+    /// `Internals.AsyncStream`, is synchronous on the producing side by design (its own
+    /// `SubjectBufferingPolicy` doc says back pressure there "can only be applied by discarding",
+    /// and discarding a response body is not an option), and `.untilFirstIteration` only stops
+    /// retaining chunks the reader has already been handed. So this sits *beside* the stream: the
+    /// stream charges it as chunks go in (see
+    /// `Internals.AsyncStream.init(bufferingPolicy:flowControl:)`), its reader credits it as
+    /// chunks come out, and the producer asks it whether to keep going.
     ///
-    /// Counts bytes rather than chunks. Chunk sizes vary by orders of magnitude along the way
-    /// (whatever NIO happened to read, then whatever `Internals.DownloadStep.ReadingMode` re-slices
-    /// that into, then whatever a decoder emits), so a chunk count would bound nothing in
-    /// particular.
+    /// Counts bytes rather than chunks, since chunk sizes vary by orders of magnitude along the
+    /// way (whatever NIO read, then whatever `Internals.DownloadStep.ReadingMode` re-slices that
+    /// into, then whatever a decoder emits).
     ///
     /// ## Liveness
     ///
-    /// The producer is only ever told to wait while `bufferedBytes` is above `highWatermark`, and
-    /// only resumed once readers bring it back down to `lowWatermark`. That can only deadlock if
-    /// some counted byte could never reach a reader without the producer first producing more,
-    /// so every charge must be for bytes a reader can actually drain on its own. This is why
+    /// The producer is only told to wait while `bufferedBytes` is above `highWatermark`, and only
+    /// resumed once readers bring it back down to `lowWatermark`. That can only deadlock if some
+    /// counted byte could never reach a reader without the producer first producing more, so every
+    /// charge must be for bytes a reader can actually drain on its own. This is why
     /// `Internals.DownloadBuffer` credits bytes back as soon as they move into its re-chunking
     /// accumulator: a `.length(n)` with `n` above the window, or a `.separator` line longer than
     /// it, would otherwise wait forever for input that the pause itself is withholding.
     ///
-    /// Everything else that ends the exchange -- the request failing or being cancelled, or the
-    /// reader going away -- calls ``release()``, which is terminal: every waiter resumes, and
-    /// nothing waits again. See `Internals.ClientResponseReceiver` and
+    /// Everything else that ends the exchange (the request failing or being cancelled, or the
+    /// reader going away) calls ``release()``, which is terminal: every waiter resumes, and nothing
+    /// waits again. See `Internals.ClientResponseReceiver` and
     /// `Internals.Client.execute(request:url:readingMode:uploadingBytes:decompression:cache:logger:)`
     /// for which event maps to which call on the `.nio` path, and
     /// `Internals.URLSessionClient.executeSessionTask` on the `.urlSession` one.
@@ -43,21 +42,17 @@ extension Internals {
     /// ## Suspension
     ///
     /// ``suspend()`` shuts the window deliberately, regardless of how much is buffered, until
-    /// ``resume()``: the incidental pause above, generalized to one the application asked for and
-    /// that may last arbitrarily long. See `Internals.TransferControl`, which is what suspends and
-    /// resumes windows as a unit.
+    /// ``resume()``: the incidental pause above, generalized to one the application asked for.
+    /// See `Internals.TransferControl`, which suspends and resumes windows as a unit.
     ///
-    /// That is not a hole in the liveness argument, and the reason matters for anything built on
-    /// top: a suspended window withholds input the reader may well be waiting for -- that is the
-    /// point -- but the wait is never *unbounded by construction*. It ends when the application
-    /// resumes, or when the exchange ends for any other reason, because ``release()`` overrides a
-    /// suspension exactly like it overrides a full window. So every path that already releases
-    /// the window (cancellation, the response being dropped, the reader going away, the exchange
-    /// failing or finishing) also frees a producer parked by a suspension, and a producer can
-    /// never be left waiting for a ``resume()`` nobody will ever call.
+    /// That is not a hole in the liveness argument: a suspended window withholds input the reader
+    /// may be waiting for, but the wait ends when the application resumes or when the exchange
+    /// ends for any other reason, because ``release()`` overrides a suspension exactly like it
+    /// overrides a full window. A producer can never be left waiting for a ``resume()`` nobody
+    /// will call.
     ///
-    /// Suspension only stops the producer. Bytes already counted keep flowing to the reader,
-    /// and crediting them never wakes the producer while suspended.
+    /// Suspension only stops the producer. Bytes already counted keep flowing to the reader, and
+    /// crediting them never wakes the producer while suspended.
     package final class FlowControlWindow: @unchecked Sendable {
 
         // MARK: - Internal static properties
@@ -221,8 +216,8 @@ extension Internals {
         }
 
         /// Lifts ``suspend()``. A waiting producer resumes right away if the backlog is within
-        /// ``highWatermark`` -- the same test a producer that had not been suspended would have
-        /// passed -- and otherwise once readers drain it to ``lowWatermark``, as usual.
+        /// ``highWatermark`` (the same test a producer that had not been suspended would have
+        /// passed), and otherwise once readers drain it to ``lowWatermark``, as usual.
         /// Idempotent.
         package func resume() {
             let waiters = lock.withLock { () -> [@Sendable () -> Void] in
@@ -242,9 +237,9 @@ extension Internals {
 
         /// Opens the window for good: every waiting producer resumes, and none ever waits again.
         ///
-        /// Terminal and idempotent. Called once the exchange cannot make progress through
-        /// reading anymore -- it failed, was cancelled, finished, or lost its reader -- so pausing
-        /// could only turn into a hang from here on.
+        /// Terminal and idempotent. Called once the exchange cannot make progress through reading
+        /// anymore (it failed, was cancelled, finished, or lost its reader), so pausing could only
+        /// turn into a hang from here on.
         package func release() {
             let waiters = lock.withLock { () -> [@Sendable () -> Void] in
                 _isReleased = true

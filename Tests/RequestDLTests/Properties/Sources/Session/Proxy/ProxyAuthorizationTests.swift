@@ -18,9 +18,9 @@ struct ProxyAuthorizationTests {
     func standaloneUsage_notPinnedToAnyHeadersSpecialization() async throws {
         // Given
         // `ProxyAuthorization` is a top-level type, not nested inside the generic
-        // `Proxy<Headers>`. A standalone helper returning it (unlike the old
-        // `Proxy<SomeSpecificHeaders>.Authorization`) never forces a `Headers` specialization
-        // on its own — the regression this type exists to fix.
+        // `Proxy<Headers>`. A standalone helper returning it (unlike
+        // `Proxy<SomeSpecificHeaders>.Authorization`) never forces a `Headers` specialization on
+        // its own, which is what this type exists to guarantee.
         func makeAuthorization(credentials: String) -> ProxyAuthorization {
             .basic(credentials: credentials)
         }

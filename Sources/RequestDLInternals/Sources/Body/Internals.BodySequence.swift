@@ -28,10 +28,10 @@ extension Internals {
 
             /// The still-unconsumed suffix starts at `bufferIndex`, not index zero: a body
             /// assembled from many small parts (e.g. a multipart form with thousands of fields)
-            /// used to drop its front element with `removeFirst()` on every exhausted buffer,
-            /// which is O(*n*) per call and O(*n*²) over the whole body. An index cursor makes
-            /// advancing past an exhausted buffer O(1) instead, since `buffers` keeps its value
-            /// semantics and in-place element updates (`buffers[bufferIndex] = buffer`) don't
+            /// would otherwise drop its front element with `removeFirst()` on every exhausted
+            /// buffer, which is O(*n*) per call and O(*n*²) over the whole body. An index cursor
+            /// makes advancing past an exhausted buffer O(1) instead, since `buffers` keeps its
+            /// value semantics and in-place element updates (`buffers[bufferIndex] = buffer`) don't
             /// shift anything either.
             private var buffers: [Internals.AnyBuffer]
             private var bufferIndex = Int.zero
@@ -190,14 +190,12 @@ extension Internals {
                 .reduce(.zero, +)
 
             // A non-positive explicit `chunkSize` (`payloadChunkSize(0)`, or a caller-computed
-            // value that can legitimately evaluate to `0`/negative) used to be taken as-is here,
-            // bypassing `defaultChunkSize`'s clamping. `AsyncIterator.next()` then yields no
-            // chunks at all (`guard chunkSize > .zero`), silently sending an empty body while
-            // `totalSize`/`RequestBody.knownWireSize` still declare the real, non-zero length —
-            // surfacing downstream as an opaque body/length-mismatch error with no indication the
-            // actual cause was an invalid `chunkSize`. Treated the same as `nil` now, mirroring
-            // how a non-positive `maximumConcurrentConnections` is treated as "no limit" rather
-            // than left to misbehave.
+            // value that can evaluate to `0`/negative) is treated the same as `nil`, mirroring how
+            // a non-positive `maximumConcurrentConnections` means "no limit". Taken as-is, it would
+            // bypass `defaultChunkSize`'s clamping, `AsyncIterator.next()` would yield no chunks at
+            // all (`guard chunkSize > .zero`), and the body would be sent empty while `totalSize`/
+            // `RequestBody.knownWireSize` still declare the real length, surfacing as an opaque
+            // body/length-mismatch error.
             if let chunkSize, chunkSize > .zero {
                 self.chunkSize = chunkSize
             } else {

@@ -79,7 +79,7 @@ struct InternalsUnsafeTaskTests {
     }
 }
 
-/// A bare TCP server that accepts a connection and never writes anything back — used to keep a
+/// A bare TCP server that accepts a connection and never writes anything back, used to keep a
 /// request genuinely in flight so it can be cancelled mid-request, something `LocalServer`
 /// cannot do, since it always answers immediately.
 func withHangingServer<Result>(

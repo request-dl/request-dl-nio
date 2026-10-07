@@ -22,16 +22,16 @@ struct Make: Sendable {
     /// Rules accumulated by every declared `URLOverride`, in declaration order.
     ///
     /// Matched against the final `baseURL`/`pathComponents` in `Resolve.build()`, once every
-    /// property (including whichever `BaseURL` wins) has contributed — matching here, while the
-    /// tree is still being walked, could still miss a `BaseURL` or `Path` declared later.
+    /// property (including whichever `BaseURL` wins) has contributed. Matching while the tree is
+    /// still being walked could miss a `BaseURL` or `Path` declared later.
     var urlOverrides: [URLOverrideRule]
 
     /// Url-encoded `Payload` fields accumulated by every declared `Payload`, in declaration
     /// order, whose query-vs-body placement is still pending.
     ///
     /// Resolved by `Resolve.build()`, once every property (including whichever `RequestMethod`
-    /// wins) has contributed — deciding here, while the tree is still being walked, could still
-    /// miss a `RequestMethod` declared later. See `PendingURLEncodedPayload`'s own doc comment.
+    /// wins) has contributed. Deciding while the tree is still being walked could miss a
+    /// `RequestMethod` declared later. See `PendingURLEncodedPayload`'s own doc comment.
     var pendingURLEncodedPayloads: [PendingURLEncodedPayload]
 
     // MARK: - Inits

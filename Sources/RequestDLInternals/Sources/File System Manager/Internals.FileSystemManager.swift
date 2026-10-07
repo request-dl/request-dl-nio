@@ -79,25 +79,18 @@ extension Internals {
         /// positive problem this type exists to solve actually turns on, not `NIOThreadPool`
         /// specifically.
         ///
-        /// `DispatchQueue.global()` looked like an equivalent elastic worker pool at first, since
-        /// it is already outside Swift Concurrency's fixed-size cooperative pool, and earlier
-        /// versions of this method dispatched onto it directly instead of building a dedicated
-        /// pool by hand the way `NIOThreadPool(numberOfThreads:)` does above. That queue is
-        /// shared by everything else in the process, though, and under `swift-testing`'s parallel
-        /// execution -- a sudden burst of hundreds of suites each opening their own file at
-        /// once -- its own ramp-up lag was directly observed adding up past
-        /// `Internals.Buffer.Storage`'s per-operation budget in aggregate on CI macOS runners: the
-        /// exact failure mode this comment's first paragraph already describes the NIOCore side
-        /// needing a dedicated pool to avoid. `PortableBlockingPool` below is that same fix,
-        /// ported without NIO: real OS threads that never return to GCD's shared pool for
-        /// anything else.
+        /// `DispatchQueue.global()` isn't used because that queue is shared by everything else in
+        /// the process, and under `swift-testing`'s parallel execution (a sudden burst of hundreds
+        /// of suites each opening their own file at once) its ramp-up lag was observed adding up
+        /// past `Internals.Buffer.Storage`'s per-operation budget in aggregate on CI macOS runners.
+        /// `PortableBlockingPool` below is the same dedicated-pool fix as the NIOCore side: real OS
+        /// threads that never return to GCD's shared pool for anything else.
         ///
         /// Sized more generously than the NIOCore side's `max(16, coreCount * 4)`
-        /// (`max(64, coreCount * 16)` instead): these are plain blocking-I/O threads, cheap to
-        /// keep idle on any platform this trait targets, and CI's own constrained core count
-        /// otherwise sizes this pool too small for a single suite's own concurrency burst (one
-        /// test alone fires 64 tasks at once) layered on top of everything else the full
-        /// portable test run has in flight at the same time.
+        /// (`max(64, coreCount * 16)` instead): these are plain blocking-I/O threads, cheap to keep
+        /// idle on any platform this trait targets, and CI's constrained core count would otherwise
+        /// size the pool too small for a single suite's own concurrency burst (one test alone fires
+        /// 64 tasks at once) on top of everything else the portable test run has in flight.
         package static func run<T: Sendable>(
             _ body: @escaping @Sendable () throws -> T
         ) async throws -> T {
@@ -184,10 +177,10 @@ private final class PortableBlockingPool: @unchecked Sendable {
                 condition.wait()
             }
 
-            // `isEmpty` was just checked under this same lock, with no unlock in between, so
-            // this always has an element -- but `popFirst()` returning `nil` is a checkable
-            // condition already, so there's no reason to trap on it instead of just looping back
-            // to wait again like a spurious wakeup would.
+            // `isEmpty` was just checked under this same lock, with no unlock in between, so this
+            // always has an element. `popFirst()` returning `nil` is a checkable condition anyway,
+            // so there's no reason to trap on it instead of just looping back to wait again like a
+            // spurious wakeup would.
             guard let workItem = workItems.popFirst() else {
                 condition.unlock()
                 continue

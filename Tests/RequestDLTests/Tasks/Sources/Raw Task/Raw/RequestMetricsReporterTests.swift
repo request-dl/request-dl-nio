@@ -244,7 +244,11 @@ struct RequestMetricsReporterTests {
                 ("http.response.status_class", "2xx"),
             ]
 
-            try await eventually(timeout: 30) { !metrics.timers.isEmpty }
+            // A metric exists before its value is recorded, so wait for the values themselves.
+            try await eventually(timeout: 30) {
+                (try? metrics.expectTimer(Self.durationLabel, dimensions).values.count) == 1
+                    && (try? metrics.expectRecorder(Self.responseBodySizeLabel, dimensions).values) == [4_096]
+            }
 
             #expect(try metrics.expectTimer(Self.durationLabel, dimensions).values.count == 1)
             #expect(try metrics.expectRecorder(Self.responseBodySizeLabel, dimensions).values == [4_096])

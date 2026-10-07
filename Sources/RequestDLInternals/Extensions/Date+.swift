@@ -211,10 +211,10 @@ extension Date {
 
     /// This date as an HTTP date, the IMF-fixdate form of RFC 9110: `Sun, 06 Nov 1994 08:49:37 GMT`.
     ///
-    /// The inverse of `init(httpDate:)` above. Nothing in this package's production paths needs
-    /// to format one — only to parse an incoming `Expires`/`Last-Modified` — but tests that
-    /// fabricate cache response headers need to build one without `DateFormatter`, which is not
-    /// part of `FoundationEssentials` any more than `Calendar` is.
+    /// The inverse of `init(httpDate:)` above. Production paths only parse an incoming
+    /// `Expires`/`Last-Modified`, but tests that fabricate cache response headers need to build
+    /// one without `DateFormatter`, which is not part of `FoundationEssentials` any more than
+    /// `Calendar` is.
     package func toHTTPDateString() -> String {
         let timestamp = Int64(timeIntervalSince1970.rounded(.down))
 

@@ -559,8 +559,8 @@ struct CURLCommandParserTests {
 
     @Test
     func repeatedURLFlagIsRejected() async throws {
-        // Given / When / Then: `--url` used to silently overwrite a previous `url`/`--url`
-        // instead of rejecting it like a second bare URL does; both now reject consistently.
+        // Given / When / Then: a repeated `--url` is rejected, consistent with a second bare URL,
+        // instead of silently overwriting the previous `url`/`--url`.
         await #expect(throws: CURLParsingError.self) {
             try await CURLCommandParser.parse("curl --url https://example.com --url https://example.org")
         }

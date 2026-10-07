@@ -73,8 +73,8 @@ struct _EitherContentTests {
 func assertNever<T>(_ closure: @autoclosure @escaping @Sendable () throws -> T) async throws {
     try await withUnsafeThrowingContinuation { continuation in
         // A queue of its own, not `Task` and not the global concurrent queue. The override
-        // below must never return — its signature is `-> Never`, matching the real
-        // `fatalError` it stands in for — and the only portable way to make that true without
+        // below must never return, as its signature is `-> Never`, matching the real
+        // `fatalError` it stands in for, and the only portable way to make that true without
         // `Foundation`'s `Thread.exit()` is to park the thread it runs on forever. Parking a
         // `Task`'s cooperative-pool thread or a global queue's worker that way would starve
         // unrelated work; a queue nothing else shares can be blocked at no cost to anything

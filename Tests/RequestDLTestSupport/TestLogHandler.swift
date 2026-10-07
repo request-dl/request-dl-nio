@@ -95,8 +95,8 @@ extension String {
 
 extension Logger {
 
-    /// Builds a `Logger` backed by `TestLogHandler` and hands it directly to `operation` --
-    /// unlike `RequestDLTests`' own `Logger.withTesting(recorded:perform:)`, this does not push
+    /// Builds a `Logger` backed by `TestLogHandler` and hands it directly to `operation`.
+    /// Unlike `RequestDLTests`' own `Logger.withTesting(recorded:perform:)`, this does not push
     /// anything onto `RequestEnvironmentValues`' task-local storage, since that type belongs to
     /// `RequestDL` and isn't reachable from `RequestDLInternalsTests`.
     @discardableResult

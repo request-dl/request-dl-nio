@@ -56,7 +56,7 @@ struct URLOverrideTests {
 
     @Test
     func pathPrefixOverride_matchesByComponentNotRawString() async throws {
-        // Given / When — "api/v10" must not be treated as prefixed by "api/v1".
+        // Given / When: "api/v10" must not be treated as prefixed by "api/v1".
         let resolved = try await resolve(
             TestProperty {
                 BaseURL("google.com")
@@ -71,7 +71,7 @@ struct URLOverrideTests {
 
     @Test
     func override_appliesAgainstFinalBaseURL_regardlessOfDeclarationOrder() async throws {
-        // Given / When — `URLOverride` declared before the `BaseURL` that ends up winning.
+        // Given / When: `URLOverride` declared before the `BaseURL` that ends up winning.
         let resolved = try await resolve(
             TestProperty {
                 URLOverride("https://apple.com", from: "https://google.com")
@@ -159,7 +159,7 @@ struct URLOverrideTests {
 
     @Test
     func destinationIsNeverRematchedAgainstOtherRules() async throws {
-        // Given / When — a.com -> b.com is declared, and b.com -> c.com is declared, but a
+        // Given / When: a.com -> b.com is declared, and b.com -> c.com is declared, but a
         // resolved request should stop at b.com rather than chaining through to c.com.
         let resolved = try await resolve(
             TestProperty {
@@ -175,7 +175,7 @@ struct URLOverrideTests {
 
     @Test
     func dictionaryInitializer_appliesMatchingEntry() async throws {
-        // Given / When — non-overlapping origins, so the dictionary's unspecified iteration
+        // Given / When: non-overlapping origins, so the dictionary's unspecified iteration
         // order can't make the match ambiguous (overlapping scopes are documented as undefined).
         let resolved = try await resolve(
             TestProperty {

@@ -66,21 +66,18 @@ enum DigestResponse {
     // MARK: - Private static methods
 
     /// Escapes `value` for safe inclusion inside a `name="value"` header parameter: `\` and `"`
-    /// are backslash-escaped per RFC 7230 §3.2.6's `quoted-pair`, and CR/LF — which `quoted-pair`
-    /// has no valid escape for — are stripped outright, the same characters
-    /// `DigestChallenge.isSafeQuotedValue` rejects in the server-sent fields this same header
-    /// echoes back.
+    /// are backslash-escaped per RFC 7230 §3.2.6's `quoted-pair`, and CR/LF, which `quoted-pair`
+    /// has no valid escape for, are stripped. These are the same characters
+    /// `DigestChallenge.isSafeQuotedValue` rejects in the server-sent fields this header echoes.
     ///
-    /// Applied to `username` and `uri`: the two quoted parameters here that can carry
-    /// caller-supplied content (`uri` is built from `Path`/`Query` components, which are commonly
-    /// derived from external data such as a resource id) rather than server- or
-    /// package-generated content already known to be safe. Unlike `realm`/`nonce`/`opaque`
-    /// (rejecting the whole challenge is fine — the server sent something unusable), silently
-    /// dropping the `Authorization` header over an escapable character in the caller's own
-    /// input would be a worse failure mode than escaping it, so this repairs the value instead
-    /// of refusing it. The hash inputs above still use the literal `username`/`uri`, not this
-    /// escaped copy: the digest response must match what the server computes from the request as
-    /// given, not from its header-safe representation.
+    /// Applied to `username` and `uri`, the two quoted parameters that can carry caller-supplied
+    /// content (`uri` is built from `Path`/`Query` components, often derived from external data
+    /// such as a resource id). Unlike `realm`/`nonce`/`opaque`, where rejecting the whole
+    /// challenge is fine because the server sent something unusable, silently dropping the
+    /// `Authorization` header over an escapable character in the caller's own input would be
+    /// worse than escaping it, so this repairs the value instead. The hash inputs above still
+    /// use the literal `username`/`uri`: the digest response must match what the server computes
+    /// from the request as given, not from its header-safe representation.
     private static func escapeQuotedValue(_ value: String) -> String {
         var result = ""
         result.reserveCapacity(value.count)

@@ -24,14 +24,14 @@ extension Internals {
     ///
     /// The original exchange's `Internals.ClientResponseReceiver`, and every continuation's
     /// `Internals.ResumedResponseReceiver`, report to it: the bytes they deliver, and any failure
-    /// mid-body, which it either ``claim(_:)``s -- starting a continuation with `Range`/`If-Range`
-    /// from exactly the delivered count -- or leaves to end the body as before.
+    /// mid-body, which it either ``claim(_:)``s (starting a continuation with `Range`/`If-Range`
+    /// from exactly the delivered count) or leaves to end the body as before.
     ///
     /// ## Ending exactly once
     ///
-    /// The body can now outlive any single exchange, so ending it is no longer any one receiver's
-    /// call: every ending goes through ``terminate(_:)``, whose first caller alone closes or fails
-    /// the body and releases everything the download holds -- its window, the execution's
+    /// The body can outlive any single exchange, so ending it is not any one receiver's call:
+    /// every ending goes through ``terminate(_:)``, whose first caller alone closes or fails the
+    /// body and releases everything the download holds: its window, the execution's
     /// `Internals.TransferControl`, and the operation keeping the client busy between exchanges.
     /// A cancellation that lands *between* two exchanges, where no receiver is left to report it,
     /// ends the body itself (``cancel()``).
@@ -295,8 +295,8 @@ extension Internals {
 
         // MARK: - Internal static methods
 
-        /// Whether `error` means the connection was lost or couldn't be (re)established -- what a
-        /// continuation can recover from -- rather than a cancellation, a TLS/trust or
+        /// Whether `error` means the connection was lost or couldn't be (re)established, which is
+        /// what a continuation can recover from, rather than a cancellation, a TLS/trust or
         /// redirect-policy failure, or a protocol error, which it can't.
         package static func isTransientTransportFailure(_ error: Error) -> Bool {
             if let error = error as? HTTPClientError {

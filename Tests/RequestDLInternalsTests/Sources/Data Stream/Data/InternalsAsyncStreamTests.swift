@@ -273,8 +273,8 @@ struct InternalsDataStreamTests {
         // When
         let first = try await iterator.next()
         let second = try await iterator.next()
-        // The iterator's own state is already `.done` by this third call — not just the
-        // underlying subject — exercising that branch directly rather than falling through it.
+        // The iterator's own state is already `.done` by this third call, not just the underlying
+        // subject, exercising that branch directly rather than falling through it.
         let third = try await iterator.next()
 
         // Then

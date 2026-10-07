@@ -7,7 +7,7 @@
 // these tests either pin `.requiredExecutor(.nio)` and check for `.nio` case of
 // `resolvedClient()` (only exists with NIOCore) or need `LocalServer.TLSOption.client`
 // (server-side client-certificate verification, not implemented on the portable `NWListener`
-// backend -- see `LocalServer.TLSOption.makeLocalIdentity()`'s own doc comment).
+// backend, see `LocalServer.TLSOption.makeLocalIdentity()`'s own doc comment).
 #if canImport(Darwin) && canImport(NIOCore)
 
 import Testing
@@ -25,10 +25,9 @@ import class Foundation.ProcessInfo
 
 extension RawTaskExecutorDispatchTests {
 
-    /// Regression coverage for the bug this phase's own testing caught: `requiredExecutor(.nio)`
-    /// used to validate without ever actually being the executor a real request dispatched
-    /// over, since `resolveExecutor()` read only `preferredExecutor`, so a
-    /// `.urlSession`-compatible config kept resolving there anyway.
+    /// `requiredExecutor(.nio)` must be the executor a real request dispatches over, not merely
+    /// validate: `resolveExecutor()` has to read `requiredExecutor` and not only
+    /// `preferredExecutor`, or a `.urlSession`-compatible config keeps resolving there anyway.
     ///
     /// See `InternalsSessionConfigurationExecutorTests`'s "resolveExecutor() with
     /// requiredExecutor" section for the unit-level fix; this is the same fact proven one
@@ -114,27 +113,25 @@ extension RawTaskExecutorDispatchTests {
     }
 
     /// Completes a real mTLS handshake under `.urlSession` through the *public* `DataTask` entry
-    /// point specifically -- the same way `dataTask_whenCAEnabled` (`DataTaskTests`, pinned to
+    /// point specifically, the same way `dataTask_whenCAEnabled` (`DataTaskTests`, pinned to
     /// `.nio`) and `DataTaskTests.dataTask_whenCAEnabledUnderNIOTransportServices` (pinned to
-    /// `.nioTransportServices`) already do for the other two executors, completing the trio.
+    /// `.nioTransportServices`) do for the other two executors, completing the trio.
     ///
     /// `RequestConfigurationURLSessionClientMTLSTests
-    /// .urlSessionClient_whenMTLSConfigured_completesHandshakeMatchingNIOBackend` already covers
-    /// `.urlSession` mTLS success too, but drives `Internals.URLSessionClient` directly; nothing
-    /// else exercised this same success through `DataTask` itself.
+    /// .urlSessionClient_whenMTLSConfigured_completesHandshakeMatchingNIOBackend` also covers
+    /// `.urlSession` mTLS success, but drives `Internals.URLSessionClient` directly; this one
+    /// exercises the same success through `DataTask` itself.
     ///
     /// Needs `LocalServer.TLSOption.client` (server-side client-certificate verification), only
     /// implemented on the NIOSSL backend.
     ///
-    /// The Keychain round trip this needs genuinely succeeds on real macOS (bare `swift test` or
-    /// an Xcode-run macOS test bundle) once `Internals.RawBytesIdentityBuilder.makeIdentity(_:_:)`
-    /// sets `kSecAttrApplicationLabel` correctly -- confirmed, not assumed, and no longer a known
-    /// issue there. Every other Apple platform's Simulator, reached only via `xcodebuild test`
-    /// against SwiftPM's auto-generated scheme, has no `.entitlements` file to add Keychain
-    /// Sharing to at all, so `SecItemAdd` there fails with `errSecMissingEntitlement` before
-    /// identity pairing is ever reached, surfacing through the public `DataTask` API as
-    /// `ClientIdentityError` -- a genuinely different, still-open gap, confirmed directly on
-    /// iOS/tvOS/watchOS Simulator CI runs.
+    /// The Keychain round trip this needs succeeds on real macOS (bare `swift test` or an
+    /// Xcode-run macOS test bundle) because `Internals.RawBytesIdentityBuilder
+    /// .makeIdentity(_:_:)` sets `kSecAttrApplicationLabel` correctly. Every other Apple
+    /// platform's Simulator, reached only via `xcodebuild test` against SwiftPM's auto-generated
+    /// scheme, has no `.entitlements` file to add Keychain Sharing to at all, so `SecItemAdd`
+    /// there fails with `errSecMissingEntitlement` before identity pairing is ever reached,
+    /// surfacing through the public `DataTask` API as `ClientIdentityError`.
     @Test
     func dataTask_whenCAEnabledUnderURLSession() async throws {
         let server = Certificates().server()

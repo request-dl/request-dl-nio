@@ -171,17 +171,17 @@ extension Internals.SystemProxyResolver {
     /// here, even though `Internals.PACEvaluator`/`Internals.PACProxyCache` already exist and are
     /// wired into the Darwin branch above. Two separate problems block porting that here:
     ///
-    ///   1. **Finding whether a PAC script is even configured, and its URL, has no OS-standard
-    ///      answer outside Darwin** -- `CFNetworkCopySystemProxySettings` folds in every source
-    ///      (network profile, IT-managed config, user setting) behind one call; nothing here does.
+    ///   1. **Finding whether a PAC script is configured, and its URL, has no OS-standard answer
+    ///      outside Darwin.** `CFNetworkCopySystemProxySettings` folds in every source (network
+    ///      profile, IT-managed config, user setting) behind one call; nothing here does.
     ///      - Windows: the readable trace is `HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\
     ///        Internet Settings\AutoConfigURL`, but WinInet actually resolves the *active*
     ///        connection from a binary `DefaultConnectionSettings` blob under `...\Internet
     ///        Settings\Connections`, so a naive registry read can disagree with what the OS would
     ///        really use. The correct source is the Win32 `WinHttpGetIEProxyConfigForCurrentUser`
     ///        API (plus `WinHttpGetProxyForUrl`/`WinHttpDetectAutoProxyConfigUrl` for WPAD, when
-    ///        "automatically detect settings" -- not a fixed URL -- is what's configured) --
-    ///        meaning C interop against `winhttp.h`, not a file or registry read.
+    ///        "automatically detect settings" rather than a fixed URL is what's configured),
+    ///        which means C interop against `winhttp.h`, not a file or registry read.
     ///      - Linux has no cross-desktop standard at all. GNOME keeps it in dconf, readable via
     ///        `gsettings get org.gnome.system.proxy autoconfig-url` (only meaningful once `mode`
     ///        reads `'auto'`); KDE keeps it in `~/.config/kioslaverc` under `[Proxy Settings]` as
@@ -192,11 +192,11 @@ extension Internals.SystemProxyResolver {
     ///   2. **Evaluating the script once fetched needs a JavaScript engine.** CFNetwork gives
     ///      Darwin `CFNetworkExecuteProxyAutoConfigurationURL` for free; nothing here replaces it
     ///      except writing a PAC-specific JS-subset interpreter or embedding an engine (e.g.
-    ///      QuickJS via C interop) -- a new dependency this package's Android/musl/static-SDK CI
+    ///      QuickJS via C interop), a new dependency this package's Android/musl/static-SDK CI
     ///      targets would all need to keep compiling against.
     ///
     /// Both are real, separate pieces of work. `Internals.PACEvaluator`/`Internals.PACProxyCache`
-    /// only cover problem 2 -- porting either here still leaves problem 1 completely unsolved.
+    /// only cover problem 2, so porting either here still leaves problem 1 completely unsolved.
     private static func resolve(_ url: URL) async -> Internals.Proxy? {
         let environment = ProcessInfo.processInfo.environment
 

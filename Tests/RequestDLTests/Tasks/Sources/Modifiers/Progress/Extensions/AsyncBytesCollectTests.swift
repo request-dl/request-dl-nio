@@ -100,14 +100,14 @@ struct AsyncBytesCollectTests {
         #expect(!fetchedDataRecords.isEmpty)
     }
 
-    /// Regression coverage for `collect()`/`collect(with:)` pre-allocating `Data` capacity
-    /// straight from `totalSize` — which mirrors the response's `Content-Length` header
-    /// verbatim, with no validation against how many bytes actually arrive. A response claiming
-    /// an enormous, attacker- or server-controlled length would otherwise force an immediate
-    /// multi-gigabyte allocation before a single byte is read, its own denial of service
-    /// regardless of the real body size. This exercises exactly that shape — a `totalSize` far
-    /// beyond anything reasonable, backed by a tiny real body — and would hang or crash the test
-    /// process outright on the pre-fix code instead of completing.
+    /// `collect()`/`collect(with:)` must not pre-allocate `Data` capacity straight from
+    /// `totalSize`, which mirrors the response's `Content-Length` header verbatim, with no
+    /// validation against how many bytes actually arrive. A response claiming an enormous,
+    /// attacker- or server-controlled length would otherwise force an immediate multi-gigabyte
+    /// allocation before a single byte is read, its own denial of service regardless of the real
+    /// body size. This exercises exactly that shape (a `totalSize` far beyond anything
+    /// reasonable, backed by a tiny real body) and would hang or crash the test process outright
+    /// instead of completing if the allocation weren't capped.
     @Test
     func collect_whenTotalSizeIsImplausiblyLarge_shouldNotPreallocateItAndStillCollectCorrectly() async throws {
         // Given

@@ -12,9 +12,7 @@ import Foundation
 
 extension Internals.URLSessionClient {
 
-    /// Routes a TLS challenge (server-trust, client-certificate) to `policy`. This is promoted
-    /// from the URLSession Executor Spike's `RoutingMTLSURLSessionDelegate`, not the
-    /// single-identity `MTLSURLSessionDelegate` the spike test itself used.
+    /// Routes a TLS challenge (server-trust, client-certificate) to `policy`.
     ///
     /// `Internals.URLSessionClient` only ever resolves one `Internals.SecureConnection` (the one
     /// it was configured with, same as `redirectConfiguration`/`proxy`), so there is only ever one

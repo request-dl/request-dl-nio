@@ -94,12 +94,11 @@ struct RawTaskExecutorDispatchTests {
         }
     }
 
-    /// Regression coverage for the gap `Session.compression(_:)` used to have: its
-    /// `NIOHTTPRequestCompressor` was spliced into the `.nio` executor's own connection pipeline
-    /// (`Internals.Session.Configuration.build()`), which `.urlSession` never runs through.
-    /// `compression` wasn't even listed in `urlSessionIncompatibilityReasons()`, so a session
-    /// pinned (or, on Darwin, defaulted) to `.urlSession` silently sent the body uncompressed,
-    /// no error anywhere.
+    /// `Session.compression(_:)` must not be limited to the `.nio` executor's own connection
+    /// pipeline (`Internals.Session.Configuration.build()`), which `.urlSession` never runs
+    /// through. `compression` isn't listed in `urlSessionIncompatibilityReasons()`, so a session
+    /// pinned (or, on Darwin, defaulted) to `.urlSession` would otherwise silently send the
+    /// body uncompressed, with no error anywhere.
     ///
     /// `RequestConfiguration.applyCompression(_:onDuplicateHeader:)` now compresses `RequestBody`
     /// itself, once, before either executor ever sees it. This proves that fix through the real,
@@ -160,11 +159,11 @@ struct RawTaskExecutorDispatchTests {
         }
     }
 
-    /// Regression coverage for the design decision that `.urlSession` should drop RequestDL's own
-    /// default `User-Agent` and let URLSession synthesize its native `AppName/version
-    /// Darwin/version CFNetwork/version` report instead of RequestDL's neutral one, since claiming
-    /// that format under a different executor (`.nio`) would misrepresent a network stack that
-    /// never actually ran the request. See `RequestConfiguration.dropDefaultUserAgentForNativeReporting()`.
+    /// `.urlSession` drops RequestDL's own default `User-Agent` and lets URLSession synthesize
+    /// its native `AppName/version Darwin/version CFNetwork/version` report instead of
+    /// RequestDL's neutral one, since claiming that format under a different executor (`.nio`)
+    /// would misrepresent a network stack that never actually ran the request. See
+    /// `RequestConfiguration.dropDefaultUserAgentForNativeReporting()`.
     @Test
     func dataTask_withDefaultUserAgentOverURLSession_defersToURLSessionsNativeReport() async throws {
         // Given
@@ -240,13 +239,13 @@ struct RawTaskExecutorDispatchTests {
         #expect(result.receivedUserAgentHeader == customUserAgent)
     }
 
-    /// Regression coverage for combining RequestDL's default with a plain `CustomHeader(name:
-    /// "user-agent", ...)`, not `UserAgentHeader(_:)`. `HeaderNode.make(_:)` matches "User-Agent"
-    /// case-insensitively, so this still disqualifies `hasDefaultUserAgent`; see
+    /// Combining RequestDL's default with a plain `CustomHeader(name: "user-agent", ...)`, not
+    /// `UserAgentHeader(_:)`. `HeaderNode.make(_:)` matches "User-Agent" case-insensitively, so
+    /// this still disqualifies `hasDefaultUserAgent`; see
     /// `UserAgentHeaderTests.hasDefaultUserAgent_whenDefaultIsCombinedWithCustomHeaderUnderDifferentCasing`
-    /// for that check at the graph-resolve level, where the two values are still stored
-    /// separately (`CustomHeader` defaults to `headerSeparator == nil`, unlike `UserAgentHeader`'s
-    /// own hardcoded `" "`).
+    /// for that check at the graph-resolve level, where the two values are still stored separately
+    /// (`CustomHeader` defaults to `headerSeparator == nil`, unlike `UserAgentHeader`'s own
+    /// hardcoded `" "`).
     ///
     /// This proves what actually reaches the wire once `URLRequest` gets involved:
     /// `buildURLRequestWithoutBody()` calls `addValue(_:forHTTPHeaderField:)` once per stored
@@ -366,9 +365,9 @@ struct RawTaskExecutorDispatchTests {
     /// that awaits the request's own future (to surface a pre-flight rejection that never drives
     /// the delegate). That watcher must not keep the request's `TaskSeed` alive: dropping the
     /// response is the *only* thing that cancels a still-running request, via the seed's
-    /// `deinit`, so a watcher holding the seed until the request finishes on its own made that
-    /// cancellation unreachable — the connection, the operation slot, and any
-    /// `maximumConcurrentConnections` permit stayed held for as long as the server kept the
+    /// `deinit`, so a watcher holding the seed until the request finishes on its own would make
+    /// that cancellation unreachable: the connection, the operation slot, and any
+    /// `maximumConcurrentConnections` permit would stay held for as long as the server kept the
     /// response open, forever for an endless stream.
     @Test
     func downloadTask_whenResponseDroppedMidFlight_actuallyCancelsTheUnderlyingNIOClient() async throws {
@@ -421,7 +420,7 @@ struct RawTaskExecutorDispatchTests {
     /// own default; see `dataTask_whenNoExecutorPreferenceSet_actuallyDispatchesOverURLSessionOnDarwin`
     /// above).
     ///
-    /// This pins `.urlSession` explicitly, so this regression coverage can't silently go stale
+    /// This pins `.urlSession` explicitly, so this coverage can't silently go stale
     /// if that default ever changes, and reuses `withPartialResponseServer` (headers plus a
     /// small body, then silence forever), so the deadline has to fire against a connection
     /// that's demonstrably still open, the same technique
@@ -659,7 +658,7 @@ import Foundation
 import Network
 import SwiftAsyncStream
 
-/// Network.framework-backed `withRawServer(response:_:)`: plain TCP, no TLS -- both callers speak
+/// Network.framework-backed `withRawServer(response:_:)`: plain TCP, no TLS. Both callers speak
 /// `http://127.0.0.1:<port>`, so there is nothing to terminate. Writes `response` verbatim as
 /// soon as any bytes arrive (the client's own request line/headers, never actually parsed: a
 /// canned response needs nothing from them), then does nothing further, exactly like the NIOCore

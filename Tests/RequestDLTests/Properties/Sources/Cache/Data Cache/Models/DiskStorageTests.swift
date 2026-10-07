@@ -37,7 +37,7 @@ struct DiskStorageTests {
         )
     }
 
-    /// Whether `subsequence` occurs contiguously anywhere in `bytes` — a portable stand-in for
+    /// Whether `subsequence` occurs contiguously anywhere in `bytes`, a portable stand-in for
     /// `Data.range(of:)`, which isn't guaranteed available under `FoundationEssentials`.
     private func contains(_ bytes: [UInt8], subsequence: [UInt8]) -> Bool {
         guard !subsequence.isEmpty, bytes.count >= subsequence.count else {
@@ -105,7 +105,7 @@ struct DiskStorageTests {
             #expect(await storage["k1"] != nil)
 
             // When: a second entry is allocated with a capacity that only has room for itself
-            // plus a sliver more — not enough to also keep the first entry around.
+            // plus a sliver more, not enough to also keep the first entry around.
             var (secondBuffer, _, _) = await storage.allocateBuffer(
                 key: "k2",
                 cachedResponse: secondResponse,
@@ -125,13 +125,12 @@ struct DiskStorageTests {
     @Test
     func record_whenReadThroughAFreshInstanceShortlyAfterAnotherWroteAnEntry_isFoundThroughAColdScan() async throws {
         try await withTemporaryFileURL(createPath: false) { directoryURL in
-            // Given: an entry written through one `DiskStorage` value — standing in for a
-            // different process (e.g. a Share Extension writing to a cache directory shared
-            // via `suiteName`) that wrote this entry and is already gone by the time anything
-            // reads it. Within a single process this pairing can't happen — the same
-            // directory always resolves to the same `Storage`/index through
-            // `DataCache.Manager` — but nothing enforces that across processes, and that's
-            // exactly the gap `index` can't see across (see its doc).
+            // Given: an entry written through one `DiskStorage` value, standing in for a different
+            // process (e.g. a Share Extension writing to a cache directory shared via `suiteName`)
+            // that wrote this entry and is already gone by the time anything reads it. Within a
+            // single process this pairing can't happen (the same directory always resolves to the
+            // same `Storage`/index through `DataCache.Manager`), but nothing enforces that across
+            // processes, and that's exactly the gap `index` can't see across (see its doc).
             let writer = DiskStorage(directory: directoryURL)
             let response = makeCachedResponse(key: "k1")
 
@@ -144,8 +143,8 @@ struct DiskStorageTests {
             await buffer?.writeData(Data([0x1]))
             try? await buffer?.close()
 
-            // When: a second, freshly constructed `DiskStorage` value — its index unpopulated,
-            // sharing no state at all with `writer` — reads that key concurrently alongside a
+            // When: a second, freshly constructed `DiskStorage` value (its index unpopulated,
+            // sharing no state at all with `writer`) reads that key concurrently alongside a
             // lookup for a key that was never written anywhere.
             let reader = DiskStorage(directory: directoryURL)
 
@@ -167,7 +166,7 @@ struct DiskStorageTests {
             let response = makeCachedResponse(key: "k1")
 
             // Given: a real entry that is already over whatever capacity `freeSpace` is about
-            // to be called with — a rescan would find it and evict it.
+            // to be called with: a rescan would find it and evict it.
             var (buffer, _, _) = await storage.allocateBuffer(
                 key: "k1",
                 cachedResponse: response,
@@ -178,7 +177,7 @@ struct DiskStorageTests {
             try? await buffer?.close()
             #expect(await storage["k1"] != nil)
 
-            // When: freeing space down to zero, but with a `knownUsage` of zero — a trusted
+            // When: freeing space down to zero, but with a `knownUsage` of zero, a trusted
             // (if, here, deliberately wrong) claim that there is nothing to evict.
             let result = await storage.freeSpace(.zero, knownUsage: .zero)
 
@@ -210,7 +209,7 @@ struct DiskStorageTests {
             let result = await storage.freeSpace(.zero, knownUsage: .max)
 
             // Then: the real scan found and evicted the entry, and reported the true resulting
-            // total — zero, since it was the only entry — rather than the stale `knownUsage`.
+            // total (zero, since it was the only entry) rather than the stale `knownUsage`.
             #expect(result == .zero)
             #expect(await storage["k1"] == nil)
         }
@@ -234,8 +233,8 @@ struct DiskStorageTests {
             )
             #expect(firstUsage == firstResponseSize + 10)
 
-            // When: a second entry is allocated reusing that reported usage as `knownUsage` —
-            // the shape `DataCache.Storage` relies on to thread the estimate across calls.
+            // When: a second entry is allocated reusing that reported usage as `knownUsage`, which
+            // is the shape `DataCache.Storage` relies on to thread the estimate across calls.
             try? await Task.sleep(nanoseconds: 2_000_000)
             let secondResponse = makeCachedResponse(key: "k2")
             let secondResponseSize = Int64(try JSONEncoder().encode(secondResponse).count)
@@ -276,7 +275,7 @@ struct DiskStorageTests {
             try await responseURL.write(Data(JSONEncoder().encode(response)))
 
             // Given: "response.record" exists already, but "data.record" only shows up a few
-            // milliseconds into the lookup below — the same shape a transient
+            // milliseconds into the lookup below, the same shape a transient
             // `Internals.fileSystem.info(forFileAt:)` miss leaves behind. `Record.init?` has to
             // tolerate that instead of reporting the whole record missing outright.
             async let lookup = storage[key]
@@ -377,22 +376,22 @@ struct DiskStorageTests {
             await buffer?.writeData(Data([0x1]))
             try? await buffer?.close()
 
-            // Given: the entry is indexed — a lookup finds it without any directory scan.
+            // Given: the entry is indexed, so a lookup finds it without any directory scan.
             #expect(await storage["k1"] != nil)
 
             // When: something outside `DiskStorage`'s own API removes the record directory
-            // the index still points to — e.g. another process sharing this directory (via
+            // the index still points to, e.g. another process sharing this directory (via
             // `suiteName`) clearing entries it doesn't know this instance has indexed.
             let recordURL = try await encryptedRecordDirectoryURL(in: directoryURL)
             try await Internals.fileSystem.removeItem(at: recordURL.filePath)
 
-            // Then: the stale mapping fails validation and is dropped instead of being served
-            // — or, worse, retried against forever on every future lookup for this key.
+            // Then: the stale mapping fails validation and is dropped instead of being served or,
+            // worse, retried against forever on every future lookup for this key.
             #expect(await storage["k1"] == nil)
         }
     }
 
-    /// The one `.cached` record directory under `directoryURL` — cross-platform, unlike
+    /// The one `.cached` record directory under `directoryURL`. Cross-platform, unlike
     /// `recordDirectoryURL(in:)` below, since encryption (unlike `fileProtection`) is not
     /// Darwin-only.
     private func encryptedRecordDirectoryURL(in directoryURL: URL) async throws -> URL {
@@ -493,7 +492,7 @@ struct DiskStorageTests {
             try? await buffer?.close()
             #expect(await storage["k1"] != nil)
 
-            // When: the same directory is reopened under a different key — the shared-state
+            // When: the same directory is reopened under a different key. The shared-state
             // realities of `DataCache.Manager` aside, `DiskStorage` itself is a plain value type
             // here, so nothing prevents constructing a second one against the same directory.
             var rotated = DiskStorage(directory: directoryURL)
@@ -546,7 +545,7 @@ struct DiskStorageTests {
             let firstSize = Int64(try JSONEncoder().encode(firstResponse).count)
             let secondSize = Int64(try JSONEncoder().encode(secondResponse).count)
 
-            // Same numbers as the unencrypted version of this test above — the admission check
+            // Same numbers as the unencrypted version of this test above: the admission check
             // (`writableBytes`) is still plaintext-based either way, unaffected by encryption.
             // What has to keep working is `Record.size`'s eviction accounting, a real stat of
             // whatever is actually on disk, so eviction still targets the oldest entry correctly
@@ -582,7 +581,7 @@ struct DiskStorageTests {
     func record_whenAnotherEntryIsStillBeingWritten_doesNotStallTheLookupOfACompleteKey() async throws {
         try await withTemporaryFileURL(createPath: false) { directoryURL in
             // Given: one complete entry, written by some other `DiskStorage` over the same
-            // directory — a fresh instance below has to find it by scanning, not through the
+            // directory, so a fresh instance below has to find it by scanning, not through the
             // index a write of its own would have populated.
             var (buffer, _, _) = await DiskStorage(directory: directoryURL).allocateBuffer(
                 key: "complete",
@@ -618,7 +617,7 @@ struct DiskStorageTests {
             let retries = DiskStorage.retryCount - retriesBefore
 
             // Then: it resolves, and without spending the retry budget on the neighbor. That budget
-            // is 299 retries of 50ms, the 15s the incomplete neighbor used to cost. Counted, not
+            // is 299 retries of 50ms, the 15s the incomplete neighbor would cost. Counted, not
             // timed: a CI runner under contention has taken 12.7s over a lookup that takes a few
             // milliseconds when nothing else is running. The margin allows for retries that tests
             // running at the same time do, which the count includes.
@@ -632,7 +631,7 @@ struct DiskStorageTests {
         try await withTemporaryFileURL(createPath: false) { directoryURL in
             let storage = DiskStorage(directory: directoryURL)
 
-            // Given/When: a successful write of a response with an empty body — nothing is ever
+            // Given/When: a successful write of a response with an empty body, so nothing is ever
             // written through the buffer, so "data.record" is never opened lazily.
             let (buffer, _, _) = await storage.allocateBuffer(
                 key: "empty",
@@ -697,7 +696,7 @@ struct DiskStorageTests {
 
             #if targetEnvironment(simulator)
             // Every Apple Simulator backs its file system with the host Mac's plain APFS
-            // volume, not the per-class, hardware-derived encryption real devices use — a
+            // volume, not the per-class, hardware-derived encryption real devices use, so a
             // protection class has no effect there and does not round-trip back through
             // `FileManager.attributesOfItem`. `DiskStorage` knows this and skips the (otherwise
             // pointless) work outright, degrading to the same behavior as `fileProtection ==
@@ -707,7 +706,7 @@ struct DiskStorageTests {
             #expect(protectionType(atPath: dataPath) == protectionType(atPath: responsePath))
             #else
             // Then: "response.record" is fully written already, and "data.record" was
-            // pre-created empty — both already carry the configured protection class, rather
+            // pre-created empty: both already carry the configured protection class, rather
             // than only picking it up once actual content is streamed in later.
             #expect(protectionType(atPath: responsePath) == .completeUntilFirstUserAuthentication)
             #expect(protectionType(atPath: dataPath) == .completeUntilFirstUserAuthentication)
@@ -740,7 +739,7 @@ struct DiskStorageTests {
             #expect(buffer != nil)
 
             // Then: "data.record" is still pre-created (that is what keeps an empty-bodied
-            // response from becoming an unfindable orphan), it just gets no class of its own —
+            // response from becoming an unfindable orphan), it just gets no class of its own:
             // it lands on whatever the volume's default is, same as "response.record" beside it.
             let recordURL = try recordDirectoryURL(in: directoryURL)
             let dataPath = recordURL.appendingPathComponent("data.record").path

@@ -23,13 +23,13 @@ struct InternalsFileStreamBufferTests {
         try await withTemporaryFileURL("stream.bin") { url in
             let stream = try await Internals.FileStreamBuffer(writingTo: .init(url))
 
-            // Holding the lock first, then waiting for the task to actually queue behind it,
-            // makes "cancelled before it runs" deterministic instead of a race between
-            // `task.cancel()` and the task getting scheduled — under CI scheduler contention,
-            // a freshly created task can start and finish before the creating task even reaches
-            // `cancel()`. `AsyncLock` guarantees a cancelled waiter still takes its turn and
-            // runs `writeData`'s loop, which checks `Task.checkCancellation()` before doing
-            // anything else — see `Internals.FileStreamBuffer.writeData`.
+            // Holding the lock first, then waiting for the task to actually queue behind it, makes
+            // "cancelled before it runs" deterministic instead of a race between `task.cancel()`
+            // and the task getting scheduled: under CI scheduler contention, a freshly created task
+            // can start and finish before the creating task even reaches `cancel()`. `AsyncLock`
+            // guarantees a cancelled waiter still takes its turn and runs `writeData`'s loop, which
+            // checks `Task.checkCancellation()` before doing anything else (see
+            // `Internals.FileStreamBuffer.writeData`).
             await stream.lockForTesting.lock()
 
             let task = _Concurrency.Task<Void, Error> {
@@ -75,12 +75,12 @@ struct InternalsFileStreamBufferTests {
         }
     }
 
-    /// Regression test for the read/write path running blocking syscalls directly on the
-    /// Swift Concurrency cooperative thread pool: under `swift-testing`'s parallel execution,
-    /// enough concurrent instances doing that used to saturate the pool and could make a single
-    /// instance's critical section look "stuck" to `AsyncLock.Watchdog`, five seconds later,
-    /// even though no lock was ever contended between them. Each instance below has its own
-    /// file and its own lock, so this exercises exactly that many-instances-at-once shape.
+    /// The read/write path must not run blocking syscalls directly on the Swift Concurrency
+    /// cooperative thread pool: under `swift-testing`'s parallel execution, enough concurrent
+    /// instances doing that would saturate the pool and could make a single instance's critical
+    /// section look "stuck" to `AsyncLock.Watchdog`, five seconds later, even though no lock was
+    /// ever contended between them. Each instance below has its own file and its own lock, so
+    /// this exercises exactly that many-instances-at-once shape.
     @Test
     func manyInstances_whenRunningConcurrently_shouldAllCompleteWithoutStallingTheCooperativePool() async throws {
         let expected = Data(repeating: 0x2A, count: 4_096)

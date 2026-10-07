@@ -9,10 +9,10 @@ extension Interceptors {
     /// the behavior of the main `RequestTask`.
     ///
     /// - Important: The closure runs synchronously, inline, on whatever task/executor is already
-    /// resolving the intercepted `RequestTask` -- there is no thread hop or detachment of
-    /// execution here despite the name. "Detach" refers to detaching a side effect from the
-    /// main result path, not to concurrency: `interceptor(_:)`'s own result is unaffected by
-    /// what this closure does, so it can run without changing the task's own outcome.
+    /// resolving the intercepted `RequestTask`: there is no thread hop or detachment of execution
+    /// here despite the name. "Detach" refers to detaching a side effect from the main result
+    /// path, not to concurrency. `interceptor(_:)`'s own result is unaffected by what this
+    /// closure does, so it can run without changing the task's own outcome.
     ///
     /// ```swift
     /// DataTask { ... }

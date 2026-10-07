@@ -101,13 +101,13 @@ struct ZeroingBytesTests {
         #expect(lhs == rhs)
     }
 
-    /// Regression coverage: `==` used to delegate to `memcmp`, which short-circuits on the first
-    /// mismatched byte -- a timing side channel already fixed once for SPKI pin matching
+    /// `==` must not delegate to `memcmp`, which short-circuits on the first mismatched byte, a
+    /// timing side channel already avoided for SPKI pin matching
     /// (`Internals.SPKIHash.matchesSPKI`). `ZeroingBytes.==` backs `PrivateKey`'s password
-    /// comparison on every `Internals.ClientManager` pool lookup, so the same class of bug applied
-    /// here too. This can't assert on timing directly (too flaky), but confirms `==` still agrees
-    /// with `memcmp` on where the *first* mismatch falls, not just whether the two are equal
-    /// overall -- the one case an XOR-accumulate rewrite could plausibly get wrong.
+    /// comparison on every `Internals.ClientManager` pool lookup, so the same class of bug applies
+    /// here. This can't assert on timing directly (too flaky), but confirms `==` still agrees with
+    /// `memcmp` on where the *first* mismatch falls, not just whether the two are equal overall,
+    /// the one case an XOR-accumulate rewrite could plausibly get wrong.
     @Test
     func zeroingBytes_whenFirstByteDiffers_stillComparesEveryByte() async throws {
         // Given

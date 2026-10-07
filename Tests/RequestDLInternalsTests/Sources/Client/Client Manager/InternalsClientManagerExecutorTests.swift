@@ -103,14 +103,13 @@ struct InternalsClientManagerExecutorTests {
         #expect(firstClient === secondClient)
     }
 
-    /// Regression coverage: a `.urlSession` client resolved once and used for two sequential
-    /// calls on the very same instance -- exactly what `Internals.CacheControl`'s conditional
-    /// revalidation does (a `HEAD`, then, if still needed, the real `GET`) -- must not be
-    /// invalidated in the gap between the two just because its pooled entry's `readAt` (set once,
-    /// at checkout) has gone stale by the time an eviction pass happens to run. An operation
-    /// completing on the client (the `HEAD` above) is itself evidence of recent use that
-    /// `Internals.ClientOperationQueue.generation`/`Internals.ClientManager.Item
-    /// .lastKnownOperationGeneration` exist to capture.
+    /// A `.urlSession` client resolved once and used for two sequential calls on the very same
+    /// instance (what `Internals.CacheControl`'s conditional revalidation does: a `HEAD`, then,
+    /// if still needed, the real `GET`) must not be invalidated in the gap between the two just
+    /// because its pooled entry's `readAt` (set once, at checkout) has gone stale by the time an
+    /// eviction pass happens to run. An operation completing on the client (the `HEAD` above)
+    /// is itself evidence of recent use that `Internals.ClientOperationQueue.generation`/
+    /// `Internals.ClientManager.Item.lastKnownOperationGeneration` exist to capture.
     ///
     /// Exercises `_evictIfNeeded(protecting:)` directly, with both the protected entry's and a
     /// decoy entry's `readAt` backdated by hand: real background-sweep timing can't be pinned to
@@ -121,13 +120,13 @@ struct InternalsClientManagerExecutorTests {
     func resolvedClient_whenOperationCompletesBetweenTwoCallsOnTheSameClient_survivesEvictionDespiteStaleReadAt()
         async throws
     {
-        // Given: a real client, resolved and used once -- advancing its
-        // `operationGeneration` past what the table recorded when it was checked out -- plus a
-        // second, decoy entry that never ran anything at all.
-        // An entry is expired once `now - readAt > lifetime`, `now` being the machine's uptime and
-        // `readAt` what this test backdates to `0` and `1` below. That is only ever true on a
-        // machine that has been up for longer than the lifetime, which a CI runner that was just
-        // started has not, so the lifetime is the usual five minutes only when there is room for it.
+        // Given: a real client, resolved and used once, which advances its `operationGeneration`
+        // past what the table recorded when it was checked out, plus a second, decoy entry that
+        // never ran anything at all. An entry is expired once `now - readAt > lifetime`, `now`
+        // being the machine's uptime and `readAt` what this test backdates to `0` and `1` below.
+        // That is only ever true on a machine that has been up for longer than the lifetime, which
+        // a CI runner that was just started has not, so the lifetime is the usual five minutes only
+        // when there is room for it.
         let lifetime = min(5 * 60 * 1_000_000_000, Int64(Internals.ClientManager.monotonicNow()) / 2)
         let manager = Internals.ClientManager(lifetime: lifetime, maximumCount: 1)
         let provider = Internals.SharedSessionProvider()
@@ -159,7 +158,7 @@ struct InternalsClientManagerExecutorTests {
             return
         }
 
-        // A real request, run to completion on `protectedClient` -- mirrors the revalidation
+        // A real request, run to completion on `protectedClient`, mirrors the revalidation
         // `HEAD` finishing just before the real `GET` would start on the same client.
         _ = try await protectedClient.execute(
             request: URLRequest(url: url),
@@ -169,18 +168,18 @@ struct InternalsClientManagerExecutorTests {
         #expect(protectedClient.operationGeneration > .zero)
 
         // When: both entries' bookkeeping is backdated to look idle-and-expired, as a real
-        // multi-minute-old checkout would -- except `protectedClient`'s recorded
+        // multi-minute-old checkout would, except `protectedClient`'s recorded
         // `lastKnownOperationGeneration` (0, from its original checkout) purposefully still
         // doesn't match its *current* `operationGeneration`, since the request above ran after
-        // that checkout. `protected` sorts older than `decoy` so an unfixed eviction, which
-        // ignores this mismatch, deterministically picks it first.
+        // that checkout. `protected` sorts older than `decoy` so an eviction that ignores this
+        // mismatch deterministically picks it first.
         let protectedIdentifier = ObjectIdentifier(protectedClient)
 
         manager.tableLock.withLock {
-            // Both configurations share one provider, and `_table` keys by provider identity
-            // alone -- distinct `sessionConfiguration`s live as separate `Item`s in the *same*
-            // key's array (see `_reusableItem`'s own per-item `sessionConfiguration` comparison)
-            // -- so every item in every array needs backdating, not just each key's first.
+            // Both configurations share one provider, and `_table` keys by provider identity alone,
+            // so distinct `sessionConfiguration`s live as separate `Item`s in the *same* key's
+            // array (see `_reusableItem`'s own per-item `sessionConfiguration` comparison). Every
+            // item in every array needs backdating, not just each key's first.
             for key in manager._table.keys {
                 guard let items = manager._table[key] else { continue }
 

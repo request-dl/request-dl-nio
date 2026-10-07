@@ -133,12 +133,12 @@ struct PublishedTaskTests {
         cancellable.cancel()
     }
 
-    // Regression test: `Subscription.cancel()` used to only drop the `_task`/`_subscriber`
-    // references without calling `_task?.cancel()`. Dropping a `_Concurrency.Task` handle does
-    // not cancel it, so the wrapped request kept running to completion, and the subscriber —
-    // captured directly by the task's closure, not through `_subscriber` — still received a
-    // late value/completion after the subscription had already been cancelled, violating
-    // Combine's `Subscription.cancel()` contract.
+    // `Subscription.cancel()` must call `_task?.cancel()`, not only drop the `_task`/
+    // `_subscriber` references. Dropping a `_Concurrency.Task` handle does not cancel it, so the
+    // wrapped request would keep running to completion, and the subscriber (captured directly
+    // by the task's closure, not through `_subscriber`) would still receive a late
+    // value/completion after the subscription had already been cancelled, violating Combine's
+    // `Subscription.cancel()` contract.
     @Test
     func cancelStopsDeliveryOfAnInFlightRequest() async throws {
         // Given
@@ -211,7 +211,7 @@ struct PublishedTaskTests {
         // When
         //
         // `receive(subscription:)` runs synchronously as part of `subscribe(_:)`, and this
-        // subscriber cancels before requesting demand — the guard in `request(_:)` returns
+        // subscriber cancels before requesting demand: the guard in `request(_:)` returns
         // before any async work is scheduled, so there is nothing to await.
         MockedTask {
             BaseURL("localhost")
@@ -226,10 +226,10 @@ struct PublishedTaskTests {
     }
 
     /// Combine explicitly permits a subscriber to call `request(_:)` more than once before any
-    /// value has arrived (accumulating demand). `Subscription.request(_:)` used to unconditionally
-    /// launch a new `_Concurrency.Task` on every call, overwriting (not cancelling) any prior
-    /// in-flight one -- so two overlapping `request(_:)` calls ran the wrapped task twice, a real
-    /// problem for a non-idempotent request, and could have delivered two
+    /// value has arrived (accumulating demand). `Subscription.request(_:)` must not
+    /// unconditionally launch a new `_Concurrency.Task` on every call, overwriting (not
+    /// cancelling) any prior in-flight one: two overlapping `request(_:)` calls would run the
+    /// wrapped task twice, a real problem for a non-idempotent request, and could deliver two
     /// `receive(_:)`/`receive(completion:)` pairs to one subscriber.
     final class TwiceRequestingSubscriber<Input: Sendable>: Subscriber, @unchecked Sendable {
         typealias Failure = Error

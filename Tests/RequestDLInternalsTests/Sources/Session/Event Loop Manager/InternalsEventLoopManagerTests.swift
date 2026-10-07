@@ -69,7 +69,7 @@ struct InternalsEventLoopManagerTests {
     /// Forwards everything to a real group, and records whether `Internals.EventLoopGroupManager`
     /// asked it to shut down.
     ///
-    /// The obvious alternative — submitting work and seeing whether it runs — deadlocks: NIO
+    /// The obvious alternative, submitting work and seeing whether it runs, deadlocks: NIO
     /// silently *drops* work handed to a closed `EventLoop`, so the future it hands back never
     /// completes, in either direction. Recording the call is both deterministic and the thing
     /// actually under test.
@@ -137,9 +137,9 @@ struct InternalsEventLoopManagerTests {
         }
     }
 
-    /// `_groups` had no ceiling and nothing ever shut a group down, so every distinct
-    /// `Session(_:numberOfThreads:)` identifier a process ever used kept its
-    /// `MultiThreadedEventLoopGroup` — OS threads included — alive until the process exited.
+    /// `_groups` has a ceiling: without one, every distinct `Session(_:numberOfThreads:)`
+    /// identifier a process ever used would keep its `MultiThreadedEventLoopGroup`, OS threads
+    /// included, alive until the process exited.
     @Test
     func manager_whenMoreDistinctIdentifiersThanTheCap_shutsDownTheGroupsItBuiltItself() async throws {
         // Given
@@ -171,7 +171,7 @@ struct InternalsEventLoopManagerTests {
     /// `Internals.Client` holds an `EventLoopGroupToken` for exactly this reason: its pooled
     /// lifetime is governed by `Internals.ClientManager`, which knows nothing about this table,
     /// so an entry here can be evicted while clients are mid-request on that group. Retiring it
-    /// then pulls the event loops out from under live connections — and an `HTTPClient` whose
+    /// then pulls the event loops out from under live connections, and an `HTTPClient` whose
     /// loops are gone can never complete its own `shutdown()`, which NIO traps on as a leaked
     /// promise.
     @Test
@@ -203,11 +203,11 @@ struct InternalsEventLoopManagerTests {
         #expect(inUse.wasShutDown)
     }
 
-    /// The other half of the same change: a group this manager only *borrows* must never be shut
-    /// down when it is evicted. `createsGroup == false` here stands for
-    /// `Internals.CustomSessionProvider` (a group handed in through `Session.init(_:)`) and for
-    /// `Internals.SharedSessionProvider` (NIO's process-wide singletons) alike — shutting either
-    /// down would take every unrelated user of it along.
+    /// A group this manager only *borrows* must never be shut down when it is evicted.
+    /// `createsGroup == false` here stands for `Internals.CustomSessionProvider` (a group handed
+    /// in through `Session.init(_:)`) and for `Internals.SharedSessionProvider` (NIO's
+    /// process-wide singletons) alike: shutting either down would take every unrelated user of
+    /// it along.
     @Test
     func manager_whenEvictingAGroupItDidNotBuild_leavesItRunning() async throws {
         // Given
@@ -223,8 +223,8 @@ struct InternalsEventLoopManagerTests {
         // When
         await pushPastTheCeiling(manager, count: maximumCount * 3)
 
-        // Then: dropped from the table, but left entirely alone — checked after every shutdown
-        // the eviction did start has finished, so this cannot pass merely by being quicker.
+        // Then: dropped from the table, but left entirely alone, checked after every shutdown the
+        // eviction did start has finished, so this cannot pass merely by being quicker.
         await manager.waitUntilShutdownsComplete()
 
         #expect(await manager.count <= maximumCount)

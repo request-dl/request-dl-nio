@@ -18,12 +18,12 @@ extension DataCache {
             (memoryBuffer ?? diskBuffer)?.readableBytes ?? .zero
         }
 
-        /// The exact disk record directory `diskBuffer` writes into, `nil` when there is no
-        /// disk tier (memory-only policy, or the disk write couldn't be allocated). Kept around
-        /// so a caller whose body stream never finishes writing through this buffer can hand it
-        /// straight to ``DataCache/discardFailedWrite(_:forKey:)`` — precise cleanup of exactly
-        /// this write, not a search by key that could catch an unrelated, still in-progress
-        /// write to the same key from a concurrent request.
+        /// The exact disk record directory `diskBuffer` writes into, `nil` when there is no disk
+        /// tier (memory-only policy, or the disk write couldn't be allocated).
+        ///
+        /// Lets a caller whose body stream never finishes writing through this buffer hand it to
+        /// ``DataCache/discardFailedWrite(_:forKey:)`` for precise cleanup of exactly this write,
+        /// instead of a search by key that could catch an unrelated in-progress write.
         let diskRecordURL: URL?
 
         /// The exact in-memory record `memoryBuffer` writes into, `nil` when there is no memory

@@ -77,10 +77,8 @@ struct FormNode: PropertyNode {
             make.requestConfiguration.method = "POST"
         }
 
-        // Each item's factory runs exactly once here, however many things below need its
-        // output — `FormGroupBuilder` used to run it again itself, once per item, for every
-        // request; a `TaskDescriptor` pass needing the same output no longer means running it a
-        // third time between the two.
+        // Each item's factory runs exactly once here, however many things below need its output
+        // (`FormGroupBuilder` and a `TaskDescriptor` pass both reuse it).
         var outputs: [FormItem.Output] = []
         outputs.reserveCapacity(items.count)
 
@@ -89,9 +87,9 @@ struct FormNode: PropertyNode {
         }
 
         // A `TaskDescriptor` pass (see `RawTask.description(_:)`) needs every field's own
-        // name/filename/content-type/bytes — still right here, one item at a time — before
+        // name/filename/content-type/bytes, still available here one item at a time, before
         // `constructor()` below flattens everything into one multipart byte stream with a
-        // boundary, at which point that structure is gone.
+        // boundary and that structure is gone.
         if let descriptorFormFields {
             for output in outputs {
                 descriptorFormFields.fields.append(

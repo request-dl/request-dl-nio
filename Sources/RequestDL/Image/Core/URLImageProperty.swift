@@ -35,9 +35,8 @@ struct URLImageProperty: Property {
     }
 
     /// - Important: Read as `percentEncodedQueryItems`, not `queryItems`. Everything RequestDL
-    /// stores in ``RequestConfiguration/queries`` is expected to already be percent encoded
-    /// (see its doc comment) — encoding it a second time here would turn every `%20` the URL
-    /// already carries into `%2520`.
+    /// stores in ``RequestConfiguration/queries`` is expected to already be percent encoded (see
+    /// its doc comment), so encoding it again would turn every `%20` in the URL into `%2520`.
     private var percentEncodedQueryItems: [URLQueryItem] {
         URLComponents(url: url, resolvingAgainstBaseURL: false)?
             .percentEncodedQueryItems ?? []
@@ -47,10 +46,9 @@ struct URLImageProperty: Property {
 /// Appends a fixed list of already-resolved query items.
 ///
 /// A plain `Property` leaf rather than a loop of ``Query`` inside a `@PropertyBuilder` block,
-/// because `PropertyBuilder` has no `buildArray`: it cannot compose a variable-length list of
-/// properties from a `for` loop. Writing directly to `RequestConfiguration.queries` — exactly
-/// what `Query`'s own node does — sidesteps that limitation for a list whose length isn't known
-/// until the `URL` is inspected at runtime.
+/// because `PropertyBuilder` has no `buildArray` and can't compose a variable-length list
+/// from a `for` loop. Writing directly to `RequestConfiguration.queries`, as `Query`'s own
+/// node does, handles a list whose length is only known once the `URL` is inspected.
 private struct QueryItemsProperty: Property {
 
     private struct Node: PropertyNode {

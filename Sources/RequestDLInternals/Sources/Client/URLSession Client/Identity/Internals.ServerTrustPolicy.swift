@@ -338,10 +338,9 @@ extension Internals {
             var evaluationError: CFError?
             let isTrusted = SecTrustEvaluateWithError(serverTrust, &evaluationError)
 
-            // `.audit` behaves exactly like AsyncHTTPClient's own former SPKI pinning policy: a
-            // mismatch (or a leaf the SPKI bytes couldn't even be extracted from) is still
-            // accepted, on the assumption this is a deliberate debugging/migration window rather
-            // than production traffic.
+            // `.audit` accepts a mismatch (or a leaf the SPKI bytes couldn't even be extracted
+            // from) anyway, on the assumption this is a deliberate debugging/migration window
+            // rather than production traffic.
             if evaluation.evaluate(chain: serverTrust, chainIsTrusted: isTrusted) {
                 completionHandler(.useCredential, URLCredential(trust: serverTrust))
             } else {
@@ -360,9 +359,8 @@ extension Internals {
         }
 
         /// Same rationale and shape as `Internals.SPKIHash.matchesSPKI`: a length or byte
-        /// mismatch here should not be distinguishable by timing from a match. This rebuilt-
-        /// after-relaunch path used to compare with plain `Data.==`, which bails out on the
-        /// first differing byte instead.
+        /// mismatch here should not be distinguishable by timing from a match, which plain
+        /// `Data.==` would allow by bailing out on the first differing byte.
         private static func constantTimeEquals(_ lhs: Data, _ rhs: Data) -> Bool {
             guard lhs.count == rhs.count else {
                 return false

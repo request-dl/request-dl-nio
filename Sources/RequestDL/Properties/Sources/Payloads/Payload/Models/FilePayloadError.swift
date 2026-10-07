@@ -14,8 +14,8 @@ import struct Foundation.URL
 ///
 /// `Form(name:filename:contentType:url:)` and `Payload(url:contentType:)` both stream their body
 /// from disk through a file backed buffer that, by design, treats a missing or unreadable file
-/// as an empty one rather than failing — see `Internals.Buffer`. Left unchecked that turns a
-/// wrong `url` into a request sent with a silently empty body instead of an error anywhere near
+/// as an empty one rather than failing (see `Internals.Buffer`). Left unchecked, that turns a
+/// wrong `url` into a request sent with a silently empty body, with no error anywhere near
 /// the mistake. This type exists to fail loudly instead, before that buffer is ever built.
 public struct FilePayloadError: Error, Sendable {
 
@@ -24,8 +24,8 @@ public struct FilePayloadError: Error, Sendable {
         /// No file exists at ``url``.
         case notFound
 
-        /// A file exists at ``url``, but the file system refused to report on it — most often a
-        /// permissions problem.
+        /// A file exists at ``url``, but the file system refused to report on it, most often
+        /// because of a permissions problem.
         case cantAccessFile(reason: any Error)
     }
 

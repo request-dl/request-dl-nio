@@ -18,22 +18,22 @@
 /// itself: the destination server sees `Host: apple.com` and gets real TLS certificate validation
 /// against its own certificate, not the origin's. This makes it suited to migrating an API to a
 /// new domain without touching every ``BaseURL`` call site, environment overrides, or staged
-/// domain cutovers — not to bypassing DNS or tunneling through an intermediary, which is what
+/// domain cutovers, not to bypassing DNS or tunneling through an intermediary, which is what
 /// ``DNSOverride``/``Proxy`` are for.
 ///
 /// It is also unrelated to `Session.disableRedirect()`/`.enableRedirectFollow(...)`, despite the
-/// naming proximity — those follow HTTP 3xx responses returned by the server; `URLOverride` never
-/// sees a 3xx, it rewrites the request before it is ever sent.
+/// naming proximity: those follow HTTP 3xx responses returned by the server, while `URLOverride`
+/// never sees a 3xx and rewrites the request before it is ever sent.
 ///
-/// Both initializers take full `"scheme://host[/path]"` strings — never a bare host — so the
+/// Both initializers take full `"scheme://host[/path]"` strings, never a bare host, so the
 /// `://` keeps parsing unambiguous and the scheme mandatory, the same way ``BaseURL`` validates
 /// its own host string.
 ///
 /// ```swift
-/// // Single pair — composes with @PropertyBuilder conditionals (if/else picking one override)
+/// // Single pair: composes with @PropertyBuilder conditionals (if/else picking one override)
 /// URLOverride("https://apple.com", from: "https://google.com")
 ///
-/// // Dictionary — bulk declaration of the whole table up front
+/// // Dictionary: bulk declaration of the whole table up front
 /// URLOverride([
 ///     "https://google.com": "https://apple.com",
 ///     "https://google.com/api/v1": "https://apple.com/v2",
@@ -45,7 +45,7 @@
 /// are replaced with the destination's; the remainder of the path and the query string pass
 /// through untouched.
 ///
-/// > Note: A destination is never re-matched against other `URLOverride` rules — there is no
+/// > Note: A destination is never re-matched against other `URLOverride` rules, so there is no
 /// > chaining, which avoids override loops.
 ///
 /// > Note: When several rules match, the most specific one wins: the one whose origin path

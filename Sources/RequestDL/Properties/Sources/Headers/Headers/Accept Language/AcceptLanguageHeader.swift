@@ -20,9 +20,9 @@ import struct Foundation.Locale
 ///
 /// - On Darwin, the system's preferred languages (`Locale.preferredLanguages`), via the empty
 /// initializer ``RequestDL/AcceptLanguageHeader/init()``. This is a separate, opt-in
-/// initializer rather than something applied implicitly: not every app should track the
-/// system's language — one that pins its own in-app language regardless of Settings has no use
-/// for it.
+/// initializer rather than something applied implicitly, since not every app should track
+/// the system's language: one that pins its own in-app language regardless of Settings has
+/// no use for it.
 ///
 /// Either way, each language is assigned a descending `q` weight, per
 /// [RFC 7231 §5.3.5](https://tools.ietf.org/html/rfc7231#section-5.3.5).

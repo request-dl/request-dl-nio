@@ -5,20 +5,20 @@
 import RequestDLInternals
 
 /// An error thrown when a request cannot proceed under the network-availability constraints
-/// configured on ``Session`` — ``Session/allowsCellularAccess(_:)``,
+/// configured on ``Session``: ``Session/allowsCellularAccess(_:)``,
 /// ``Session/allowsExpensiveNetworkAccess(_:)``, ``Session/allowsConstrainedNetworkAccess(_:)``,
 /// and ``Session/waitsForConnectivity(_:)``.
 ///
 /// AsyncHTTPClient has no hook to configure these at the `NWParameters` level the way
-/// `URLSessionConfiguration` does — see swift-server/async-http-client#915 and #918, both closed
-/// without a path forward — so RequestDL enforces them itself with a pre-flight check against the
-/// current network path, before the request is ever handed to AsyncHTTPClient.
+/// `URLSessionConfiguration` does (see swift-server/async-http-client#915 and #918, both
+/// closed without a path forward), so RequestDL enforces them itself with a pre-flight check
+/// against the current network path, before the request is handed to AsyncHTTPClient.
 ///
 /// That check runs exactly once, right before the request starts. It is not a mid-flight
 /// watchdog: like `URLSession`, which only waits for connectivity during a task's initial
-/// connection phase, RequestDL never re-evaluates the network path once a transfer is under way —
-/// a network change part way through a request surfaces as an ordinary transport error instead of
-/// this one.
+/// connection phase, RequestDL never re-evaluates the network path once a transfer is under
+/// way, so a network change part way through a request surfaces as an ordinary transport
+/// error instead of this one.
 ///
 /// Under normal use this is only ever thrown on Apple platforms, where `Network.framework` is
 /// available to check the current path; the four modifiers above have no effect anywhere else.

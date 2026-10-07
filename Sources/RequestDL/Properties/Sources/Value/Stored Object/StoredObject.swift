@@ -45,12 +45,11 @@ public struct StoredObject<Object: AnyObject & Sendable>: DynamicValue {
             return value
         }
 
-        // - Important: Reading, then building, then storing must not be three separate steps
-        // with nothing holding them together — two concurrent readers could both miss, both run
-        // the factory, and both store, so each would walk away with a different instance. This
-        // wrapper's one promise is a single shared instance, so the insert below must resolve
-        // the race and report the winner, discarding a loser's instance rather than returning
-        // it.
+        // - Important: Reading, building, and storing must not be three unrelated steps: two
+        // concurrent readers could both miss, both run the factory, and both store, so each would
+        // walk away with a different instance. This wrapper's one promise is a single shared
+        // instance, so the insert below must resolve the race and report the winner, discarding a
+        // loser's instance rather than returning it.
         return Internals.Storage.shared.setValueIfAbsent(thunk(), forKey: key)
     }
 

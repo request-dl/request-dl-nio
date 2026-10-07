@@ -261,10 +261,11 @@ struct BackgroundDownloadsSessionDelegateTests {
     }
 
     /// URLSession hands a download task's body to `didFinishDownloadingTo` whatever the HTTP
-    /// status, so a `404`'s error page used to replace the file already at `destination` and be
-    /// reported as `.completed`. Driven end to end through a real (non-background) `URLSession`
-    /// whose delegate is `BackgroundDownloads.Session` itself, with a `URLProtocol` stub serving
-    /// the error response, so `downloadTask.response` is a genuine `HTTPURLResponse`.
+    /// status, so a `404`'s error page must not replace the file already at `destination` and
+    /// be reported as `.completed`. Driven end to end through a real (non-background)
+    /// `URLSession` whose delegate is `BackgroundDownloads.Session` itself, with a `URLProtocol`
+    /// stub serving the error response, so `downloadTask.response` is a genuine
+    /// `HTTPURLResponse`.
     @Test
     func didFinishDownloadingTo_whenServerAnswersWithErrorStatus_reportsFailedAndKeepsExistingFile() async throws {
         try await withTemporaryFileURL("destination.bin") { destination in

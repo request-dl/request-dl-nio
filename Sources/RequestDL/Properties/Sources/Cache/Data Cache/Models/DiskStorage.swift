@@ -84,14 +84,10 @@ struct DiskStorage: Sendable {
             let dataURL = url.appendingPathComponent(Self.dataPath)
 
             // Both files have to be on disk for the record to be usable. Short circuits on the
-            // first miss rather than awaiting both unconditionally: `isReachableWithRetry` pays
-            // up to its full retry budget (300 attempts, 15s) to tell a transient flake apart
-            // from a genuine absence, and awaiting a second one back to back after the first
-            // already came back negative -- the result is `nil` either way -- doubles that
-            // worst case for no reason. Directly observed doubling every one of this
-            // initializer's own genuine-miss tests to ~30s apiece, which is exactly the kind of
-            // aggregate slowdown `AsyncLock.Watchdog`'s CI-flakiness investigation traces stalls
-            // to elsewhere in this same file.
+            // first miss instead of awaiting both: `isReachableWithRetry` can spend its full retry
+            // budget (300 attempts, 15s) telling a transient flake from a genuine absence, so
+            // awaiting a second one after the first already came back negative would double that
+            // worst case.
             func isReachable(_ url: URL) async -> Bool {
                 retryOnMiss ? await Self.isReachableWithRetry(url) : await url.isReachable
             }
@@ -162,7 +158,7 @@ struct DiskStorage: Sendable {
         /// The cache key `url`'s directory name encodes, or `nil` if it doesn't name a record
         /// directory at all.
         ///
-        /// Purely a string parse — no file system access — so a scan can tell which entry it is
+        /// Purely a string parse with no file system access, so a scan can tell which entry it is
         /// standing on *before* deciding how hard to stat it.
         static func key(at url: URL) -> String? {
             guard url.pathExtension == Self.pathExtension else { return nil }
@@ -394,10 +390,10 @@ struct DiskStorage: Sendable {
     /// above this call site needs to know which one it got.
     ///
     /// - Parameter retryingEmptyContent: Forwarded to `Internals.Buffer.init(addressing:...)`.
-    /// A read passes the default `true`: a zero-byte answer there may be the transient stat flake
-    /// that retry exists for. `allocateBuffer` passes `false` — it has just created the file
-    /// itself and knows nothing has been written to it yet, so the retry could only ever exhaust
-    /// its whole budget, putting ~290ms of sleeping in front of every encrypted cache write.
+    /// A read passes the default `true`, since a zero-byte answer there may be the transient
+    /// stat flake that retry exists for. `allocateBuffer` passes `false`: it has just created
+    /// the file and knows nothing was written yet, so the retry could only exhaust its whole
+    /// budget (~290ms of sleeping before every encrypted cache write).
     private func dataBuffer(
         for record: Record,
         retryingEmptyContent: Bool = true
@@ -637,7 +633,7 @@ struct DiskStorage: Sendable {
     /// costing O(1) versus O(current entry count): the latter turns writing `n` entries into
     /// O(n²) total filesystem operations, cheap enough to hide on a fast local disk but not on
     /// a simulator's slower, host-bridged filesystem, where it has been the underlying cause of
-    /// `AsyncLock.Watchdog` firing on otherwise-healthy cache writes (see #271).
+    /// `AsyncLock.Watchdog` firing on otherwise-healthy cache writes.
     ///
     /// Skipping is safe regardless of how accurate `knownUsage` is:
     /// - If it undercounts (e.g. another process sharing this directory, via `suiteName`, wrote
@@ -765,13 +761,11 @@ struct DiskStorage: Sendable {
     /// Applies `fileProtection` to a freshly written record's `response.record` and its
     /// still-empty `data.record`.
     ///
-    /// - Note: `data.record` holds no bytes yet at this point — `allocateBuffer` creates it
-    /// empty and `Internals.FileBuffer` streams into it afterwards, which can happen an
-    /// arbitrary amount of time after this call returns, with no single moment this type
-    /// controls to apply the class retroactively. Setting the class on the empty file here means
-    /// the later open (`.modifyFile(createIfNecessary: true, ...)`) just finds it already there
-    /// and writes into it: the same outcome as if the whole file had been created with the class
-    /// from the start.
+    /// - Note: `data.record` holds no bytes yet at this point: `allocateBuffer` creates it empty
+    /// and `Internals.FileBuffer` streams into it afterwards, at a moment this type doesn't
+    /// control, so the class can't be applied retroactively. Setting it on the empty file here
+    /// means the later open (`.modifyFile(createIfNecessary: true, ...)`) finds it already there,
+    /// with the same outcome as creating the whole file with the class.
     private func applyFileProtection(to record: Record) async {
         guard let fileProtection else { return }
 
@@ -833,13 +827,11 @@ struct DiskStorage: Sendable {
     /// removals, and what it deliberately doesn't cover.
     private func record(forKey key: String) async -> Record? {
         // `retryOnMiss: false`: this scan only decides *which directory* holds `key`, and the
-        // record it finds is re-opened with the full retry budget right below. Every entry it
-        // walks past belongs to some other key, and paying up to 15s per incomplete one of
-        // those — serially — to answer a lookup that doesn't concern them turns one cold miss
-        // into a multi-second stall. A write made through this same instance never needs the
-        // scan at all: `allocateBuffer`/`updateCached` publish their location into `index`
-        // directly, so the freshly-written entry this scan would be retrying for is already a
-        // hit above.
+        // record it finds is re-opened with the full retry budget right below. Every entry it walks
+        // past belongs to another key, and paying up to 15s per incomplete one, serially, would
+        // turn one cold miss into a multi-second stall. A write made through this same instance
+        // never needs the scan: `allocateBuffer`/`updateCached` publish their location into `index`
+        // directly, so that entry is already a hit above.
         guard let url = await index.location(for: key, scan: { await self.records(retryOnMissFor: key) })
         else {
             return nil
@@ -856,21 +848,20 @@ struct DiskStorage: Sendable {
         return record
     }
 
-    /// The full, live directory scan `index` exists to keep off the read path. Still the
-    /// source of truth for anything that has to see every entry regardless of what `index`
-    /// currently knows: `freeSpace`'s eviction accounting and `removeAll(since:)` call this
-    /// directly rather than through `index`, so a duplicate directory from a lost write race
-    /// (two concurrent writers for the same key) stays visible and gets swept up like any other
-    /// entry instead of going untracked once `index` moves on to the newer one.
+    /// The full, live directory scan `index` exists to keep off the read path.
+    ///
+    /// Still the source of truth for anything that has to see every entry regardless of what
+    /// `index` knows: `freeSpace`'s eviction accounting and `removeAll(since:)` call this
+    /// directly, so a duplicate directory from a lost write race (two concurrent writers for
+    /// the same key) stays visible and gets swept up like any other entry.
     ///
     /// - Parameter targetKey: The single key, if any, whose entry is worth the full
     /// `Record.init?(_:retryOnMiss:)` retry budget. `record(forKey:)`'s cold-start scan passes
-    /// the key it is looking up: that one entry may genuinely have been written moments ago, and
-    /// missing it would turn a transient stat flake into a false cache miss. Every *other* entry
-    /// the scan walks past belongs to a key nobody here asked about, and a miss on one of those
-    /// is just as likely to be a write still in progress — paying 15s per such entry, serially,
-    /// turns one cold lookup into a multi-second stall. `freeSpace`/`removeAll(since:)` pass
-    /// nothing: a bulk sweep has no target key at all.
+    /// the key it is looking up, since that entry may have been written moments ago and missing
+    /// it would turn a transient stat flake into a false cache miss. A miss on any other entry
+    /// is as likely a write still in progress, and paying 15s for each, serially, would turn
+    /// one cold lookup into a multi-second stall. `freeSpace`/`removeAll(since:)` pass nothing,
+    /// since a bulk sweep has no target key.
     private func records(retryOnMissFor targetKey: String? = nil) async -> [Record] {
         let dirPath = directory.filePath
         var foundRecords: [Record] = []

@@ -99,14 +99,13 @@ struct SPKIPinningTests {
         )
     }
 
-    /// Regression coverage: `SPKIHash._makeProperty` used to always succeed and return a leaf
-    /// node regardless of context, unlike `Certificate`'s own guard against being declared outside
-    /// its allowed context. `SPKIPinning` only ever finds its pins by searching its own `content`
-    /// subtree for `SPKIHashNode`s (`outputs.node.search(for: SPKIHashNode.self)`), not through
-    /// `SPKIHash`'s own `_makeProperty`, so a loose `SPKIHash` declared anywhere else -- even
-    /// directly inside `SecureConnection`, with no enclosing `SPKIPinning` at all -- silently
-    /// contributed nothing, with no diagnostic. `SPKIHash` must now no-op the same way `Certificate`
-    /// does when used outside its own allowed context.
+    /// `SPKIHash._makeProperty` must no-op the same way `Certificate`'s own guard does when
+    /// declared outside its allowed context, instead of always succeeding and returning a leaf
+    /// node regardless of context. `SPKIPinning` only ever finds its pins by searching its own
+    /// `content` subtree for `SPKIHashNode`s (`outputs.node.search(for: SPKIHashNode.self)`), not
+    /// through `SPKIHash`'s own `_makeProperty`, so a loose `SPKIHash` declared anywhere else
+    /// (even directly inside `SecureConnection`, with no enclosing `SPKIPinning` at all) would
+    /// silently contribute nothing, with no diagnostic.
     @Test
     func hash_whenDeclaredOutsideSPKIPinning_hasNoEffect() async throws {
         // Given

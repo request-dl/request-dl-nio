@@ -19,17 +19,17 @@ extension Internals {
     /// `httpBody` and an `httpBodyStream` over a file are both pulled by CFNetwork itself, as fast
     /// as the socket takes them; nothing RequestDL could do between two reads would stop the next
     /// one. `URLSessionTask.suspend()` is not an answer either: it's the OS mechanism this exists
-    /// to avoid depending on, it was measured losing its suspension under load on the response
-    /// side (see `Internals.URLSessionClient.executeSessionTask`), and with
+    /// to avoid depending on (it was measured losing its suspension under load on the response
+    /// side, see `Internals.URLSessionClient.executeSessionTask`), and with
     /// `bytes(for:delegate:)` there isn't even a task to call it on until the response head
     /// arrives, i.e. after the upload.
     ///
     /// A pair from `Stream.getBoundStreams` is different: CFNetwork reads the input end, and the
-    /// output end only has what this type writes into it. Measured (a 24 MiB body, fixed length and
-    /// chunked): CFNetwork recognizes the end of the body once the output end closes -- the
-    /// end-of-body bug `Internals.URLSessionUploadFile` documents only ever affected custom
-    /// `InputStream` subclasses -- nothing more reaches the server while this stops writing, and
-    /// the body arrives byte-identical after resuming.
+    /// output end only has what this type writes into it. Measured with a 24 MiB body, fixed
+    /// length and chunked: CFNetwork recognizes the end of the body once the output end closes,
+    /// nothing more reaches the server while this stops writing, and the body arrives
+    /// byte-identical after resuming. (The end-of-body bug `Internals.URLSessionUploadFile`
+    /// documents only ever affected custom `InputStream` subclasses.)
     ///
     /// ## How it writes
     ///
@@ -46,7 +46,7 @@ extension Internals {
     /// the body, abandoning the previous one.
     ///
     /// Only used when an `Internals.TransferControl` is supplied; the paths that can't be paused
-    /// stay exactly as they were.
+    /// are unaffected.
     final class URLSessionUploadBodyPump: @unchecked Sendable {
 
         // MARK: - Internal properties

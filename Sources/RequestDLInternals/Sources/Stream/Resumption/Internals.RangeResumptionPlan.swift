@@ -63,15 +63,15 @@ extension Internals {
     /// resource changed answers `200` with the whole new body instead of `206`), and every
     /// continuation is checked before a single byte of it is accepted: status, `Content-Range`
     /// starting exactly where delivery stopped, complete length, validator. Anything else fails the
-    /// download with ``DownloadResumptionMismatchError``, which is no worse than today's failure on
-    /// a lost connection.
+    /// download with ``DownloadResumptionMismatchError``, which is no worse than failing on a
+    /// lost connection without resumption.
     ///
     /// ## When a download is resumable
     ///
     /// - `GET` (the only method RFC 9110 defines range requests for), without a `Range` of its own.
     /// - A `200` response.
     /// - A strong validator: a strong `ETag`, or, only without any `ETag`, a `Last-Modified` that is
-    ///   strong per RFC 9110 §8.8.2.2 -- the response's `Date` at least a second later. `If-Range`
+    ///   strong per RFC 9110 §8.8.2.2 (the response's `Date` at least a second later). `If-Range`
     ///   must never carry a weak one (§13.1.5).
     /// - No content coding. Byte offsets are offsets into the *representation*; a transport that
     ///   decodes natively (CFNetwork, `NIOHTTPResponseDecompressor`) delivers decoded bytes, whose
@@ -194,7 +194,7 @@ extension Internals {
                 return .alreadyComplete
 
             case 200:
-                // Either `If-Range` no longer matched -- the resource changed -- or the server
+                // Either `If-Range` no longer matched (the resource changed) or the server
                 // doesn't do ranges at all. Both hand back a whole body that can't be spliced.
                 throw DownloadResumptionMismatchError(.representationChanged)
 

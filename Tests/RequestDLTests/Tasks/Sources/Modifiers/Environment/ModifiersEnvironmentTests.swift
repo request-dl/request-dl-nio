@@ -68,7 +68,7 @@ struct ModifiersEnvironmentTests {
 
     @Test
     func environment_whenSetOutsideLoggerModifier_isStillVisibleToTheInnerTask() async throws {
-        // Given: `.logger(_:)` sits between the task and an outer `.environment(...)` — the same
+        // Given: `.logger(_:)` sits between the task and an outer `.environment(...)`, the same
         // shape as `.logger(_:)` followed by `.digestAuthentication()` or `.description(...)`,
         // both of which hand their state to the inner task through the environment.
         let task = NumberAndLoggerTask()

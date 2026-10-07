@@ -96,9 +96,9 @@ struct CURLTaskDescriptorTests {
     }
 
     /// A plain (no `filename`) form field's bytes aren't necessarily valid UTF-8, e.g. binary
-    /// `Data` handed to `Form` without a filename. Regression test for a bug where those bytes
-    /// were lossily decoded to `String` (replacing anything invalid with U+FFFD) before ever
-    /// reaching `curlShellQuote`'s own byte-safe fallback, silently corrupting the value.
+    /// `Data` handed to `Form` without a filename. They must not be lossily decoded to `String`
+    /// (replacing anything invalid with U+FFFD) before reaching `curlShellQuote`'s own
+    /// byte-safe fallback, which would silently corrupt the value.
     @Test
     func binaryFormFieldContentIsNotCorrupted() async throws {
         // Given

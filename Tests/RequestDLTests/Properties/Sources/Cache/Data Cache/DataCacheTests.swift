@@ -161,9 +161,9 @@ struct DataCacheTests {
     }
 
     /// A disk record's directory name embeds its key, and a single path component is capped at
-    /// 255 bytes (`NAME_MAX`). Base64 inflates a key by a third, so any URL past roughly 175
-    /// bytes — routine for signed or search URLs — used to produce a name the file system
-    /// rejected: the directory was never created, and that URL could never be cached on disk.
+    /// 255 bytes (`NAME_MAX`). Base64 inflates a key by a third, so a URL past roughly 175
+    /// bytes (routine for signed or search URLs) must still be cacheable on disk, not produce a
+    /// name the file system rejects.
     @Test(arguments: [180, 400, 2_000])
     func cache_whenKeyIsLong_isStillCachedOnDisk(keyLength: Int) async throws {
         let testState = await TestState()
@@ -453,12 +453,12 @@ struct DataCacheTests {
         #expect(cached == nil)
     }
 
-    /// Regression test for #271: `DataCache.Storage` threads a disk usage estimate across
-    /// sequential writes to skip `DiskStorage.freeSpace`'s directory rescan, rather than
-    /// discovering it fresh from disk on every single write. This exercises that estimate
-    /// across several real, sequential writes through the public API — the same path
-    /// `Storage.allocateDiskBuffer` now takes — to confirm eviction still lands correctly with
-    /// the estimate in the loop, not just when `DiskStorage` is driven directly.
+    /// `DataCache.Storage` threads a disk usage estimate across sequential writes to skip
+    /// `DiskStorage.freeSpace`'s directory rescan, rather than discovering it fresh from disk on
+    /// every single write. This exercises that estimate across several real, sequential writes
+    /// through the public API (the same path `Storage.allocateDiskBuffer` takes) to confirm
+    /// eviction still lands correctly with the estimate in the loop, not just when `DiskStorage`
+    /// is driven directly.
     @Test
     func cache_whenManySequentialDiskWritesExceedCapacity_shouldEvictOldestAndKeepNewest() async throws {
         let testState = await TestState()
@@ -482,20 +482,20 @@ struct DataCacheTests {
         }
 
         // Then: the oldest entry didn't survive five entries' worth of writes on a capacity
-        // sized for about two, and the most recent write — always made room for by construction
-        // — did.
+        // sized for about two, and the most recent write (always made room for by construction)
+        // did.
         let oldest = await dataCache.getCachedData(forKey: "key0", policy: .disk)
         let newest = await dataCache.getCachedData(forKey: "key4", policy: .disk)
         #expect(oldest == nil)
         #expect(newest != nil)
     }
 
-    /// Regression coverage for `MemoryStorage`'s move away from an `OrderedSet`-backed
-    /// "move key to the most-recently-written end" index (an unconditional O(current entry
-    /// count) shift on every single write) to ordering by `Record.date` only inside
-    /// `freeSpace`'s own already-guarded rescan — the same shape `DiskStorage.freeSpace` already
-    /// used. Mirrors `cache_whenManySequentialDiskWritesExceedCapacity_shouldEvictOldestAndKeepNewest`
-    /// for the memory tier, to confirm the refactor didn't change eviction order.
+    /// `MemoryStorage` orders entries by `Record.date` only inside `freeSpace`'s own
+    /// already-guarded rescan, the same shape `DiskStorage.freeSpace` uses, instead of keeping an
+    /// index that moves a key to the most-recently-written end on every single write (an
+    /// unconditional O(current entry count) shift). Mirrors
+    /// `cache_whenManySequentialDiskWritesExceedCapacity_shouldEvictOldestAndKeepNewest` for the
+    /// memory tier, to confirm eviction order is as expected.
     @Test
     func cache_whenManySequentialMemoryWritesExceedCapacity_shouldEvictOldestAndKeepNewest() async throws {
         let testState = await TestState()
@@ -519,8 +519,8 @@ struct DataCacheTests {
         }
 
         // Then: the oldest entry didn't survive five entries' worth of writes on a capacity
-        // sized for about two, and the most recent write — always made room for by construction
-        // — did.
+        // sized for about two, and the most recent write (always made room for by construction)
+        // did.
         let oldest = await dataCache.getCachedData(forKey: "key0", policy: .memory)
         let newest = await dataCache.getCachedData(forKey: "key4", policy: .memory)
         #expect(oldest == nil)
@@ -711,19 +711,17 @@ extension DataCacheTests {
         }
     }
 
-    /// Regression test for a cache write whose body stream is cancelled or errors before a
-    /// single byte reaches disk: `allocateBuffer` already created the record's directory and
-    /// wrote `response.record`, but `data.record` never came into being. The `catch` block in
-    /// `Internals.CacheControl.cacheIfNeeded` is supposed to clean this up by calling
-    /// `discardFailedWrite`.
+    /// A cache write whose body stream is cancelled or errors before a single byte reaches disk
+    /// must not leave anything behind: `allocateBuffer` already created the record's directory
+    /// and wrote `response.record`, but `data.record` never came into being. The `catch` block in
+    /// `Internals.CacheControl.cacheIfNeeded` cleans this up by calling `discardFailedWrite`.
     ///
-    /// Before that method existed, cleanup went through `remove(forKey:)`, which looks entries
-    /// up via `DiskStorage.record(_:)` — and that lookup requires `response.record` *and*
-    /// `data.record` to already both be present to even recognize the entry. An entry missing
-    /// `data.record` was therefore invisible to it, `remove(forKey:)` silently did nothing, and
-    /// the half-written directory was orphaned on disk permanently — where it stayed invisible
-    /// to every future read for the same reason, while still costing each of them the full
-    /// `isReachableWithRetry` retry budget (up to ~15s) for a `data.record` that would never
+    /// `remove(forKey:)` could not do this: it looks entries up via `DiskStorage.record(_:)`,
+    /// which requires `response.record` *and* `data.record` to both be present to even recognize
+    /// the entry. An entry missing `data.record` is invisible to it, so it would silently do
+    /// nothing and orphan the half-written directory on disk permanently, where it would stay
+    /// invisible to every future read for the same reason while still costing each of them the
+    /// full `isReachableWithRetry` retry budget (up to ~15s) for a `data.record` that would never
     /// appear.
     @Test
     func discardFailedWrite_whenBodyNeverArrives_shouldDeleteTheOrphanedCacheDirectory() async throws {
@@ -734,9 +732,9 @@ extension DataCacheTests {
 
         let key = UUID().uuidString
 
-        // Given: a cache write that allocated its disk record but never wrote a body byte
-        // through it — the exact shape `cacheIfNeeded` leaves behind for a request that gets
-        // cancelled, errors, or is interrupted before the response body starts streaming.
+        // Given: a cache write that allocated its disk record but never wrote a body byte through
+        // it, the exact shape `cacheIfNeeded` leaves behind for a request that gets cancelled,
+        // errors, or is interrupted before the response body starts streaming.
         let buffer = await dataCache.allocateBuffer(
             key: key,
             cachedResponse: .init(
@@ -768,11 +766,10 @@ extension DataCacheTests {
         #expect(!foundOrphan)
     }
 
-    /// Regression test for a memory-tier race: `discardFailedWrite` used to remove whatever
-    /// record currently sat at `key`, not specifically the one this failed write itself
-    /// allocated. Two concurrent writes to the same key (a common shape — parallel fetches of
-    /// the same URL) could let a failed write's cleanup delete a *different*, successfully
-    /// completed write's entry out from under it.
+    /// `discardFailedWrite` must remove only the record this failed write itself allocated, not
+    /// whatever record currently sits at `key`. Two concurrent writes to the same key (a common
+    /// shape: parallel fetches of the same URL) could otherwise let a failed write's cleanup
+    /// delete a *different*, successfully completed write's entry out from under it.
     @Test
     func discardFailedWrite_whenAnotherWriteReplacedTheMemoryEntry_shouldNotDeleteIt() async throws {
         let dataCache = DataCache(
@@ -783,7 +780,7 @@ extension DataCacheTests {
         let key = UUID().uuidString
 
         // Given: two allocations for the same key, mimicking two concurrent requests racing to
-        // cache the same URL. `failedBuffer` is allocated first (and never finishes writing —
+        // cache the same URL. `failedBuffer` is allocated first (and never finishes writing,
         // the failure this test discards). `goodBuffer` is allocated second, overwriting the
         // memory tier's record for `key`, and finishes its write successfully.
         let responseHead = Internals.ResponseHead(
@@ -821,14 +818,13 @@ extension DataCacheTests {
         #expect(cachedMemoryData == goodData)
     }
 
-    /// Regression coverage for the usage-estimate bug `finalizeWrite` fixes: `allocateBuffer`'s
-    /// `contentLength` is only a pre-write hint — `0` for a response with no accurate
-    /// `Content-Length`, exactly what chunked transfer encoding leaves behind — but the bytes
-    /// actually written through the returned buffer are not bounded by it. Left unreconciled,
-    /// the tracked usage estimate would understate such a write by its entire body size, and
-    /// `MemoryStorage.freeSpace`'s `knownUsage` short-circuit (#271/#361) would keep trusting
-    /// that understatement forever, letting the memory tier grow past `memoryCapacity`
-    /// indefinitely across repeated chunked writes.
+    /// The usage estimate `finalizeWrite` reconciles: `allocateBuffer`'s `contentLength` is only
+    /// a pre-write hint (`0` for a response with no accurate `Content-Length`, exactly what
+    /// chunked transfer encoding leaves behind), but the bytes actually written through the
+    /// returned buffer are not bounded by it. Left unreconciled, the tracked usage estimate would
+    /// understate such a write by its entire body size, and `MemoryStorage.freeSpace`'s
+    /// `knownUsage` short-circuit would keep trusting that understatement forever, letting the
+    /// memory tier grow past `memoryCapacity` indefinitely across repeated chunked writes.
     @Test
     func finalizeWrite_whenContentLengthHintWasZeroButBodyWasLarge_reconcilesUsageSoLaterWritesStillEvict()
         async throws
@@ -846,8 +842,8 @@ extension DataCacheTests {
             isKeepAlive: true
         )
 
-        // Given: a "chunked" write — no Content-Length known up front, so `allocateBuffer` is
-        // called with a `0` hint — whose real body takes up most of the whole capacity.
+        // Given: a "chunked" write, with no Content-Length known up front, so `allocateBuffer` is
+        // called with a `0` hint, whose real body takes up most of the whole capacity.
         var chunkedBuffer = try #require(
             await dataCache.allocateBuffer(
                 key: "chunked-key",
@@ -862,7 +858,7 @@ extension DataCacheTests {
         dataCache.finalizeWrite(chunkedBuffer, contentLengthHint: 0)
 
         // A second, ordinarily-sized write that, combined with the first entry's *real* size,
-        // exceeds the 10,000-byte capacity — but would not if the first write's usage were still
+        // exceeds the 10,000-byte capacity, but would not if the first write's usage were still
         // (wrongly) tracked as zero.
         var secondBuffer = try #require(
             await dataCache.allocateBuffer(

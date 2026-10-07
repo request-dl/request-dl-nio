@@ -4,13 +4,13 @@
 
 import RequestDLInternals
 
-/// Installs an already-built `RequestConfiguration` as-is, bypassing every other node — and,
-/// optionally, an edit to `Make.sessionConfiguration` alongside it, the same way `Session`'s own
+/// Installs an already-built `RequestConfiguration` as-is, bypassing every other node, and
+/// optionally an edit to `Make.sessionConfiguration` alongside it, the same way `Session`'s own
 /// node does (`configuration?(&make.sessionConfiguration)`), for the handful of curl flags that
 /// are session-level rather than request-level (`-L`, `-k`, `-x`, `--resolve`, `--compressed`).
 ///
 /// `CURLCommandParser` builds a `RequestConfiguration` directly from a parsed curl command line
-/// rather than composing a `@PropertyBuilder` tree of `BaseURL`/`Headers`/etc. — there is no
+/// rather than composing a `@PropertyBuilder` tree of `BaseURL`/`Headers`/etc., since there is no
 /// per-flag `Property` to declare. This is the bridge back into `RawTask`/`Resolve`, so a parsed
 /// command still goes through the same session/cache/executor/tracing pipeline every other task
 /// uses instead of duplicating it.

@@ -59,7 +59,7 @@ struct FilePayloadFactory: PayloadFactory {
     // MARK: - Private methods
 
     /// Confirms `url` can actually be read before handing it to `Internals.FileBuffer`, which
-    /// silently treats a missing or unreadable file as an empty one — see `Internals.Buffer`.
+    /// silently treats a missing or unreadable file as an empty one (see `Internals.Buffer`).
     private func validateFileExists() async throws {
         do {
             guard try await Internals.fileSystem.info(forFileAt: url.filePath) != nil else {

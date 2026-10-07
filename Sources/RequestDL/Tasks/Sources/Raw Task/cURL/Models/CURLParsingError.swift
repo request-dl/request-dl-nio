@@ -4,7 +4,7 @@
 
 /// Something in a curl command line couldn't be parsed.
 ///
-/// `CURLTask` only supports a documented subset of curl's flags — see ``CURLTask`` — so anything
+/// `CURLTask` only supports a documented subset of curl's flags (see ``CURLTask``), so anything
 /// outside that subset surfaces here rather than being silently dropped.
 public struct CURLParsingError: Error, Sendable, Hashable {
 

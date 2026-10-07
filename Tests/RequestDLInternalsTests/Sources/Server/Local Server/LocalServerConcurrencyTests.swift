@@ -3,8 +3,8 @@
 //
 
 // Drives `Internals.Session.client()`/`.execute()` directly (AsyncHTTPClient's `HTTPClient
-// .Request`), the `.nio`-only low-level plumbing with no `.urlSession` equivalent to take over —
-// same category as `SessionExecutionTests` in `RequestDLTests`.
+// .Request`), the `.nio`-only low-level plumbing with no `.urlSession` equivalent to take
+// over, same category as `SessionExecutionTests` in `RequestDLTests`.
 #if canImport(NIOCore)
 
 import AsyncHTTPClient
@@ -26,12 +26,11 @@ import struct Foundation.UUID
 // (`Configuration.stress` / `ServerManager.stress`, see LocalServer.swift and
 // LocalServer.Configuration.swift) instead of `.standard`, which every other LocalServer-backed
 // suite (DataTaskTests, UploadTaskTests, InternalsSessionTests, ModifiersCollect*Tests,
-// CachedRequestTests, ...) shares — swift-testing runs suites concurrently by default, and this
-// test's own burst previously starved those suites (and itself) into `HTTPClientError
-// .connectTimeout` when it shared their group (ci-triage/TASKS.md T1b). `configuration.timeout
-// .connect` below is also widened past AsyncHTTPClient's 10s default for the same reason: even on
-// its own dedicated group, 200 simultaneous TLS handshakes under heavy CI contention can
-// legitimately take longer than that.
+// CachedRequestTests, ...) shares. swift-testing runs suites concurrently by default, and a
+// burst this size would starve those suites (and itself) into `HTTPClientError.connectTimeout`
+// if it shared their group. `configuration.timeout.connect` below is also widened past
+// AsyncHTTPClient's 10s default for the same reason: even on its own dedicated group, 200
+// simultaneous TLS handshakes under heavy CI contention can legitimately take longer than that.
 @Suite(.concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog)
 struct LocalServerConcurrencyTests {
 

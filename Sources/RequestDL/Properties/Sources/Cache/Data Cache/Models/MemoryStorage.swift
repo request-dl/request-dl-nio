@@ -73,11 +73,10 @@ struct MemoryStorage: Sendable {
     /// Removes `key` only if its currently stored record is still the exact one `dataURL`
     /// identifies, mirroring `DiskStorage.Index.remove(_:ifLocation:)`.
     ///
-    /// A plain `remove(_:)` would blindly delete whatever record currently sits at `key`, even
-    /// one a concurrent, still-in-progress write for the same key just installed after this
-    /// caller's own write started. `ByteURL` is a class — its identity, not its bytes, is what a
-    /// caller who allocated a specific record can still prove it owns that record by the time it
-    /// wants to discard it.
+    /// A plain `remove(_:)` would delete whatever record sits at `key`, even one a concurrent,
+    /// still-in-progress write for the same key installed after this caller's write started.
+    /// `ByteURL` is a class, so its identity (not its bytes) lets the caller prove it owns the
+    /// record it wants to discard.
     mutating func remove(_ key: String, ifDataURL dataURL: Internals.ByteURL) {
         guard records[key]?.dataURL === dataURL else {
             return
@@ -124,15 +123,13 @@ struct MemoryStorage: Sendable {
     /// fit) and usage immediately after this call, for the caller to keep as its next
     /// `knownUsage`.
     ///
-    /// - Important: Must not be `async`, and must not return the buffer itself. This type is
-    /// only reachable through `withMemoryStorage`, which hands out an `inout` from inside a non
-    /// reentrant lock, and a synchronous closure cannot await — so a method whose only
-    /// suspension point is building the `Internals.DataBuffer` itself would be a method its only
-    /// caller could not call.
+    /// - Important: Must not be `async`, and must not return the buffer itself. This type is only
+    /// reachable through `withMemoryStorage`, which hands out an `inout` from inside a non
+    /// reentrant lock, and a synchronous closure cannot await. A method whose only suspension
+    /// point is building the `Internals.DataBuffer` would be impossible to call from there.
     ///
-    /// Returning the location instead lets the bookkeeping stay under the lock, where it
-    /// belongs, and the buffer be built outside it. That also stops the lock being held across
-    /// buffer construction.
+    /// Returning the location instead keeps the bookkeeping under the lock and lets the buffer
+    /// be built outside it, so the lock isn't held across buffer construction.
     mutating func allocateBuffer(
         key: String,
         cachedResponse: CachedResponse,
@@ -159,18 +156,15 @@ struct MemoryStorage: Sendable {
     /// Evicts the oldest entries, if any, until usage is at or under `maximumCapacity`.
     ///
     /// - Parameter knownUsage: A caller-tracked usage estimate. When it already fits under
-    /// `maximumCapacity`, the full scan below is skipped outright, since nothing would be
-    /// evicted anyway. Mirrors `DiskStorage.freeSpace(_:knownUsage:)`'s own short-circuit and
-    /// safety argument — see that method's doc — for the same O(current entry count) cost this
-    /// would otherwise pay on every single cache write, `n` of them turning a cache's whole
-    /// lifetime into O(n²).
+    /// `maximumCapacity`, the full scan below is skipped, since nothing would be evicted anyway.
+    /// Mirrors `DiskStorage.freeSpace(_:knownUsage:)`'s short-circuit and safety argument (see
+    /// that method's doc), which avoids paying the O(current entry count) scan on every write
+    /// and turning a cache's whole lifetime into O(n²).
     ///
-    /// Ordering entries by `Record.date` here, rather than maintaining a reorderable index that
-    /// every `allocateBuffer`/`updateCached` call would have to move a key to the front of, mirrors
-    /// how `DiskStorage.freeSpace` already orders its own records: sorting is paid only on this
-    /// already-guarded rescan path, instead of as an unconditional O(current entry count) shift on
-    /// every write (what an `OrderedSet`-backed "move to most-recently-written" index cost here
-    /// previously — the same quadratic shape `freeSpace`'s own short-circuit exists to avoid).
+    /// Entries are ordered by `Record.date` here instead of maintaining a reorderable index that
+    /// every `allocateBuffer`/`updateCached` call would have to update, as `DiskStorage.freeSpace`
+    /// does for its own records. Sorting is paid only on this guarded rescan path, not as an
+    /// O(current entry count) shift on every write.
     ///
     /// - Returns: Usage immediately after this call: either the untouched `knownUsage` when
     /// skipped, or the freshly measured total otherwise.

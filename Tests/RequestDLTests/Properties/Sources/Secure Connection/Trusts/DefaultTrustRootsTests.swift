@@ -30,8 +30,8 @@ struct DefaultTrustRootsTests {
     @Test
     func trustRoots_whenUsedWithoutEnclosingSecureConnection_shouldStillBeValid() async throws {
         // Given
-        // Regression test: `DefaultTrustRoots` used to require an enclosing `SecureConnection`.
-        // The base `Internals.SecureConnection` is now created lazily the first time it's needed.
+        // `DefaultTrustRoots` must not require an enclosing `SecureConnection`. The base
+        // `Internals.SecureConnection` is created lazily the first time it's needed.
 
         // When
         let resolved = try await resolve(

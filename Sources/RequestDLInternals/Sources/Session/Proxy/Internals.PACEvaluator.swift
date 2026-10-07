@@ -100,11 +100,10 @@ extension Internals {
         /// The error to answer `evaluate(scriptURL:targetURL:timeout:)`'s continuation with when
         /// `CFRunLoopRunInMode` returns `result` without CFNetwork having called back.
         ///
-        /// Every outcome maps to *something*. Only `.timedOut` and `.stopped` used to be
-        /// considered, and a run loop that returned `.finished` (it ran out of sources) or
-        /// `.handledSource` (`returnAfterSourceHandled` is `false`, so it should not happen, but
-        /// the type allows it) left the caller suspended on a continuation nobody would ever
-        /// answer — and so did any case a future SDK might add.
+        /// Every outcome maps to *something*. A run loop that returned `.finished` (it ran out of
+        /// sources) or `.handledSource` (`returnAfterSourceHandled` is `false`, so it should not
+        /// happen, but the type allows it) would otherwise leave the caller suspended on a
+        /// continuation nobody would ever answer, and so would any case a future SDK might add.
         ///
         /// `.stopped` gets an error here too, rather than being excluded. It is the success path:
         /// `pacEvaluationCallback` resumes and only then stops the loop, so by the time the loop
@@ -122,7 +121,7 @@ extension Internals {
 }
 
 /// Bridges `withTaskCancellationHandler`'s `onCancel` (which can run before, during, or after
-/// `evaluate(...)`'s `PACContinuationBox` exists — `onCancel` fires synchronously and
+/// `evaluate(...)`'s `PACContinuationBox` exists, as `onCancel` fires synchronously and
 /// immediately if the task is already cancelled by the time the handler is installed) to that
 /// box, whichever of those turns out to be true.
 private final class PACCancellationState: @unchecked Sendable {
@@ -135,7 +134,7 @@ private final class PACCancellationState: @unchecked Sendable {
 
     // MARK: - Internal methods
 
-    /// Registers `box` as the one to cancel, unless cancellation already happened -- in which
+    /// Registers `box` as the one to cancel, unless cancellation already happened, in which
     /// case it returns `true` and leaves `box` unregistered, since `evaluate(...)` is about to
     /// cancel it directly instead of ever starting its thread.
     func attach(_ box: PACContinuationBox) -> Bool {
@@ -164,8 +163,8 @@ private final class PACContinuationBox: @unchecked Sendable {
 
     private let lock = Lock()
     private var isResumed = false
-    /// Set once `run(...)` starts, from whichever thread that happens to be, so `cancel()` --
-    /// called from an arbitrary task's cancellation, on no particular thread -- can stop it.
+    /// Set once `run(...)` starts, from whichever thread that happens to be, so `cancel()`
+    /// (called from an arbitrary task's cancellation, on no particular thread) can stop it.
     private var runLoop: CFRunLoop?
     private let continuation: CheckedContinuation<Internals.Proxy?, Swift.Error>
 
@@ -239,7 +238,7 @@ private final class PACContinuationBox: @unchecked Sendable {
     }
 
     /// Called from whatever task noticed the cancellation, on no particular thread. Stops the
-    /// dedicated evaluation thread's run loop immediately (if it's already pumping one -- if
+    /// dedicated evaluation thread's run loop immediately (if it's already pumping one; if
     /// `run(...)` hasn't started yet, its own `alreadyCancelled` check catches this instead once
     /// it does) and resumes right away rather than leaving the caller suspended for the rest of
     /// `timeout`.

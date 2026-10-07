@@ -2,11 +2,9 @@
 // See LICENSE for this package's licensing information.
 //
 
-// Promoted from the URLSession Executor Spike (formerly
-// `Tests/RequestDLTests/URLSession Executor Spike/RawBytesIdentityBuilder.swift`) for
-// request-dl-nio#287. Supports RSA (PKCS#1 or PKCS#8) and EC P-256/P-384/P-521 (SEC1 or
-// PKCS#8) private keys, unencrypted, plus password-protected traditional PKCS#1 RSA PEM
-// keys specifically, decrypted via `_CryptoExtras` (see `privateKeyDER(from:)`).
+// Supports RSA (PKCS#1 or PKCS#8) and EC P-256/P-384/P-521 (SEC1 or PKCS#8) private keys,
+// unencrypted, plus password-protected traditional PKCS#1 RSA PEM keys specifically,
+// decrypted via `_CryptoExtras` (see `privateKeyDER(from:)`).
 
 #if canImport(Darwin)
 
@@ -323,11 +321,10 @@ extension Internals {
             // `Internals.IdentityHandle` for the same pair sharing this one.
             //
             // Folds in the private key, not just the certificate, so two different keys
-            // accidentally paired with the same certificate never collide under one Keychain
-            // item. `kSecValueRef`-based matching (delete "whatever item has this exact
-            // key/certificate value") looked like the more direct way to express that and is what
-            // the original spike did, but empirically did not reliably match an existing item
-            // across process runs; label-based matching does.
+            // accidentally paired with the same certificate never collide under one Keychain item.
+            // `kSecValueRef`-based matching (delete "whatever item has this exact key/certificate
+            // value") looks like the more direct way to express that, but empirically does not
+            // reliably match an existing item across process runs; label-based matching does.
             let label = "RequestDL.mtls." + Self.hexDigest(certificateDER) + "." + Self.hexDigest(privateKeyDER)
 
             return try Internals.IdentityManager.shared.handle(for: label) {
@@ -335,16 +332,14 @@ extension Internals {
                 // Try the modern, data-protection keychain first: unlike the legacy (CDSA-backed)
                 // keychain below, it's confirmed to accept an *imported* EC `SecKey` (built here
                 // via `secKey(fromDER:)`, not generated in place) via this exact
-                // `SecItemAdd(kSecValueRef:)` round trip -- iOS/tvOS/watchOS, which always use it
+                // `SecItemAdd(kSecValueRef:)` round trip. iOS/tvOS/watchOS, which always use it
                 // (see the `#else` branch), have never shown this gap. A properly signed,
-                // Keychain-Sharing-entitled macOS app can use it too, same as those platforms.
+                // Keychain-Sharing-entitled macOS app can use it too.
                 //
-                // Falls back to the legacy keychain on `errSecMissingEntitlement`, exactly the
-                // unsigned-process case (`swift test` included) the `#if os(macOS)` branch used to
-                // hardcode unconditionally. That fallback still can't store an *imported* EC key
-                // either way (see `store(...)`'s own doc comment) -- this only widens which
-                // *signed* macOS apps get a working path, it doesn't touch the still-open,
-                // unsigned-process-only gap.
+                // Falls back to the legacy keychain on `errSecMissingEntitlement`, which is the
+                // unsigned-process case (`swift test` included). That fallback still can't store an
+                // *imported* EC key (see `store(...)`'s own doc comment), so this only widens which
+                // *signed* macOS apps get a working path.
                 do {
                     return try Self.store(
                         certificate: certificate,
@@ -378,19 +373,18 @@ extension Internals {
         /// One attempt at the add-then-query-back round trip described in `makeIdentity(_:_:)`'s
         /// own doc comment, against a single Keychain (`useDataProtectionKeychain` picks which).
         ///
-        /// - Important: On macOS specifically, the legacy (non-data-protection) keychain cannot
-        /// store a `SecKey` this package *imports* from raw bytes (`secKey(fromDER:)`, hence
-        /// `SecKeyCreateWithData`) when it's an EC key (P-256/P-384/P-521): `SecItemAdd` fails
-        /// with `-25304 (errSecInvalidItemRef)`. Confirmed to be specific to importing external EC
-        /// key material into that one Keychain, not a mistaken attribute on this call or a
-        /// blanket EC/legacy-Keychain incompatibility: an RSA key through this exact same call
-        /// succeeds, and a *freshly generated* EC key (`SecKeyCreateRandomKey`, stored directly by
-        /// the OS rather than imported) also succeeds there. `makeIdentity(_:_:)` above tries the
-        /// data-protection Keychain first specifically to route around this for any macOS caller
-        /// that can (a properly signed app with the Keychain Sharing entitlement); a caller
-        /// without it (`swift test` included) still lands here with `useDataProtectionKeychain:
-        /// false` and still hits this gap for an EC client certificate -- not fixed by this
-        /// method, since there's no known way to store an imported EC key on that Keychain at all.
+        /// - Important: On macOS, the legacy (non-data-protection) keychain cannot store a `SecKey`
+        /// this package *imports* from raw bytes (`secKey(fromDER:)`, hence `SecKeyCreateWithData`)
+        /// when it's an EC key (P-256/P-384/P-521): `SecItemAdd` fails with
+        /// `-25304 (errSecInvalidItemRef)`. This is specific to importing external EC key material
+        /// into that Keychain, not a wrong attribute on this call: an RSA key through the same
+        /// call succeeds, and so does a *freshly generated* EC key (`SecKeyCreateRandomKey`, stored
+        /// directly by the OS rather than imported). `makeIdentity(_:_:)` tries the
+        /// data-protection Keychain first to route around this for any macOS caller that can (a
+        /// properly signed app with the Keychain Sharing entitlement). A caller without it
+        /// (`swift test` included) still lands here with `useDataProtectionKeychain: false` and
+        /// hits this gap for an EC client certificate, since there is no known way to store an
+        /// imported EC key on that Keychain.
         package static func store(
             certificate: SecCertificate,
             secKey: SecKey,
@@ -400,20 +394,19 @@ extension Internals {
             Self.removeExistingKeychainItems(label: label, useDataProtectionKeychain: useDataProtectionKeychain)
 
             // `kSecAttrApplicationLabel` is the public-key hash Security.framework's own
-            // identity-synthesis engine actually uses to pair a `kSecClassKey` item with a
-            // `kSecClassCertificate` item into a `kSecClassIdentity` -- it's how "identity is
-            // a synthetic pairing of a certificate and a key by matching public key" (see the
-            // query comment below) actually happens under the hood. Left unset, `SecItemAdd`
-            // assigns the key item some value that does not match the certificate's own
-            // (automatically derived) `kSecAttrPublicKeyHash`, so no identity is ever
-            // synthesized -- confirmed empirically: `kSecClassIdentity` queries reliably
-            // returned zero results without this, on every run, regardless of Keychain state,
-            // entitlement, or process signing.
+            // identity-synthesis engine uses to pair a `kSecClassKey` item with a
+            // `kSecClassCertificate` item into a `kSecClassIdentity`: it's how "identity is a
+            // synthetic pairing of a certificate and a key by matching public key" (see the query
+            // comment below) happens under the hood. Left unset, `SecItemAdd` assigns the key item
+            // some value that does not match the certificate's own (automatically derived)
+            // `kSecAttrPublicKeyHash`, so no identity is ever synthesized and `kSecClassIdentity`
+            // queries return zero results, regardless of Keychain state, entitlement, or process
+            // signing.
             //
             // SHA-1 of the public key's external representation (X9.63 for EC, PKCS#1
-            // `RSAPublicKey` for RSA -- `SecKeyCopyExternalRepresentation` already returns
-            // whichever shape matches `secKey`'s own key type) is the OS's own convention for
-            // this hash, confirmed byte for byte against `openssl`'s equivalent computation.
+            // `RSAPublicKey` for RSA; `SecKeyCopyExternalRepresentation` already returns whichever
+            // shape matches `secKey`'s own key type) is the OS's own convention for this hash,
+            // confirmed byte for byte against `openssl`'s equivalent computation.
             guard let publicKey = SecKeyCopyPublicKey(secKey) else {
                 throw Error.secKeyCreationFailed("SecKeyCopyPublicKey returned nil")
             }

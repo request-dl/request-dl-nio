@@ -38,8 +38,8 @@ import struct Foundation.Data
 /// ```
 ///
 /// Use the ``init(id:scale:transaction:loader:task:content:)`` initializer when the request needs
-/// more than a URL — custom headers, authentication, a specific ``Property/cachePolicy(_:)``, and
-/// so on — by building it the same way a ``DataTask`` is built:
+/// more than a URL (custom headers, authentication, a specific ``Property/cachePolicy(_:)``,
+/// and so on) by building it the same way a ``DataTask`` is built:
 ///
 /// ```swift
 /// RDLImage(
@@ -55,12 +55,12 @@ import struct Foundation.Data
 /// ```
 ///
 /// Any ``RequestTask`` producing a ``TaskResult`` of `Data` works, so a ``MockedTask`` also drops
-/// in directly — handy for previews and tests that shouldn't hit the network.
+/// in directly, which is handy for previews and tests that shouldn't hit the network.
 ///
 /// - Important: `id` identifies the request for both restarting the load (when it changes, the
 /// current load is cancelled and a new one begins, same as `AsyncImage` reacting to a new `url`)
 /// and deduplicating concurrent loads in ``RDLImageLoader``. It can't be derived automatically
-/// from an arbitrary ``RequestTask``, so callers supply it explicitly — typically the URL or
+/// from an arbitrary ``RequestTask``, so callers supply it explicitly, typically the URL or
 /// endpoint the request resolves to.
 public struct RDLImage<Content: View>: View {
 

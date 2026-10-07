@@ -49,12 +49,11 @@ extension Internals {
         ///
         /// Portable counterpart to `build()`: reads the exact same bytes, without NIOSSL parsing
         /// them into a `NIOSSLCertificate` first only to export the DER right back out again.
-        /// Built on `SwiftASN1`'s own `PEMDocument.parseMultiple(pemString:)`, not a hand-rolled
-        /// PEM splitter. `SwiftASN1` is already a portable dependency of this package (`X509`'s
-        /// own non-Darwin trust evaluator uses it), and it already handles what a hand-rolled
-        /// version would have to get right itself: locating every `-----BEGIN/END-----` pair and
-        /// base64-decoding each one. Verified against `NIOSSLCertificate.fromPEMFile`'s own DER
-        /// output for byte-for-byte equality. See `InternalsCertificateTests`.
+        /// Built on `SwiftASN1`'s own `PEMDocument.parseMultiple(pemString:)` rather than a
+        /// hand-rolled PEM splitter, since `SwiftASN1` is already a portable dependency of this
+        /// package (`X509`'s own non-Darwin trust evaluator uses it). Verified against
+        /// `NIOSSLCertificate.fromPEMFile`'s own DER output for byte-for-byte equality. See
+        /// `InternalsCertificateTests`.
         ///
         /// - Important: Matches `build()`'s own behavior for both `.pem` sources: `.file` and
         /// `.bytes` each read every certificate in the bundle, matching

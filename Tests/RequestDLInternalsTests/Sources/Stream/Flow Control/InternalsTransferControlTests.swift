@@ -9,7 +9,7 @@ import Testing
 
 /// Unit coverage for `Internals.FlowControlWindow`'s suspension and for
 /// `Internals.TransferControl`, which applies it to every window of an execution. The end-to-end
-/// behaviour -- on real connections, both executors -- is in
+/// behaviour (on real connections, both executors) is in
 /// `InternalsTransferControlDownloadTests`/`InternalsTransferControlUploadTests`.
 struct InternalsTransferControlTests {
 
@@ -36,7 +36,7 @@ struct InternalsTransferControlTests {
         #expect(resumed.withLockedValue { $0 } == 1)
     }
 
-    /// The reader draining the backlog -- even all of it -- must not wake a suspended producer:
+    /// The reader draining the backlog, even all of it, must not wake a suspended producer:
     /// only `resume()` (or `release()`) may.
     @Test
     func credit_whileSuspended_neverWakesTheProducer() {
@@ -193,8 +193,8 @@ struct InternalsTransferControlTests {
         #expect(second.isWritable)
     }
 
-    /// A suspension that comes before the executor attaches its window -- the app pausing a
-    /// request that hasn't reached the network yet -- still holds once it does.
+    /// A suspension that comes before the executor attaches its window (the app pausing a
+    /// request that hasn't reached the network yet) still holds once it does.
     @Test
     func transferControl_attachingAfterASuspension_startsSuspended() {
         // Given

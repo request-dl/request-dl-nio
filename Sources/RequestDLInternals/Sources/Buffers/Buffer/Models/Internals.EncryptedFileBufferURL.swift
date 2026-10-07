@@ -25,20 +25,21 @@ extension Internals {
     /// this reported ciphertext-plus-framing size instead, that comparison would fail for every
     /// encrypted entry, permanently, and the cache would never serve a hit.
     ///
-    /// - Important: This type is only ever meant to be constructed directly, with a key already
-    /// in hand — see ``Internals/EncryptedFileStreamBuffer`` and `DiskStorage`'s
-    /// `dataBuffer(for:)`. `make(from:)` deliberately does not implement the "discover an
-    /// encrypted buffer from a bare `URL`" path: there is no channel through that static factory
-    /// to supply a key, and a key must never be smuggled through a `Foundation.URL`.
+    /// - Important: This type is only meant to be constructed directly, with a key already in
+    /// hand (see ``Internals/EncryptedFileStreamBuffer`` and `DiskStorage`'s `dataBuffer(for:)`).
+    /// `make(from:)` deliberately does not implement the "discover an encrypted buffer from a
+    /// bare `URL`" path: there is no channel through that static factory to supply a key, and a
+    /// key must never be smuggled through a `Foundation.URL`.
     package struct EncryptedFileBufferURL: BufferURL {
 
         // MARK: - Internal static properties
 
-        /// - Warning: Reachable only if something bypasses `Internals.Buffer<EncryptedFileStreamBuffer>
-        /// (addressing:)` and calls the no-argument or `Foundation.URL`-based `Internals.Buffer`
-        /// initializers against this stream type instead — there is no legitimate call path to
-        /// this property. See ``Internals/EncryptedFileStreamBuffer`` for why a plaintext
-        /// fallback here would be a footgun worth avoiding outright.
+        /// - Warning: Reachable only if something bypasses
+        /// `Internals.Buffer<EncryptedFileStreamBuffer> (addressing:)` and calls the no-argument or
+        /// `Foundation.URL`-based `Internals.Buffer` initializers against this stream type instead,
+        /// since there is no legitimate call path to this property. See
+        /// ``Internals/EncryptedFileStreamBuffer`` for why a plaintext fallback here would be a
+        /// footgun worth avoiding outright.
         package static var temporaryURL: Internals.EncryptedFileBufferURL {
             Internals.assertionFailure(
                 "EncryptedFileBufferURL.temporaryURL reached — a caller bypassed "
@@ -46,10 +47,10 @@ extension Internals {
                     + "hand, and fell back to the keyless generic Buffer construction path instead."
             )
 
-            // Release builds don't trap on the assertion above. A random, immediately discarded
-            // key still produces a self-consistent (if permanently unreadable) encrypted temp
-            // buffer — safe, since nothing can ever decrypt it, rather than the alternative of
-            // silently reading/writing the target file as plaintext through a mismatched stream.
+            // Release builds don't trap on the assertion above. A random, immediately discarded key
+            // still produces a self-consistent (if permanently unreadable) encrypted temp buffer,
+            // which is safe since nothing can ever decrypt it, unlike silently reading/writing the
+            // target file as plaintext through a mismatched stream.
             return Internals.EncryptedFileBufferURL(
                 inner: .temporaryURL,
                 key: SymmetricKey(size: .bits256)
@@ -96,7 +97,7 @@ extension Internals {
         }
 
         /// Wipes the header and base nonce along with everything else. The next write starts a
-        /// fresh record, with a fresh nonce — exactly as if the file never existed.
+        /// fresh record, with a fresh nonce, exactly as if the file never existed.
         package func truncate() async {
             await inner.truncate()
         }

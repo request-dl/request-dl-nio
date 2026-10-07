@@ -110,10 +110,10 @@ public final class URLEncoder: @unchecked Sendable {
     ///
     /// - Throws: Whatever a strategy throws.
     public func encode(_ value: Any, forKey key: String) throws -> [QueryItem] {
-        // Snapshot, then release. Must not hold the lock across the whole recursion — that
-        // would hold it across calls into strategy code this type does not own, and `Lock` is
-        // not reentrant, so a strategy reading any of the public properties above would deadlock
-        // the calling thread outright.
+        // Snapshot, then release. The lock must not be held across the whole recursion: that would
+        // hold it across calls into strategy code this type does not own, and `Lock` is not
+        // reentrant, so a strategy reading any of the public properties above would deadlock the
+        // calling thread.
         let configuration = lock.withLock { _configuration }
 
         return try _encode(value, forKey: key, with: configuration)
@@ -422,9 +422,9 @@ extension URLEncoder {
 /// Lets `Optional` be recognised through an existential, which a dynamic cast cannot do without
 /// knowing `Wrapped`.
 ///
-/// - Note: No longer inherits `Sendable`. `Optional` is only conditionally `Sendable`, on
-/// `Wrapped`, so an unconditional conformance to a `Sendable` protocol did not hold. Nothing
-/// needed it either: this is used for one synchronous type test.
+/// - Note: Deliberately not `Sendable`: `Optional` is only conditionally `Sendable`, on
+/// `Wrapped`, so an unconditional conformance to a `Sendable` protocol would not hold. Nothing
+/// needs it either: this is used for one synchronous type test.
 private protocol OptionalLiteral {
 
     var literal: Any? { get }

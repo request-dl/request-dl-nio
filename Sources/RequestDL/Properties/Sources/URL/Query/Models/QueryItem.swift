@@ -69,12 +69,10 @@ extension [QueryItem] {
     /// a literal `+` in the input has already become `%2B` by the time this puts unencoded `+`
     /// characters in, so the two can never be confused on the way back.
     ///
-    /// - Note: Rewritten on `split` and `joined`. It was branching on `#available` between the
-    /// standard library's `replacing(_:with:)` above macOS 13 and Foundation's
-    /// `replacingOccurrences(of:with:)` below it. The second of those is the Foundation
-    /// dependency this package is trying to shed, and the file had no import that would have
-    /// let it compile in the first place. `omittingEmptySubsequences: false` is what keeps
-    /// runs of spaces, and leading and trailing ones, intact.
+    /// - Note: Built on `split` and `joined` rather than `replacing(_:with:)` or Foundation's
+    /// `replacingOccurrences(of:with:)`: the former needs macOS 13, and the latter is the
+    /// Foundation dependency this package is trying to shed. `omittingEmptySubsequences: false`
+    /// is what keeps runs of spaces, and leading and trailing ones, intact.
     func replacingWhitespace(with representable: String) -> [QueryItem] {
         map {
             .init(

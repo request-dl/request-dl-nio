@@ -37,9 +37,9 @@ struct LocalServer: Sendable {
         static let shared = ServerManager()
 
         // Separate instance (own `group`/`_servers`) for LocalServerConcurrencyTests' 200
-        // -connection burst, paired with `Configuration.stress` (see LocalServer.Configuration.swift)
-        // so that deliberate stress test no longer competes with every other LocalServer-backed
-        // suite for `.shared`'s threads.
+        // -connection burst, paired with `Configuration.stress` (see
+        // LocalServer.Configuration.swift) so that deliberate stress test doesn't compete with
+        // every other LocalServer-backed suite for `.shared`'s threads.
         static let stress = ServerManager()
 
         // MARK: - Private properties
@@ -50,23 +50,16 @@ struct LocalServer: Sendable {
         // Shared process-wide across every suite that spins up a LocalServer (DataTaskTests,
         // DownloadTaskTests, UploadTaskTests, InternalsSessionTests, ModifiersCollect*Tests,
         // CachedRequestTests, ...). swift-testing runs suites concurrently by default, so too few
-        // threads here queues every concurrent suite's TLS handshakes behind each other —
-        // tolerable on lighter simulators, not on visionOS (see InternalsSessionTests'
-        // connectTimeout/tlsHandshakeTimeout failures in visionOS CI).
+        // threads here queues every concurrent suite's TLS handshakes behind each other, which is
+        // tolerable on lighter simulators but not on visionOS (connectTimeout/tlsHandshakeTimeout
+        // failures in InternalsSessionTests).
         //
-        // Bumped from 1 to 4 threads previously (see git history), which held up until a CI run
-        // with unusually heavy shared-runner contention (ci-triage/TASKS.md T4) reproduced the
-        // same connectTimeout on both `InternalsSessionTests.session_whenPerformingGet_shouldBeValid`
-        // and, independently, `LocalServerConcurrencyTests.manyConcurrentSessions_
-        // shareLocalServerWithoutCrossTalkOrHanging` itself — the latter alone drives 200
-        // concurrently-connecting client sessions at this same group. Bumped again to 8; still a
-        // fixed headroom guess rather than a guarantee against arbitrarily bad contention, so a
-        // recurrence here should widen this further rather than be treated as a new bug.
-        //
-        // LocalServerConcurrencyTests has since moved its 200-connection burst to `.stress`
-        // (its own instance, own group, `Configuration.stress`/port 8889) instead of driving
-        // that load at this shared group — this group's remaining exposure is the aggregate of
-        // every *other* LocalServer-backed suite's normal (light) traffic.
+        // The thread count is a fixed headroom guess rather than a guarantee against arbitrarily
+        // bad CI contention, so a connectTimeout recurring here should widen it further rather than
+        // be treated as a new bug. `LocalServerConcurrencyTests` drives its 200-connection burst at
+        // its own instance (`.stress`, own group, `Configuration.stress`/port 8889), so this
+        // group's exposure is the aggregate of every *other* LocalServer-backed suite's normal
+        // (light) traffic.
         private let group = MultiThreadedEventLoopGroup(numberOfThreads: 8)
         #endif
 

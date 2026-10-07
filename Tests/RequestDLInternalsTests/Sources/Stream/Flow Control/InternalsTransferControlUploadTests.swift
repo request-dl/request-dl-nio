@@ -25,7 +25,7 @@ import Foundation
 /// `.urlSession` pauses `Internals.URLSessionUploadBodyPump`'s writes into a bound stream pair.
 ///
 /// The server checks every byte it receives against the pattern the body was generated from, so a
-/// suspension that lost, repeated or reordered anything -- at the pause, or across a resend -- fails
+/// suspension that lost, repeated or reordered anything (at the pause, or across a resend) fails
 /// `isBodyIntact`, and it counts what arrives as it arrives, so an upload that kept going while
 /// "suspended" shows up as that count moving.
 ///
@@ -48,7 +48,7 @@ struct InternalsTransferControlUploadTests {
     /// server itself, from its own thread, at an exact byte early in the body, and the server reads
     /// slower than loopback would (`uploadReadDelay`): even the smaller body then stays well clear
     /// of that bound. Triggered from the test's own task instead, under full-suite load, the task
-    /// was once scheduled so late the whole 6 MiB was already in -- which says nothing about the
+    /// can be scheduled so late that the whole 6 MiB is already in, which says nothing about the
     /// suspension either way.
     @Test(arguments: TransferExecutor.allCases, sizes)
     func suspendMidUpload_stopsTheBodyUntilResumed(_ executor: TransferExecutor, size: Int) async throws {
@@ -205,7 +205,7 @@ struct InternalsTransferControlUploadTests {
     /// it fails the request; `.nio` has no client-side idle timeout on the request body at all
     /// (AsyncHTTPClient only starts its read timeout once the request is fully sent, and RequestDL
     /// sets no write timeout), so the same suspension survives. Either way the server's own idle
-    /// timeout still applies -- see `serverGivingUpOnASuspendedUpload_failsItWithoutResending`.
+    /// timeout still applies (see `serverGivingUpOnASuspendedUpload_failsItWithoutResending`).
     @Test(arguments: TransferExecutor.allCases)
     func suspensionLongerThanTheClientIdleTimeout(_ executor: TransferExecutor) async throws {
         let size = 24 * 1_048_576

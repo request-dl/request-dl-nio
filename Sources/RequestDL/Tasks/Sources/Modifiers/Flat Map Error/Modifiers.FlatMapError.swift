@@ -34,10 +34,10 @@ extension Modifiers {
             } catch is CancellationError {
                 // Skips `transform` and rethrows directly, mirroring `Modifiers.Retry`'s own
                 // carve-out (see `Modifiers.MapError.body`'s doc comment for the full rationale).
-                // Unlike `MapError`/`FlatMap`, a `transform` here can't turn cancellation into an
-                // apparent success -- this always rethrows `error` regardless -- but calling it
-                // on a cancelled task is still pointless work (e.g. reporting/logging a "the
-                // request failed" side effect for what is, in fact, the caller giving up).
+                // Unlike `MapError`/ `FlatMap`, a `transform` here can't turn cancellation into an
+                // apparent success, since this always rethrows `error`, but calling it on a
+                // cancelled task is still pointless work (e.g. logging a "the request failed" side
+                // effect for what is the caller giving up).
                 throw CancellationError()
             } catch {
                 try await transform(error)

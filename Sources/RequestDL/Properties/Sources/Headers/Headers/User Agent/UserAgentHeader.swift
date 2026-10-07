@@ -38,11 +38,11 @@ public struct UserAgentHeader: Property {
     /// Whether this is RequestDL's own built-in default (the empty ``init()``), as opposed to a
     /// caller-supplied value from ``init(_:)``.
     ///
-    /// Threaded through to ``HeaderNode`` so the `.urlSession` executor can later drop this
-    /// header and let URLSession report its own native `CFNetwork`/`Darwin` value instead of
-    /// RequestDL's neutral one — see `RequestConfiguration.dropDefaultUserAgentForNativeReporting()`.
-    /// Only the untouched default may be dropped this way; anything the caller wrote must reach
-    /// the wire as given.
+    /// Threaded through to ``HeaderNode`` so the `.urlSession` executor can later drop this header
+    /// and let URLSession report its own native `CFNetwork`/`Darwin` value instead of RequestDL's
+    /// neutral one (see `RequestConfiguration.dropDefaultUserAgentForNativeReporting()`). Only the
+    /// untouched default may be dropped this way; anything the caller wrote must reach the wire as
+    /// given.
     private let isDefault: Bool
 
     /// `ProcessInfo.processInfo.userAgent` bundle/version/OS lookups and string interpolation,

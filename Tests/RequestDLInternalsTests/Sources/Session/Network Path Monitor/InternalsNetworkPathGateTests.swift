@@ -89,8 +89,8 @@ private let disconnectedPath = Internals.NetworkPath(
 )
 
 /// Models `NWPathMonitor` right after `start()`: `currentPath` still reads its unsatisfied
-/// placeholder (confirmed empirically — it only turns satisfied once the first update lands,
-/// a few milliseconds later), while the first real path is already on its way.
+/// placeholder (it only turns satisfied once the first update lands, a few milliseconds
+/// later), while the first real path is already on its way.
 private struct NotYetResolvedNetworkPathObserver: Internals.NetworkPathObserving {
 
     let resolvedPath: Internals.NetworkPath
@@ -114,8 +114,8 @@ private struct NotYetResolvedNetworkPathObserver: Internals.NetworkPathObserving
 
 struct InternalsNetworkPathGateTests {
 
-    /// The first gated request in a process used to judge the path from `NWPathMonitor`'s
-    /// pre-first-update placeholder, and so failed with `.noConnection` on a fully connected
+    /// The first gated request in a process must not judge the path from `NWPathMonitor`'s
+    /// pre-first-update placeholder, which would fail with `.noConnection` on a fully connected
     /// device whenever `waitsForConnectivity` wasn't also set.
     @Test
     func gate_whenFirstPathNotYetDelivered_judgesTheResolvedPathNotThePlaceholder() async throws {

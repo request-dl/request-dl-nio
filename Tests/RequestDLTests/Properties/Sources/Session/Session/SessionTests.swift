@@ -475,8 +475,8 @@ struct SessionTests {
 
         // `async-http-client`'s own built-in tracing is always suppressed; RequestDL owns the
         // span lifecycle itself, in `RawTask.result()`, using `resolved.session.configuration
-        // .tracer` directly. `Internals.Session.Configuration.build()` -- which actually builds
-        // the `HTTPClient.Configuration` this checks -- only exists under `canImport(NIOCore)`.
+        // .tracer` directly. `Internals.Session.Configuration.build()`, which actually builds
+        // the `HTTPClient.Configuration` this checks, only exists under `canImport(NIOCore)`.
         #if canImport(NIOCore)
         let builtTracer = try resolved.session.configuration.build().httpClientConfiguration.tracing.tracer
         #expect((builtTracer as? NoOpTracer) != nil)

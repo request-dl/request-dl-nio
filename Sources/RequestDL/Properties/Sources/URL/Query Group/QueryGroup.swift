@@ -51,13 +51,10 @@ public struct QueryGroup<Content: Property>: Property {
             inputs: inputs
         )
 
-        // Kept as individual `LeafNode<QueryNode>` children rather than collapsed into one
-        // opaque wrapper node: a `QueryGroup` nested inside another `QueryGroup` needs its own
-        // resolved queries to still be structurally discoverable by the outer group's own
-        // `search(for: QueryNode.self)`. A single combined leaf hid them from that search
-        // entirely, silently dropping every query composed through a nested `QueryGroup` — the
-        // same class of bug fixed for `HeaderGroup`, whose leaf-wrapping broke `Proxy`'s and
-        // `Form`'s external searches for `HeaderNode` the same way.
+        // Kept as individual `LeafNode<QueryNode>` children rather than collapsed into one opaque
+        // wrapper node: a `QueryGroup` nested inside another needs its own resolved queries to stay
+        // discoverable by the outer group's `search(for: QueryNode.self)`, the same reason
+        // `HeaderGroup` keeps its headers as individual leaves.
         var children = ChildrenNode()
 
         for query in output.node.search(for: QueryNode.self) {

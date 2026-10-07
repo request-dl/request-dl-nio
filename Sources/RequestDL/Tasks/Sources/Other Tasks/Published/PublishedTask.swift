@@ -41,11 +41,11 @@ public struct PublishedTask<Output: Sendable>: Publisher {
                 }
 
                 // Combine permits a subscriber to call `request(_:)` more than once (e.g.
-                // accumulating demand before any value has arrived); this publisher only ever
+                // accumulating demand before any value has arrived), but this publisher only ever
                 // produces a single value/completion, so a second call while `_task` is already
-                // running must not start a second one. Without this guard, two overlapping calls
-                // ran `wrapper()` twice -- a real problem for a non-idempotent request -- and
-                // could deliver two `receive(_:)`/`receive(completion:)` pairs to one subscriber,
+                // running must not start another one. Without this guard, overlapping calls would
+                // run `wrapper()` twice (a real problem for a non-idempotent request) and could
+                // deliver two `receive(_:)`/ `receive(completion:)` pairs to one subscriber,
                 // violating Combine's at-most-one-completion contract.
                 guard _task == nil else {
                     return
