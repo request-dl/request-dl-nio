@@ -914,9 +914,10 @@ package final class TransferServer: @unchecked Sendable {
                 headers.append(("Tus-Resumable", "1.0.0"))
             }
 
-            let isSent = isRead && io.send(Self.head(status: 409, headers: headers), counted: false)
+            // Recorded before it is sent: a client that has the response can already be asking
+            // what the server saw.
             record(head, bodyLength: 0, isIntact: true, isComplete: isRead, status: 409)
-            return isSent
+            return isRead && io.send(Self.head(status: 409, headers: headers), counted: false)
         }
 
         // What arrives is kept as it arrives, so an upload cut short holds the part that made it:
@@ -963,41 +964,34 @@ package final class TransferServer: @unchecked Sendable {
             return false
         }
 
-        let isSent: Bool
         let status: Int
+        let response: [UInt8]
 
         switch dialect {
         case .ietf where held.isComplete:
             let body = Array("done".utf8)
             status = 200
-            isSent = io.send(
-                Self.head(
-                    status: 200,
-                    headers: [
-                        ("Content-Type", "text/plain"), ("X-Upload", "done"), ("Content-Length", String(body.count)),
-                    ]
-                ) + body,
-                counted: false
-            )
+            response = Self.head(
+                status: 200,
+                headers: [
+                    ("Content-Type", "text/plain"), ("X-Upload", "done"), ("Content-Length", String(body.count)),
+                ]
+            ) + body
         case .ietf:
             status = 204
-            isSent = io.send(
-                Self.head(status: 204, headers: [("Upload-Offset", String(held.data.count))]),
-                counted: false
-            )
+            response = Self.head(status: 204, headers: [("Upload-Offset", String(held.data.count))])
         case .tus:
             status = 204
-            isSent = io.send(
-                Self.head(
-                    status: 204,
-                    headers: [("Upload-Offset", String(held.data.count)), ("Tus-Resumable", "1.0.0")]
-                ),
-                counted: false
+            response = Self.head(
+                status: 204,
+                headers: [("Upload-Offset", String(held.data.count)), ("Tus-Resumable", "1.0.0")]
             )
         }
 
+        // Recorded before it is sent: a client that has the response can already be asking what
+        // the server saw.
         record(head, bodyLength: outcome.length, isIntact: true, isComplete: true, status: status)
-        return isSent
+        return io.send(response, counted: false)
     }
 
     // MARK: - Bookkeeping (called from `TransferServerIO`)
