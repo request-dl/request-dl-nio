@@ -116,12 +116,7 @@ struct InternalsURLSessionClientTests {
 
             // `didCompleteWithError:` releases the operation-queue slot asynchronously, so poll
             // briefly rather than asserting immediately after `cancel()` returns.
-            var stillRunning = client.isRunning
-            for _ in 0..<50 where stillRunning {
-                try await _Concurrency.Task.sleep(nanoseconds: 20_000_000)
-                stillRunning = client.isRunning
-            }
-            #expect(!stillRunning)
+            try await eventually(timeout: 15) { !client.isRunning }
         }
     }
 
@@ -160,12 +155,7 @@ struct InternalsURLSessionClientTests {
 
             // `didCompleteWithError:` releases the operation-queue slot asynchronously, so poll
             // briefly rather than asserting immediately after `cancel()` returns.
-            var stillRunning = client.isRunning
-            for _ in 0..<50 where stillRunning {
-                try await _Concurrency.Task.sleep(nanoseconds: 20_000_000)
-                stillRunning = client.isRunning
-            }
-            #expect(!stillRunning)
+            try await eventually(timeout: 15) { !client.isRunning }
         }
     }
 
@@ -199,12 +189,7 @@ struct InternalsURLSessionClientTests {
 
             // `didCompleteWithError:` releases the operation-queue slot asynchronously, so poll
             // briefly rather than asserting immediately after `cancel()` returns.
-            var stillRunning = client.isRunning
-            for _ in 0..<50 where stillRunning {
-                try await _Concurrency.Task.sleep(nanoseconds: 20_000_000)
-                stillRunning = client.isRunning
-            }
-            #expect(!stillRunning)
+            try await eventually(timeout: 15) { !client.isRunning }
         }
     }
 }
