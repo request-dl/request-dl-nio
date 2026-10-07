@@ -110,7 +110,7 @@ struct HeaderNodeSingleValuedNamesTests {
 
     @Test
     func host_whenCollidingWithCustomHeaderUnderExplicitSeparator_overwritesWithoutCorrupting() async throws {
-        // Given (the sharper failure mode): with a separator in scope, `.adding` used to splice
+        // Given (the sharper failure mode): with a separator in scope, `.adding` would splice
         // the new value directly into the existing one instead of just duplicating it.
         let resolved = try await resolve(
             TestProperty {
@@ -126,9 +126,9 @@ struct HeaderNodeSingleValuedNamesTests {
 
     @Test
     func contentType_whenCollidingWithCustomHeaderUnderExplicitSeparator_overwritesWithoutCorrupting() async throws {
-        // Given (the exact scenario that motivated this fix): `Payload` sets `Content-Type` via
-        // a direct `.set()`, then a colliding `CustomHeader` with a separator in scope used to
-        // splice its value directly into it, producing an unparseable single string
+        // Given: `Payload` sets `Content-Type` via a direct `.set()`, then a colliding
+        // `CustomHeader` with a separator in scope must not splice its value directly into it,
+        // which would produce an unparseable single string
         // ("application/json; charset=UTF-8,application/xml").
         let resolved = try await resolve(
             TestProperty {

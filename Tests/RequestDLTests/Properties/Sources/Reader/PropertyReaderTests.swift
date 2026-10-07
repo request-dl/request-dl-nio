@@ -69,7 +69,7 @@ struct PropertyReaderTests {
     func propertyReader_combinedWithAsyncProperty_resolvesProxyDynamicallyFromComposedURL() async throws {
         // Given
         // Demonstrates that a per-request dynamic proxy (decided from the fully composed URL,
-        // with a real `async` lookup in between) doesn't need a dedicated resolver protocol --
+        // with a real `async` lookup in between) doesn't need a dedicated resolver protocol:
         // `PropertyReader` exposes the resolved URL of its `source`, and `AsyncProperty` can
         // `await` before picking the `Proxy` to add as a sibling.
         @Sendable func lookUpProxy(for host: String) async -> (host: String, port: Int)? {
@@ -111,7 +111,7 @@ struct PropertyReaderTests {
     @Test
     func propertyReader_whenCallerWrapsEntireURLTreeAsSource_proxyDecisionSeesFullyComposedURL() async throws {
         // Given
-        // `PropertyReader`'s `content` only sees what `source` itself resolved into -- not
+        // `PropertyReader`'s `content` only sees what `source` itself resolved into, not
         // whatever siblings surround the `PropertyReader` node in the outer tree. A reusable
         // "pick a proxy from the request's URL" component therefore has to have its *caller*
         // wrap the entire URL-producing tree (`BaseURL` + `Path` + `Query`, in whatever order
@@ -156,7 +156,7 @@ struct PropertyReaderTests {
     func propertyReader_whenURLPartsAreDeclaredOutsideSource_proxyDecisionMissesThem() async throws {
         // Given
         // The gotcha the previous test's contract depends on getting right: `Path` declared as
-        // a *sibling* of `PropertyReader` -- not inside its `source` -- never reaches
+        // a *sibling* of `PropertyReader`, not inside its `source`, never reaches
         // `context.requestConfiguration.url`, even though it still lands in the final request.
         // A caller who only wraps part of the URL tree gets a routing decision made against a
         // stale/partial URL, silently.
@@ -181,18 +181,18 @@ struct PropertyReaderTests {
         #expect(resolved.session.configuration.proxy?.host == "default-proxy.local")
     }
 
-    /// Regression coverage: `PropertyReader._makeProperty` used to resolve `source` through a
-    /// brand-new `Resolve(root:environment:)`, which always mints a fresh `SeedFactory` and
-    /// hardcodes `namespaceID: .global` -- never the caller's own `inputs.namespaceID`/
-    /// `.seedFactory`. Two sibling `PropertyReader`s each wrapping the same `@StoredObject`-bearing
-    /// type as `source` therefore both independently computed seed `.zero` for `.global`,
-    /// colliding on the identical `Internals.Storage` entry and silently sharing one
-    /// `MemoryReference` instance instead of each getting its own -- exactly the "intermittent
-    /// `StoredObject`-identity flake" the `#if DEBUG` diagnostic in `Internals.Storage` exists to
-    /// chase. `ReferenceMemoryProperty`'s `@StoredObject` only constructs a fresh `MemoryReference`
-    /// (stamped with the next value off a shared, monotonically increasing counter) the first time
-    /// its identity is resolved, so two independent identities show up here as two *different*
-    /// counter values embedded in each sibling's own resolved `source` URL.
+    /// `PropertyReader._makeProperty` must resolve `source` with the caller's own
+    /// `inputs.namespaceID`/`.seedFactory`, not through a brand-new `Resolve(root:environment:)`,
+    /// which always mints a fresh `SeedFactory` and hardcodes `namespaceID: .global`. Otherwise
+    /// two sibling `PropertyReader`s each wrapping the same `@StoredObject`-bearing type as
+    /// `source` would both independently compute seed `.zero` for `.global`, colliding on the
+    /// identical `Internals.Storage` entry and silently sharing one `MemoryReference` instance
+    /// instead of each getting its own (the "intermittent `StoredObject`-identity flake" the
+    /// `#if DEBUG` diagnostic in `Internals.Storage` exists to chase). `ReferenceMemoryProperty`'s
+    /// `@StoredObject` only constructs a fresh `MemoryReference` (stamped with the next value off
+    /// a shared, monotonically increasing counter) the first time its identity is resolved, so
+    /// two independent identities show up here as two *different* counter values embedded in
+    /// each sibling's own resolved `source` URL.
     @Test
     func propertyReader_whenTwoSiblingsDeclareSameStoredObjectSourceType_getIndependentInstances() async throws {
         // Given / When

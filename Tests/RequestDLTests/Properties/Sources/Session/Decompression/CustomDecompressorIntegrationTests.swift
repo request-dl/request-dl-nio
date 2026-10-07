@@ -205,16 +205,16 @@ struct CustomDecompressorIntegrationTests {
     #if canImport(NIOCore)
     @Test
     func decompressionAlgorithms_whenOnlyNativeAlgorithmConfigured_bypassesManualDispatchUnderNIO() async throws {
-        // Given: the `.nio` counterpart to the test above, regression coverage for a real bug.
-        // Unlike `.urlSession`, `NIOHTTPResponseDecompressor` has no all-or-nothing
-        // `Accept-Encoding` constraint to work around, so `Internals.Client.execute` dispatched
-        // manually for every configured algorithm unconditionally, on the assumption that
+        // Given: the `.nio` counterpart to the test above. Unlike `.urlSession`,
+        // `NIOHTTPResponseDecompressor` has no all-or-nothing `Accept-Encoding` constraint to
+        // work around, so `Internals.Client.execute` must not dispatch manually for every
+        // configured algorithm unconditionally on the assumption that
         // `NIOHTTPResponseDecompressor` strips `Content-Encoding` once it decodes.
         //
         // It doesn't (confirmed against the vendored `swift-nio-extras` source), so a response
-        // compressed with a genuinely native-only algorithm like `.gzip` reached manual dispatch
-        // anyway and threw `NativeOnlyAlgorithmError`, exactly like a real caller configuring
-        // only `.gzip` under `.nio` would have hit on every request.
+        // compressed with a genuinely native-only algorithm like `.gzip` would reach manual
+        // dispatch anyway and throw `NativeOnlyAlgorithmError`, exactly as a real caller
+        // configuring only `.gzip` under `.nio` would hit on every request.
         let server = try RawHTTPServer()
         let original = String(repeating: "hello native gzip under NIO, no custom algorithm. ", count: 200)
         let encoded = try Self.gzipCompress(original)
@@ -241,13 +241,12 @@ struct CustomDecompressorIntegrationTests {
         #expect(String(data: data, encoding: .utf8) == original)
     }
 
-    /// The *mixed* half of the bug above, which the earlier fix didn't reach.
-    ///
-    /// `Internals.Decompression.build()` enables `NIOHTTPResponseDecompressor` as soon as any one
-    /// algorithm is natively decoded, so with `[.gzip, RLEDecompressor()]` a gzip response is
-    /// already decoded by the time it arrives — and, since the handler forwards the head
-    /// unmodified, still labelled `Content-Encoding: gzip`. Manual dispatch was handed the full
-    /// list, matched gzip a second time, and ran the decoder over plain text.
+    /// The *mixed* case: `Internals.Decompression.build()` enables `NIOHTTPResponseDecompressor`
+    /// as soon as any one algorithm is natively decoded, so with `[.gzip, RLEDecompressor()]` a
+    /// gzip response is already decoded by the time it arrives and, since the handler forwards
+    /// the head unmodified, still labelled `Content-Encoding: gzip`. Manual dispatch must not be
+    /// handed the full list, or it would match gzip a second time and run the decoder over plain
+    /// text.
     @Test
     func decompressionAlgorithms_whenNativeAndCustomAreMixed_doesNotDecodeNativeTwiceUnderNIO() async throws {
         // Given

@@ -12,7 +12,7 @@ import Testing
 import FoundationEssentials
 #endif
 
-// `SIGTRAP` is a libc signal constant, not a `Foundation` one — it comes from whichever of
+// `SIGTRAP` is a libc signal constant, not a `Foundation` one: it comes from whichever of
 // these the platform provides, matching `Internals.Override.Raise`'s own imports.
 #if canImport(Darwin)
 import Darwin
@@ -24,7 +24,7 @@ import Musl
 import WinSDK
 #endif
 
-// `.breakpoint()` (`Interceptors.Breakpoint`) only exists where `signal_h` is importable —
+// `.breakpoint()` (`Interceptors.Breakpoint`) only exists where `signal_h` is importable,
 // effectively Darwin, whose SDK auto-modularizes system headers this way. Glibc exposes
 // `signal.h`'s declarations through the single `Glibc` umbrella module instead, so this test's
 // only subject does not exist to call on Linux.

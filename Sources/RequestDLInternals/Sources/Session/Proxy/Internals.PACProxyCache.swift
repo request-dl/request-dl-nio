@@ -123,25 +123,25 @@ extension Internals {
                 inFlight[key] = newTask
                 task = newTask
 
-                // Detached from any one caller's lifetime on purpose: this records the result
-                // for whoever asks next (this key's cache entry, and any other concurrent
-                // caller sharing `inFlight[key]`) regardless of whether the specific call that
-                // started the evaluation is itself still being awaited below -- it may have
-                // already returned early after its own task was cancelled.
+                // Detached from any one caller's lifetime on purpose: this records the result for
+                // whoever asks next (this key's cache entry, and any other concurrent caller
+                // sharing `inFlight[key]`) regardless of whether the specific call that started the
+                // evaluation is itself still being awaited below, since it may have already
+                // returned early after its own task was cancelled.
                 _Concurrency.Task { [weak self] in
                     let resolved = await newTask.value
                     await self?.finishEvaluation(key: key, resolved: resolved)
                 }
             }
 
-            // `await task.value` alone does not observe *this call's own* task cancellation --
-            // an unstructured `Task`'s `.value` runs to completion regardless of what the
-            // awaiting side does, so a caller cancelled while `PACEvaluator`'s up-to-30s timeout
-            // is still running would otherwise stay suspended for the rest of it, exactly the
-            // hang this cache exists to bound to once per `lifetime` window, not once per
-            // caller. Racing it against cancellation lets a cancelled caller fail safe to
-            // direct (`nil`) immediately instead, without disturbing the shared evaluation
-            // other, still-live callers for the same key are waiting on.
+            // `await task.value` alone does not observe *this call's own* task cancellation: an
+            // unstructured `Task`'s `.value` runs to completion regardless of what the awaiting
+            // side does, so a caller cancelled while `PACEvaluator`'s up-to-30s timeout is still
+            // running would otherwise stay suspended for the rest of it, which is the hang this
+            // cache exists to bound to once per `lifetime` window, not once per caller. Racing it
+            // against cancellation lets a cancelled caller fail safe to direct (`nil`) immediately
+            // instead, without disturbing the shared evaluation other, still-live callers for the
+            // same key are waiting on.
             return await Self.awaitingCancellably(task)
         }
 
@@ -235,7 +235,7 @@ private final class PACCacheAwaitBox: @unchecked Sendable {
     // MARK: - Internal methods
 
     /// Registers `continuation` as the one `resolve`/`cancel` should answer, unless `cancel()`
-    /// already ran -- in which case this resumes it immediately instead, since there is nothing
+    /// already ran, in which case this resumes it immediately instead, since there is nothing
     /// left to wait on.
     func attach(_ continuation: CheckedContinuation<Internals.Proxy?, Never>) {
         let resumeNow: Bool = lock.withLock {

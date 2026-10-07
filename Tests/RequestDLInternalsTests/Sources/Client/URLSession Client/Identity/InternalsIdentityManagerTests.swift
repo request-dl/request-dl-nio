@@ -22,10 +22,10 @@ import struct Foundation.Data
 /// mechanics.
 ///
 /// - Note: This test exercises the call pattern the race needs, but does not reliably reproduce
-/// it on its own — confirmed by running it against the unguarded code multiple times, where it
-/// still passed every time. Two things explain that. First, the race window (between a handle's
-/// weak reference zeroing and its `release(label:)` acquiring the lock) is vanishingly small next
-/// to a `SecItemAdd`/`SecItemDelete` round trip. Second, a hit is self-healing: the very next
+/// it on its own: it still passed every time against the unguarded code. Two things explain
+/// that. First, the race window (between a handle's weak reference zeroing and its
+/// `release(label:)` acquiring the lock) is vanishingly small next to a
+/// `SecItemAdd`/`SecItemDelete` round trip. Second, a hit is self-healing: the very next
 /// `makeIdentity` call for the label just re-adds whatever a stale release wrongly deleted, so
 /// nothing looks wrong unless some other, non-rebuilding consumer needed those exact Keychain
 /// items in that exact window. Treat this as a general concurrency-safety smoke test (no crash,

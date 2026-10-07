@@ -83,13 +83,13 @@ struct InternalsManualDecompressionDispatchTests {
         #expect(collected == Data("hello world".utf8))
     }
 
-    /// Regression test for the decompression fallback path retaining its entire decoded body in
-    /// memory forever. The stream `decompressing(_:using:)` builds used to be constructed with
-    /// the default `.unbounded` buffering policy, the same `ReplaySubject`-backed policy
+    /// The decompression fallback path must not retain its entire decoded body in memory
+    /// forever. The stream `decompressing(_:using:)` builds must not use the default
+    /// `.unbounded` buffering policy, the same `ReplaySubject`-backed policy
     /// `Internals.DownloadBuffer.stream` deliberately avoids (`.untilFirstIteration` instead) for
     /// exactly this reason: `.unbounded` never releases what it has already handed a reader,
     /// which for a large streamed download (the `.brotli` fallback under `.nio`, or any custom
-    /// `Decompressor`) meant every decoded chunk stayed resident for the life of the stream.
+    /// `Decompressor`) would keep every decoded chunk resident for the life of the stream.
     ///
     /// `.untilFirstIteration` makes the stream single use: once a first reader has drained it,
     /// a second iterator has nothing left to replay and reports `AlreadyConsumedError` instead of
@@ -122,8 +122,8 @@ struct InternalsManualDecompressionDispatchTests {
     /// RFC 9110 §5.2 makes several field lines of one name equivalent to a single comma-joined
     /// line, so `gzip` then `br` means the body was compressed twice.
     ///
-    /// Taking only `.first` decoded gzip and handed the caller bytes that were still
-    /// brotli-compressed while reporting success — and `Internals.CacheControl` stored those
+    /// Taking only `.first` would decode gzip and hand the caller bytes that are still
+    /// brotli-compressed while reporting success, and `Internals.CacheControl` would store those
     /// wrong bytes on the way past.
     @Test
     func resolvedStream_whenContentEncodingIsStackedAcrossFieldLines_throws() async throws {
@@ -143,8 +143,8 @@ struct InternalsManualDecompressionDispatchTests {
     }
 
     /// The same stacking, comma-joined into one field line, which the spec says means the same
-    /// thing and which `.first` also mishandled — it matched the whole `"gzip, br"` string
-    /// against each algorithm's `contentEncodingValue` and matched nothing.
+    /// thing. Matching the whole `"gzip, br"` string against each algorithm's
+    /// `contentEncodingValue` would match nothing.
     @Test
     func resolvedStream_whenContentEncodingIsStackedInOneFieldLine_throws() async throws {
         // Given
@@ -226,12 +226,11 @@ struct InternalsManualDecompressionDispatchTests {
         }
     }
 
-    /// Regression coverage: `decompressing(_:using:)`'s background task used to have nothing
-    /// stopping it once its returned stream was discarded unread -- it kept pulling `source`,
-    /// decompressing every chunk, and (under `.untilFirstIteration`, which buffers until read)
-    /// growing without bound, for a body nobody asked for. `Internals.AsyncStream
-    /// .withTerminationToken(_:)` exists specifically to close this: dropping the returned stream
-    /// without ever reading it must cancel that task instead.
+    /// `decompressing(_:using:)`'s background task must stop once its returned stream is
+    /// discarded unread. Otherwise it keeps pulling `source`, decompressing every chunk, and
+    /// (under `.untilFirstIteration`, which buffers until read) growing without bound, for a body
+    /// nobody asked for. `Internals.AsyncStream.withTerminationToken(_:)` exists specifically to
+    /// prevent this: dropping the returned stream without ever reading it must cancel that task.
     @Test
     func resolvedStream_whenNeverRead_cancelsTheDecompressionTaskInsteadOfRunningForever() async throws {
         // Given
@@ -241,8 +240,8 @@ struct InternalsManualDecompressionDispatchTests {
 
         source.append(.success(await Internals.DataBuffer(Array("first".utf8))))
 
-        // When: the resolved stream is created and immediately discarded -- assigned to nothing,
-        // never iterated -- exactly the "inspected only the response head" scenario this guards
+        // When: the resolved stream is created and immediately discarded (assigned to nothing,
+        // never iterated), exactly the "inspected only the response head" scenario this guards
         // against.
         _ = try dispatch.resolvedStream(for: responseHead(contentEncoding: "gzip"), source: source)
 
@@ -260,7 +259,7 @@ struct InternalsManualDecompressionDispatchTests {
 
         try await Task.sleep(nanoseconds: 100_000_000)
 
-        // Then: nothing decompressed the later chunks -- the task was already cancelled and gone,
+        // Then: nothing decompressed the later chunks: the task was already cancelled and gone,
         // not still running and simply slow.
         #expect(counter.count == countOnceAbandoned)
     }
@@ -330,8 +329,8 @@ struct InternalsManualDecompressionDispatchTests {
         let output = try dispatch.resolvedStream(for: responseHead(contentEncoding: "gzip"), source: source)
         let outputWindow = try #require(output.flowControlWindow)
 
-        // Then: the decoder pulls two chunks -- the second takes its output past the high
-        // watermark -- and parks, leaving the other fourteen counted against the source.
+        // Then: the decoder pulls two chunks (the second takes its output past the high
+        // watermark) and parks, leaving the other fourteen counted against the source.
         try await eventually { outputWindow.waitingCountForTesting == 1 }
 
         #expect(outputWindow.bufferedBytesForTesting == 2_048)
@@ -410,14 +409,12 @@ struct InternalsManualDecompressionDispatchTests {
         )
     }
 
-    /// Regression guard: this is the exact check `Internals.ClientResponseReceiver` (`.nio`) and
+    /// This is the exact check `Internals.ClientResponseReceiver` (`.nio`) and
     /// `Internals.URLSessionClient`'s `runExchange` (`.urlSession`) both gate their cache tee on,
     /// so a caching response this package still has to decode itself is never persisted still
-    /// compressed. Both executors were found, independently, to have lost this gate while being
-    /// rewritten -- once during the twelfth audit's original fix, once merging the `.nio` and
-    /// `.urlSession` back-pressure fixes together -- because nothing exercised this function
-    /// directly. See `InternalsClientSessionTaskTests`/`InternalsURLSessionClientSessionTaskTests`
-    /// for the executor-level regression tests this one complements.
+    /// compressed. See
+    /// `InternalsClientSessionTaskTests`/`InternalsURLSessionClientSessionTaskTests` for the
+    /// executor-level tests this one complements.
     @Test
     func requiresManualDecoding_whenDispatchingARealEncoding_isTrue() {
         let dispatch = Internals.ManualDecompressionDispatch.dispatch(algorithms: [MockIdentityAlgorithm()])

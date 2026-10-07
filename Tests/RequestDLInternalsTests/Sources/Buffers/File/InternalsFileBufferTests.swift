@@ -23,8 +23,8 @@ struct InternalsFileBufferTests {
     /// Owns a scratch file for the lifetime of one test.
     ///
     /// - Important: Must write into the system temporary directory, not a path derived from
-    /// `#file` — that puts test artefacts in the source tree, and combined with the fire and
-    /// forget teardown below leaves stray `.txt` files accumulating in the repository.
+    /// `#file`, which would put test artefacts in the source tree and, combined with the fire
+    /// and forget teardown below, leave stray `.txt` files accumulating in the repository.
     final class FileURLManager: Sendable {
 
         let url: URL
@@ -34,7 +34,7 @@ struct InternalsFileBufferTests {
                 .appendingPathComponent("FileBufferTests.\(UUID().uuidString).txt")
 
             // On a freshly booted iOS Simulator, the system temporary directory isn't
-            // guaranteed to exist yet — unlike `Internals.FileBuffer`, `Data.write(to:)` below
+            // guaranteed to exist yet. Unlike `Internals.FileBuffer`, `Data.write(to:)` below
             // doesn't create its parent directory. Concurrently-running tests would otherwise
             // race to be the first to create it, and everyone that lost the race would fail
             // with "no such file or directory".

@@ -170,10 +170,10 @@ extension Internals {
 
         /// Whether the response's own `Cache-Control` explicitly permits a cache to store a
         /// response to a credentialed (`Authorization`-bearing) request, per RFC 7234 §3.2:
-        /// `must-revalidate`, `public`, or `s-maxage` are the only directives the RFC recognizes
-        /// as having that effect. Absent one of these, storing at all is what the RFC forbids —
-        /// unlike `no-store`/`no-cache`, there is no directive that must be *present* to trigger
-        /// this; the request having `Authorization` at all is what does.
+        /// `must-revalidate`, `public`, or `s-maxage` are the only directives the RFC recognizes as
+        /// having that effect. Absent one of these, storing at all is what the RFC forbids. Unlike
+        /// `no-store`/`no-cache`, no directive must be *present* to trigger this: the request
+        /// having `Authorization` is what does.
         private func permitsCachingCredentialedResponse(headers: [String]) -> Bool {
             for directive in directives(headers) {
                 let directive = directive.lowercased()
@@ -349,29 +349,27 @@ extension Internals {
 
             if head.status.code == 304 {
                 logger?.log(level: .info, "Cache validated (304 Not Modified), reusing cached data")
-                // The fresh 304 response's own headers, not the stale cached ones: a 304 is
-                // exactly where the server sends an updated `Cache-Control`/`Expires` to extend
-                // freshness (RFC 9111 §4.3.4), and `updateCacheHeaders` below only ever refreshes
-                // a directive from what this method returns. Returning the cached headers here
-                // made the two sides of that comparison identical, so `validateCachedData` always
-                // saw "no change" and never refreshed `CachedResponse.date` -- revalidation could
-                // never actually extend an already-stale entry's life, the one case it exists for.
+                // The fresh 304 response's own headers, not the stale cached ones: a 304 is where
+                // the server sends an updated `Cache-Control`/`Expires` to extend freshness (RFC
+                // 9111 §4.3.4), and `updateCacheHeaders` below only refreshes a directive from what
+                // this method returns. Returning the cached headers would make both sides of that
+                // comparison identical, so `validateCachedData` would never refresh
+                // `CachedResponse.date` and revalidation could never extend an already-stale
+                // entry's life.
                 return RequestDL.HTTPHeaders(head.headers.map { ($0.name, $0.value) })
             }
 
-            // Both sides defaulted before comparing. `response.headers[name]` is optional and
-            // the cached side had `?? []` applied, so a server that sends neither header
-            // compared `nil` against `[]`, which is not equal, and every such response
-            // invalidated a cache entry that was in fact unchanged.
+            // Both sides defaulted before comparing. `response.headers[name]` is optional and the
+            // cached side has `?? []` applied, so a server that sends neither header would compare
+            // `nil` against `[]`, which is not equal, and invalidate an entry that is in fact
+            // unchanged.
             //
-            // `hasValidatorEvidence` tracks whether at least one of the two validators was
-            // actually present (not just equal) to compare. Without it, a non-304 response
-            // carrying neither `ETag` nor `Last-Modified` compared `[] == []` on every iteration
-            // -- vacuously "matching" -- and this treated the cached entry as still valid even
-            // though there was nothing behind that conclusion: a HEAD answered with 404, 410, or
-            // 503 (or a plain 200 the server chose not to make conditional) means the origin
-            // itself did not say "unchanged", and the absence of validators leaves nothing else
-            // that could.
+            // `hasValidatorEvidence` tracks whether at least one of the two validators was actually
+            // present (not just equal) to compare. Without it, a non-304 response carrying neither
+            // `ETag` nor `Last-Modified` would compare `[] == []` on every iteration, vacuously
+            // "matching", and the cached entry would be treated as still valid with nothing behind
+            // that conclusion: a HEAD answered with 404, 410, or 503 (or a plain 200 the server
+            // chose not to make conditional) means the origin itself did not say "unchanged".
             var hasValidatorEvidence = false
 
             for name in ["Last-Modified", "ETag"] {

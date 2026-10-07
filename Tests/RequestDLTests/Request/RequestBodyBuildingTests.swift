@@ -32,7 +32,7 @@ struct RequestBodyBuildingTests {
         // Then
         #expect(body.totalSize == string.count)
 
-        // Regression guard: anything under the minimum chunk must go out whole, not as one
+        // Anything under the minimum chunk must go out whole, not as one
         // write per character, each with its own future and its own progress event.
         #expect(body.chunkSize == string.count)
         let resolvedData = await buffers.resolveData()

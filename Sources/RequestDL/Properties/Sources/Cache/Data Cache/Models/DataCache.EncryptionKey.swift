@@ -16,13 +16,13 @@ extension DataCache {
     /// A symmetric key ``DataCache`` uses to encrypt its disk tier at rest with AES-GCM.
     ///
     /// RequestDL does not manage key material: generating, rotating, and securely storing a key
-    /// (Keychain, a KMS, whatever fits the app's own threat model) is the app's responsibility —
-    /// this only carries key bytes across the boundary. Set it via ``DataCache/encryptionKey`` or
+    /// (Keychain, a KMS, whatever fits the app's threat model) is the app's responsibility. This
+    /// only carries key bytes across the boundary. Set it via ``DataCache/encryptionKey`` or
     /// the `.cache(...)` property's `encryptionKey` parameter. `nil` (the default) leaves the
-    /// disk tier exactly as unencrypted as it has always been.
+    /// disk tier unencrypted.
     ///
-    /// A decrypt failure — the wrong key, a rotated key, or a corrupted/tampered file — is always
-    /// a cache miss, never a crash: the entry is silently treated as absent and re-fetched.
+    /// A decrypt failure (the wrong key, a rotated key, or a corrupted or tampered file) is
+    /// always a cache miss, never a crash: the entry is treated as absent and re-fetched.
     public struct EncryptionKey: Sendable, Equatable {
 
         // MARK: - Internal properties

@@ -33,7 +33,7 @@ extension Internals {
     /// client's own (`timeoutIntervalForRequest` on `.urlSession`, for either direction; the
     /// configured read timeout on `.nio`, for a download only), the server's, and any middlebox's.
     /// A suspension outliving the connection therefore ends the exchange like any other dropped
-    /// connection does -- promptly, never by hanging -- unless ``resumption`` can reconnect a
+    /// connection does, promptly and never by hanging, unless ``resumption`` can reconnect a
     /// download.
     ///
     /// ## Liveness

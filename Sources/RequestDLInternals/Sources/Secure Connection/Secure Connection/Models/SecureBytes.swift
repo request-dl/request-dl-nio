@@ -14,14 +14,14 @@ import Glibc
 import Musl
 #endif
 
-/// A byte sequence for a password/passphrase, such as ``Internals/PrivateKey``'s `password`,
+/// A byte sequence for a password/passphrase, such as `Internals.PrivateKey`'s `password`,
 /// that stays constructible without NIO. When NIOSSL is available, it stores straight into
 /// NIOSSL's own `NIOSSLSecureBytes` (auto-zeroing storage included).
 ///
 /// The single ``init(_:)`` behaves identically on every platform; only what it stores into
 /// differs, gated by `#if canImport(NIOCore)`:
 /// - `.nio`: a real `NIOSSLSecureBytes`, so this value gets NIOSSL's own zero-on-deallocation
-///   guarantee for free, and ``build()`` returns it directly with no copy.
+///   guarantee for free, and `build()` returns it directly with no copy.
 /// - `.bytes`: a `ZeroingBytes` fallback where NIOSSL isn't available, backed by a heap
 ///   allocation that zeroes itself on deallocation the same way `NIOSSLSecureBytes` does, just
 ///   without NIOSSL/BoringSSL's `OPENSSL_cleanse` to lean on. See `ZeroingBytes`'s own doc
@@ -185,14 +185,14 @@ extension ZeroingBytes: RandomAccessCollection {}
 extension ZeroingBytes: Equatable {
 
     /// `_reusableItem(id:sessionConfiguration:)` runs this on every client-pool lookup for a
-    /// `PrivateKey` with a password — reachable off Darwin (where NIOCore's own constant-time
-    /// `NIOSSLSecureBytes.==` isn't in the loop at all) but also *on* Darwin whenever the
-    /// `.urlSession`-only trait is built (`--disable-default-traits`), since pooling runs
-    /// through this same path there too. `memcmp`, which this used to call, short-circuits on
-    /// the first mismatched byte: exactly the timing side channel already fixed once for SPKI
-    /// pin matching (`Internals.SPKIHash.matchesSPKI`, whose XOR-accumulate shape this mirrors)
-    /// and for the same reason it can't be reintroduced here — a password byte guessed one
-    /// position at a time via repeated pool-lookup timing.
+    /// `PrivateKey` with a password. That is reachable off Darwin (where NIOCore's own
+    /// constant-time `NIOSSLSecureBytes.==` isn't in the loop at all) but also *on* Darwin
+    /// whenever the `.urlSession`-only trait is built (`--disable-default-traits`), since
+    /// pooling runs through this same path there too. A `memcmp` would short-circuit on the
+    /// first mismatched byte, the timing side channel already avoided for SPKI pin matching
+    /// (`Internals.SPKIHash.matchesSPKI`, whose XOR-accumulate shape this mirrors), and it must
+    /// not be reintroduced here: a password byte could be guessed one position at a time via
+    /// repeated pool-lookup timing.
     package static func == (_ lhs: ZeroingBytes, _ rhs: ZeroingBytes) -> Bool {
         guard lhs.buffer.count == rhs.buffer.count else {
             return false

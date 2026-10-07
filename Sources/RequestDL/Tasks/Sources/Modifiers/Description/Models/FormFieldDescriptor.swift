@@ -14,7 +14,7 @@ public struct FormFieldDescriptor: Sendable {
     /// The field's name.
     public let name: String
 
-    /// The field's filename, when it was declared with one — a plain text field has none.
+    /// The field's filename, when it was declared with one; a plain text field has none.
     public let filename: String?
 
     /// The field's `Content-Type`.

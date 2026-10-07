@@ -10,9 +10,8 @@ import Foundation
 /// future regression hanging the suite instead of failing fast, sized against CI Simulator
 /// scheduler jitter rather than against how long the request itself should actually take.
 ///
-/// Bumped once already (5s -> 15s -> 30s, see request-dl-nio#319) after CI flaked on it: 30s
-/// still wasn't enough. A genuine `NSURLErrorTimedOut` was directly observed on tvOS at 30s under
-/// contention (request-dl-nio#327), a platform this margin previously wasn't even suspected of
+/// 30s was not enough on its own: a genuine `NSURLErrorTimedOut` was directly observed on
+/// tvOS at 30s under CI contention, a platform this margin wasn't even suspected of
 /// affecting.
 ///
 /// 90s gives real headroom on every Apple *Simulator* platform (iOS, iPadOS, which shares

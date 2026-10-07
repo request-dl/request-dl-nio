@@ -18,7 +18,7 @@ import Testing
 @testable import RequestDLTestSupport
 
 // `ContinuousClock` needs macOS 13/iOS 16/tvOS 16/watchOS 9, newer than this package's macOS
-// 12/iOS 15/tvOS 15/watchOS 8 floor -- same reasoning as `Internals.ResourceDeadline`.
+// 12/iOS 15/tvOS 15/watchOS 8 floor, same reasoning as `Internals.ResourceDeadline`.
 #if canImport(Darwin)
 import struct Foundation.DispatchTime
 #endif
@@ -30,8 +30,8 @@ struct InternalsClientManagerTests {
     func manager_whenRegister_shouldBeEqual() async throws {
         // Given: this manager's own table, not `.shared`. What is under test is that one
         // configuration reuses its own client, and `.shared` is a process-wide pool every other
-        // suite writes into concurrently — `LocalServerConcurrencyTests` alone pushes 200
-        // distinct providers through it, enough to evict this entry between the two calls below.
+        // suite writes into concurrently (`LocalServerConcurrencyTests` alone pushes 200 distinct
+        // providers through it), enough to evict this entry between the two calls below.
         let manager = Internals.ClientManager(lifetime: Internals.ClientManager.lifetime)
         let provider = Internals.SharedSessionProvider()
         let sessionConfiguration = Internals.Session.Configuration()
@@ -77,9 +77,9 @@ struct InternalsClientManagerTests {
         #expect(sut1 !== sut2)
     }
 
-    /// Regression coverage for a pooled-client cache collision: `Internals.Proxy.connectHeaders`
-    /// used to be excluded from `Hashable`, so `Internals.Session.Configuration.==` (this
-    /// manager's cache key) treated two sessions whose proxy differed only in CONNECT headers as
+    /// A pooled-client cache collision: `Internals.Proxy.connectHeaders` must be part of
+    /// `Hashable`, otherwise `Internals.Session.Configuration.==` (this manager's cache key)
+    /// would treat two sessions whose proxy differed only in CONNECT headers as
     /// interchangeable. `connectHeaders` is commonly where proxy-auth secrets distinct per
     /// session live, so sharing a pooled client here would silently carry one session's proxy
     /// credentials into a request meant for a different one's.
@@ -128,10 +128,10 @@ struct InternalsClientManagerTests {
         #expect(sut1 !== sut2)
     }
 
-    /// Regression coverage for a pooled-client cache collision: `Internals.Decompression.==`
-    /// used to compare only the set of `Content-Encoding` values, so a session configured with a
-    /// custom algorithm declaring `"gzip"` was indistinguishable from one configured with the
-    /// built-in placeholder for `async-http-client`'s own gzip decoding. The two need opposite
+    /// A pooled-client cache collision: `Internals.Decompression.==` must not compare only the
+    /// set of `Content-Encoding` values, otherwise a session configured with a custom algorithm
+    /// declaring `"gzip"` would be indistinguishable from one configured with the built-in
+    /// placeholder for `async-http-client`'s own gzip decoding. The two need opposite
     /// `HTTPClient.Decompression` settings, which `Internals.Session.Configuration.build()` bakes
     /// into the client at construction, so sharing one here would either double-decode the custom
     /// session's body or leave the native session's body compressed.
@@ -195,9 +195,9 @@ struct InternalsClientManagerTests {
 
     // MARK: - Table bounds
 
-    /// `_table` used to have no ceiling at all, so a workload producing configurations that never
-    /// compare equal to a pooled one grew it forever — and made every `_reusableItem` scan, which
-    /// is linear, walk the whole accumulated list on the way to finding nothing.
+    /// `_table` has a ceiling: a workload producing configurations that never compare equal to a
+    /// pooled one would otherwise grow it forever, and make every `_reusableItem` scan, which is
+    /// linear, walk the whole accumulated list on the way to finding nothing.
     @Test
     func manager_whenManyDistinctConfigurationsAreRegistered_shouldNotGrowPastMaximumCount() async throws {
         // Given
@@ -243,9 +243,9 @@ struct InternalsClientManagerTests {
 
             var busy = [Internals.Client]()
 
-            // Held for the duration: dropping the handle releases the request's `TaskSeed`,
-            // which tears the request down and makes its client idle again -- the very state
-            // this test needs never to happen.
+            // Held for the duration: dropping the handle releases the request's `TaskSeed`, which
+            // tears the request down and makes its client idle again, the very state this test
+            // needs never to happen.
             var inFlight = [Internals.UnsafeTask<HTTPClient.Response>]()
 
             for index in 0..<maximumCount {
@@ -306,16 +306,16 @@ struct InternalsClientManagerTests {
 
     /// A client handed out but not yet used looks exactly like an idle pooled one: `isRunning`
     /// only becomes `true` once a request is actually asked of it. Evicting *and shutting down*
-    /// on that basis raced every caller in the gap between resolving a client and executing
-    /// through it, which a 200-session burst hit for real
-    /// (`LocalServerConcurrencyTests`, `HTTPClientError.alreadyShutdown`).
+    /// on that basis would race every caller in the gap between resolving a client and
+    /// executing through it, which a 200-session burst hit for real (`LocalServerConcurrencyTests`,
+    /// `HTTPClientError.alreadyShutdown`).
     ///
-    /// Un-caching it is fine — the caller's own reference keeps it alive, and
+    /// Un-caching it is fine: the caller's own reference keeps it alive, and
     /// `Internals.Client.deinit` retires it afterwards.
     @Test
     func manager_whenEvictingAnIdleClientSomeoneStillHolds_shouldNotShutItDown() async throws {
-        // Given: a client resolved but not yet used — idle, and the oldest entry in the table,
-        // so the first thing any eviction reaches for.
+        // Given: a client resolved but not yet used (idle, and the oldest entry in the table,
+        // so the first thing any eviction reaches for).
         let maximumCount = 2
         let manager = Internals.ClientManager(
             lifetime: 5 * 60 * 1_000_000_000,
@@ -411,13 +411,13 @@ struct InternalsClientManagerTests {
         #expect(manager.count == 1)
     }
 
-    /// `cleanupIfNeeded()` was rewritten to decide first and shut down after, so that several
-    /// expired clients drain concurrently instead of one `await` at a time inside `lock` — which
-    /// every client resolution in the process also has to take.
+    /// `cleanupIfNeeded()` decides first and shuts down after, so that several expired clients
+    /// drain concurrently instead of one `await` at a time inside `lock`, which every client
+    /// resolution in the process also has to take.
     ///
     /// Whether the drains genuinely overlap isn't crisply observable from here (nothing lets a
-    /// test hold one client's shutdown open), so this pins the behaviour the rewrite had to
-    /// preserve: a backlog of expired clients is still fully retired in one sweep.
+    /// test hold one client's shutdown open), so this pins the behaviour that has to be
+    /// preserved: a backlog of expired clients is still fully retired in one sweep.
     @Test
     func manager_whenSeveralClientsExpire_shouldRetireAllOfThemInOneSweep() async throws {
         // Given: a lifetime long enough that creating the clients cannot itself outlast it, even
@@ -491,9 +491,9 @@ struct InternalsClientManagerTests {
 
 /// Runs `body` against a TCP listener that accepts connections and then says nothing at all.
 ///
-/// A request sent here stays genuinely in flight — `Internals.Client.isRunning` stays `true` —
-/// for as long as the test needs, instead of racing it to completion the way a request to a real
-/// or an unreachable endpoint would.
+/// A request sent here stays genuinely in flight (`Internals.Client.isRunning` stays `true`)
+/// for as long as the test needs, instead of racing it to completion the way a request to a
+/// real or an unreachable endpoint would.
 private func withHangingTCPServer<Result>(
     _ body: (Int) async throws -> Result
 ) async throws -> Result {

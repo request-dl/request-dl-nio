@@ -191,9 +191,9 @@ struct InternalsSessionConfigurationExecutorTests {
         // When
         configuration.decompression = .disabled
 
-        // Then: `.disabled` gets real parity with NIO on `.urlSession` now, via
-        // `Accept-Encoding: identity` at request-build time, so it no longer disqualifies the
-        // executor the way it used to.
+        // Then: `.disabled` gets real parity with NIO on `.urlSession`, via
+        // `Accept-Encoding: identity` at request-build time, so it doesn't disqualify the
+        // executor.
         #expect(configuration.urlSessionIncompatibilityReasons().isEmpty)
     }
 
@@ -257,7 +257,7 @@ struct InternalsSessionConfigurationExecutorTests {
 
     /// `minimumTLSVersion` has a real equivalent under URLSession (an ATS
     /// `NSExceptionMinimumTLSVersion` entry in the app's Info.plist), so it must never force a
-    /// fallback away from `.urlSession` -- the same is now true of `maximumTLSVersion`, which maps
+    /// fallback away from `.urlSession`. The same is true of `maximumTLSVersion`, which maps
     /// directly onto `tlsMaximumSupportedProtocolVersion` (see
     /// `resolveExecutor_whenMaximumTLSVersionSet_resolvesToURLSessionOnDarwin` in
     /// `InternalsSessionConfigurationExecutorTests+NIO.swift`); only `applicationProtocols` (ALPN)

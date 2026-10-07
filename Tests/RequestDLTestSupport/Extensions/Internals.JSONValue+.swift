@@ -6,8 +6,7 @@ import RequestDLInternals
 
 extension Internals.JSONValue {
 
-    /// Unwraps to whichever native Swift value callers that predate this type already know how
-    /// to work with — the shape `URLEncoder.encode(_:forKey:)` accepts.
+    /// Unwraps to the native Swift value `URLEncoder.encode(_:forKey:)` accepts.
     var unwrapped: Any {
         switch self {
         case .null:

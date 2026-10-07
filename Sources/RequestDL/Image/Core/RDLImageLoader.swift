@@ -17,7 +17,7 @@ import struct Foundation.Data
 ///
 /// Concurrent calls for the same `id` share a single in-flight download: the first call starts
 /// it, and every other call that arrives before it finishes awaits the same result instead of
-/// starting a second request. This is separate from — and on top of — RequestDL's own response
+/// starting a second request. This is separate from, and on top of, RequestDL's own response
 /// cache, which is what makes a *later*, non-concurrent request for the same image cheap.
 public actor RDLImageLoader {
 
@@ -28,9 +28,9 @@ public actor RDLImageLoader {
     // MARK: - Public properties
 
     /// The cache ``load(url:)`` stores downloaded image data in. Defaults to a dedicated
-    /// on-disk cache, separate from ``DataCache/shared``. Configure it directly — its
-    /// capacities, or, on Apple platforms, its `fileProtection` — or pass your own instance at
-    /// init to share a cache across loaders.
+    /// on-disk cache, separate from ``DataCache/shared``. Configure it directly (its capacities
+    /// or, on Apple platforms, its `fileProtection`), or pass your own instance at init to
+    /// share a cache across loaders.
     public let dataCache: DataCache
 
     // MARK: - Private properties
@@ -38,31 +38,29 @@ public actor RDLImageLoader {
     /// In-flight downloads, keyed by the caller-supplied `id`.
     ///
     /// Cleared as soon as the task finishes (success or failure): this tracks concurrency, not
-    /// results. A request that lands after this is cleared starts fresh rather than reusing a
-    /// stale entry — RequestDL's own cache is what makes that repeat request cheap.
+    /// results. A request that lands after this is cleared starts fresh, and RequestDL's own
+    /// cache is what makes that repeat request cheap.
     private var tasks: [String: Task<SendableImage, Error>] = [:]
 
     // MARK: - Inits
 
     /// Creates a new, independent loader with its own dedupe bookkeeping and its own default
-    /// on-disk cache — see ``dataCache``.
+    /// on-disk cache. See ``dataCache``.
     ///
     /// Most callers should use ``shared`` instead, so unrelated call sites requesting the same
     /// image still dedupe against each other.
     ///
-    /// - Note: A separate overload from ``init(dataCache:)`` rather than one `dataCache`
-    /// parameter with a default value, so this stays the same `init()` symbol it always was —
-    /// giving it a default argument instead would change its signature and break binary
-    /// compatibility with anything already linked against it.
+    /// - Note: This is a separate overload from ``init(dataCache:)``, rather than a default
+    /// argument, to keep the `init()` symbol binary compatible.
     public init() {
         self.init(
             dataCache: DataCache(
                 // Sized for a meaningful number of typical thumbnail/avatar-sized images
                 // without growing unbounded; use `init(dataCache:)` for a different capacity.
                 diskCapacity: 50 * 1_024 * 1_024,
-                // Kept separate from `DataCache.shared`'s directory: without this, image bytes
-                // would compete for space with — and be subject to eviction by — whatever
-                // unrelated HTTP responses the host app also caches through the default cache.
+                // Kept separate from `DataCache.shared`'s directory, so image bytes don't compete
+                // for space with (or get evicted by) the unrelated HTTP responses the host app
+                // caches by default.
                 suiteName: "com.request-dl-nio.RDLImage"
             )
         )
@@ -97,16 +95,10 @@ public actor RDLImageLoader {
             return try await existing.value.image
         }
 
-        // `.detached`, not a plain `Task { ... }`: created from this actor-isolated method, a
-        // plain `Task` would inherit `RDLImageLoader`'s own executor, running the synchronous,
-        // CPU-bound `PlatformImage(data:)` decode below on it. That decode doesn't touch any
-        // actor state -- it only needs `task`, a local, `Sendable` value -- so nothing about it
-        // requires the actor at all, but running there anyway would monopolize the one serial
-        // executor this loader's dedupe bookkeeping (`tasks[id]`) also relies on: a screenful of
-        // concurrently loading thumbnails would have every decode queue up behind whichever one
-        // is currently running, and block brand-new, unrelated `load()` calls from even reaching
-        // their `tasks[id]` lookup in the meantime, instead of spreading decode work across cores
-        // the way the concurrent downloads already do.
+        // `.detached` rather than a plain `Task { ... }`: a plain `Task` would inherit this actor's
+        // executor and run the CPU-bound `PlatformImage(data:)` decode on it. The decode touches no
+        // actor state, and running it there would serialize every decode behind one another and
+        // block unrelated `load()` calls from reaching their `tasks[id]` lookup.
         let newTask = Task.detached {
             let result = try await task.result()
 
@@ -149,8 +141,8 @@ public actor RDLImageLoader {
     ///
     /// Loads and decodes the image described by `content`, in the same manner as ``DataTask``.
     ///
-    /// Use this when the request needs more than a URL — custom headers, authentication, a
-    /// specific ``Property/cachePolicy(_:)``, and so on.
+    /// Use this when the request needs more than a URL (custom headers, authentication, a
+    /// specific ``Property/cachePolicy(_:)``, and so on).
     ///
     /// - Parameters:
     ///    - id: A stable identifier for the request, used to deduplicate concurrent loads that

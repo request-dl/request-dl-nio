@@ -7,7 +7,7 @@ import RequestDLInternals
 /// Assembles already-computed form item outputs into the buffers of a `multipart/form-data`
 /// body.
 ///
-/// Takes `[FormItem.Output]`, not `[FormItem]` — running a `FormItem`'s `PayloadFactory` is the
+/// Takes `[FormItem.Output]`, not `[FormItem]`: running a `FormItem`'s `PayloadFactory` is the
 /// caller's job, once, before constructing this. A caller that also needs each field's own
 /// name/filename/content-type/bytes for something else (`FormNode`'s `TaskDescriptor` capture,
 /// `CURLCommandParser`'s `-F` handling) runs the same outputs through both without paying for the

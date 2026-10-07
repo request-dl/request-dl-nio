@@ -80,7 +80,7 @@ struct RDLImageLoaderTests {
         // Given/When
         let loader = RDLImageLoader()
 
-        // Then: disk caching is on by default — a zero capacity would silently make every
+        // Then: disk caching is on by default: a zero capacity would silently make every
         // cache write a no-op regardless of the policy `load(url:)` applies.
         #expect(await loader.dataCache.diskCapacity > .zero)
     }

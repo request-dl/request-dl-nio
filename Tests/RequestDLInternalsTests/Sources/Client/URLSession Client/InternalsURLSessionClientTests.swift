@@ -125,10 +125,11 @@ struct InternalsURLSessionClientTests {
         }
     }
 
-    /// Same regression as `execute_whenTaskCancelledMidFlight_cancelsUnderlyingURLSessionTaskAndThrows`
-    /// above, for `execute(request:streaming:delegate:onUploadProgress:)`. This overload's
-    /// continuation wasn't wrapped in `withTaskCancellationHandler` at all, unlike its sibling:
-    /// cancelling the caller's `Task` while it awaited the upload response left the underlying
+    /// Same guarantee as
+    /// `execute_whenTaskCancelledMidFlight_cancelsUnderlyingURLSessionTaskAndThrows` above, for
+    /// `execute(request:streaming:delegate:onUploadProgress:)`. This overload's continuation has to
+    /// be wrapped in `withTaskCancellationHandler`, as its sibling's is: cancelling the caller's
+    /// `Task` while it awaited the upload response would otherwise leave the underlying
     /// `URLSessionTask` running unnoticed, with the throttle slot never released.
     @Test
     func execute_whenStreamingUploadTaskCancelledMidFlight_cancelsUnderlyingURLSessionTaskAndThrows() async throws {
@@ -168,11 +169,12 @@ struct InternalsURLSessionClientTests {
         }
     }
 
-    /// Same regression as the two tests above, for `execute(request:readingMode:delegate:)` (the
-    /// standalone streamed-download overload). Also missing `withTaskCancellationHandler`
-    /// entirely: cancelling the caller's `Task` while it awaited the response head left both the
-    /// `URLSessionTask` and the throttle slot acquired at the top of the method (only ever
-    /// released from `onDownloadComplete`, which a leaked task never reaches) stuck.
+    /// Same guarantee as the two tests above, for `execute(request:readingMode:delegate:)` (the
+    /// standalone streamed-download overload). It also has to wrap the request in
+    /// `withTaskCancellationHandler`: cancelling the caller's `Task` while it awaited the
+    /// response head would otherwise leave both the `URLSessionTask` and the throttle slot
+    /// acquired at the top of the method (only ever released from `onDownloadComplete`, which a
+    /// leaked task never reaches) stuck.
     @Test
     func execute_whenStreamedDownloadTaskCancelledMidFlight_cancelsUnderlyingURLSessionTaskAndThrows() async throws {
         try await withHangingURLSessionTestServer { port in
@@ -230,7 +232,7 @@ private final class AcceptAnyServerTrustDelegate: NSObject, URLSessionTaskDelega
     }
 }
 
-/// A bare TCP server that accepts a connection and never writes anything back -- used to keep a
+/// A bare TCP server that accepts a connection and never writes anything back, used to keep a
 /// request genuinely in flight so it can be cancelled mid-request, something `LocalServer` cannot
 /// do, since it always answers immediately.
 ///
@@ -238,7 +240,7 @@ private final class AcceptAnyServerTrustDelegate: NSObject, URLSessionTaskDelega
 /// `Internals.Client` (AsyncHTTPClient), gated `#if canImport(NIOCore)`, via NIOCore's own
 /// `ServerBootstrap`. This file tests `Internals.URLSessionClient` specifically and is gated only
 /// on `canImport(Darwin)`, where Network.framework is always available, so it gets its own
-/// Network.framework-backed implementation instead of needing NIOCore at all -- named distinctly
+/// Network.framework-backed implementation instead of needing NIOCore at all, named distinctly
 /// to avoid a module-level name collision with the other one when both happen to compile.
 private func withHangingURLSessionTestServer<Result>(
     _ body: (Int) async throws -> Result

@@ -12,7 +12,7 @@ extension Session {
     ///
     /// Every test that omits an explicit `Session` gets the library's default: provider
     /// `.shared`, which is `MultiThreadedEventLoopGroup.shared`, and `ClientManager.shared`
-    /// reuses one `Internals.Client` — one `AsyncHTTPClient`, one connection pool — for any two
+    /// reuses one `Internals.Client` (one `AsyncHTTPClient`, one connection pool) for any two
     /// requests whose built `Internals.Session.Configuration` compares equal. Every file in this
     /// suite that talks to `LocalServer` through `TrustRoots { Certificate(the same server
     /// resource) }` builds the same configuration, so all of them, across every test function in

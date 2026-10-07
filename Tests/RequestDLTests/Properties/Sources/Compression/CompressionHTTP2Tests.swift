@@ -16,10 +16,10 @@ import struct Foundation.Data
 import struct Foundation.UUID
 #endif
 
-/// `Session.compression(_:)` used to splice a `NIOHTTPRequestCompressor` into the `.nio`
-/// executor's `http1_1ConnectionDebugInitializer`, which HTTP/2 connections never run, so
-/// compression silently did nothing over `h2` (see async-http-client#917).
-/// `RequestConfiguration.applyCompression()` now compresses `RequestBody` itself before any
+/// `Session.compression(_:)` must compress over HTTP/2 too: splicing a `NIOHTTPRequestCompressor`
+/// into the `.nio` executor's `http1_1ConnectionDebugInitializer` would silently do nothing
+/// over `h2`, since HTTP/2 connections never run it (see async-http-client#917).
+/// `RequestConfiguration.applyCompression()` compresses `RequestBody` itself before any
 /// executor builds its request; these tests prove that over a real HTTP/2 connection.
 ///
 /// `HTTP2LocalServer` only negotiates `h2`, so a request that completes at all went over HTTP/2.

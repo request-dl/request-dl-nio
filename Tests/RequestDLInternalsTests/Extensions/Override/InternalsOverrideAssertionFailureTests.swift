@@ -46,22 +46,22 @@ struct InternalsOverrideAssertionFailureTests {
         #expect(captured.wrappedValue == "plain message")
     }
 
-    /// `installGlobally` is one shared, last-writer-wins slot for the whole process — the same
+    /// `installGlobally` is one shared, last-writer-wins slot for the whole process, the same
     /// contract a real test run relies on (whichever `.nonFatalWatchdog` suite starts first
     /// installs it for everyone). Racing this test's own install against `NonFatalWatchdogTrait`
     /// installing its own closure from a concurrently-running covered suite would make this
     /// flaky (whichever wins governs, silently), so `ensureInstalled()` joins that trait's
-    /// one-time install first — it can then never fire again for the rest of the process — before
-    /// this test claims the slot for itself.
+    /// one-time install first, which can then never fire again for the rest of the process,
+    /// before this test claims the slot for itself.
     @Test
     func installGloballyInterceptsDetachedReportsAndYieldsToTaskLocalReplace() async throws {
         // Given
         NonFatalWatchdogTrait.ensureInstalled()
 
         // `AsyncLock.Watchdog` reports from a `Task.detached`, which does not inherit the
-        // task-local override `replace(with:perform:)` relies on — this is the scenario
-        // `installGlobally` exists for, so the regression has to go through a detached task
-        // too, not a plain synchronous call.
+        // task-local override `replace(with:perform:)` relies on. This is the scenario
+        // `installGlobally` exists for, so the test has to go through a detached task too, not a
+        // plain synchronous call.
         let captured = InlineProperty<String?>(wrappedValue: nil)
         let signal = AsyncSignal()
 
@@ -81,7 +81,7 @@ struct InternalsOverrideAssertionFailureTests {
         #expect(captured.wrappedValue == "🐞 RequestDL bug: simulated watchdog trip")
 
         // Given
-        // A task-local replace must still win over the global override just installed above —
+        // A task-local replace must still win over the global override just installed above,
         // otherwise every other test relying on replace(with:perform:) to capture a specific
         // failure would silently observe nothing once any global override exists.
         let taskLocalCaptured = InlineProperty<String?>(wrappedValue: nil)

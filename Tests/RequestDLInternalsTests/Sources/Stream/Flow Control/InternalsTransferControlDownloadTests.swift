@@ -46,8 +46,8 @@ struct InternalsTransferControlDownloadTests {
 
     // MARK: - In-flight suspension
 
-    /// The core guarantee: suspending stops the *connection* -- the server can't get another byte
-    /// out -- for as long as the suspension lasts, and resuming carries on over the same
+    /// The core guarantee: suspending stops the *connection* (the server can't get another byte
+    /// out) for as long as the suspension lasts, and resuming carries on over the same
     /// connection to an intact body.
     @Test(arguments: TransferExecutor.allCases)
     func suspendMidBody_holdsTheConnectionUntilResumed(_ executor: TransferExecutor) async throws {
@@ -178,9 +178,9 @@ struct InternalsTransferControlDownloadTests {
         }
     }
 
-    /// The connection is lost while suspended, and nothing can resume the download: it fails, as
-    /// it always did, instead of hanging -- promptly on `.nio`, which learns about it right away,
-    /// and once resumed on `.urlSession`, which only does when it reads again.
+    /// The connection is lost while suspended, and nothing can resume the download: it fails
+    /// instead of hanging, promptly on `.nio`, which learns about it right away, and once resumed
+    /// on `.urlSession`, which only does when it reads again.
     @Test(arguments: TransferExecutor.allCases)
     func connectionLostWhileSuspended_withoutResumption_failsTheReader(_ executor: TransferExecutor) async throws {
         try await withTransferServer(.init(length: Self.largeBody)) { server in
@@ -209,10 +209,10 @@ struct InternalsTransferControlDownloadTests {
     }
 
     /// Pins down the limit of an in-flight suspension: a connection that moves nothing for longer
-    /// than the client's own idle timeout is given up on by the client -- `timeoutIntervalForRequest`
-    /// on `.urlSession`, the read timeout on `.nio` -- and, with nothing to resume it, the download
-    /// fails with that timeout once the reader looks again. (On `.nio` the read timeout is off unless
-    /// configured, and a suspension then lasts as long as the server lets it:
+    /// than the client's own idle timeout is given up on by the client (`timeoutIntervalForRequest`
+    /// on `.urlSession`, the read timeout on `.nio`) and, with nothing to resume it, the download
+    /// fails with that timeout once the reader looks again. (On `.nio` the read timeout is off
+    /// unless configured, and a suspension then lasts as long as the server lets it:
     /// `suspendMidBody_holdsTheConnectionUntilResumed` holds one for several seconds.)
     @Test(arguments: TransferExecutor.allCases)
     func suspensionLongerThanTheClientIdleTimeout_failsWithThatTimeout(_ executor: TransferExecutor) async throws {

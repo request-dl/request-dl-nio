@@ -102,7 +102,7 @@ public struct RequestMetrics: Sendable, Equatable {
         /// The lookup of the host name.
         ///
         /// AsyncHTTPClient only reports it on a POSIX platform when the session sets
-        /// ``Session/collectDNSMetrics()``. On the Network framework, it is always reported.
+        /// ``Session/collectDNSMetrics(_:)``. On the Network framework, it is always reported.
         public let domainLookup: Interval?
 
         /// The connection being made. With a proxy, it includes setting up the tunnel.

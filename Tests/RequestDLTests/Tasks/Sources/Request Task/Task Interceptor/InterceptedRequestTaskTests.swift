@@ -95,9 +95,9 @@ struct InterceptedRequestTaskTests {
 
     @Test
     func interceptor_readsEnvironmentSetOnTheSameChain() async throws {
-        // Given: the environment is set on the same task chain as the interceptor itself --
-        // `InterceptedRequestTask._result(environment:)` only threaded `environment` into the
-        // wrapped task, never into the interceptor's own `@RequestEnvironment` properties.
+        // Given: the environment is set on the same task chain as the interceptor itself.
+        // `InterceptedRequestTask._result(environment:)` has to thread `environment` into the
+        // interceptor's own `@RequestEnvironment` properties, not only into the wrapped task.
         let observedFlag = InlineProperty(wrappedValue: false)
 
         // When

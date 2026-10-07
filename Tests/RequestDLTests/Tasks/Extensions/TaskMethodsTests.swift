@@ -47,7 +47,7 @@ struct TaskMethodsTests {
         let data = Data()
 
         // `Logger.debug(_:)`'s message is `@autoclosure`, only evaluated once the logger's own
-        // level admits `.debug` — the default level is `.info`, which would silently skip the
+        // level admits `.debug`: the default level is `.info`, which would silently skip the
         // "Pinging N started/succeeded" interpolations without exercising them.
         var logger = Logger(label: "RequestDLTests.TaskMethodsTests")
         logger.logLevel = .trace

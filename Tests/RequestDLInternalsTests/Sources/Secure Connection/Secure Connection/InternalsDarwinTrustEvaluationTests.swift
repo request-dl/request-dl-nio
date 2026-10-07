@@ -157,13 +157,10 @@ struct InternalsDarwinTrustEvaluationTests {
         #expect(observer.decisions == [TrustDecision(isTrusted: false, pinsMatched: nil)])
     }
 
-    /// Regression coverage for the correctness fix folded into the `NIOTrustEvaluator`/
-    /// `ServerTrustPolicy` unification: `prepare(_:skipsHostnameVerification:)` uses
-    /// `SecPolicyCreateSSL(true, nil)`, a real SSL server policy that still requires proper
-    /// server-auth `extendedKeyUsage`, just without the hostname match, rather than
-    /// `SecPolicyCreateBasicX509()` (a bare chain-of-trust policy with no purpose/EKU checks at
-    /// all), which is what `NIOTrustEvaluator`'s Network.framework closure used to build before
-    /// this type existed.
+    /// `prepare(_:skipsHostnameVerification:)` uses `SecPolicyCreateSSL(true, nil)`, a real SSL
+    /// server policy that still requires proper server-auth `extendedKeyUsage`, just without the
+    /// hostname match, rather than `SecPolicyCreateBasicX509()` (a bare chain-of-trust policy
+    /// with no purpose/EKU checks at all).
     ///
     /// The fixtures' "client" certificate is self-signed with `extendedKeyUsage=clientAuth` only
     /// (no `serverAuth`): exactly the shape a bare X.509 policy would still accept but a real SSL
@@ -194,12 +191,12 @@ struct InternalsDarwinTrustEvaluationTests {
         #expect(!isTrusted)
     }
 
-    /// Regression coverage for `prepare(_:skipsHostnameVerification:)`'s revocation-policy
-    /// composition: `SecTrustSetPolicies` replaces a trust's whole policy array rather than
-    /// appending to it, so appending a revocation policy without first reading the trust's
-    /// existing array back via `SecTrustCopyPolicies` would silently drop the base SSL/X.509
-    /// policy `SecTrustCreateWithCertificates` installed it with. This asserts the array grows
-    /// by exactly one rather than being replaced outright.
+    /// `prepare(_:skipsHostnameVerification:)`'s revocation-policy composition:
+    /// `SecTrustSetPolicies` replaces a trust's whole policy array rather than appending to it,
+    /// so appending a revocation policy without first reading the trust's existing array back
+    /// via `SecTrustCopyPolicies` would silently drop the base SSL/X.509 policy
+    /// `SecTrustCreateWithCertificates` installed it with. This asserts the array grows by
+    /// exactly one rather than being replaced outright.
     @Test
     func prepare_whenRevocationPolicyConfiguredWithoutSkippingHostnameVerification_appendsToExistingPolicies() throws {
         // Given
@@ -232,11 +229,11 @@ struct InternalsDarwinTrustEvaluationTests {
     }
 
     #if os(macOS)
-    /// `AdditionalTrustRoots` means *in addition to* the system roots — NIOSSL's own
+    /// `AdditionalTrustRoots` means *in addition to* the system roots: NIOSSL's own
     /// `additionalTrustRoots` semantics, and what plain `.nio` already does. Anchoring only on
-    /// them (`SecTrustSetAnchorCertificatesOnly(true)`) turned "also trust my corporate CA" into
-    /// "trust nothing else", rejecting every publicly-trusted host on `.urlSession` and on the
-    /// Network.framework/pinned `.nio` paths.
+    /// them (`SecTrustSetAnchorCertificatesOnly(true)`) would turn "also trust my corporate CA"
+    /// into "trust nothing else", rejecting every publicly-trusted host on `.urlSession` and on
+    /// the Network.framework/pinned `.nio` paths.
     @Test
     func prepare_whenTrustRootsAreNotExclusive_stillTrustsTheSystemRoots() throws {
         // Given: a chain the system itself trusts, plus one unrelated extra anchor.

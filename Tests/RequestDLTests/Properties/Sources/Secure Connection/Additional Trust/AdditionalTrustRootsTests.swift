@@ -119,9 +119,8 @@ struct AdditionalTrustRootsTests {
     @Test
     func additional_whenUsedWithoutEnclosingSecureConnection_shouldStillBeValid() async throws {
         // Given
-        // Regression test: `AdditionalTrustRoots` used to require an enclosing
-        // `SecureConnection`. The base `Internals.SecureConnection` is now created lazily the
-        // first time it's needed.
+        // `AdditionalTrustRoots` must not require an enclosing `SecureConnection`. The base
+        // `Internals.SecureConnection` is created lazily the first time it's needed.
         let server = Certificates().server()
         let client = Certificates().client()
 

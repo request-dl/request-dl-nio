@@ -78,26 +78,23 @@ struct RequestConfigurationURLSessionClientTests {
 /// does.
 struct RequestConfigurationURLSessionClientMTLSTests {
 
-    /// Direct port of `DataTaskTests.dataTask_whenCAEnabled`: same `LocalServer`/`Certificates`
-    /// fixtures, same `Certificate`/`PrivateKey`/`TrustRoots` sources (file paths, PEM, RSA), but
-    /// forced onto `.urlSession` instead of driven through `DataTask`.
+    /// `DataTaskTests.dataTask_whenCAEnabled` forced onto `.urlSession`: same `LocalServer`/
+    /// `Certificates` fixtures, same `Certificate`/`PrivateKey`/`TrustRoots` sources (file
+    /// paths, PEM, RSA), but driven directly instead of through `DataTask`.
     ///
-    /// The Keychain round trip this needs genuinely succeeds on real macOS (bare `swift test` or
-    /// an Xcode-run macOS test bundle) once `Internals.RawBytesIdentityBuilder.makeIdentity(_:_:)`
-    /// sets `kSecAttrApplicationLabel` correctly -- confirmed, not assumed, and no longer a known
-    /// issue there. Every other Apple platform's Simulator, reached only via `xcodebuild test`
-    /// against SwiftPM's auto-generated scheme, has no `.entitlements` file to add Keychain
-    /// Sharing to at all, so `SecItemAdd` there fails with `errSecMissingEntitlement` before
-    /// identity pairing is ever reached -- a genuinely different, still-open gap, confirmed
-    /// directly on iOS/tvOS/watchOS Simulator CI runs.
+    /// The Keychain round trip this needs succeeds on real macOS (bare `swift test` or an
+    /// Xcode-run macOS test bundle) because `Internals.RawBytesIdentityBuilder
+    /// .makeIdentity(_:_:)` sets `kSecAttrApplicationLabel` correctly. Every other Apple
+    /// platform's Simulator, reached only via `xcodebuild test` against SwiftPM's auto-generated
+    /// scheme, has no `.entitlements` file to add Keychain Sharing to at all, so `SecItemAdd`
+    /// there fails with `errSecMissingEntitlement` before identity pairing is ever reached.
     @Test
     func urlSessionClient_whenMTLSConfigured_completesHandshakeMatchingNIOBackend() async throws {
         // `LocalServer.TLSOption.client(_:)` (server-side mTLS verification, needed to even
         // construct the `LocalServer` this test drives against) has no Network.framework
-        // equivalent under a NIOCore-free build -- see that type's own doc comment. Under
-        // NIOCore this whole body runs for real; without it, everything from construction
-        // onward is expected to throw, so it is wrapped wholesale rather than gated
-        // piecemeal.
+        // equivalent under a NIOCore-free build (see that type's own doc comment). Under NIOCore
+        // this whole body runs for real; without it, everything from construction onward is
+        // expected to throw, so it is wrapped wholesale rather than gated piecemeal.
         func run() async throws {
             // Given
             let server = Certificates().server()

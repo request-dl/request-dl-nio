@@ -41,9 +41,8 @@ extension LocalServer {
             self.data = data
         }
 
-        /// - Note: `Value: Encodable`, not `Any` plus `JSONSerialization` — every call site
-        /// passes a `String`, and `JSONEncoder` handles a bare top-level value the same way
-        /// `JSONSerialization`'s `.fragmentsAllowed` used to, without needing `Foundation`.
+        /// - Note: `Value: Encodable`, not `Any` plus `JSONSerialization`: every call site passes a
+        /// `String`, and `JSONEncoder` handles a bare top-level value without needing `Foundation`.
         init<Value: Encodable>(
             status: Status = .ok,
             headers: Headers = .init(),

@@ -13,8 +13,8 @@ import struct Foundation.URL
 
 /// Parses a curl command line into a ``RequestConfiguration``.
 ///
-/// Builds the configuration directly rather than composing a `@PropertyBuilder` tree — there is
-/// no per-flag `Property` to declare, since the flags are only known at runtime. Scoped to a
+/// Builds the configuration directly rather than composing a `@PropertyBuilder` tree, since
+/// there is no per-flag `Property` to declare: the flags are only known at runtime. Scoped to a
 /// documented subset of curl's flags: `-X`/`--request`, `-H`/`--header`, `-d`/`--data`/
 /// `--data-raw`/`--data-binary`, `-F`/`--form`, `-u`/`--user`, `--url` (plus a bare trailing
 /// URL), `-G`/`--get`, `-L`/`--location` (with `--max-redirs`), `-k`/`--insecure`, `-x`/`--proxy`,
@@ -24,9 +24,9 @@ enum CURLCommandParser {
 
     // MARK: - Internal types
 
-    /// A parsed command: the ``RequestConfiguration`` itself, plus — for the handful of flags
+    /// A parsed command: the ``RequestConfiguration`` itself, plus, for the handful of flags
     /// that are session-level rather than request-level (`-L`, `-k`, `-x`, `--resolve`,
-    /// `--compressed`, `--cacert`, `--cert`, `--key`) — an edit to apply to
+    /// `--compressed`, `--cacert`, `--cert`, `--key`), an edit to apply to
     /// `Make.sessionConfiguration`. `RequestConfiguration` has no field for any of those; they
     /// live on `Internals.Session.Configuration` instead, which is why this can't just be one
     /// richer `RequestConfiguration`.
@@ -37,8 +37,7 @@ enum CURLCommandParser {
 
     // MARK: - Internal static methods
 
-    /// Convenience for callers that only need the request itself — every existing caller before
-    /// the session-level flags below were added.
+    /// Convenience for callers that only need the request itself.
     static func parse(_ command: String) async throws -> RequestConfiguration {
         try await parseCommand(command).requestConfiguration
     }
@@ -111,9 +110,8 @@ enum CURLCommandParser {
             case "--url":
                 let urlValue = try value(for: token)
 
-                // Same rule as a second bare trailing URL below: only one URL total, from
-                // whichever form names it, not "last one wins" for `--url` but "reject" for a
-                // bare argument.
+                // Same rule as a second bare trailing URL below: only one URL total, from whichever
+                // form names it. A repeated `--url` is rejected, just like a bare argument.
                 guard url == nil else {
                     throw CURLParsingError(.unsupportedFlag, token: urlValue)
                 }
@@ -159,12 +157,12 @@ enum CURLCommandParser {
 
             // Ignored outright, not routed through `value(for:)`/`RequestConfiguration` at all:
             // every one of these only shapes curl's own CLI output (what it prints, and how) and
-            // has zero effect on the bytes that go over the wire, so there is nothing to apply
-            // here to begin with. See `CURLParsingError` and `CURLTask`'s own doc comment for why
-            // this is a narrow, explicit allowlist rather than "anything unrecognized is a no-op"
-            // — a flag that *does* change request/response behavior still has to throw, since
-            // silently ignoring one of those would make the request actually performed diverge
-            // from what the pasted command does.
+            // has zero effect on the bytes that go over the wire, so there is nothing to apply. See
+            // `CURLParsingError` and `CURLTask`'s own doc comment for why this is a narrow,
+            // explicit allowlist rather than "anything unrecognized is a no-op": a flag that *does*
+            // change request/response behavior still has to throw, since silently ignoring one of
+            // those would make the request actually performed diverge from what the pasted command
+            // does.
             case "-s", "--silent", "-S", "--show-error", "-v", "--verbose", "-i", "--include", "-#", "--progress-bar":
                 break
 
@@ -220,18 +218,17 @@ enum CURLCommandParser {
 
     // MARK: - Private static methods
 
-    /// `nil` when none of the session-level flags were given at all — so a command using only
-    /// the documented request-level subset doesn't touch `Make.sessionConfiguration` in any way,
-    /// same as before these flags existed.
+    /// `nil` when none of the session-level flags were given, so a command using only the
+    /// documented request-level subset doesn't touch `Make.sessionConfiguration` at all.
     ///
     /// - Important: When non-`nil`, this *always* sets `redirectConfiguration` and
     /// `decompression` explicitly, to curl's own real defaults (no redirects, no decompression)
     /// rather than leaving them `nil`/whatever they already were. Leaving either alone would mean
-    /// "no `-L` in this command" silently inherited this package's own default instead of curl's
-    /// — which for redirects is the *opposite* of curl's default (see `CURLTask`'s doc comment).
-    /// A command with none of these session-level flags skips this distinction entirely (returns
-    /// `nil` above) precisely so it doesn't newly start disabling redirects for every existing
-    /// command that never asked for any of this.
+    /// "no `-L` in this command" silently inherited this package's own default instead of
+    /// curl's, which for redirects is the *opposite* of curl's default (see `CURLTask`'s doc
+    /// comment). A command with none of these session-level flags skips this distinction
+    /// entirely (returns `nil` above), so it doesn't start disabling redirects for commands that
+    /// never asked for any of this.
     private static func makeSessionConfigurationEdit(
         followsRedirects: Bool,
         maxRedirects: Int?,
@@ -307,7 +304,7 @@ enum CURLCommandParser {
 
     /// Parses `[scheme://][user[:password]@]host[:port]` (curl's `-x`/`--proxy` argument) into
     /// an `Internals.Proxy`. `socks`/`socks4`/`socks4a`/`socks5`/`socks5h` schemes all map to
-    /// `.socks` — `Internals.Proxy.ConnectionProtocol` doesn't distinguish SOCKS versions.
+    /// `.socks`, since `Internals.Proxy.ConnectionProtocol` doesn't distinguish SOCKS versions.
     /// Defaults to `.http` when no scheme is given, and to port 1080 when no port is given,
     /// matching curl's own defaults.
     private static func makeProxy(_ value: String) throws -> Internals.Proxy {
@@ -371,10 +368,10 @@ enum CURLCommandParser {
         )
     }
 
-    /// Parses curl's `--resolve HOST:PORT:ADDRESS` into `(host, address)` — the port is read
-    /// (and validated) but then dropped: `Internals.Session.Configuration.dnsOverride` is a
-    /// plain `[hostname: address]` dictionary with no port dimension to carry it in, so a
-    /// `--resolve` override applies to every port on that host, not only the one named.
+    /// Parses curl's `--resolve HOST:PORT:ADDRESS` into `(host, address)`. The port is read (and
+    /// validated) but then dropped: `Internals.Session.Configuration.dnsOverride` is a plain
+    /// `[hostname: address]` dictionary with no port dimension to carry it in, so a `--resolve`
+    /// override applies to every port on that host, not only the one named.
     private static func makeDNSOverride(_ value: String) throws -> (host: String, address: String) {
         let components = value.split(separator: ":", maxSplits: 2, omittingEmptySubsequences: false)
 

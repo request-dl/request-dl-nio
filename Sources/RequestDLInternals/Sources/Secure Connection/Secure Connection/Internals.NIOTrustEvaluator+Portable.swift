@@ -18,13 +18,13 @@ import Foundation
 /// A minimal `VerifierPolicy` covering the one category of check `RFC5280Policy` deliberately
 /// leaves to its caller: that the leaf is actually meant to serve as a *TLS server* certificate.
 ///
-/// Installing `tlsCustomVerification` replaces BoringSSL's own default verification outright,
-/// which does enforce the `ssl_server` purpose -- so without this, a certificate whose
-/// `ExtendedKeyUsage` names `clientAuth` only (but chains to a trusted, or even pinned, CA and
-/// whose SAN matches the host) would be accepted as a server certificate. This mirrors the
-/// Darwin-side fix in `Internals.NIOTrustEvaluator+Darwin.swift`, which builds its `SecTrust`
-/// with `SecPolicyCreateSSL(true, nil)` (a real SSL server policy) instead of
-/// `SecPolicyCreateBasicX509()` for the same reason -- see
+/// Installing `tlsCustomVerification` replaces BoringSSL's own default verification outright, which
+/// does enforce the `ssl_server` purpose, so without this a certificate whose `ExtendedKeyUsage`
+/// names `clientAuth` only (but chains to a trusted, or even pinned, CA and whose SAN matches the
+/// host) would be accepted as a server certificate. This mirrors the Darwin-side fix in
+/// `Internals.NIOTrustEvaluator+Darwin.swift`, which builds its `SecTrust` with
+/// `SecPolicyCreateSSL(true, nil)` (a real SSL server policy) instead of
+/// `SecPolicyCreateBasicX509()` for the same reason. See
 /// `InternalsNIOTrustEvaluatorTests.tlsCustomVerification_whenLeafLacksServerAuthExtendedKeyUsage_rejects`.
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 private struct ServerAuthExtendedKeyUsagePolicy: VerifierPolicy {
@@ -151,7 +151,7 @@ extension Internals.NIOTrustEvaluator {
 
                         // `pins.isEmpty` means nothing is configured to pin against, so chain
                         // validity (already established above) is the whole check then, mirroring
-                        // the Darwin evaluator's own `guard !pins.isEmpty` short-circuit -- without
+                        // the Darwin evaluator's own `guard !pins.isEmpty` short-circuit. Without
                         // it, `matched` is vacuously `false` over an empty pin set and every chain
                         // is rejected under the default `isStrict` policy.
                         guard !pins.isEmpty else {

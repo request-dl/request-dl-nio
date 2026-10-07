@@ -58,7 +58,7 @@ public struct DataTask<Content: Property>: RequestTask {
     /// Resolves this task's request and hands it to `descriptor`, without performing it.
     ///
     /// - Parameter descriptor: The ``TaskDescriptor`` that produces the description.
-    /// - Returns: The descriptor's output — a curl command line for ``CURLTaskDescriptor/cURL``.
+    /// - Returns: The descriptor's output, a curl command line for ``CURLTaskDescriptor/cURL``.
     /// - Throws: An error thrown while resolving the request, or by the descriptor itself.
     ///
     public func description<Descriptor: TaskDescriptor>(_ descriptor: Descriptor) async throws -> Descriptor.Output {

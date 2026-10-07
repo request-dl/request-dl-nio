@@ -140,19 +140,15 @@ struct InternalsURLSessionClientSessionTaskTests {
         #expect(!assembledCache.isEmpty)
     }
 
-    /// Regression guard for the gate `Internals.CacheControl`'s manual-decompression fix added:
-    /// caching a response this package still has to decode itself would persist the still-
+    /// Caching a response this package still has to decode itself would persist the still-
     /// compressed wire bytes under a cached head that (on replay, which never re-runs
     /// decompression) claims they're already decoded. So whenever
     /// `Internals.ManualDecompressionDispatch.requiresManualDecoding(for:)` answers `true` for a
     /// response, the cache tee must never attach at all.
     ///
-    /// Verified by temporarily dropping `decompressionDispatch` from `runExchange`'s parameter
-    /// list and its `requiresManualDecoding` guard, mirroring the exact regression this test is
-    /// named after: that fix was lost, silently, while merging this executor's `bytes(for:
-    /// delegate:)` rewrite with the NIO executor's own copy of the same fix. This test then
-    /// fails, since `cache` is invoked and `cacheStream` receives the (still identity-"encoded")
-    /// body instead of closing empty.
+    /// Dropping `decompressionDispatch` from `runExchange`'s parameter list and its
+    /// `requiresManualDecoding` guard makes this test fail, since `cache` is invoked and
+    /// `cacheStream` receives the (still identity-"encoded") body instead of closing empty.
     @Test
     func sessionTask_whenCacheProvidedAndManualDecompressionRequired_skipsTheCacheTee() async throws {
         // Given
@@ -258,21 +254,17 @@ struct InternalsURLSessionClientSessionTaskTests {
         #expect(!stillRunning)
     }
 
-    /// **Used to be a confirmed `withKnownIssue`.** The original `uploadTask(withStreamedRequest:)`
-    /// bridge hit a confirmed CFNetwork bug (a custom `InputStream` is never recognized as
-    /// reaching end-of-body); it was replaced with `Internals.URLSessionUploadFile` (small bodies
-    /// stay in memory and upload
-    /// via `uploadTask(with:from:)`; anything past `inMemoryThreshold` spills to a temp file and
-    /// uploads via `uploadTask(with:fromFile:)`), neither of which touches `InputStream`/
-    /// `needNewBodyStream`, so neither is affected. This test's 128 KiB payload takes the
+    /// The upload must report progress while the body streams. `Internals.URLSessionUploadFile`
+    /// keeps small bodies in memory (uploaded via `uploadTask(with:from:)`) and spills anything
+    /// past `inMemoryThreshold` to a temp file (uploaded via `uploadTask(with:fromFile:)`), so
+    /// neither touches `InputStream`/`needNewBodyStream`, where CFNetwork never recognizes a
+    /// custom `InputStream` as reaching end-of-body. This test's 128 KiB payload takes the
     /// in-memory branch.
     ///
-    /// One genuine bug was found and fixed while diagnosing the old known issue,
-    /// independent of that fix and still in effect: `upload` was only closing from
-    /// `onDownloadComplete` (task completion), not as soon as the body actually finished sending
-    /// the way `Internals.ClientResponseReceiver.didReceiveHead`/`didSendRequest` close it on the
-    /// NIO side. A live progress bar would otherwise have hung waiting for the whole download
-    /// before ever hearing "upload done."
+    /// `upload` closes as soon as the body actually finishes sending, the way
+    /// `Internals.ClientResponseReceiver.didReceiveHead`/`didSendRequest` close it on the NIO
+    /// side, not only from `onDownloadComplete` (task completion). A live progress bar would
+    /// otherwise hang waiting for the whole download before ever hearing "upload done."
     @Test
     func sessionTask_whenStreamingUploadAndDownload_reportsUploadProgressInIncreasingOrder() async throws {
         // Given
@@ -328,9 +320,8 @@ struct InternalsURLSessionClientSessionTaskTests {
         #expect(chunkSizes.last == payload.count)
     }
 
-    /// Same fix as the test above (the file-backed upload bridge). Kept here (rather than
-    /// relying on that test alone) to also exercise the download half of this specific overload,
-    /// which the old `uploadTask(withStreamedRequest:)`-based bridge could never reach via
+    /// Same bridge as the test above (the file-backed upload). Kept here (rather than relying
+    /// on that test alone) to also exercise the download half of this specific overload through
     /// `LocalServer`.
     @Test
     func sessionTask_whenStreamingUploadAndDownloadCompletes_deliversWholeBodyIntact() async throws {
@@ -409,7 +400,7 @@ private final class AcceptAnyServerTrustDelegate: NSObject, URLSessionTaskDelega
 
 /// The identity function, registered under a `Content-Encoding` CFNetwork doesn't decode
 /// natively, so `Internals.ManualDecompressionDispatch` always takes the `.dispatch` branch for
-/// it -- the one condition `requiresManualDecoding(for:)` answers `true` for.
+/// it, the one condition `requiresManualDecoding(for:)` answers `true` for.
 private struct IdentityTestAlgorithm: Internals.DecompressionAlgorithm {
 
     static let contentEncoding = "x-requestdl-identity-test"

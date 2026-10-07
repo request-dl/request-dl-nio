@@ -4,7 +4,7 @@
 
 /// What a ``TaskDescriptor`` has to work with.
 ///
-/// `requestConfiguration` is enough on its own for almost everything a request declares — its
+/// `requestConfiguration` is enough on its own for almost everything a request declares: its
 /// URL, method, headers, and a plain body all round-trip losslessly. The one exception is
 /// ``RequestDL/Form``: by the time its fields reach `requestConfiguration.body` they're already
 /// flattened into one `multipart/form-data` byte stream with a boundary, which is not something

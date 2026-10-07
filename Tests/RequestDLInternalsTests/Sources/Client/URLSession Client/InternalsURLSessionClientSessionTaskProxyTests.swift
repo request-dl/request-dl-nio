@@ -185,8 +185,8 @@ struct InternalsURLSessionClientSessionTaskProxyTests {
     /// through the buffered `execute(request:delegate:)` overload's plain `dataTask`, observed
     /// side by side; the NIO executor, which sends `Proxy-Authorization` up front, has no such gap.
     ///
-    /// What this asserts is that it ends promptly and visibly -- one request, the proxy's own
-    /// `407` -- rather than hanging or appearing to succeed.
+    /// What this asserts is that it ends promptly and visibly (one request, the proxy's own
+    /// `407`) rather than hanging or appearing to succeed.
     @Test
     func forwardedRequest_throughAnAuthenticatingProxy_getsThe407WithoutAChallenge() async throws {
         try await withAuthenticatingProxy(
@@ -225,10 +225,10 @@ struct InternalsURLSessionClientSessionTaskProxyTests {
     /// The proxy rejects the configured credentials. `TaskDelegate` answers the first challenge
     /// with them and cancels any repeat, reporting `ProxyAuthenticationFailedError`.
     ///
-    /// It used to answer every repeat with the same rejected credential: the proxy got 81-340
+    /// Answering every repeat with the same rejected credential would send the proxy 81-340
     /// `CONNECT`s within a fraction of a second before `URLSession` gave up on its own. Leaving
-    /// the repeat to default handling instead failed fast most of the time but, about one run in
-    /// three, waited out the whole request timeout, which is why the timeout here is far longer
+    /// the repeat to default handling instead fails fast most of the time but, about one run in
+    /// three, waits out the whole request timeout, which is why the timeout here is far longer
     /// than this is allowed to take.
     @Test(arguments: [RequestPath.sessionTask, .buffered])
     func connectTunnel_withWrongCredentials_failsFastWithoutRetrying(path: RequestPath) async throws {
@@ -286,7 +286,7 @@ struct InternalsURLSessionClientSessionTaskProxyTests {
 
     /// Pins a limitation of `URLSession` itself, not of this path: the proxy demands credentials
     /// and none are configured, so `TaskDelegate` leaves the challenge to `URLSession`'s default
-    /// handling -- deliberately, since that is also what lets credentials the system itself holds
+    /// handling, deliberately, since that is also what lets credentials the system itself holds
     /// for a proxy be used. With none there either, on macOS `URLSession` neither fails nor
     /// retries: the request waits out `timeoutIntervalForRequest` and only then fails. Identical
     /// through the buffered `execute(request:delegate:)` overload's plain `dataTask` (31s against
@@ -516,7 +516,7 @@ private final class AcceptAnyServerTrustDelegate: NSObject, URLSessionTaskDelega
 /// - When `requiredAuthorization` is set, a request without exactly that gets `407` with a
 ///   `Proxy-Authenticate: Basic` challenge, and the connection is closed.
 /// - An authorized `CONNECT` is answered `200 Connection Established` and relayed, raw, to
-///   `127.0.0.1:upstreamPort` -- whatever host the client asked for -- so the client can use a
+///   `127.0.0.1:upstreamPort` (whatever host the client asked for), so the client can use a
 ///   host name the OS won't bypass the proxy for, and that never has to resolve.
 /// - An authorized forwarded (absolute-form) request is answered by the proxy itself, with
 ///   `cannedBodySize` bytes of body, written with blocking `send(2)` into a small send buffer and

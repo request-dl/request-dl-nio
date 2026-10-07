@@ -26,8 +26,8 @@ import Network
 /// `.serialized`: every test here spins up a real dedicated `Thread` plus real network I/O
 /// against a local listener, and running them concurrently with each other adds self-inflicted
 /// contention on top of whatever the rest of the job is already under. That's the same class of
-/// problem `RequestConfigurationURLSessionClientUploadTests` (request-dl-nio#327) traced part of
-/// its own CI timeouts back to; every other suite here doing comparable real I/O
+/// problem `RequestConfigurationURLSessionClientUploadTests` traced part of its own CI
+/// timeouts back to; every other suite here doing comparable real I/O
 /// (`SessionExecutionTests`, `DataCacheTests`, `CachedRequestTests`) already serializes for the
 /// same reason.
 ///
@@ -205,11 +205,11 @@ struct InternalsPACEvaluatorTests {
         #expect(elapsedSeconds < 120)
     }
 
-    /// `.finished`/`.handledSource` used to fall through silently, leaving `evaluate(...)`'s
-    /// caller suspended on a continuation nobody would ever answer. Neither can be produced on
-    /// demand from out here — that would mean driving CFNetwork's own run-loop source into a
-    /// state it does not normally reach — so this covers the decision the run loop's result feeds
-    /// into, which is the part that was wrong.
+    /// `.finished`/`.handledSource` must not fall through silently, which would leave
+    /// `evaluate(...)`'s caller suspended on a continuation nobody would ever answer. Neither can
+    /// be produced on demand from out here (that would mean driving CFNetwork's own run-loop
+    /// source into a state it does not normally reach), so this covers the decision the run
+    /// loop's result feeds into.
     @Test
     func fallbackError_answersEveryRunLoopOutcome_notOnlyTimedOut() async throws {
         // Then: the one outcome with a meaning of its own keeps it.
@@ -219,7 +219,7 @@ struct InternalsPACEvaluatorTests {
         }
 
         // And: every other outcome still produces an error to answer with, rather than nothing.
-        // `.stopped` included — it is the success path, where the box's idempotent `resume` makes
+        // `.stopped` included: it is the success path, where the box's idempotent `resume` makes
         // this a no-op, but a loop stopped by anything other than `pacEvaluationCallback` must
         // not hang either.
         for outcome in [CFRunLoopRunResult.finished, .handledSource, .stopped] {

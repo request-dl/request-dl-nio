@@ -128,23 +128,21 @@ public struct DataCache: Sendable, Equatable {
 
         // MARK: - Unsafe properties
 
-        // Plain storage. Eviction cannot hang off `didSet` here: one of the two storages is
-        // asynchronous, and an observer cannot await. It lives in the setters above instead,
-        // in the one place that assigns these — which also keeps the pair symmetrical and makes
-        // it visible that shrinking is the only direction that evicts.
+        // Plain storage. Eviction can't hang off `didSet` because one of the two storages is
+        // asynchronous and an observer cannot await. It lives in the setters above instead, which
+        // keeps the pair symmetrical and makes it visible that only shrinking evicts.
         private var _memoryCapacity: Int64
         private var _diskCapacity: Int64
 
         private var _memoryStorage: MemoryStorage
         private var _diskStorage: DiskStorage
 
-        /// Best-effort disk usage estimate, `nil` until first reconciled. Purely a hint for
-        /// `DiskStorage.freeSpace(_:knownUsage:)` to skip its directory rescan on the common
-        /// write that isn't anywhere near capacity — never relied on for correctness, so a
-        /// stale or absent value only costs an extra rescan, not a wrong eviction. Deliberately
-        /// left untouched by `remove`/`removeAll`/capacity changes: those only ever move usage
-        /// down or reset it, so an estimate that predates them is at worst a harmless
-        /// overcount that triggers one avoidable rescan next time. See #271.
+        /// Best-effort disk usage estimate, `nil` until first reconciled.
+        ///
+        /// Only a hint for `DiskStorage.freeSpace(_:knownUsage:)` to skip its directory rescan on
+        /// writes that are nowhere near capacity; it is never relied on for correctness. It's left
+        /// untouched by `remove`/`removeAll`/capacity changes, since those only move usage down or
+        /// reset it, so a stale estimate costs at worst one avoidable rescan.
         private var _diskUsageEstimate: Int64?
 
         /// Same role as `_diskUsageEstimate`, for `MemoryStorage.freeSpace(_:knownUsage:)`. See
@@ -237,7 +235,7 @@ public struct DataCache: Sendable, Equatable {
         /// is the common case, since the two are mutually exclusive per HTTP semantics), while
         /// the actual write can be arbitrarily larger. Left unreconciled, the estimate would
         /// permanently undercount such a write, and `MemoryStorage.freeSpace`'s `knownUsage`
-        /// short-circuit (see #271/#361) would keep trusting that undercount forever, letting the
+        /// short-circuit would keep trusting that undercount forever, letting the
         /// memory tier grow past `memoryCapacity` indefinitely across repeated chunked writes.
         func reconcileMemoryUsage(contentLengthHint: Int64, actualSize: Int64) {
             guard actualSize != contentLengthHint else { return }
@@ -296,9 +294,8 @@ public struct DataCache: Sendable, Equatable {
     ///
     /// The Data Protection class applied to newly written disk cache files.
     ///
-    /// `nil`, the default, leaves the system default protection class in place — the same
-    /// behavior as before this property existed. Setting it only affects cache entries written
-    /// from that point on; existing files on disk keep whatever class they already had.
+    /// `nil`, the default, leaves the system default protection class in place. Setting it only
+    /// affects cache entries written from that point on; existing files keep their class.
     ///
     /// `.completeUntilFirstUserAuthentication` is the usual choice for a cache: it keeps entries
     /// unreadable before the device's first unlock after boot, without the stricter classes'
@@ -313,12 +310,12 @@ public struct DataCache: Sendable, Equatable {
     ///
     /// The key used to encrypt the disk tier at rest.
     ///
-    /// `nil`, the default, leaves the disk tier unencrypted — the same behavior as before this
-    /// property existed. Setting it only affects cache entries written from that point on;
-    /// existing plaintext files on disk are left alone. Supplying a new key does not invalidate
-    /// entries written under a previous one: they simply fail to decrypt and are treated as
-    /// misses, re-encrypting under the current key the next time they're written. See
-    /// ``removeAll()`` for clearing the cache outright, e.g. after a suspected key compromise.
+    /// `nil`, the default, leaves the disk tier unencrypted. Setting it only affects cache
+    /// entries written from that point on; existing plaintext files are left alone. Supplying a
+    /// new key does not invalidate entries written under a previous one: they fail to decrypt,
+    /// are treated as misses, and are re-encrypted under the current key the next time they're
+    /// written. See ``removeAll()`` for clearing the cache outright, e.g. after a suspected key
+    /// compromise.
     ///
     public var encryptionKey: DataCache.EncryptionKey? {
         get { storage.encryptionKey }
@@ -643,24 +640,18 @@ public struct DataCache: Sendable, Equatable {
         )
     }
 
-    /// Discards a cache write that started via ``allocateBuffer(key:cachedResponse:contentLength:)``
-    /// but never finished — its body stream was cancelled, errored, or otherwise gave up before
-    /// writing through `buffer` completed.
+    /// Discards a cache write that started via
+    /// ``allocateBuffer(key:cachedResponse:contentLength:)`` but never finished (its body stream
+    /// was cancelled or errored before writing through `buffer` completed).
     ///
-    /// - Important: Not the same thing as ``remove(forKey:)``. That method looks entries up by
-    /// key through `DiskStorage.record(_:)`, which requires a disk entry's `response.record`
-    /// *and* `data.record` to already both be on disk before it can even be found — exactly the
-    /// gate a write that never finished can't pass. Called there, it would silently do nothing,
-    /// leaving the half-written directory behind: invisible to every future read for the same
-    /// reason, yet still costing each of them a multi-second retry budget for `data.record`
-    /// permanently missing. This method instead targets `buffer.diskRecordURL` — the exact
-    /// directory captured at allocation time — so it finds and deletes precisely the write that
-    /// failed, without searching by key and risking an unrelated, still in-progress write to the
-    /// same key from a concurrent request. `buffer.memoryDataURL` gives the memory tier the same
+    /// - Important: Not the same as ``remove(forKey:)``. That method finds entries through
+    /// `DiskStorage.record(_:)`, which needs both `response.record` and `data.record` on disk,
+    /// a gate an unfinished write can't pass, so it would silently leave the half-written
+    /// directory behind. This method targets `buffer.diskRecordURL`, the exact directory
+    /// captured at allocation, so it deletes precisely the failed write and never an unrelated
+    /// in-progress write to the same key. `buffer.memoryDataURL` gives the memory tier the same
     /// precision: `MemoryStorage.remove(_:ifDataURL:)` only removes `key`'s record when it is
-    /// still the exact one this write allocated, so a concurrent write to the same key that has
-    /// since installed its own (good, current) record is left alone instead of being deleted out
-    /// from under it.
+    /// still the one this write allocated.
     func discardFailedWrite(_ buffer: Buffer, forKey key: String) async {
         let key = base64EncodedKey(key)
 
@@ -676,16 +667,14 @@ public struct DataCache: Sendable, Equatable {
     /// Reconciles each tier's tracked usage estimate with a completed write's real byte count,
     /// once the whole body has been written through `buffer` successfully.
     ///
-    /// `allocateBuffer(key:cachedResponse:contentLength:)` admits and estimates a write using
-    /// `contentLength` as a hint, taken from the response's `Content-Length` header — `0` when
-    /// that header is absent, which is exactly the case for chunked transfer encoding. The bytes
-    /// actually written via `buffer.writeBuffer` are not bounded by that hint, so for any
-    /// response without an accurate `Content-Length`, the tracked estimate can end up
-    /// permanently understating real usage by the entire body size unless corrected here. See
-    /// `Storage.reconcileMemoryUsage(contentLengthHint:actualSize:)` for why that matters.
+    /// `allocateBuffer(key:cachedResponse:contentLength:)` estimates a write from the response's
+    /// `Content-Length` header, which is `0` when the header is absent (as with chunked transfer
+    /// encoding). The bytes actually written aren't bounded by that hint, so without this
+    /// correction the tracked estimate can understate real usage by the entire body size. See
+    /// `Storage.reconcileMemoryUsage(contentLengthHint:actualSize:)`.
     ///
-    /// Not called from ``discardFailedWrite(_:forKey:)``'s path: a write that never finished
-    /// removes its own record outright, so there is no usage left for it to have miscounted.
+    /// Not called from ``discardFailedWrite(_:forKey:)``'s path, since a write that never
+    /// finished removes its own record outright.
     func finalizeWrite(_ buffer: Buffer, contentLengthHint: Int64) {
         let actualSize = Int64(buffer.readableBytes)
 
@@ -713,24 +702,21 @@ public struct DataCache: Sendable, Equatable {
 
     // MARK: - Private methods
 
-    /// - Note: A `compactMap` rather than `replacingOccurrences(of:with:)`, which is not part of
-    /// `FoundationEssentials`. Base64's alphabet makes each of these substitutions a single
-    /// character, so a character-by-character rewrite covers the same ground.
     /// The longest storage key embedded verbatim in a disk record's directory name.
     ///
     /// That name is `<base36 date>.<key>.cached`: up to 13 + 1 + key + 7 bytes, and a single path
-    /// component is capped at 255 bytes (`NAME_MAX`). Past this, the directory could not be
-    /// created at all, so a URL longer than roughly 175 bytes (base64 inflates by a third) —
-    /// routine for signed or search URLs — was never cached on disk.
+    /// component is capped at 255 bytes (`NAME_MAX`). Longer keys, such as the base64 of a signed
+    /// or search URL over roughly 175 bytes, are hashed instead (see `base64EncodedKey(_:)`).
     private static let maximumVerbatimKeyLength = 200
 
     /// The storage key for `key`: its base64url encoding, or, when that would be too long for a
     /// file name, `sha256.` followed by the hex SHA-256 of `key`. The `.` can never appear in
-    /// base64url output, so the two forms cannot collide, and short keys keep exactly the
-    /// names they always had.
+    /// base64url output, so the two forms cannot collide.
     private func base64EncodedKey(_ key: String) -> String {
         let base64 = Data(key.utf8).base64EncodedString()
 
+        // `compactMap` rather than `replacingOccurrences(of:with:)`, which isn't in
+        // `FoundationEssentials`.
         let encoded = String(
             base64.compactMap { character -> Character? in
                 switch character {

@@ -58,8 +58,9 @@ struct ModifiedRequestTaskTests {
     @Test
     func modifier_readsEnvironmentSetOnTheSameChain() async throws {
         // Given: the environment is set on the same task chain as the modifier itself, not just
-        // visible to the wrapped task -- `Modifiers.Environment.body` never updated the modifier's
-        // own `@RequestEnvironment` properties, only the `Content` passed down to the inner task.
+        // visible to the wrapped task. `Modifiers.Environment.body` has to update the modifier's
+        // own `@RequestEnvironment` properties, not only the `Content` passed down to the inner
+        // task.
         let observedFlag = InlineProperty(wrappedValue: false)
 
         // When

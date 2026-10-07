@@ -41,10 +41,10 @@ extension Internals {
         // Hand-written rather than synthesized, deliberately excluding `resource`: this struct
         // feeds `Internals.Session.Configuration`'s `Hashable`/`==`, which is
         // `Internals.ClientManager`'s pooled-client cache key, and `resource` is never read by
-        // `build()` above (`RawTask` reads it directly instead). Including it meant two sessions
-        // identical in every way `build()` actually consumes — differing only in
-        // `.timeout(.resource(_:))` — produced byte-identical `HTTPClient.Configuration`s but
-        // still compared unequal, so they could never share a pooled client/connection pool.
+        // `build()` above (`RawTask` reads it directly instead). Including it would make two
+        // sessions identical in every way `build()` actually consumes (differing only in
+        // `.timeout(.resource(_:))`) produce byte-identical `HTTPClient.Configuration`s that still
+        // compare unequal, so they could never share a pooled client/connection pool.
         package static func == (lhs: Self, rhs: Self) -> Bool {
             lhs.connect == rhs.connect && lhs.read == rhs.read
         }

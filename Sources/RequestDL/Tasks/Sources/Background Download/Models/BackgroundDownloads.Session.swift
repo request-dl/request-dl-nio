@@ -42,14 +42,14 @@ extension BackgroundDownloads {
         // MARK: - Private types
 
         /// A `ClientIdentityDescriptor`'s already-built identity, kept for the rest of this
-        /// process's lifetime once challenged once, so a redirect chain -- or several downloads
-        /// sharing one client certificate -- doesn't pay `ClientIdentityDescriptor.makeIdentity()`'s
-        /// full Keychain round trip (two `SecItemAdd` calls, then a `kSecMatchLimitAll` scan of
-        /// the *entire* keychain, since `kSecClassIdentity` supports no label-based query) again
-        /// on every single challenge. `Internals.IdentityManager`'s own weak-reference
-        /// deduplication can't do this on its own: `handleClientCertificateChallenge`'s handle is
-        /// deliberately not retained past the completion handler it answers, so the weak
-        /// reference is already gone before the *next* challenge in the same chain arrives.
+        /// process's lifetime once challenged once, so a redirect chain (or several downloads
+        /// sharing one client certificate) doesn't pay `ClientIdentityDescriptor.makeIdentity()`'s
+        /// full Keychain round trip on every challenge: two `SecItemAdd` calls, then a
+        /// `kSecMatchLimitAll` scan of the *entire* keychain, since `kSecClassIdentity` supports no
+        /// label-based query. `Internals.IdentityManager`'s weak-reference deduplication can't do
+        /// this on its own, because `handleClientCertificateChallenge`'s handle isn't retained past
+        /// the completion handler it answers, so the weak reference is gone before the *next*
+        /// challenge in the same chain arrives.
         private struct CachedIdentity {
             let descriptor: Internals.ClientIdentityDescriptor
             let handle: Internals.IdentityHandle
@@ -311,18 +311,18 @@ extension BackgroundDownloads {
         }
 
         /// Reuses this exact descriptor's already-built identity when this same task (or another
-        /// one sharing the same client certificate) was challenged before in this process -- see
-        /// `CachedIdentity`'s own doc comment for why that's worth doing -- rebuilding fresh from
-        /// disk only on the first challenge for a given descriptor.
+        /// one sharing the same client certificate) was challenged before in this process,
+        /// rebuilding from disk only on the first challenge for a given descriptor. See
+        /// `CachedIdentity`'s own doc comment for why that's worth doing.
         ///
         /// Gated on `challengedHost`, which is how a challenge from a redirect target is turned
         /// away. See `decodeClientIdentity(_:challengedBy:)` for why.
         ///
-        /// The cached `handle` outliving any single challenge is safe the same way a freshly
-        /// built, unretained one already was: once `SecItemCopyMatching` has handed back a
-        /// `SecIdentity`, the in-memory object doesn't stop working just because the Keychain
-        /// entry backing it is later deleted (e.g. once every cached reference to this
-        /// certificate/key pair finally goes away at process exit).
+        /// The cached `handle` outliving any single challenge is safe, as a freshly built,
+        /// unretained one already was: once `SecItemCopyMatching` has handed back a `SecIdentity`,
+        /// the in-memory object keeps working even if the Keychain entry backing it is later
+        /// deleted (e.g. once every cached reference to this certificate/key pair goes away at
+        /// process exit).
         private func handleClientCertificateChallenge(
             task: URLSessionTask,
             challengedHost: String,
@@ -356,16 +356,15 @@ extension BackgroundDownloads {
         /// The identity for `descriptor`, from `_cachedIdentities` if this exact descriptor was
         /// already resolved before in this process, or freshly built (and then cached) otherwise.
         ///
-        /// `descriptor.makeIdentity()`'s own Keychain round trip runs while `lock` is held, same
-        /// as every other access to this instance's state -- serializing it against a
-        /// concurrently-arriving challenge for a different descriptor is an acceptable cost here,
-        /// not a new one this introduces: `Internals.IdentityManager.shared`'s own lock already
-        /// serializes every identity build process-wide, cache or no cache.
+        /// `descriptor.makeIdentity()`'s Keychain round trip runs while `lock` is held, like every
+        /// other access to this instance's state. Serializing it against a concurrently-arriving
+        /// challenge for a different descriptor is an acceptable cost, since
+        /// `Internals.IdentityManager.shared`'s own lock already serializes every identity build
+        /// process-wide.
         ///
-        /// Not `private`: unit-tested directly (`@testable import`), the same reasoning `encode`/
-        /// `decode` above give for their own visibility -- this lets a test confirm a repeat
-        /// resolution reuses the exact same `Internals.IdentityHandle` instance without needing a
-        /// real, entitled background session or a genuine `URLAuthenticationChallenge` round trip.
+        /// Not `private`, so unit tests (`@testable import`) can confirm a repeat resolution reuses
+        /// the exact same `Internals.IdentityHandle` instance without needing a real, entitled
+        /// background session or a genuine `URLAuthenticationChallenge` round trip.
         func resolvedIdentity(
             for descriptor: Internals.ClientIdentityDescriptor
         ) -> (handle: Internals.IdentityHandle, intermediates: [SecCertificate])? {
@@ -546,18 +545,18 @@ extension BackgroundDownloads {
         ///
         /// A background session follows redirects by itself, and a client certificate identifies
         /// *us* to whoever receives it. Answering a redirect target's challenge with it would hand
-        /// the caller's identity to whoever controls that redirect, so the identity is bound to
-        /// one host at schedule time and checked here — the same gate
-        /// `Internals.URLSessionIdentityPolicy` applies on the foreground executor, and for the
-        /// same reason.
+        /// the caller's identity to whoever controls that redirect, so the identity is bound to one
+        /// host at schedule time and checked here. This is the same gate
+        /// `Internals.URLSessionIdentityPolicy` applies on the foreground executor, for the same
+        /// reason.
         ///
         /// Server-trust handling deliberately stays host-independent (see that type's own doc
         /// comment): pinning has to survive a redirect, whereas an identity must not.
         ///
-        /// `nil` therefore covers four cases that all deserve the same response — defer to the
-        /// system's default handling — a `taskDescription` this type didn't encode, one carrying
-        /// no `clientIdentity` (no mTLS configured, the common case), one persisted before this
-        /// package recorded a host at all, and one whose host simply isn't the one now asking.
+        /// `nil` therefore covers four cases that all deserve the same response (defer to the
+        /// system's default handling): a `taskDescription` this type didn't encode, one carrying no
+        /// `clientIdentity` (no mTLS configured, the common case), one persisted before this
+        /// package recorded a host at all, and one whose host isn't the one now asking.
         static func decodeClientIdentity(
             _ taskDescription: String?,
             challengedBy challengedHost: String

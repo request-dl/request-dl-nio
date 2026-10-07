@@ -49,11 +49,11 @@ struct PayloadNode: PropertyNode {
             // Deliberately *not* decided here, against `make.requestConfiguration.method` as it
             // stands at this point in the walk: nodes run in declaration order, so a `Payload`
             // declared before a `RequestMethod(.post)` in the same property tree would still see
-            // `method == nil` -- indistinguishable from "no method at all", which
-            // `sendsFieldsAsQuery(_:)` treats as query-string -- even though the method is about
-            // to become `POST`. `PendingURLEncodedPayload` stashes everything needed to finish
-            // this decision, and `Resolve` applies it once every node (including whichever
-            // `RequestMethod` wins) has run. See `PendingURLEncodedPayload`'s own doc comment.
+            // `method == nil` (indistinguishable from "no method at all", which
+            // `sendsFieldsAsQuery(_:)` treats as query-string) even though the method is about to
+            // become `POST`. `PendingURLEncodedPayload` stashes everything needed to finish this
+            // decision, and `Resolve` applies it once every node (including whichever
+            // `RequestMethod` wins) has run.
             make.pendingURLEncodedPayloads.append(
                 PendingURLEncodedPayload(
                     queries: queries,
@@ -126,7 +126,7 @@ struct PayloadNode: PropertyNode {
     /// True with no method set, and for the two methods that carry no body.
     ///
     /// - Important: Must compare uppercased. HTTP methods are conventionally uppercase but the
-    /// value comes from the caller — without normalizing, `.method("get")` falls through and
+    /// value comes from the caller, so without normalizing, `.method("get")` falls through and
     /// sends the fields as a body instead of as a query.
     static func sendsFieldsAsQuery(_ method: String?) -> Bool {
         guard let method = method?.uppercased() else {

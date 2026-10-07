@@ -64,10 +64,10 @@ struct HeaderGroupTests {
     }
 
     /// Companion to `headerGroupWithAuthorization`, above: `DigestAuthentication` writes its
-    /// `Authorization` header through its own private node too, same as `Authorization` used to
-    /// -- but unlike `Authorization`, it can't simply become a plain `HeaderNode`, since its
-    /// value is only known once `make(_:)` actually runs (computed lazily from
-    /// `credential.challenge`/the request's own URI, both only available at that point).
+    /// `Authorization` header through its own private node, but unlike `Authorization`, it can't
+    /// simply become a plain `HeaderNode`, since its value is only known once `make(_:)`
+    /// actually runs (computed lazily from `credential.challenge`/the request's own URI, both
+    /// only available at that point).
     @Test
     func headerGroupWithDigestAuthentication() async throws {
         let credential = DigestCredential()

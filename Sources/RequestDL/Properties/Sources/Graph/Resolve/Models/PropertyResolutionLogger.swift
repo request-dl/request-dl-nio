@@ -10,8 +10,7 @@ import Logging
 /// scope to read it from directly.
 ///
 /// Scoped to `Property` resolution only: bound once per `Resolve.outputs()` call, to that
-/// resolve's own `environment.logger`, unlike the `@TaskLocal` `RequestEnvironmentValues.current`
-/// used to be.
+/// resolve's own `environment.logger`, not to an ambient `@TaskLocal` value.
 ///
 /// A nested `Resolve` (a `RequestTask` built from within another task's `result()`)
 /// rebinds this to its own logger before building its own graph, so there's nothing here for it

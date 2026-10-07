@@ -51,14 +51,12 @@ public struct HeaderGroup<Content: Property>: Property {
             inputs: inputs
         )
 
-        // Kept as individual `LeafNode<HeaderNode>` children rather than collapsed into one
-        // opaque wrapper node: consumers that search the resolved graph for `HeaderNode`
-        // directly — `Proxy`'s `connectHeaders`, `Form`'s per-part headers — need each header
-        // to still be structurally discoverable. A single combined leaf hid them from that
-        // search entirely, silently dropping every header composed through `HeaderGroup` in
-        // those contexts. This is also a deliberate filter, not just a flattening: unrelated
-        // content nested inside a `HeaderGroup` (e.g. `Timeout`) is meant to be dropped, not
-        // carried through -- see `ResolveTests`'s "should be eliminated" case.
+        // Kept as individual `LeafNode<HeaderNode>` children rather than collapsed into one opaque
+        // wrapper node, since consumers that search the resolved graph for `HeaderNode` (`Proxy`'s
+        // `connectHeaders`, `Form`'s per-part headers) need each header to stay discoverable. This
+        // is also a deliberate filter, not just a flattening: unrelated content nested inside a
+        // `HeaderGroup` (e.g. `Timeout`) is meant to be dropped. See `ResolveTests`'s "should be
+        // eliminated" case.
         var children = ChildrenNode()
 
         for header in outputs.node.search(for: HeaderNode.self) {
@@ -113,10 +111,9 @@ extension HeaderGroup where Content == PropertyForEach<[String: String], String,
 
     /// `"\(value)"` alone renders an `Any` box wrapping an `Optional` (e.g. an `Int?`/`String?`
     /// value the caller's `[String: Any]` happened to carry) as `"Optional(5)"`/
-    /// `"Optional(\"foo\")"` instead of `"5"`/`"foo"` -- `String`'s interpolation has no static
-    /// type to unwrap against once boxed in `Any`, so it falls back to `String(describing:)`'s
-    /// generic, wrapper-preserving behavior. Going through `Mirror` first unwraps that specific
-    /// case before it ever reaches interpolation.
+    /// `"Optional(\"foo\")"` instead of `"5"`/`"foo"`, because `String`'s interpolation has no
+    /// static type to unwrap against once boxed in `Any`. Going through `Mirror` first unwraps
+    /// that case before it reaches interpolation.
     private static func describing(_ value: Any) -> String {
         let mirror = Mirror(reflecting: value)
 

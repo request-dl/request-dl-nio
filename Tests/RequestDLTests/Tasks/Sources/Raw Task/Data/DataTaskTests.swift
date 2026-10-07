@@ -113,11 +113,10 @@ struct DataTaskTests {
             Path(uri)
 
             Session.localServer
-            // Wide on purpose: since the pre-flight steps ahead of the request now share this
-            // same budget too (descriptor hooks, client resolution, network-path waiting -- see
-            // the `.resource` timeout fix bounding all of them), a contended CI simulator adding
-            // real seconds to each of those must not turn "completes normally" into a false
-            // timeout.
+            // Wide on purpose: the pre-flight steps ahead of the request share this same budget too
+            // (descriptor hooks, client resolution, network-path waiting), so a contended CI
+            // simulator adding real seconds to each of those must not turn "completes normally"
+            // into a false timeout.
             Timeout(.seconds(90), for: .resource)
 
             SecureConnection {
@@ -138,7 +137,7 @@ struct DataTaskTests {
     /// cache entry whose lock is held by a slow neighbour, or a system-proxy PAC script being
     /// fetched and evaluated over the network.
     ///
-    /// Reaching the deadline through a hook is what makes that class of stall testable at all —
+    /// Reaching the deadline through a hook is what makes that class of stall testable at all:
     /// unlike the others, it is the one the caller supplies themselves.
     private struct StallingDescriptor: TaskDescriptor {
 

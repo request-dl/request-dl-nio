@@ -24,7 +24,7 @@ extension Internals {
 
         /// Mirrors `Internals.ClientOperationQueue.generation`, read by
         /// `Internals.ClientManager`'s idle-cleanup sweep and ceiling eviction alongside
-        /// `isRunning` -- see that property's own doc comment.
+        /// `isRunning`, see that property's own doc comment.
         package var operationGeneration: UInt64 {
             manager.generation
         }
@@ -66,7 +66,7 @@ extension Internals {
         /// `HTTPClient.EventLoopGroupProvider.shared(_:)` means the client does *not* own the
         /// group, and `Internals.EventLoopGroupManager`'s table is a cache that can drop its own
         /// reference at any point. Without this, a group could be retired while this client still
-        /// had requests on it — and a client whose loops are gone can never complete its own
+        /// had requests on it, and a client whose loops are gone can never complete its own
         /// `shutdown()`, which NIO traps on as a leaked promise. `nil` only where no manager was
         /// involved (tests constructing a client directly).
         private let eventLoopGroupToken: Internals.EventLoopGroupToken?
@@ -307,32 +307,31 @@ extension Internals {
                 }
             }
 
-            // No all-or-nothing constraint on this executor, unlike `.urlSession`: manual
-            // dispatch only has to activate for algorithms `NIOHTTPResponseDecompressor` (added
-            // separately, once, via `Internals.Session.Configuration.build()`) doesn't already
-            // handle: gzip/deflate can stay skipped alongside it, rather than every configured
-            // algorithm always going through manual dispatch regardless.
+            // No all-or-nothing constraint on this executor, unlike `.urlSession`: manual dispatch
+            // only has to activate for algorithms `NIOHTTPResponseDecompressor` (added separately,
+            // once, via `Internals.Session.Configuration.build()`) doesn't already handle, so
+            // gzip/deflate can stay skipped alongside it instead of every configured algorithm
+            // always going through manual dispatch.
             //
             // - Important: `NIOHTTPResponseDecompressor` decodes the body but does *not* strip
             // `Content-Encoding` from the response head (confirmed against the vendored
-            // `swift-nio-extras` source this package actually ships), the same caveat already
-            // documented for CFNetwork's own transparent decoding under `.urlSession`.
+            // `swift-nio-extras` source this package ships), the same caveat documented for
+            // CFNetwork's own transparent decoding under `.urlSession`.
             //
             // Dispatch must therefore bypass by *type* (`isNativelyDecodedByNIO`), the same
             // structural check `Internals.URLSessionClient` uses, not by checking whether the
             // header is still present: it always is, natively decoded or not.
             //
-            // A *mixed* list (say gzip plus a custom algorithm) is what makes
-            // `nativelyDecoded` necessary rather than merely tidy. `Internals.Decompression
-            // .build()` enables `NIOHTTPResponseDecompressor` as soon as any one algorithm is
-            // natively decoded, so a `Content-Encoding: gzip` response arrives already decoded —
-            // and, per the note above, still labelled. Handing the full list to manual dispatch
-            // then matched gzip a second time and decoded the body twice.
+            // A *mixed* list (say gzip plus a custom algorithm) is what makes `nativelyDecoded`
+            // necessary. `Internals.Decompression.build()` enables `NIOHTTPResponseDecompressor` as
+            // soon as any one algorithm is natively decoded, so a `Content-Encoding: gzip` response
+            // arrives already decoded and still labelled. Handing the full list to manual dispatch
+            // would match gzip a second time and decode the body twice.
             //
-            // Filtering the natives out of the list isn't enough on its own: that turns the
-            // double decode into an `UnsupportedContentEncodingError` for a response that was in
-            // fact decoded correctly. What manual dispatch needs to know is which encodings to
-            // leave alone, not merely which algorithms it owns.
+            // Filtering the natives out of the list isn't enough on its own, since that would turn
+            // the double decode into an `UnsupportedContentEncodingError` for a response that was
+            // decoded correctly. Manual dispatch needs to know which encodings to leave alone, not
+            // merely which algorithms it owns.
             let decompressionDispatch: Internals.ManualDecompressionDispatch = {
                 switch decompression {
                 case .disabled:
@@ -396,18 +395,17 @@ extension Internals {
                 delegate.failIfNotStarted(error)
             }
 
-            // Cancelling or dropping the response has to release `flowControl` itself, and not
-            // rely on the cancellation reaching `delegate.didReceiveError` to do it.
+            // Cancelling or dropping the response has to release `flowControl` itself, and not rely
+            // on the cancellation reaching `delegate.didReceiveError` to do it.
             //
-            // AsyncHTTPClient only reports a failure straight away while it still has more of
-            // the body to read. Once the response's end has already arrived -- sitting in its
-            // own buffer behind a body part whose future is waiting on this window -- a
-            // cancellation only discards that buffer and records the error, to be delivered
-            // after that future completes (`RequestBag.StateMachine.fail(_:)`, the
-            // `.buffering(_, next: .eof)` case). With a reader that is gone, or that stopped for
-            // good, that future never would: the `HTTPClient.Task` would never complete, and the
-            // request, its delegate and whatever it buffered would stay reachable from the pending
-            // promise's own callbacks indefinitely. Observed directly, not inferred; see
+            // AsyncHTTPClient only reports a failure straight away while it still has more of the
+            // body to read. Once the response's end has already arrived, sitting in its own buffer
+            // behind a body part whose future is waiting on this window, a cancellation only
+            // discards that buffer and records the error, to be delivered after that future
+            // completes (`RequestBag.StateMachine.fail(_:)`, the `.buffering(_, next: .eof)` case).
+            // With a reader that is gone or stopped for good, that future never would: the
+            // `HTTPClient.Task` would never complete, and the request, its delegate and whatever it
+            // buffered would stay reachable from the pending promise's callbacks indefinitely. See
             // `InternalsClientResponseReceiverBackPressureTests
             // .requestCancelledAfterTheEndAlreadyArrived_stillReleasesThePausedPart`.
             //
@@ -430,7 +428,7 @@ extension Internals {
                 },
                 release: {
                     // `requestSeed`'s own `deinit`, which is what cancels a dropped request, runs
-                    // once this closure -- its last owner -- goes away with the seed wrapping it.
+                    // once this closure (its last owner) goes away with the seed wrapping it.
                     withExtendedLifetime(requestSeed) {
                         reconnection?.cancel()
                         flowControl.release()

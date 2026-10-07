@@ -121,8 +121,8 @@ public struct Payload: Property {
     /// Initializes a `Payload` with a value serialized through a custom ``PayloadEncoder``.
     ///
     /// Pass `encoder: nil` to defer to the default set via ``Property/payloadEncoder(_:)`` on an
-    /// enclosing property. Resolving to no encoder at all — neither passed here nor set on the
-    /// environment — throws ``EncodingPayloadError`` with context `.missingPayloadEncoder`.
+    /// enclosing property. Resolving to no encoder at all, neither passed here nor set on the
+    /// environment, throws ``EncodingPayloadError`` with context `.missingPayloadEncoder`.
     ///
     /// - Parameters:
     ///    - value: The value to be serialized.
@@ -197,11 +197,11 @@ public struct Payload: Property {
     /// Initializes a `Payload` with a file URL, starting the upload's byte stream at an
     /// arbitrary offset instead of from the beginning of the file.
     ///
-    /// This does not implement resumable upload by itself — HTTP has no universal mechanism for
-    /// that. It provides the one transport-agnostic building block a resume implementation needs:
-    /// a way to start streaming from a byte position other than zero. Track how many bytes were
-    /// sent (e.g. via ``UploadStep``), and on failure, start a fresh upload with a payload
-    /// beginning at that offset.
+    /// This does not implement resumable upload by itself, since HTTP has no universal mechanism
+    /// for that. It provides the one transport-agnostic building block a resume implementation
+    /// needs: a way to start streaming from a byte position other than zero. Track how many
+    /// bytes were sent (e.g. via ``UploadStep``), and on failure, start a fresh upload with a
+    /// payload beginning at that offset.
     ///
     /// - Parameters:
     ///    - url: The file URL.

@@ -11,8 +11,8 @@ import Testing
 import SwiftUI
 
 /// `RDLImage` leans on `_ConditionalContent`-returning generic initializers to mirror
-/// `AsyncImage`'s API. That machinery is easy to break silently — the type still compiles, just
-/// against a narrower or looser signature than intended — so these tests exist to pin every
+/// `AsyncImage`'s API. That machinery is easy to break silently (the type still compiles, just
+/// against a narrower or looser signature than intended), so these tests exist to pin every
 /// public initializer's shape, not to exercise runtime loading behavior (already covered by
 /// `RDLImageLoaderTests`).
 @MainActor

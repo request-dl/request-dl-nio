@@ -5,8 +5,8 @@
 // The `.nio`/`.nioTransportServices` half of `InternalsClientManagerExecutorTests` (see the main
 // declaration's own doc comment, in `InternalsClientManagerExecutorTests.swift`), split out
 // because these tests reach `Internals.ClientManager.Client.nio` and `NIOTSEventLoopGroup`,
-// neither of which exists at all without `NIOCore`/`NIOTransportServices` -- i.e. under
-// `--disable-default-traits`.
+// neither of which exists at all without `NIOCore`/`NIOTransportServices` (i.e. under
+// `--disable-default-traits`).
 #if canImport(Darwin) && canImport(NIOCore)
 
 import NIOCore
@@ -23,9 +23,7 @@ extension InternalsClientManagerExecutorTests {
         // Given: a DNS override is excluded from `.urlSession` (bucket D; `URLSessionConfiguration`
         // has no equivalent to hook one in), so `resolveExecutor()` must fall through to
         // `.nio`/`.nioTransportServices`, and `resolvedClient` must cache a `.nio` entry rather
-        // than a `.urlSession` one. (A SOCKS proxy used to be this test's example, but it's no
-        // longer incompatible; see `InternalsSessionConfigurationExecutorTests
-        // .configuration_whenSOCKSProxySet_doesNotContainReason`.)
+        // than a `.urlSession` one.
         let manager = Internals.ClientManager(lifetime: 5 * 60 * 1_000_000_000)
         let provider = Internals.SharedSessionProvider()
 
@@ -47,12 +45,11 @@ extension InternalsClientManagerExecutorTests {
         }
     }
 
-    /// Regression coverage for the `enableNetworkFramework`/executor unification:
-    /// `resolvedClient`'s `.nio` fallback branch used to always call
-    /// `client(provider:sessionConfiguration:)` unmodified, which decides
-    /// NIOTransportServices-vs-plain-NIO purely from the `enableNetworkFramework` flag, never from
-    /// `resolveExecutor()`'s own (correct) answer. `preferredExecutor(.nioTransportServices)`
-    /// therefore had zero effect on which event loop group backed a real client.
+    /// `resolvedClient`'s `.nio` fallback branch must honor `resolveExecutor()`'s answer, not
+    /// decide NIOTransportServices-vs-plain-NIO purely from the `enableNetworkFramework` flag
+    /// (as `client(provider:sessionConfiguration:)` does on its own). Otherwise
+    /// `preferredExecutor(.nioTransportServices)` would have no effect on which event loop
+    /// group backs a real client.
     ///
     /// `enableNetworkFramework` is never set here at all, proving this is `resolveExecutor()`'s
     /// decision alone, not the flag's.

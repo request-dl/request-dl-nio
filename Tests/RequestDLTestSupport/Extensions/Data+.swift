@@ -29,7 +29,7 @@ extension Data {
         var buffer = await Internals.DataBuffer()
 
         let max = length > UInt8.max ? UInt8.max : UInt8(length)
-        // `.rounded(.down)`, not the free function `floor(_:)` — that comes from `Glibc`/
+        // `.rounded(.down)`, not the free function `floor(_:)`, which comes from `Glibc`/
         // `Darwin`, neither of which this file imports under `FoundationEssentials`.
         let chunk = Int((Double(length) / Double(max)).rounded(.down))
 
@@ -57,7 +57,7 @@ extension Data {
 
 extension Data {
 
-    /// The "&"-separated query pairs, decoded as UTF-8 — the only encoding any call site uses.
+    /// The "&"-separated query pairs, decoded as UTF-8, the only encoding any call site uses.
     ///
     /// - Note: `String.Encoding` is not part of `FoundationEssentials`. `String(decoding:as:)`
     /// needs no import at all, and substitutes U+FFFD for anything malformed rather than
@@ -72,7 +72,7 @@ extension Data {
     ///
     /// - Note: `String(data:encoding:)`/`String.Encoding` are not part of `FoundationEssentials`.
     /// `String(decoding:as:)` takes code units, not bytes, so the byte order has to be resolved
-    /// by hand first — the reverse of what `Charset.utf16`'s encoder does.
+    /// by hand first, the reverse of what `Charset.utf16`'s encoder does.
     func decodedUTF16String() -> String? {
         var bytes = Array(self)
 

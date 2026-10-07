@@ -32,11 +32,11 @@ import struct Foundation.Data
 /// plain or TLS-wrapped tunnel (`LocalServer` is always TLS).
 ///
 /// Deliberately hand-parses the `CONNECT` request and writes the response as raw bytes, rather
-/// than using `NIOHTTP1`'s codec (`HTTPRequestDecoder`/`HTTPResponseEncoder`) removed
-/// mid-connection. An earlier version did that: removing handlers asynchronously while the
-/// client is free to start writing tunnel bytes (a TLS `ClientHello`, the instant it sees the
-/// `200`) the moment the response is flushed raced the removal on iOS/tvOS/watchOS/visionOS
-/// Simulators (reliably; never observed on macOS).
+/// than using `NIOHTTP1`'s codec (`HTTPRequestDecoder`/`HTTPResponseEncoder`) and removing it
+/// mid-connection: removing handlers asynchronously while the client is free to start writing
+/// tunnel bytes (a TLS `ClientHello`, the instant it sees the `200`) the moment the response
+/// is flushed races the removal on iOS/tvOS/watchOS/visionOS Simulators (reliably; never
+/// observed on macOS).
 ///
 /// Bytes meant for the tunnel could still reach the not-yet-removed `HTTPRequestDecoder`, which
 /// trips `NIOAny`'s type-mismatch fatal error on anything that isn't a well-formed HTTP request.

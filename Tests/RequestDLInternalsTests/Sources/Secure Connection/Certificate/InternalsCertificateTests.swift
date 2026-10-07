@@ -16,8 +16,8 @@ import struct Foundation.Data
 /// Only the two `resolvedDERBytes()` error-path tests, which never touch `NIOSSLCertificate`,
 /// stay here. Every other test either calls `Internals.Certificate.build()` (only exists under
 /// `canImport(NIOCore)`, returns `[NIOSSLCertificate]`) or compares `resolvedDERBytes()`'s
-/// portable output against that same NIOSSL-backed output — see
-/// `InternalsCertificateTests+NIO.swift`.
+/// portable output against that same NIOSSL-backed output (see
+/// `InternalsCertificateTests+NIO.swift`).
 struct InternalsCertificateTests {
 
     @Test

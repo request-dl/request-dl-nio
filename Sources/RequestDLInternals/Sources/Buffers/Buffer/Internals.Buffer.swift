@@ -56,18 +56,14 @@ extension Internals {
 
             /// Bytes currently in the resource.
             ///
-            /// - Important: The file system stat this reads through `url.writtenBytes` runs
-            /// without the lock, so it can race a write this same storage just finished: under
-            /// heavy concurrent disk contention (many buffers writing at once, observed on CI
-            /// macOS runners under the full portable test suite) the stat has been caught
-            /// reporting a file smaller than what this storage already wrote to it and awaited
-            /// the completion of, which made `overwritableBytes` go negative and crashed
-            /// ``moveWriterIndex(to:)`` downstream. `_writtenBytesFloor` is this storage's own
-            /// record of the highest offset it has itself written to -- updated inside `write`'s
-            /// lock, so it is race free with respect to this storage's own writes -- and the
-            /// result can never report less than what this instance already knows landed.
-            /// Reading the floor costs a lock acquisition, not I/O, so operations still never
-            /// queue behind one another here; only the slow stat itself stays lockless.
+            /// - Important: The file system stat behind `url.writtenBytes` runs without the lock,
+            /// so it can race a write this same storage just finished: under heavy concurrent disk
+            /// contention it can report a file smaller than what this storage already wrote, which
+            /// would make `overwritableBytes` go negative and crash ``moveWriterIndex(to:)``.
+            /// `_writtenBytesFloor` is this storage's own record of the highest offset it has
+            /// written, updated inside `write`'s lock, and the result never reports less than that.
+            /// Reading it costs a lock acquisition, not I/O, so only the slow stat itself stays
+            /// lockless.
             package var writtenBytes: Int {
                 get async {
                     let floor = await lock.withLock { _writtenBytesFloor }
@@ -79,11 +75,11 @@ extension Internals {
             // MARK: - Private static properties
 
             /// Flags a read/write/close/clear that is still running after 15s. Development
-            /// builds only — see `AsyncLock.Watchdog`.
+            /// builds only. See `AsyncLock.Watchdog`.
             ///
-            /// - Note: Computed rather than a stored `static let` — `Storage` is nested inside
-            /// the generic `Buffer<Stream>`, and Swift does not allow stored static properties
-            /// in a generic type.
+            /// - Note: Computed rather than a stored `static let`, because `Storage` is nested
+            /// inside the generic `Buffer<Stream>`, and Swift does not allow stored static
+            /// properties in a generic type.
             private static var watchdog: AsyncLock.Watchdog? {
                 #if DEBUG
                 .init(seconds: 15) { Internals.assertionFailure($0) }
@@ -302,28 +298,24 @@ extension Internals {
 
             /// - Warning: Lockless. Only reachable from inside `lock`.
             ///
-            /// `url.isResourceAvailable()` is a file system stat, and under heavy concurrent
-            /// reads on sandboxed Apple simulators it intermittently reports a file as missing
-            /// in short, contiguous windows, with nothing thrown and no descriptor ever closed
-            /// underneath this storage. Retrying that stat a
-            /// handful of times narrows the window but does not close it: the same simulator
-            /// contention that produces one flaky answer can produce five in a row once enough
-            /// callers are stat-ing the same path at once, which is exactly what happens once
-            /// hundreds of reads land on one storage concurrently.
+            /// `url.isResourceAvailable()` is a file system stat, and under heavy concurrent reads
+            /// on sandboxed Apple simulators it intermittently reports a file as missing in short,
+            /// contiguous windows, with nothing thrown and no descriptor ever closed underneath
+            /// this storage. Retrying the stat narrows that window but doesn't close it: once
+            /// hundreds of reads land on one storage concurrently, the same contention can produce
+            /// several flaky answers in a row.
             ///
-            /// The reliable fix is not a bigger retry budget, it is not re-asking a question
-            /// this storage already knows the answer to. Once this instance has itself created
-            /// the resource, or a stat has ever come back positive, nothing other than
-            /// ``clear()`` can make it disappear from underneath it — same invariant
-            /// `_createResourceIfNeeded()` already relies on. So the confirmation is cached and
-            /// every read after the first reachable one skips the stat entirely, which is also
-            /// what removes it from that concurrent contention going forward.
+            /// The reliable fix is not a bigger retry budget but not re-asking a question this
+            /// storage already knows the answer to. Once this instance has created the resource, or
+            /// a stat has come back positive, nothing other than ``clear()`` can make it disappear
+            /// (the same invariant `_createResourceIfNeeded()` relies on). So the confirmation is
+            /// cached and every read after the first reachable one skips the stat.
             ///
-            /// A caller that addresses a file through a brand new `Storage` right after some
-            /// other `Storage` finished writing it -- this instance's own first call, with
-            /// nothing cached yet -- is a related but genuinely different window this cache
-            /// cannot help with at all. See ``Internals/Buffer/init(addressing:)``, the one
-            /// legitimate entry point that reopens content this way, for that fix.
+            /// A caller that addresses a file through a brand new `Storage` right after another
+            /// `Storage` finished writing it (this instance's own first call, with nothing cached
+            /// yet) is a different window this cache can't help with. See
+            /// ``Internals/Buffer/init(addressing:)``, the one legitimate entry point that reopens
+            /// content this way.
             private func _isResourceAvailable() async -> Bool {
                 guard !_hasConfirmedResource else {
                     return true
@@ -483,31 +475,27 @@ extension Internals {
 
         /// Addresses `url` directly, bypassing `Stream.URL.make(from:)`.
         ///
-        /// Every other constructor above starts from a `Foundation.URL`/`Internals.ByteURL` and
-        /// asks `Stream.URL.make(from:)` — a `static` factory with no channel to carry anything
-        /// beyond the address itself — to produce the concrete `Stream.URL`. That is a problem
-        /// for a `Stream.URL` that also needs per-instance context, such as
-        /// `Internals.EncryptedFileBufferURL`'s encryption key: there is no way to smuggle a key
-        /// through `make(from:)` without embedding it in the `Foundation.URL` itself, which must
-        /// never happen. This exists for exactly that case — a caller that already has a fully
-        /// formed `Stream.URL` in hand skips `make(from:)` entirely.
+        /// Every other constructor starts from a `Foundation.URL`/`Internals.ByteURL` and asks
+        /// `Stream.URL.make(from:)`, a `static` factory with no channel for anything beyond the
+        /// address, to produce the concrete `Stream.URL`. That doesn't work for a `Stream.URL` that
+        /// needs per-instance context, such as `Internals.EncryptedFileBufferURL`'s encryption key,
+        /// which must never be embedded in the `Foundation.URL` itself. A caller that already has a
+        /// fully formed `Stream.URL` skips `make(from:)` through this initializer.
         ///
-        /// - Important: In practice this is only ever called with a key already in hand for
-        /// content that either does not exist yet (a fresh cache entry) or was written by some
-        /// entirely separate `Storage` an instant ago (reopening one, the same encrypted file's
-        /// writer and reader are two distinct `Buffer`/`Storage` pairs over the same path -- see
-        /// `Internals.EncryptedFileBufferURL`'s own doc comment). The latter case races this
-        /// brand new `Storage`'s very first size stat against a write it has no way to already
-        /// know about, and under heavy concurrent disk contention that stat has been caught
-        /// reporting zero for a file the other `Storage` had already finished writing and closed.
-        /// A short, bounded retry closes that window.
+        /// - Important: In practice this is called with a key already in hand, for content that
+        /// either does not exist yet (a fresh cache entry) or was written an instant ago by a
+        /// separate `Storage` (reopening one: an encrypted file's writer and reader are two
+        /// distinct `Buffer`/`Storage` pairs over the same path, see
+        /// `Internals.EncryptedFileBufferURL`). In the latter case this brand new `Storage`'s first
+        /// size stat races a write it can't know about, and under heavy disk contention it can
+        /// report zero for a file already written and closed. A short, bounded retry closes that
+        /// window.
         ///
-        /// - Parameter retryingEmptyContent: Whether a zero-byte answer from the first size stat
-        /// is worth retrying. `true` (the default) is the reopen case above, where zero is
-        /// probably that flake. A caller that is opening this address in order to *write* it,
-        /// knowing nothing has been written yet, passes `false`: for it, zero is the correct and
-        /// only possible answer, so the retry can never do anything but exhaust its full budget
-        /// -- ~290ms of sleeping in front of every single fresh cache write.
+        /// - Parameter retryingEmptyContent: Whether a zero-byte answer from the first size stat is
+        /// worth retrying. `true` (the default) is the reopen case above, where zero is probably
+        /// that flake. A caller opening this address in order to *write* it knows nothing has been
+        /// written yet and passes `false`: zero is then the only possible answer, so the retry
+        /// could only exhaust its full budget (~290ms of sleeping before every fresh cache write).
         package init(addressing url: Stream.URL, retryingEmptyContent: Bool = true) async {
             let storage = Storage(url)
 
@@ -716,9 +704,9 @@ extension Internals.Buffer {
     ///
     /// - Important: Must not take a lock on either side. Both cursors are local to their own
     /// copy, and the two storage operations are each atomic on their own, so there is nothing
-    /// left to hold across the pair. Locking both buffers in argument order deadlocks outright
-    /// when the two are copies of each other — copies share one lock object, the lock is not
-    /// reentrant, and two threads calling this in opposite directions deadlock each other.
+    /// left to hold across the pair. Locking both buffers in argument order deadlocks when the
+    /// two are copies of each other: copies share one lock object, the lock is not reentrant,
+    /// and two threads calling this in opposite directions deadlock each other.
     package mutating func writeBuffer<OtherStream: StreamBuffer>(_ buffer: inout Internals.Buffer<OtherStream>) async {
         let length = buffer.readableBytes
 

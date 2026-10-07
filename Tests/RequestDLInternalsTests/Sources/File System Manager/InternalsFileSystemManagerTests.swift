@@ -8,19 +8,17 @@ import Testing
 
 struct InternalsFileSystemManagerTests {
 
-    /// Regression test for the portable (`--disable-default-traits`, no `NIOCore`) thread pool's
-    /// work queue: `PortableBlockingPool` used to dequeue with `Array.removeFirst()`, shifting
-    /// every remaining item on every dequeue while holding the pool's lock -- O(*n*) per item,
-    /// O(*n*²) to drain a burst, with every competing worker thread paying for the shift. Now
-    /// backed by `FIFOQueue`, an O(1)-amortized dequeue.
+    /// The portable (`--disable-default-traits`, no `NIOCore`) thread pool's work queue must
+    /// dequeue in O(1): `Array.removeFirst()` would shift every remaining item on every dequeue
+    /// while holding the pool's lock, which is O(*n*) per item and O(*n*²) to drain a burst, with
+    /// every competing worker thread paying for the shift. `PortableBlockingPool` is backed by
+    /// `FIFOQueue`, an O(1)-amortized dequeue.
     ///
     /// This doesn't assert on timing (flaky under CI load), but a few thousand queued operations
-    /// still exercise the same dequeue path a shift-based queue would have paid quadratic cost
-    /// walking, while asserting the fix didn't change the contract: every operation still runs
+    /// still exercise the dequeue path, while asserting the contract: every operation runs
     /// exactly once and returns its own result, under real concurrent pressure from many callers
-    /// at once. Runs the same way under the `NIOCore` trait too (against `NIOThreadPool`, already
-    /// correct), so this is a cross-trait regression guard rather than only exercising the
-    /// portable path.
+    /// at once. Runs the same way under the `NIOCore` trait too (against `NIOThreadPool`), so it
+    /// covers both traits rather than only the portable path.
     @Test
     func run_whenManyConcurrentOperationsQueueAtOnce_completesEachExactlyOnce() async throws {
         // Given

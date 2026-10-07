@@ -31,8 +31,8 @@ private let simulatorTimeoutScale: Double = {
 /// Polls `condition` until it holds, or throws ``EventuallyTimeoutError`` after `timeout`
 /// seconds (more on an Apple simulator, see `simulatorTimeoutScale`).
 ///
-/// For tests that need to wait for something they cannot await directly -- a producer reaching
-/// a paused state, a background task giving up a resource -- without sleeping a fixed duration
+/// For tests that need to wait for something they cannot await directly (a producer reaching
+/// a paused state, a background task giving up a resource) without sleeping a fixed duration
 /// and hoping, the same reason `AsyncSignal.waitForWaiters(_:timeout:)` exists.
 package func eventually(
     timeout: Double = 10,

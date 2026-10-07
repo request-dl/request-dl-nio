@@ -57,10 +57,10 @@ extension [UInt8] {
                     break
                 }
             } else if bytes.count < separator.count {
-                // The final, shorter-than-`separator` read at the end of the buffer: no
-                // further window can ever be tried, so everything left over is remainder —
-                // unlike the branch below, which only advances by one byte to retry a new
-                // window, this has to keep the whole tail or trailing bytes go missing.
+                // The final, shorter-than-`separator` read at the end of the buffer: no further
+                // window can ever be tried, so everything left over is remainder. Unlike the branch
+                // below, which only advances by one byte to retry a new window, this has to keep
+                // the whole tail or trailing bytes go missing.
                 await chunk.writeBytes(bytes)
             } else {
                 await chunk.writeBytes(Data(bytes)[0...0])

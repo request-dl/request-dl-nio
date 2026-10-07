@@ -17,7 +17,7 @@ extension Internals.Override {
 
         package typealias Closure = @Sendable (String, StaticString, UInt) -> Void
 
-        /// `nil` — rather than defaulting straight to `Swift.assertionFailure` — so
+        /// `nil` rather than defaulting straight to `Swift.assertionFailure`, so
         /// ``assertionFailure(_:file:line:)`` can tell "no task explicitly replaced this" apart
         /// from "replaced with something," and fall back to ``global`` in the former case only.
         @TaskLocal
@@ -26,7 +26,7 @@ extension Internals.Override {
         /// Process-wide replacement, checked when no task-local one is active.
         ///
         /// Exists for callers `Task.detached` away from whichever task installed a
-        /// replacement — ``AsyncLock/Watchdog`` reports from a detached task, which does not
+        /// replacement. ``AsyncLock/Watchdog`` reports from a detached task, which does not
         /// inherit task-local values, so ``replace(with:perform:)`` can never reach it. A test
         /// target installs this once, process-wide, instead. A task-local replacement still
         /// takes precedence when both are active, since it names a more specific scope.

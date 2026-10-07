@@ -25,31 +25,20 @@ import Security
 /// delegate the same way the non-streaming suite does. No TLS customization is in scope here
 /// either.
 ///
-/// **Both tests below used to be a confirmed `withKnownIssue`.** The original bridge
-/// (`Internals.URLSessionUploadStream`, an `InputStream` subclass) drove
-/// `uploadTask(withStreamedRequest:)`, which on this OS build automatically negotiates the IETF
-/// "resumable uploads" draft for any streamed upload. A from-scratch investigation confirmed
-/// the real cause runs deeper than that draft negotiation alone: no custom `InputStream`, whether
-/// a Swift subclass or a genuine `CFReadStream`, is ever recognized by CFNetwork as reaching
-/// end-of-body, on `LocalServer`, two independent HTTP/2 servers, and `https://httpbin.org/post`
-/// alike. Every callback-level hypothesis (`copyProperty`/`setProperty`, `getBuffer`,
-/// object-identity) was ruled out without finding the mechanism.
+/// Streamed uploads go through `Internals.URLSessionUploadFile`, which drains `body` and
+/// drives `uploadTask(with:from:)` (small bodies, kept in memory) or
+/// `uploadTask(with:fromFile:)` (anything past
+/// `Internals.URLSessionUploadFile.inMemoryThreshold`, spilled to a temporary file). Neither
+/// touches `InputStream`/`needNewBodyStream`: no custom `InputStream`, whether a Swift
+/// subclass or a genuine `CFReadStream`, is ever recognized by CFNetwork as reaching
+/// end-of-body. Both payloads in `urlSessionClient_whenStreamingUpload...` below (256 KiB,
+/// 128 KiB) sit comfortably under that threshold, so those two tests specifically exercise
+/// the in-memory branch; `InternalsURLSessionUploadFileTests` (`RequestDLInternalsTests`)
+/// covers the file-spillover branch directly, without a real network round trip.
 ///
-/// `Internals.URLSessionUploadFile`
-/// works around it instead of fixing it: it drains `body` and this now drives
-/// `uploadTask(with:from:)` (small bodies, kept in memory) or
-/// `uploadTask(with:fromFile:)` (anything past `Internals.URLSessionUploadFile.inMemoryThreshold`,
-/// spilled to a temporary file). Both are completely different `URLSession` code paths that never
-/// touch `InputStream`/`needNewBodyStream` (or the resumable-uploads draft) at all. Both payloads
-/// in `urlSessionClient_whenStreamingUpload...` below (256 KiB, 128 KiB) sit comfortably under
-/// that threshold, so those two tests specifically exercise the in-memory branch;
-/// `InternalsURLSessionUploadFileTests` (`RequestDLInternalsTests`) covers the file-spillover
-/// branch directly, without a real network round trip.
-///
-/// A third shape, a `Payload(url:)` body
-/// that's already sitting in a file untouched, forwarded as `existingUploadFile` rather than
-/// drained at all (a same-day refinement past the memory/disk split, to avoid a redundant copy
-/// of a file that's already exactly right), is exercised by
+/// A third shape, a `Payload(url:)` body that's already sitting in a file untouched, is
+/// forwarded as `existingUploadFile` rather than drained at all, to avoid a redundant copy
+/// of a file that's already exactly right. It is exercised by
 /// `urlSessionClient_whenStreamingUploadFromExistingFile_deliversWholeBodyIntact`.
 ///
 /// See `simulatorAffectedURLSessionRequestTimeout`'s doc comment (`RequestDLTestSupport`) for why
@@ -58,11 +47,9 @@ import Security
 ///
 /// `.serialized`: this suite's three tests all do real network I/O against a `LocalServer`, and
 /// unlike every other real-I/O suite here (`SessionExecutionTests`, `DataCacheTests`,
-/// `CachedRequestTests`, all already `.serialized`) this one ran its own tests concurrently with
-/// each other. Real, informative `NSURLErrorTimedOut` failures directly observed on CI Simulator
-/// runners in `urlSessionClient_whenStreamingUploadFromExistingFile_deliversWholeBodyIntact`
-/// (request-dl-nio#327) tracked back partly to this suite adding to its *own* concurrent load, on
-/// top of whatever contention the rest of the job was already under.
+/// `CachedRequestTests`, all already `.serialized`), running them concurrently with each
+/// other would add to the load the rest of the job is already under, which causes real
+/// `NSURLErrorTimedOut` failures on CI Simulator runners.
 ///
 /// `.concurrent(
 /// watchdogAffectedPlatformConcurrencyLimit)`/`.nonFatalWatchdog`: real network I/O on the same
@@ -204,9 +191,8 @@ struct RequestConfigurationURLSessionClientUploadTests {
     /// increasing and reaches the whole body, mirroring what `ModifiersProgressTests`'s looser
     /// upload assertion (`uploadMonitor.uploadedBytes.reduce(.zero, +) == data.count`, sum only)
     /// checks on the NIO backend. `uploadTask(with:fromFile:)` still fires `didSendBodyData` the
-    /// same way a streamed upload would, so this observes it the same way originally intended,
-    /// even though the file-backed bridge is what actually drives it now, not the
-    /// `InputStream`-based one.
+    /// same way a streamed upload would, so this observes it the same way, even though the
+    /// file-backed bridge is what drives it, not an `InputStream`-based one.
     @Test
     func urlSessionClient_whenStreamingUpload_reportsProgressInIncreasingOrder() async throws {
         // Given

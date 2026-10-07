@@ -43,11 +43,11 @@ public struct Path: Property {
                 return
             }
 
-            // A `?` embedded in the path (e.g. `Path("search?item=1&item=2")`) is query syntax,
-            // not a literal path character — `isURLPathAllowed` deliberately excludes it. Split
-            // it off here and merge it into `queries` the same way `FlexibleURLNode` does for its
-            // relative-path case, or it survives verbatim into `pathComponents` and the resolved
-            // `url` ends up with a second, malformed `?` once an explicit `Query` also contributes.
+            // A `?` embedded in the path (e.g. `Path("search?item=1&item=2")`) is query syntax, not
+            // a literal path character, and `isURLPathAllowed` excludes it. Split it off here and
+            // merge it into `queries` the same way `FlexibleURLNode` does for its relative-path
+            // case, or it survives verbatim into `pathComponents` and the resolved `url` ends up
+            // with a second, malformed `?` once an explicit `Query` also contributes.
             guard let questionMarkIndex = path.firstIndex(of: "?") else {
                 make.requestConfiguration.pathComponents.append(path)
                 return

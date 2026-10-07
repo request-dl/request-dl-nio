@@ -222,24 +222,24 @@ extension Internals {
             }
 
             // The returned future is AsyncHTTPClient's back pressure: it reads nothing more from
-            // this connection until it completes. Completing it unconditionally, as this used
-            // to, let the network run arbitrarily far ahead of the reader, with the whole
-            // difference held in memory.
+            // this connection until it completes. Completing it unconditionally would let the
+            // network run arbitrarily far ahead of the reader, with the whole difference held in
+            // memory.
             //
             // So it only completes once `download`'s window has room again, and that window is
-            // drained by whoever finally reads the body -- through any decompression stage in
-            // between, which meters its own output the same way -- not by `download`'s own
-            // queue catching up, which is an in-memory copy and would throttle nothing.
+            // drained by whoever finally reads the body (through any decompression stage in
+            // between, which meters its own output the same way), not by `download`'s own queue
+            // catching up, which is an in-memory copy and would throttle nothing.
             //
-            // Checked after `decide`, whose effects already ran `download.append` and so
-            // already charged this part. Waiting here never blocks the event loop's thread; it
-            // only stops this one request from reading. Every way this exchange can end without
-            // the reader draining the window releases it instead: `didReceiveError`,
-            // `didFinishRequest`, the reader's iterator going away, and the request being
-            // cancelled or dropped (see `Internals.Client.execute(request:url:...)`).
+            // Checked after `decide`, whose effects already ran `download.append` and so already
+            // charged this part. Waiting here never blocks the event loop's thread; it only stops
+            // this one request from reading. Every way this exchange can end without the reader
+            // draining the window releases it instead: `didReceiveError`, `didFinishRequest`, the
+            // reader's iterator going away, and the request being cancelled or dropped (see
+            // `Internals.Client.execute(request:url:...)`).
             //
-            // A suspended window is shut the same way, so this is also where a suspension holds
-            // the connection (see `Internals.TransferControl`).
+            // A suspended window is shut the same way, so this is also where a suspension holds the
+            // connection (see `Internals.TransferControl`).
             let (future, pausedPart) = PausedBodyPart.gate(download.flowControl, on: task.eventLoop)
 
             if let pausedPart {
@@ -250,9 +250,9 @@ extension Internals {
         }
 
         package func didFinishRequest(task: HTTPClient.Task<Response>) throws -> Response {
-            // Nothing can be waiting on the window by now -- AsyncHTTPClient only finishes once
-            // the last part's future completed -- but nothing will be produced into it again
-            // either, so there is no reason to leave it able to pause.
+            // Nothing can be waiting on the window by now (AsyncHTTPClient only finishes once the
+            // last part's future completed), but nothing will be produced into it again either, so
+            // there is no reason to leave it able to pause.
             download.flowControl?.release()
             transferControl?.release()
 

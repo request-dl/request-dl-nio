@@ -127,7 +127,7 @@ struct MockedTaskTests {
         let data = Data("Hello World".utf8)
 
         // When
-        // A mocked task always resolves regardless of the declared cache strategy — internally
+        // A mocked task always resolves regardless of the declared cache strategy: internally
         // remapped away from `.useCachedDataOnly` before `CacheControl` ever runs, since a mock
         // has no real cache to serve and `.useCachedDataOnly` would otherwise always throw
         // `EmptyCachedDataError`.
@@ -182,7 +182,7 @@ struct MockedTaskTests {
         // When
         // Deliberately no `Payload` here: `RequestConfiguration.isCacheEnabled` requires a
         // `nil` body, and a mocked task mirrors `Payload` into the response body through the
-        // same mechanism a real request would use for its upload body — so setting one would
+        // same mechanism a real request would use for its upload body, so setting one would
         // disable caching altogether and never reach `CacheControl`'s cache-hit path.
         let result = try await MockedTask {
             BaseURL("localhost")
@@ -217,7 +217,7 @@ struct MockedTaskTests {
         let cacheKey = "https://localhost/\(path)"
 
         // When
-        // No `Payload` here either — see the comment in the cache-hit test above; the mocked
+        // No `Payload` here either (see the comment in the cache-hit test above); the mocked
         // response body ends up empty (`mockRequest`'s `else { downloadBuffer.close() }`
         // branch), but that is enough to prove the write side (`cacheStream`) ran, which is
         // what this test targets.

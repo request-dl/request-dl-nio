@@ -37,7 +37,7 @@ struct CachePropertiesTests {
     }
 
     /// Every request's resolve builds its cache configuration, and a `DataCache` is shared per
-    /// directory — `.main` is the very same storage as `DataCache.shared`. A request that doesn't
+    /// directory: `.main` is the very same storage as `DataCache.shared`. A request that doesn't
     /// pass `encryptionKey` must therefore leave whatever key that cache already has alone;
     /// otherwise any ordinary request silently clears a key set through
     /// `DataCache.encryptionKey`, and every disk-tier write after it lands in plaintext.

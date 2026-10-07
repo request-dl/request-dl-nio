@@ -93,11 +93,10 @@ struct QueryGroupTests {
 
     @Test
     func groupOfQueriesFromNestedQueryGroup() async throws {
-        // Given
-        // Regression test: `QueryGroup` used to wrap its resolved queries into an opaque leaf
-        // node, invisible to an outer `QueryGroup`'s own `search(for: QueryNode.self)` over its
-        // content, so every query composed through a nested `QueryGroup` silently disappeared —
-        // the same class of bug fixed for `HeaderGroup`.
+        // Given A nested `QueryGroup`'s resolved queries must stay visible to the outer
+        // `QueryGroup`'s own `search(for: QueryNode.self)` over its content, rather than being
+        // wrapped into an opaque leaf node, which would make every query composed through a nested
+        // `QueryGroup` silently disappear (the same class of bug as `HeaderGroup`'s).
         let property = QueryGroup {
             QueryGroup {
                 Query(name: "number", value: 123)

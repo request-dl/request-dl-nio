@@ -75,7 +75,7 @@ extension PropertyNamespace.ID: CustomStringConvertible {
     /// Every component, not just the last one, with the property wrapper's leading underscore
     /// removed where there is one.
     ///
-    /// - Important: Must not take `split(separator: ".").last` and then `dropFirst()` — that
+    /// - Important: Must not take `split(separator: ".").last` and then `dropFirst()`, which
     /// would report `bar` for `_foo._bar`, losing the rest of the path, and would turn a missing
     /// label's `nil` into `il`.
     private var namespacePath: String {

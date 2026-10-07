@@ -194,9 +194,9 @@ struct FormTests {
     @Test
     func form_whenInitDataWithHeadersFromHeaderGroup() async throws {
         // Given
-        // Regression test: `HeaderGroup` used to wrap its resolved headers into an opaque leaf
-        // node, invisible to `Form`'s `search(for: HeaderNode.self)` over its per-part `headers`
-        // content, so every header composed through it here silently disappeared.
+        // `HeaderGroup` must not wrap its resolved headers into an opaque leaf node, which
+        // would be invisible to `Form`'s `search(for: HeaderNode.self)` over its per-part
+        // `headers` content, silently dropping every header composed through it here.
         let name = "foo"
         let filename = "bar.raw"
         let data = await Data.randomData(length: 1_024)
@@ -981,7 +981,7 @@ struct FormTests {
         //
         // `Dictionary` iteration order is seeded per process, so the expectation must not depend
         // on the order the test happens to walk the dictionary in. The product sorts, so this
-        // has to sort the same way — that is also what keeps the assertion deterministic.
+        // has to sort the same way, which is also what keeps the assertion deterministic.
         let queries =
             try dictionary
             .map { (key: $0.key, value: $0.value.unwrapped) }
@@ -1068,7 +1068,7 @@ struct FormTests {
         //
         // `Dictionary` iteration order is seeded per process, so the expectation must not depend
         // on the order the test happens to walk the dictionary in. The product sorts, so this
-        // has to sort the same way — that is also what keeps the assertion deterministic.
+        // has to sort the same way, which is also what keeps the assertion deterministic.
         let queries =
             try dictionary
             .map { (key: $0.key, value: $0.value.unwrapped) }
@@ -1119,7 +1119,7 @@ struct FormTests {
 
     // MARK: - Init with JSON
 
-    // `Form(name:jsonObject:options:...)` only exists on Darwin — it is the one factory that
+    // `Form(name:jsonObject:options:...)` only exists on Darwin: it is the one factory that
     // takes `Any`, so it cannot avoid `JSONSerialization`, which is not part of
     // `FoundationEssentials`. The three tests below exist to cover that initializer
     // specifically, so unlike the rest of this file, they have no portable counterpart to fall
@@ -1319,7 +1319,7 @@ struct FormTests {
     }
 
     // `form_whenInitJSONURLEncoded` exercises `Form(name:filename:contentType:jsonObject:)`,
-    // the same Darwin-only `Any`-based initializer as the tests above — it belongs in this
+    // the same Darwin-only `Any`-based initializer as the tests above, so it belongs in this
     // block for the same reason.
     @Test
     func form_whenInitJSONURLEncoded() async throws {
@@ -1432,7 +1432,7 @@ struct FormTests {
         //
         // `Dictionary` iteration order is seeded per process, so the expectation must not depend
         // on the order the test happens to walk the dictionary in. The product sorts, so this
-        // has to sort the same way — that is also what keeps the assertion deterministic.
+        // has to sort the same way, which is also what keeps the assertion deterministic.
         let queries =
             try dictionary
             .map { (key: $0.key, value: $0.value.unwrapped) }
@@ -1660,12 +1660,12 @@ struct FormTests {
         )
     }
 
-    /// Regression test: unlike a top-level request header, a `Form` part's header line is
-    /// written straight into the raw body bytes (`FormGroupBuilder.buildHeadersBuffer`), with
-    /// nothing downstream validating it again. A `headers:` closure can carry
-    /// attacker-influenced values (e.g. reflecting per-user metadata as a custom header), so an
-    /// embedded CR/LF there used to end the header line early and inject an arbitrary extra
-    /// header line into the part — this asserts it's stripped instead.
+    /// Unlike a top-level request header, a `Form` part's header line is written straight into
+    /// the raw body bytes (`FormGroupBuilder.buildHeadersBuffer`), with nothing downstream
+    /// validating it again. A `headers:` closure can carry attacker-influenced values (e.g.
+    /// reflecting per-user metadata as a custom header), so an embedded CR/LF there must not end
+    /// the header line early and inject an arbitrary extra header line into the part: this
+    /// asserts it's stripped instead.
     @Test
     func form_whenCustomHeaderValueContainsCRLF_stripsItInsteadOfInjectingALine() async throws {
         // Given

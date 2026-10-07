@@ -128,11 +128,11 @@ extension CharsetTests {
     }
 
     /// A from-scratch reference encoder, deliberately independent of `Charset`'s own
-    /// `withUnsafeBytes(of:)`-based implementation — plain bit shifting instead — so this test
+    /// `withUnsafeBytes(of:)`-based implementation (plain bit shifting instead), so this test
     /// can catch a mistake in either without checking one against a copy of itself.
     ///
     /// `String(data:encoding:)`/`String.Encoding` are not part of `FoundationEssentials`, so
-    /// they cannot serve as the reference here the way they once did.
+    /// they cannot serve as the reference here.
     fileprivate func referenceUTF16(_ string: String, bigEndian: Bool, byteOrderMark: Bool) -> Data {
         var bytes: [UInt8] = []
         bytes.reserveCapacity((string.utf16.count + (byteOrderMark ? 1 : 0)) * 2)

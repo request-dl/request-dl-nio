@@ -71,11 +71,11 @@ struct RawTask<Content: Property>: RequestTask {
             logger: environment.logger
         )
 
-        // Every step from here to the request itself is raced against the same budget. Each one
-        // can block for an unbounded stretch on something the caller can't see -- a descriptor
-        // hook doing its own I/O, a client cache entry whose `AsyncLock` is held by a slow
-        // neighbour, a TLS identity read off disk -- and a `.resource` timeout that only started
-        // counting once all of that was already done would have promised a bound it never had.
+        // Every step from here to the request itself is raced against the same budget. Each one can
+        // block for an unbounded stretch on something the caller can't see (a descriptor hook doing
+        // its own I/O, a client cache entry whose `AsyncLock` is held by a slow neighbour, a TLS
+        // identity read off disk), and a `.resource` timeout that only started counting once all of
+        // that was done would have promised a bound it never had.
         let (resolvedClient, isURLSessionExecutor) = try await surfacingResourceTimeout {
             try await deadline.race {
                 try await notifyDescriptorHooks(resolved: resolved, environment: environment)
@@ -568,7 +568,7 @@ struct RawTask<Content: Property>: RequestTask {
     /// The value `url.full` carries on the span: the request URL with its query string and any
     /// userinfo removed.
     ///
-    /// Same reasoning as `setURLAttributes` leaving `url.query` out — query strings routinely
+    /// Same reasoning as `setURLAttributes` leaving `url.query` out: query strings routinely
     /// carry tokens and PII, and `user`/`password` always do. Emitting the whole URL verbatim
     /// under a different attribute name would make that omission meaningless, since the span
     /// would still carry the query string in full.
@@ -687,9 +687,9 @@ extension RawTask {
 ///
 /// `set`, not `add`: a caller forwarding an upstream request's own `traceparent` through
 /// ``HeaderGroup``/``CustomHeader`` would otherwise leave two `traceparent` field lines on the
-/// wire, and the W3C Trace Context spec requires a receiver to treat that as invalid and discard
-/// it — losing the trace entirely. The span this injector was handed is the one that describes
-/// *this* request, so it replaces whatever was declared rather than joining it.
+/// wire, and the W3C Trace Context spec requires a receiver to treat that as invalid and
+/// discard it, losing the trace entirely. The span this injector was handed is the one that
+/// describes *this* request, so it replaces whatever was declared rather than joining it.
 private struct HTTPHeadersInjector: Injector {
 
     func inject(_ value: String, forKey key: String, into headers: inout HTTPHeaders) {

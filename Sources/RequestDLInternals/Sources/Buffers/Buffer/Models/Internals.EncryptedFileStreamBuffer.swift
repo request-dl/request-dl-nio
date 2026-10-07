@@ -21,12 +21,11 @@ extension Internals {
     /// ## Why chunked, not whole-blob
     ///
     /// The response body this backs (`data.record`) is written incrementally as bytes arrive off
-    /// the network — see `Internals.CacheControl.cacheIfNeeded` — specifically so the whole body
-    /// never has to sit in memory at once. Whole-blob AES-GCM needs the entire plaintext before
-    /// it can produce a tag, which would undo that. Chunking bounds memory to one chunk
-    /// (`chunkPlaintextSize`) regardless of body size, and — because the real read path here is
-    /// always forward-sequential, never sliced (confirmed in `DiskStorage`/`CacheControl`) —
-    /// needs no genuine random access to pull off.
+    /// the network (see `Internals.CacheControl.cacheIfNeeded`), so the whole body never has to
+    /// sit in memory at once. Whole-blob AES-GCM needs the entire plaintext before it can produce
+    /// a tag, which would undo that. Chunking bounds memory to one chunk (`chunkPlaintextSize`)
+    /// regardless of body size and, because the real read path is always forward-sequential and
+    /// never sliced (confirmed in `DiskStorage`/`CacheControl`), needs no genuine random access.
     ///
     /// ## On-disk layout
     ///
@@ -34,21 +33,21 @@ extension Internals {
     /// [1 byte format version][12 byte random base nonce][chunk 0][chunk 1]...[chunk N, isLast]
     /// ```
     /// Every chunk but the last holds exactly `chunkPlaintextSize` plaintext bytes; the last
-    /// holds whatever remains (0 when the body divides evenly — `close()` always flushes one
+    /// holds whatever remains (0 when the body divides evenly: `close()` always flushes one
     /// final chunk, even an empty one, so the stream always ends with an authenticated
-    /// `isLast=true` marker). Each chunk is `ciphertext (== its plaintext length) + 16 byte tag`
-    /// — no per-chunk nonce is stored (`SealedBox.combined` is deliberately not used here): the
+    /// `isLast=true` marker). Each chunk is `ciphertext (== its plaintext length) + 16 byte tag`.
+    /// No per-chunk nonce is stored (`SealedBox.combined` is deliberately not used here): the
     /// nonce is derived, not carried.
     ///
     /// ## Nonce and associated data
     ///
     /// The nonce for chunk `i` is the base nonce with its last 8 bytes XORed against `i` as a
-    /// big-endian `UInt64` — unique for the lifetime of one file without needing fresh randomness
+    /// big-endian `UInt64`, which is unique for the lifetime of one file without fresh randomness
     /// per chunk. The associated data authenticated alongside each chunk is `i` (big-endian,
     /// 8 bytes) followed by a 1-byte `isLast` flag. Binding both closes the gap chunking reopens
     /// relative to whole-blob encryption: without it, a chunk-level GCM tag check alone can't
     /// catch chunks being reordered, spliced in from a different file, or the trailing chunks
-    /// being dropped to fake a shorter body — each remaining chunk still verifies fine on its
+    /// being dropped to fake a shorter body, as each remaining chunk still verifies fine on its
     /// own. With the index and finality authenticated, any of those changes what a chunk decrypts
     /// against, and the tag check fails.
     ///
@@ -56,18 +55,18 @@ extension Internals {
     ///
     /// Position in the file, not a stored flag: the last on-disk block, whatever its size, is
     /// always attempted as final. By construction (see `writeData`'s flush loop), that block is
-    /// always strictly shorter, on disk, than a full `chunkOnDiskSize` — so there's no ambiguity
+    /// always strictly shorter, on disk, than a full `chunkOnDiskSize`, so there is no ambiguity
     /// between "coincidentally full-size" and genuinely non-final. A writer that crashed before
-    /// ever flushing its actual final, `isLast=true`-flagged chunk leaves the file's real last
-    /// block flagged `isLast=false` at seal time; reading it back and asserting `isLast=true`
-    /// (the read side's positional guess) produces the wrong associated data, the tag check
-    /// fails, and the whole file degrades to a decrypt-failure/cache-miss — exactly the outcome
-    /// wanted for a truncated write, with no special-case code.
+    /// flushing its final, `isLast=true`-flagged chunk leaves the file's real last block flagged
+    /// `isLast=false`; reading it back and asserting `isLast=true` (the read side's positional
+    /// guess) produces the wrong associated data, the tag check fails, and the whole file
+    /// degrades to a decrypt-failure/cache-miss, which is the outcome wanted for a truncated
+    /// write, with no special-case code.
     ///
     /// ## Append-only, by construction
     ///
-    /// `writeData` only ever supports writing at the stream's own current end — see its doc for
-    /// what happens otherwise. This is not a general-purpose random-access encrypted file; it is
+    /// `writeData` only ever supports writing at the stream's own current end (see its doc for
+    /// what happens otherwise). This is not a general-purpose random-access encrypted file; it
     /// scoped tightly to how a cache entry is actually written and read.
     package final class EncryptedFileStreamBuffer: @unchecked Sendable, StreamBuffer {
 
@@ -76,9 +75,9 @@ extension Internals {
         // MARK: - Package static properties
 
         /// Plaintext bytes per non-final chunk. A few MB, matching the "accumulate a few MB,
-        /// encrypt, flush" shape this format exists for — small enough to bound memory well
-        /// below a large response body, large enough that the fixed 16 byte per-chunk tag
-        /// overhead stays negligible.
+        /// encrypt, flush" shape this format exists for: small enough to bound memory well below a
+        /// large response body, large enough that the fixed 16 byte per-chunk tag overhead stays
+        /// negligible.
         package static let chunkPlaintextSize = 4 * 1_024 * 1_024
 
         // MARK: - Private static properties
@@ -135,7 +134,7 @@ extension Internals {
         private var _offset: UInt64 = .zero
 
         /// Plaintext bytes actually sealed-or-queued so far. The ground truth `writeData`
-        /// validates `_offset` against — see its doc for why the two are not the same variable.
+        /// validates `_offset` against (see its doc for why the two are not the same variable).
         private var _writtenPlaintextCount: UInt64 = .zero
 
         private var _pendingPlaintext = Data()
@@ -174,7 +173,7 @@ extension Internals {
 
         /// Moves the offset the next operation will address.
         ///
-        /// Recorded, not validated here — `writeData` is what rejects a write to anywhere other
+        /// Recorded, not validated here: `writeData` is what rejects a write to anywhere other
         /// than the stream's current end. This mirrors `Internals.FileStreamBuffer.seek`: cheap,
         /// never fails on its own.
         package func seek(to offset: UInt64) async throws {
@@ -184,15 +183,15 @@ extension Internals {
         /// Appends `data` at the stream's own current end, chunking and sealing as the pending
         /// buffer crosses `chunkPlaintextSize`.
         ///
-        /// - Important: Only supports writing at the stream's current end. Every real write
-        /// against a cache entry's `data.record` already lands there — `Internals.Buffer.Storage
-        /// .write(at:data:)` always seeks to its own tracked writer index immediately before
-        /// writing, and that index only ever advances by what was actually written. A write
-        /// elsewhere would mean rewriting an already-sealed chunk, which needs a genuine
-        /// read-modify-reseal this type deliberately does not support (see the type-level doc):
-        /// it throws instead, which `Internals.Buffer.Storage.write`'s existing
-        /// `catch { return index }` already turns into an ordinary, silent write failure — the
-        /// same shape every other write failure in this subsystem already has.
+        /// - Important: Only supports writing at the stream's current end. Every real write against
+        /// a cache entry's `data.record` already lands there:
+        /// `Internals.Buffer.Storage.write(at:data:)` always seeks to its own tracked writer index
+        /// immediately before writing, and that index only advances by what was actually written. A
+        /// write elsewhere would mean rewriting an already-sealed chunk, which needs a
+        /// read-modify-reseal this type deliberately does not support (see the type-level doc), so
+        /// it throws. `Internals.Buffer.Storage.write`'s existing `catch { return index }` turns
+        /// that into an ordinary, silent write failure, the same shape every other write failure in
+        /// this subsystem has.
         package func writeData<Bytes: DataProtocol & Sendable>(_ data: Bytes) async throws {
             let incoming = Data(data)
 
@@ -228,7 +227,7 @@ extension Internals {
         /// Reads up to `length` plaintext bytes forward from `_offset`, decrypting whichever
         /// chunks that range spans.
         ///
-        /// - Returns: `nil` at EOF (including every corruption/tamper/wrong-key case — a failed
+        /// - Returns: `nil` at EOF (including every corruption/tamper/wrong-key case: a failed
         /// chunk decrypt throws from inside the loop below, which
         /// `Internals.Buffer.Storage.read`'s existing `catch { return (nil, index) }` turns into
         /// an ordinary read failure, indistinguishable from EOF to everything above this type).
@@ -281,15 +280,14 @@ extension Internals {
         /// closing them, so this should not happen, but a redundant call is far cheaper than
         /// closing an already-closed handle.
         ///
-        /// - Important: On the write side, this is the only place the final (`isLast=true`)
-        /// chunk is flushed — including the empty final chunk a fully chunk-aligned body still
-        /// needs, so every encrypted `data.record` always terminates with an authenticated
-        /// finality marker. `Internals.Buffer.Storage`'s `deinit`-triggered detached task is
-        /// confirmed to be the only place this is guaranteed to run for a cache write today (no
-        /// explicit `.close()` follows the network-draining loop in
-        /// `Internals.CacheControl.cacheIfNeeded`); a process that dies before that task runs
-        /// simply never gets a final chunk, which the read side already treats as a decrypt
-        /// failure, not corruption that needs special handling.
+        /// - Important: On the write side, this is the only place the final (`isLast=true`) chunk
+        /// is flushed, including the empty final chunk a fully chunk-aligned body still needs, so
+        /// every encrypted `data.record` terminates with an authenticated finality marker.
+        /// `Internals.Buffer.Storage`'s `deinit`-triggered detached task is the only place this is
+        /// guaranteed to run for a cache write today (no explicit `.close()` follows the
+        /// network-draining loop in `Internals.CacheControl.cacheIfNeeded`). A process that dies
+        /// before that task runs never gets a final chunk, which the read side already treats as a
+        /// decrypt failure, not corruption that needs special handling.
         package func close() async throws {
             try await lock.withLock {
                 guard !_isClosed else {
@@ -317,23 +315,22 @@ extension Internals {
         // MARK: - Package static methods
 
         /// The logical plaintext size a raw (ciphertext) file of `rawSize` bytes holds, computed
-        /// without decrypting anything — pure arithmetic over the fixed header/chunk/tag sizes.
+        /// without decrypting anything: pure arithmetic over the fixed header/chunk/tag sizes.
         /// See ``Internals/EncryptedFileBufferURL``'s `writtenBytes` for why this has to be exact.
         ///
         /// - Important: A `body` that divides *exactly* by `chunkOnDiskSize` (`remainder == 0`
-        /// below) can never come from a genuinely valid, fully-closed file: `close()`'s final
-        /// chunk is sealed even when empty (see the type-level doc and `writeData`'s flush loop),
-        /// so a valid file's on-disk body is always `n * chunkOnDiskSize + r` for some
-        /// `0 < r <= chunkOnDiskSize` (`r == tagSize` for an exactly-chunk-aligned body, since an
-        /// empty final chunk still contributes its 16-byte tag). A `remainder` of exactly `0`
-        /// therefore means the file has no authenticated final chunk at all -- e.g. a writer that
-        /// flushed `chunkCount` full intermediate chunks (each correctly sealed with
-        /// `isLast: false`) and then crashed before `close()` ever ran. Reading such a file back,
-        /// `decryptedChunk(at:using:)` finds the last of those `chunkCount` chunks sitting exactly
-        /// at the file's end and infers `isLast: true` for it from its position -- the opposite of
-        /// how it was actually sealed -- so its AEAD tag check fails and only the
-        /// `chunkCount - 1` chunks before it are genuinely readable. Reporting `chunkCount` here
-        /// instead used to over-report by one whole `chunkPlaintextSize`.
+        /// below) can never come from a genuinely valid, fully-closed file: `close()`'s final chunk
+        /// is sealed even when empty (see the type-level doc and `writeData`'s flush loop), so a
+        /// valid file's on-disk body is always `n * chunkOnDiskSize + r` for some `0 < r <=
+        /// chunkOnDiskSize` (`r == tagSize` for an exactly-chunk-aligned body, since an empty final
+        /// chunk still contributes its 16-byte tag). A `remainder` of exactly `0` therefore means
+        /// the file has no authenticated final chunk at all, e.g. a writer that flushed
+        /// `chunkCount` full intermediate chunks (each sealed with `isLast: false`) and then
+        /// crashed before `close()` ran. Reading such a file back, `decryptedChunk(at:using:)`
+        /// finds the last of those chunks at the file's end and infers `isLast: true` for it from
+        /// its position, the opposite of how it was sealed, so its AEAD tag check fails and only
+        /// the `chunkCount - 1` chunks before it are readable. Reporting `chunkCount` would
+        /// over-report by one whole `chunkPlaintextSize`.
         package static func plaintextSize(fromRawSize rawSize: Int) -> Int {
             guard rawSize > headerSize else {
                 return .zero
@@ -358,7 +355,7 @@ extension Internals {
 
         // MARK: - Private methods
 
-        /// Writes the 13 byte header — format version plus a fresh random base nonce — once, at
+        /// Writes the 13 byte header (format version plus a fresh random base nonce) once, at
         /// the very start of the file.
         private func writeHeader(_ stream: Internals.FileStreamBuffer) async throws {
             let baseNonce = Data(AES.GCM.Nonce())
@@ -374,8 +371,8 @@ extension Internals {
 
         /// Seals `plaintext` as chunk `_chunkIndex` and appends `ciphertext + tag` to `stream`,
         /// then advances `_chunkIndex`. Relies on `stream`'s own offset already sitting right
-        /// after whatever was written before this call — the header, or the previous chunk —
-        /// since nothing here ever seeks the inner stream mid-file.
+        /// after whatever was written before this call (the header, or the previous chunk), since
+        /// nothing here ever seeks the inner stream mid-file.
         private func seal(_ plaintext: Data, isLast: Bool, to stream: Internals.FileStreamBuffer) async throws {
             guard let baseNonce = _baseNonce else {
                 throw StreamError.truncatedChunk
@@ -392,7 +389,7 @@ extension Internals {
             _chunkIndex += 1
         }
 
-        /// Decrypts chunk `index`, caching the single most recently decrypted chunk — real usage
+        /// Decrypts chunk `index`, caching the single most recently decrypted chunk. Real usage
         /// is strictly forward-sequential, so successive `readData` calls landing inside the same
         /// chunk are the common case this avoids re-decrypting for.
         private func decryptedChunk(at index: UInt64, using stream: Internals.FileStreamBuffer) async throws -> Data? {
@@ -465,9 +462,9 @@ extension Internals {
         }
 
         /// The real on-disk (ciphertext) file size, stat'd and cached once. Safe to cache for a
-        /// stream's whole lifetime: a cache entry's `data.record` is never mutated after it's
-        /// fully written — `updateCached` creates a fresh `Record` rather than appending to an
-        /// existing one — so nothing changes the raw size out from under a live read stream.
+        /// stream's whole lifetime: a cache entry's `data.record` is never mutated after it's fully
+        /// written (`updateCached` creates a fresh `Record` rather than appending to an existing
+        /// one), so nothing changes the raw size out from under a live read stream.
         private func rawFileSize() async throws -> UInt64 {
             if let cached = _cachedRawFileSize {
                 return cached

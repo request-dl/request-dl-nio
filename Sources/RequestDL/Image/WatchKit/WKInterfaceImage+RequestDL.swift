@@ -19,10 +19,10 @@ private nonisolated(unsafe) var rdlLoadTaskKey: UInt8 = 0
 
 extension WKInterfaceImage: RDLCompatible {}
 
-/// `@MainActor`-isolated because, unlike `UIImageView`/`NSImageView`, `WKInterfaceImage` itself
-/// isn't annotated `@MainActor` in the WatchKit overlay — capturing `base` into the `Task` below
-/// would otherwise be flagged as sending a non-`Sendable`, non-isolated value across isolation
-/// domains. Matches how `WKInterfaceObject` is meant to be driven anyway: from the main thread.
+/// `@MainActor`-isolated because, unlike `UIImageView`/`NSImageView`, `WKInterfaceImage` isn't
+/// annotated `@MainActor` in the WatchKit overlay. Capturing `base` into the `Task` below
+/// would otherwise be flagged as sending a non-`Sendable`, non-isolated value across
+/// isolation domains. It also matches how `WKInterfaceObject` is meant to be driven.
 @MainActor
 extension RDLWrapper where Base: WKInterfaceImage {
 
@@ -48,9 +48,9 @@ extension RDLWrapper where Base: WKInterfaceImage {
     ///
     /// Loads the image at `url` and sets it on this interface image once it arrives.
     ///
-    /// Cancels any load already in flight on this interface image before starting — safe to call
-    /// from a `WKInterfaceTable` row controller even when rows are reused faster than their
-    /// previous image finishes loading.
+    /// Cancels any load already in flight on this interface image before starting, so it is safe
+    /// to call from a `WKInterfaceTable` row controller even when rows are reused faster than
+    /// their previous image finishes loading.
     ///
     /// - Parameters:
     ///    - url: The URL of the image.
@@ -77,19 +77,19 @@ extension RDLWrapper where Base: WKInterfaceImage {
     ///
     /// Loads `task` and sets its image on this interface image once it arrives.
     ///
-    /// Use this when the request needs more than a URL — custom headers, authentication, a
-    /// specific ``Property/cachePolicy(_:)``, and so on — by building `task` the same way a
+    /// Use this when the request needs more than a URL (custom headers, authentication, a
+    /// specific ``Property/cachePolicy(_:)``, and so on) by building `task` the same way a
     /// ``DataTask`` is built. Any ``RequestTask`` producing a ``TaskResult`` of `Data` works, so a
     /// ``MockedTask`` also drops in directly.
     ///
-    /// Cancels any load already in flight on this interface image before starting — safe to call
-    /// from a `WKInterfaceTable` row controller even when rows are reused faster than their
-    /// previous image finishes loading.
+    /// Cancels any load already in flight on this interface image before starting, so it is safe
+    /// to call from a `WKInterfaceTable` row controller even when rows are reused faster than
+    /// their previous image finishes loading.
     ///
     /// - Parameters:
     ///    - id: A stable identifier for the request, used to deduplicate concurrent loads. It
     ///    can't be derived automatically from an arbitrary ``RequestTask``, so callers supply it
-    ///    explicitly — typically the URL or endpoint the request resolves to.
+    ///    explicitly, typically the URL or endpoint the request resolves to.
     ///    - task: The task that performs the request, e.g. a ``DataTask``.
     ///    - placeholder: The image to set immediately, shown until the load finishes.
     ///    - loader: The ``RDLImageLoader`` performing the request. Defaults to ``RDLImageLoader/shared``.

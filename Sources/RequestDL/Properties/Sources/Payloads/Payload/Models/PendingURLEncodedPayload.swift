@@ -11,8 +11,8 @@ import RequestDLInternals
 /// or in the request body the moment it runs: that decision depends on the request's final HTTP
 /// method (``PayloadNode/sendsFieldsAsQuery(_:)``), and nodes run in declaration order. A
 /// `Payload` declared before a `RequestMethod(.post)` in the same property tree would otherwise
-/// see `method == nil` at the point it runs -- indistinguishable from "no method configured at
-/// all", which reads as query-string -- even though the method is about to become `POST`.
+/// see `method == nil` at the point it runs (indistinguishable from "no method configured at
+/// all", which reads as query-string) even though the method is about to become `POST`.
 ///
 /// Deferring the whole decision to ``resolve(into:)``, run by `Resolve` only after every node in
 /// the tree (including whichever `RequestMethod` wins) has contributed, mirrors how

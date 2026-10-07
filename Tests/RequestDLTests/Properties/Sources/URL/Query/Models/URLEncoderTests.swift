@@ -383,7 +383,7 @@ struct URLEncoderTests {
         #expect(sut == "\(key)=\(expectedDate.addingRFC3986PercentEncoding())")
     }
 
-    /// `DateFormatter` with `dateFormat = "yyyy-MM-dd"` is not an option here — it is not part
+    /// `DateFormatter` with `dateFormat = "yyyy-MM-dd"` is not an option here: it is not part
     /// of `FoundationEssentials`. Built on the same calendar arithmetic the package's own
     /// `Date.toISO8601String()` uses, so it needs no locale (a calendar year, not a week year,
     /// avoids the turn-of-year surprises a literal `"yyyy"` template is normally chosen to
@@ -1051,7 +1051,7 @@ struct URLEncoderTests {
         let key = "foo"
         let value = "bar"
 
-        // A custom strategy that never touches its key container at all — distinct from
+        // A custom strategy that never touches its key container at all, distinct from
         // `encoder_whenKeyUnkeyedBeforeEncoding_throwsUnset` above, which reads the container's
         // own local state back before writing to it. This instead reaches
         // `URLEncoder.Encoder.getKey()`'s own `.none` case, since nothing ever calls

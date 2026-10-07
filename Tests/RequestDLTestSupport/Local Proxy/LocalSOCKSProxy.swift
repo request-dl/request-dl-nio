@@ -2,7 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
-// NIO-only: see `LocalHTTPConnectProxy.swift`'s own doc comment -- same reason, same gap.
+// NIO-only: see `LocalHTTPConnectProxy.swift`'s own doc comment, same reason, same gap.
 #if canImport(NIOCore)
 
 import NIOCore

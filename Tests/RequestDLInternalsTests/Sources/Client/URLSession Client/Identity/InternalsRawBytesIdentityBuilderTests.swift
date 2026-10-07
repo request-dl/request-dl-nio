@@ -203,19 +203,18 @@ struct InternalsRawBytesIdentityBuilderTests {
 
     // MARK: - Keychain round trip (store(...))
 
-    /// Regression coverage for the fallback `makeIdentity(_:_:)` added on macOS: it now tries the
-    /// modern, data-protection Keychain first (`store(...useDataProtectionKeychain: true)`),
-    /// only falling back to the legacy one on `errSecMissingEntitlement`. Confirms that first
-    /// attempt is genuinely made, not skipped, in this unsigned `swift test` harness, which has
-    /// no `keychain-access-groups` entitlement -- see `store(...)`'s own doc comment. Verified by
-    /// temporarily replacing `makeIdentity(_:_:)`'s `do`/`catch` with an unconditional
-    /// `useDataProtectionKeychain: true` call and confirming every RSA mTLS round-trip test
-    /// (`dataTask_whenCAEnabled`, `urlSessionClient_whenMTLSConfigured_completesHandshakeMatchingNIOBackend`,
-    /// ...) then fails with exactly this error, since there's no legacy-Keychain fallback left to
-    /// rescue them.
+    /// `makeIdentity(_:_:)` on macOS tries the modern, data-protection Keychain first
+    /// (`store(...useDataProtectionKeychain: true)`), only falling back to the legacy one on
+    /// `errSecMissingEntitlement`. Confirms that first attempt is genuinely made, not skipped,
+    /// in this unsigned `swift test` harness, which has no `keychain-access-groups` entitlement
+    /// (see `store(...)`'s own doc comment). Replacing `makeIdentity(_:_:)`'s `do`/`catch` with
+    /// an unconditional `useDataProtectionKeychain: true` call makes every RSA mTLS round-trip
+    /// test (`dataTask_whenCAEnabled`,
+    /// `urlSessionClient_whenMTLSConfigured_completesHandshakeMatchingNIOBackend`, ...) fail
+    /// with exactly this error, since there's no legacy-Keychain fallback left to rescue them.
     @Test
     func store_whenUsingDataProtectionKeychainInUnsignedProcess_throwsMissingEntitlement() throws {
-        // Given: any real certificate/key pair works here -- RSA, since it's what's already
+        // Given: any real certificate/key pair works here. RSA, since it's what's already
         // checked in and it isn't the EC-specific gap `store(...)` itself documents.
         let client = Certificates().client()
         let certificate = try Self.certificate(fromPEMFile: client.certificateURL)
@@ -236,28 +235,25 @@ struct InternalsRawBytesIdentityBuilderTests {
         }
     }
 
-    /// Regression coverage for the still-open gap `store(...)`'s own doc comment describes: on
-    /// macOS, the legacy (non-data-protection) Keychain -- the only one an unsigned process like
-    /// this test harness can fall back to -- cannot store an EC private key this package
-    /// *imports* from raw bytes, unlike RSA (confirmed working by the test right above, and by
-    /// every RSA mTLS round-trip test elsewhere). Confirmed via `SecItemAdd` returning exactly
-    /// `-25304`/`errSecInvalidItemRef`, not some other failure, and confirmed specific to
+    /// On macOS, the legacy (non-data-protection) Keychain, the only one an unsigned process
+    /// like this test harness can fall back to, cannot store an EC private key this package
+    /// *imports* from raw bytes (the gap `store(...)`'s own doc comment describes), unlike RSA
+    /// (confirmed working by the test right above, and by every RSA mTLS round-trip test
+    /// elsewhere). `SecItemAdd` returns exactly `-25304`/`errSecInvalidItemRef`, and only for
     /// *importing* external EC key material into this Keychain: the identical call for RSA
-    /// succeeds, and a freshly-generated (`SecKeyCreateRandomKey`, not imported) EC key also
-    /// succeeds there.
+    /// succeeds, and so does a freshly generated (`SecKeyCreateRandomKey`, not imported) EC key.
     ///
-    /// This isn't fixed by `makeIdentity(_:_:)`'s own data-protection-Keychain-first fallback:
-    /// that only helps a *signed* macOS app with the Keychain Sharing entitlement, which this
-    /// unsigned test process has no way to obtain (see `InternalsRawBytesIdentityBuilderTests`'s
-    /// own type doc comment).
+    /// `makeIdentity(_:_:)`'s data-protection-Keychain-first fallback doesn't fix this: it only
+    /// helps a *signed* macOS app with the Keychain Sharing entitlement, which this unsigned
+    /// test process has no way to obtain (see `InternalsRawBytesIdentityBuilderTests`'s own type
+    /// doc comment).
     ///
     /// macOS only: `useDataProtectionKeychain: false` doesn't exercise a distinct "legacy"
-    /// Keychain on iOS/tvOS/watchOS/Catalyst the way it does on macOS -- there's only ever the
-    /// one data-protection Keychain there (see `makeIdentity(_:_:)`'s own `#else` branch), and
-    /// passing `false` on those platforms still hits the missing-entitlement wall
+    /// Keychain on iOS/tvOS/watchOS/Catalyst the way it does on macOS, since there's only ever
+    /// the one data-protection Keychain there (see `makeIdentity(_:_:)`'s own `#else` branch).
+    /// Passing `false` on those platforms still hits the missing-entitlement wall
     /// `store_whenUsingDataProtectionKeychainInUnsignedProcess_throwsMissingEntitlement` already
-    /// covers, not the `-25304` this test is after. Confirmed directly: CI failed with that
-    /// entitlement error, not `-25304`, when this ran unconditionally on iOS Simulator.
+    /// covers, not the `-25304` this test is after.
     #if os(macOS)
     @Test
     func store_whenGivenAnECKeyOnTheLegacyKeychain_throwsInvalidItemRef() throws {
@@ -284,7 +280,7 @@ struct InternalsRawBytesIdentityBuilderTests {
 
     /// The RSA counterpart to the EC test right above, on the exact same (legacy) Keychain:
     /// proves the gap is EC-specific, not a general problem with this test harness or with
-    /// `useDataProtectionKeychain: false` storage. macOS only -- see that test's own doc comment.
+    /// `useDataProtectionKeychain: false` storage. macOS only; see that test's own doc comment.
     @Test
     func store_whenGivenAnRSAKeyOnTheLegacyKeychain_succeeds() throws {
         // Given
@@ -340,7 +336,7 @@ extension InternalsRawBytesIdentityBuilderTests {
 
     /// Loads a checked-in `CertificateResource`'s public half (PEM) as a `SecCertificate`, via
     /// the same portable, `SwiftASN1`-backed DER extraction `resolvedDERBytes()` uses elsewhere
-    /// in this package -- not a separate, ad hoc PEM parser.
+    /// in this package, not a separate, ad hoc PEM parser.
     fileprivate static func certificate(fromPEMFile url: URL) throws -> SecCertificate {
         let der = try Internals.Certificate(url.absolutePath(percentEncoded: false), format: .pem)
             .resolvedDERBytes()

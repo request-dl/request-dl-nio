@@ -103,15 +103,15 @@ extension Internals.NIOTrustEvaluator {
                 var trust: SecTrust?
                 // A real SSL server policy, deliberately without a hostname (still enforces the
                 // server-auth `extendedKeyUsage` and everything else a certificate presented for
-                // TLS server auth normally must satisfy — see `DarwinTrustEvaluation.prepare`'s
-                // own doc comment for why `SecPolicyCreateBasicX509()` must not be used here).
+                // TLS server auth normally must satisfy; see `DarwinTrustEvaluation.prepare`'s own
+                // doc comment for why `SecPolicyCreateBasicX509()` must not be used here).
                 // Hostname/SNI matching stays NIOSSL's own separate gate (tied purely to
-                // `certificateVerification`, independent of this callback being installed), so
-                // this evaluator only needs to own chain-of-trust (+ purpose) validation. Never
-                // affected by `skipsHostnameVerification`: there's no live hostname context on
-                // this from-scratch `SecTrust` for
+                // `certificateVerification`, independent of this callback being installed), so this
+                // evaluator only needs to own chain-of-trust (+ purpose) validation. Never affected
+                // by `skipsHostnameVerification`: there's no live hostname context on this
+                // from-scratch `SecTrust` for
                 // `DarwinTrustEvaluation.prepare(_:skipsHostnameVerification:)`'s policy swap to
-                // apply to in the first place — this policy is already hostname-less up front.
+                // apply to, since this policy is already hostname-less up front.
                 let status = SecTrustCreateWithCertificates(
                     secCertificates as CFArray,
                     SecPolicyCreateSSL(true, nil),

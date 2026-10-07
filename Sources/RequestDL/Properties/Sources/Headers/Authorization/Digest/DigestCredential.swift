@@ -59,11 +59,10 @@ public final class DigestCredential: @unchecked Sendable {
     // MARK: - Internal methods
 
     /// The next `nc` (nonce-count) value for the current challenge's nonce, per RFC 7616 §3.3: a
-    /// strictly increasing counter a server can use to detect a replayed/duplicated request.
-    /// Every request made with this credential — including a second one that reuses the same
-    /// challenge without a fresh `401`, the documented, encouraged way to reuse a
-    /// ``DigestCredential`` — advances this, so the mechanism stays live instead of the request
-    /// always claiming to be the nonce's first use.
+    /// strictly increasing counter a server can use to detect a replayed or duplicated request.
+    /// Every request made with this credential advances it, including a second one that reuses
+    /// the same challenge without a fresh `401` (the documented, encouraged way to reuse a
+    /// ``DigestCredential``), so the request never claims to be the nonce's first use.
     func nextNonceCount() -> String {
         lock.withLock {
             _nonceCount += 1

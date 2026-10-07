@@ -147,8 +147,8 @@ package final class TransferServer: @unchecked Sendable {
     }
 
     /// Microseconds to wait after every read of an upload body: a server slower than loopback,
-    /// so an upload is still mostly unsent -- rather than sitting whole in socket buffers --
-    /// when a test suspends it.
+    /// so an upload is still mostly unsent (rather than sitting whole in socket buffers) when a
+    /// test suspends it.
     package var uploadReadDelay: UInt32 {
         get { lock.withLock { _uploadReadDelay } }
         set { lock.withLock { _uploadReadDelay = newValue } }
@@ -651,8 +651,8 @@ package final class TransferServer: @unchecked Sendable {
 
         while sent < limit {
             // A chunk is framed for its full size even when a scripted drop cuts it short, so a
-            // drop lands mid-chunk -- where a client can tell the body is truncated -- unless it
-            // falls exactly on a chunk boundary.
+            // drop lands mid-chunk (where a client can tell the body is truncated) unless it falls
+            // exactly on a chunk boundary.
             let piece = min(16_384, count - sent)
             let taken = min(piece, limit - sent)
             let bytes = Array(Self.body(from: start + sent, count: taken, seed: resource.seed))
@@ -676,7 +676,7 @@ package final class TransferServer: @unchecked Sendable {
             sent += taken
         }
 
-        // Scripted drop: mid-body, or -- for a chunked body -- right after the last byte, before
+        // Scripted drop: mid-body, or (for a chunked body) right after the last byte, before
         // the terminating chunk that would have told the client the body was complete.
         guard sent == count, dropAfter.map({ $0 > count || !resource.isChunked }) ?? true else {
             record(head, bodyLength: sent, isIntact: true, isComplete: false, status: status)

@@ -18,7 +18,7 @@ struct PropertyEnvironmentTests {
         let wrapper = RequestEnvironment(\.propertyEnvironmentTestsInteger)
 
         // Then
-        // `update(_:)` — the only thing that ever populates the wrapper's own storage — is
+        // `update(_:)`, the only thing that ever populates the wrapper's own storage, is
         // never called here, so `wrappedValue` has to fall back to a fresh
         // `RequestEnvironmentValues()`'s own default rather than trap.
         #expect(wrapper.wrappedValue == IntegerEnvironmentKey.defaultValue)

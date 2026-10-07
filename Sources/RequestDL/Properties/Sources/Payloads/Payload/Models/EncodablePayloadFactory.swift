@@ -39,12 +39,12 @@ struct EncodablePayloadFactory: Sendable, PayloadFactory {
     func callAsFunction(_ input: PayloadInput) async throws -> PayloadOutput {
         // Encoded once, with the encoder the caller configured, and reused on every path.
         //
-        // - Important: The form-urlencoded path must not re-encode through a default
-        // `JSONEncoder` — that would silently drop the caller's settings. That matters more
-        // here than anywhere else: on this path the JSON keys become the form field names, so a
-        // caller who asked for `.convertToSnakeCase` would quietly send camel case over the
-        // wire, and a fallback branch encoding a third time with the right encoder would produce
-        // a body that does not match the object just inspected.
+        // - Important: The form-urlencoded path must not re-encode through a default `JSONEncoder`,
+        // which would silently drop the caller's settings. That matters most here, since on this
+        // path the JSON keys become the form field names: a caller who asked for
+        // `.convertToSnakeCase` would quietly send camel case over the wire, and a fallback branch
+        // encoding a third time with the right encoder would produce a body that does not match the
+        // object just inspected.
         let data = try encode(encoder)
 
         guard contentType.isFormURLEncoded else {

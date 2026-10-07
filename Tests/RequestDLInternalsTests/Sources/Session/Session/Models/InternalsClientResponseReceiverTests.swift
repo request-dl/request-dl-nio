@@ -3,8 +3,8 @@
 //
 
 // Drives `Internals.Session.client()`/`.execute()` directly (AsyncHTTPClient's `HTTPClient
-// .Request`), the `.nio`-only low-level plumbing with no `.urlSession` equivalent to take over —
-// same category as `SessionExecutionTests`/`LocalServerConcurrencyTests`.
+// .Request`), the `.nio`-only low-level plumbing with no `.urlSession` equivalent to take
+// over, same category as `SessionExecutionTests`/`LocalServerConcurrencyTests`.
 #if canImport(NIOCore)
 
 import AsyncHTTPClient
@@ -40,8 +40,8 @@ struct InternalsClientResponseReceiverTests {
     @Test
     func connectionErrorBeforeAnyDataIsSentReachesTheHeadStream() async throws {
         // Given
-        // Nothing listens on this port, so the connect attempt itself fails — never
-        // establishing a connection means `didSendRequestPart`/`didSendRequest` never run, and
+        // Nothing listens on this port, so the connect attempt itself fails: never establishing a
+        // connection means `didSendRequestPart`/`didSendRequest` never run, and
         // `ClientResponseReceiver` is still in its initial `.idle` state when `didReceiveError`
         // fires. A short connect timeout keeps this from riding out the client's full default.
         var configuration = Internals.Session.Configuration()
@@ -64,10 +64,9 @@ struct InternalsClientResponseReceiverTests {
     @Test
     func connectionDroppedAfterUploadReachesTheUploadStream() async throws {
         try await withScriptedServer(.closeAfterFirstRead) { port in
-            // Given
-            // The server accepts the connection and reads the request, so the client has
+            // Given The server accepts the connection and reads the request, so the client has
             // already gone through `didSendRequestPart`/`didSendRequest` (state `.uploading`)
-            // before the abrupt close surfaces as an error — no response head is ever sent.
+            // before the abrupt close surfaces as an error, and no response head is ever sent.
             let session = Internals.Session(
                 provider: .identified("com.requestdl.tests.drop-after-upload", numberOfThreads: 1),
                 configuration: .init()
@@ -99,7 +98,7 @@ struct InternalsClientResponseReceiverTests {
 
             // Then
             // The truncated body surfaces while draining `step.bytes`, not at the top-level
-            // `response` sequence itself — the head alone arrives intact.
+            // `response` sequence itself: the head alone arrives intact.
             await #expect(throws: (any Error).self) {
                 for try await step in response {
                     guard case .download(let download) = step else { continue }
@@ -136,20 +135,20 @@ struct InternalsClientResponseReceiverTests {
 
 /// A bare, non-HTTP-aware TCP server that reacts to the first bytes it reads according to
 /// `script`, used to force `Internals.ClientResponseReceiver` into a specific state right before
-/// the connection dies — something `LocalServer` cannot do, since it always waits for a
+/// the connection dies, something `LocalServer` cannot do, since it always waits for a
 /// complete request and always answers with a complete, valid response.
 private enum ScriptedServerBehavior {
 
-    /// Reads the request, then closes without ever responding — lands the receiver in
+    /// Reads the request, then closes without ever responding, which lands the receiver in
     /// `.uploading`.
     case closeAfterFirstRead
 
-    /// Sends a complete head promising more body than follows, then closes — lands the
+    /// Sends a complete head promising more body than follows, then closes, which lands the
     /// receiver in `.head`.
     case respondHeadThenClose
 
     /// Sends a complete head plus a first body chunk, then closes before the rest of the
-    /// promised body arrives — lands the receiver in `.downloading`.
+    /// promised body arrives, which lands the receiver in `.downloading`.
     case respondPartialBodyThenClose
 }
 

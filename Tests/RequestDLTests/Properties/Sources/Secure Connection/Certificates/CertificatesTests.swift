@@ -36,7 +36,7 @@ struct CertificatesTests {
                     RequestDL.Certificates {
                         RequestDL.Certificate(client.certificateURL.absolutePath(percentEncoded: false))
                         RequestDL.Certificate(serverCertificate)
-                        // `Certificate(_:in:format:)` only exists on Darwin — it is built on
+                        // `Certificate(_:in:format:)` only exists on Darwin: it is built on
                         // `Bundle`, which is not part of `FoundationEssentials`.
                         #if canImport(Darwin)
                         RequestDL.Certificate("client.public", in: .module)
@@ -140,8 +140,8 @@ struct CertificatesTests {
     @Test
     func certificates_whenUsedWithoutEnclosingSecureConnection_shouldStillBeValid() async throws {
         // Given
-        // Regression test: `Certificates` used to require an enclosing `SecureConnection`. The
-        // base `Internals.SecureConnection` is now created lazily the first time it's needed.
+        // `Certificates` must not require an enclosing `SecureConnection`. The base
+        // `Internals.SecureConnection` is created lazily the first time it's needed.
         let server = Certificates().server()
         let client = Certificates().client()
 

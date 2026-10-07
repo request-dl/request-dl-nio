@@ -341,8 +341,8 @@ extension InternalsSecureConnectionTests {
         #expect(result.map { Data($0.key) } == Data(identity.utf8))
     }
 
-    /// Regression coverage for the fields AsyncHTTPClient's NIOTransportServices bridge either
-    /// traps on (`keyLogger`, with no custom verification callback able to work around it, unlike
+    /// The fields AsyncHTTPClient's NIOTransportServices bridge either traps on (`keyLogger`,
+    /// with no custom verification callback able to work around it, unlike
     /// `.noHostnameVerification`, see the doc comment below) or silently drops (everything else
     /// here; they're read from the built `TLSConfiguration` and then never looked at again) when
     /// running on Network.framework.
@@ -441,15 +441,14 @@ extension InternalsSecureConnectionTests {
         #expect(!secureConnection.urlSessionIncompatibilityReasons().isEmpty)
     }
 
-    /// Regression coverage: `build()` used to call `makeLocalIdentityForNetworkFramework()`, a
-    /// Keychain round-trip, unconditionally on Darwin whenever both `certificateChain`/
-    /// `privateKey` were configured, even for a caller that was never going to run over
-    /// Network.framework at all. That meant configuring mTLS for `.urlSession`/
-    /// `.nioTransportServices` silently broke a `.nio`-pinned request too, on any process without
-    /// Keychain Sharing entitlement (e.g. this SwiftPM test harness).
+    /// `build()` must not call `makeLocalIdentityForNetworkFramework()`, a Keychain round-trip,
+    /// on Darwin whenever both `certificateChain`/`privateKey` are configured, for a caller that
+    /// is never going to run over Network.framework at all. Otherwise configuring mTLS for
+    /// `.urlSession`/`.nioTransportServices` would silently break a `.nio`-pinned request too,
+    /// on any process without Keychain Sharing entitlement (e.g. this SwiftPM test harness).
     ///
     /// See `DataTaskTests.dataTask_whenCAEnabled()`, which pins `.requiredExecutor(.nio)`
-    /// specifically to avoid this and used to hit it anyway.
+    /// specifically to avoid this.
     @Test
     func secureConnection_whenMTLSConfiguredButNetworkFrameworkNotNeeded_skipsKeychainIdentityBuild() async throws {
         // Given
@@ -473,21 +472,19 @@ extension InternalsSecureConnectionTests {
         #endif
     }
 
-    /// Regression coverage for a crash: `TLSConfiguration.getNWProtocolTLSOptions()`
-    /// (AsyncHTTPClient's NIOTransportServices bridge) `preconditionFailure`s the instant
-    /// `certificateChain`/`privateKey` is non-empty, unconditionally, so leaving either set,
-    /// even alongside a correctly-built `localIdentityHandle`, would crash the process the moment
-    /// this configuration actually ran over `.nioTransportServices`.
+    /// `TLSConfiguration.getNWProtocolTLSOptions()` (AsyncHTTPClient's NIOTransportServices
+    /// bridge) `preconditionFailure`s the instant `certificateChain`/`privateKey` is non-empty,
+    /// unconditionally, so leaving either set, even alongside a correctly-built
+    /// `localIdentityHandle`, would crash the process the moment this configuration actually ran
+    /// over `.nioTransportServices`.
     ///
     /// The Keychain round trip `build(isCompatibleWithNetworkFramework: true)` needs
-    /// (`makeLocalIdentityForNetworkFramework()`) genuinely succeeds on real macOS (bare `swift
-    /// test` or an Xcode-run macOS test bundle) once `Internals.RawBytesIdentityBuilder
-    /// .makeIdentity(_:_:)` sets `kSecAttrApplicationLabel` correctly -- confirmed, not assumed,
-    /// and no longer a known issue there. Every other Apple platform's Simulator, reached only
-    /// via `xcodebuild test` against SwiftPM's auto-generated scheme, has no `.entitlements` file
-    /// to add Keychain Sharing to at all, so `SecItemAdd` there fails with
-    /// `errSecMissingEntitlement` before identity pairing is ever reached -- a genuinely
-    /// different, still-open gap, confirmed directly on iOS Simulator CI runs.
+    /// (`makeLocalIdentityForNetworkFramework()`) succeeds on real macOS (bare `swift test` or an
+    /// Xcode-run macOS test bundle) because `Internals.RawBytesIdentityBuilder
+    /// .makeIdentity(_:_:)` sets `kSecAttrApplicationLabel` correctly. Every other Apple
+    /// platform's Simulator, reached only via `xcodebuild test` against SwiftPM's auto-generated
+    /// scheme, has no `.entitlements` file to add Keychain Sharing to at all, so `SecItemAdd`
+    /// there fails with `errSecMissingEntitlement` before identity pairing is ever reached.
     @Test
     func secureConnection_whenMTLSConfiguredAndNetworkFrameworkNeeded_omitsRawCertificateChainFromTLSConfiguration()
         async throws

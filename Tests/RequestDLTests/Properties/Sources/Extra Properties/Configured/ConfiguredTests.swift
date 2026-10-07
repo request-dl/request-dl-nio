@@ -1032,7 +1032,7 @@ struct ConfiguredTests {
     // `Configured.secureConnectionVersion(_:)` only resolves `tlsMaximumVersion` under
     // `canImport(NIOCore)`: no Network.framework/URLSession equivalent exists (no ATS key for a
     // maximum TLS version), so it deliberately throws instead of silently ignoring the setting
-    // when NIOCore is unavailable -- covered by the `#else` test below, not skipped.
+    // when NIOCore is unavailable, covered by the `#else` test below, not skipped.
     #if canImport(NIOCore)
     @Test
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)

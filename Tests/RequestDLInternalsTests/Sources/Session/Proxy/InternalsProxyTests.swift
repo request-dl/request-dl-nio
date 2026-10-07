@@ -14,13 +14,12 @@ import struct Foundation.UUID
 
 struct InternalsProxyTests {
 
-    /// Regression coverage for a pooled-client cache collision: `Internals.Session.Configuration
-    /// .==` uses `Internals.Proxy.==` (transitively) as `Internals.ClientManager`'s pooled-client
-    /// cache key. `connectHeaders` is where proxy-auth secrets distinct per session commonly
-    /// live, so two proxies differing only there must compare unequal -- otherwise one session's
-    /// pooled client (built with its own CONNECT headers baked in) could be silently handed to a
-    /// request for a *different* session's proxy credentials, leaking one session's proxy
-    /// authorization into another's traffic.
+    /// `Internals.Session.Configuration.==` uses `Internals.Proxy.==` (transitively) as
+    /// `Internals.ClientManager`'s pooled-client cache key. `connectHeaders` is where proxy-auth
+    /// secrets distinct per session commonly live, so two proxies differing only there must
+    /// compare unequal. Otherwise one session's pooled client (built with its own CONNECT headers
+    /// baked in) could be silently handed to a request for a *different* session's proxy
+    /// credentials, leaking one session's proxy authorization into another's traffic.
     @Test
     func proxy_whenConnectHeadersDiffer_shouldNotBeEqual() {
         // Given

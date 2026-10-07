@@ -7,8 +7,8 @@ import Testing
 @testable import RequestDLInternals
 
 /// Unit coverage for `Internals.RangeResumptionPlan` and `Internals.DownloadResumptionState`: when
-/// a download may be resumed at all, how the continuation is asked for, and -- the part that
-/// guards against corrupting a download -- which continuations are accepted.
+/// a download may be resumed at all, how the continuation is asked for, and which
+/// continuations are accepted, the part that guards against corrupting a download.
 struct InternalsRangeResumptionPlanTests {
 
     private static let date = "Sat, 26 Sep 2026 10:00:00 GMT"
@@ -204,7 +204,7 @@ struct InternalsRangeResumptionPlanTests {
         }
     }
 
-    /// Everything had in fact arrived -- a chunked body whose terminator was lost, say -- and the
+    /// Everything had in fact arrived (a chunked body whose terminator was lost, say), and the
     /// server says there's nothing past it.
     @Test
     func unsatisfiableRangeAtTheVeryEnd_isAlreadyComplete() throws {

@@ -20,7 +20,7 @@ extension RequestBody {
     }
 
     /// Drains the body chunk by chunk, in the order `RequestBody`'s own `AsyncSequence`
-    /// conformance produces them -- the same `bytesSequence` `Internals.StreamWriterSequence`
+    /// conformance produces them, the same `bytesSequence` `Internals.StreamWriterSequence`
     /// reads from on the wire (`RequestBody.connect(writer:body:eventLoop:)`, `.nio`-only, tested
     /// directly by `RequestBodyTests`), so this preserves the exact same chunk boundaries every
     /// caller here actually cares about, without needing `AsyncHTTPClient`'s

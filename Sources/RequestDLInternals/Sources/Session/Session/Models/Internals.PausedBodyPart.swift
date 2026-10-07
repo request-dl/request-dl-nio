@@ -14,11 +14,11 @@ extension Internals {
     /// `Internals.FlowControlWindow` is shut: AsyncHTTPClient reads nothing more off the
     /// connection until it completes.
     ///
-    /// It completes once the window opens, like before, but can also be completed on its own
-    /// with ``complete()``: when a download is about to continue on a new exchange
+    /// It completes once the window opens, but can also be completed on its own with
+    /// ``complete()``: when a download is about to continue on a new exchange
     /// (`Internals.NIODownloadReconnection`), the exchange that failed must not be left with a
     /// pending future, yet the window it was waiting on is shared with the continuation and must
-    /// stay exactly as it is -- releasing it, as a terminal failure does, would leave the rest of
+    /// stay exactly as it is. Releasing it, as a terminal failure does, would leave the rest of
     /// the download unmetered and deaf to a suspension.
     final class PausedBodyPart: @unchecked Sendable {
 

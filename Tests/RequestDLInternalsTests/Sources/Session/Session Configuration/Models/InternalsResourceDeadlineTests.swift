@@ -109,12 +109,12 @@ struct InternalsResourceDeadlineTests {
         #expect(await flag.wasCancelled)
     }
 
-    /// Regression coverage for a real race, not just a hypothetical one: with `.urlSession` as
-    /// the default executor on Darwin, a fast enough loopback `operation` could actually win
-    /// against an already-elapsed deadline before this fast path existed. `race(seed:_:)` used
-    /// to always start `operation` and the deadline's own `Task.sleep(nanoseconds:)` (even a
-    /// zero-duration one still needs a real scheduler hop) as two equally-real competing child
-    /// tasks, so "already in the past" was a coin flip, not a guarantee.
+    /// A fast enough loopback `operation` could win against an already-elapsed deadline if
+    /// `race(seed:_:)` always started `operation` and the deadline's own
+    /// `Task.sleep(nanoseconds:)` (even a zero-duration one still needs a real scheduler hop)
+    /// as two equally-real competing child tasks, so "already in the past" would be a coin
+    /// flip, not a guarantee. This matters with `.urlSession` as the default executor on
+    /// Darwin.
     ///
     /// This deadline is built already elapsed (`nanoseconds: 0`, so even `DispatchTime.now()`
     /// right after `init` is past it), and `operation` never suspends at all: as fast as an
@@ -174,19 +174,19 @@ struct InternalsResourceDeadlineTests {
         #expect(await flag.wasCancelled)
     }
 
-    /// Regression coverage for the composition `RawTask._result` relies on: it races
-    /// `Internals.NetworkPathGate.wait(for:)` (the `Session.waitsForConnectivity(true)` /
-    /// `allowsCellularAccess`/etc. pre-flight check) against the same `.resource` deadline that
-    /// bounds the request itself, so a network path that never satisfies is bounded by the
-    /// configured timeout instead of hanging forever. `NetworkPathGate.wait(for:observer:)` only
-    /// returns when a satisfying path arrives or the calling `Task` is cancelled (see
+    /// The composition `RawTask._result` relies on: it races `Internals.NetworkPathGate.wait(for:)`
+    /// (the `Session.waitsForConnectivity(true)`/`allowsCellularAccess`/etc. pre-flight check)
+    /// against the same `.resource` deadline that bounds the request itself, so a network path
+    /// that never satisfies is bounded by the configured timeout instead of hanging forever.
+    /// `NetworkPathGate.wait(for:observer:)` only returns when a satisfying path arrives or the
+    /// calling `Task` is cancelled (see
     /// `InternalsNetworkPathGateTests.gate_whenCallerTaskCancelledWhileWaiting_...`, which needs
-    /// an explicit external cancellation to terminate the equivalent wait) — `race` is what
+    /// an explicit external cancellation to terminate the equivalent wait), and `race` is what
     /// supplies that cancellation here, the same way it does for `executeSessionTask`.
     @Test
     func race_whenWrappingAHangingNetworkPathWait_boundedByDeadlineInsteadOfHangingForever() async throws {
         // Given: an observer whose `updates()` never yields and never finishes, paired with
-        // `waitsForConnectivity: true` — the shape `NetworkPathGate.wait(for:)` cannot return
+        // `waitsForConnectivity: true`, the shape `NetworkPathGate.wait(for:)` cannot return
         // from on its own once the current path is unsatisfied.
         struct HangingObserver: Internals.NetworkPathObserving {
             let currentPath = Internals.NetworkPath(

@@ -34,7 +34,7 @@ struct MemoryStorageTests {
         var storage = MemoryStorage(directory: URL(fileURLWithPath: "/tmp"))
 
         // Given: a real entry that is already over whatever capacity `freeSpace` is about to be
-        // called with — a rescan would find it and evict it.
+        // called with: a rescan would find it and evict it.
         let (dataURL, _) = storage.allocateBuffer(
             key: "k1",
             cachedResponse: makeCachedResponse(key: "k1"),
@@ -44,7 +44,7 @@ struct MemoryStorageTests {
         let dataURL0 = try #require(dataURL)
         dataURL0.replace(with: Data([0x1]))
 
-        // When: freeing space down to zero, but with a `knownUsage` of zero — a trusted (if,
+        // When: freeing space down to zero, but with a `knownUsage` of zero, a trusted (if,
         // here, deliberately wrong) claim that there is nothing to evict.
         let result = storage.freeSpace(.zero, knownUsage: .zero)
 
@@ -71,7 +71,7 @@ struct MemoryStorageTests {
         let result = storage.freeSpace(.zero, knownUsage: .max)
 
         // Then: the real scan found and evicted the entry, and reported the true resulting
-        // total — zero, since it was the only entry — rather than the stale `knownUsage`.
+        // total (zero, since it was the only entry) rather than the stale `knownUsage`.
         #expect(result == .zero)
         #expect(await storage["k1"] == nil)
     }
@@ -90,7 +90,7 @@ struct MemoryStorageTests {
         )
         #expect(firstUsage == 10)
 
-        // When: a second entry is allocated reusing that reported usage as `knownUsage` — the
+        // When: a second entry is allocated reusing that reported usage as `knownUsage`, the
         // shape `DataCache.Storage` relies on to thread the estimate across calls.
         let (_, secondUsage) = storage.allocateBuffer(
             key: "k2",
@@ -104,9 +104,9 @@ struct MemoryStorageTests {
         #expect(secondUsage == 30)
     }
 
-    /// Regression coverage for the memory-tier race `DataCache.discardFailedWrite` used to be
-    /// exposed to: a plain `remove(_:)` deletes whatever record currently sits at `key`, even
-    /// one a concurrent write installed after the caller's own record was replaced.
+    /// The memory-tier race `DataCache.discardFailedWrite` has to avoid: a plain `remove(_:)`
+    /// deletes whatever record currently sits at `key`, even one a concurrent write installed
+    /// after the caller's own record was replaced.
     @Test
     func remove_ifDataURL_whenRecordWasReplaced_shouldLeaveTheReplacementInPlace() async throws {
         var storage = MemoryStorage(directory: URL(fileURLWithPath: "/tmp"))
@@ -133,7 +133,7 @@ struct MemoryStorageTests {
         // When: the first write's cleanup runs, targeting the record it originally allocated.
         storage.remove("k1", ifDataURL: firstDataURL0)
 
-        // Then: the second write's record — the current one — is untouched.
+        // Then: the second write's record, the current one, is untouched.
         #expect(await storage["k1"] != nil)
     }
 

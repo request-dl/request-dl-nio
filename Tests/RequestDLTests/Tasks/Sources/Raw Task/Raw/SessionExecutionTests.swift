@@ -3,7 +3,7 @@
 //
 
 // This whole file drives `Internals.Session.client()`/`.execute(client:request:...)` and
-// `RequestConfiguration.build(eventLoop:)` directly -- the `.nio`-only low-level dispatch path
+// `RequestConfiguration.build(eventLoop:)` directly: the `.nio`-only low-level dispatch path
 // `RawTask.executeTraced` itself uses, all three gated `#if canImport(NIOCore)` at their own
 // declarations, with no `.urlSession` equivalent to take over here: that side of the same public
 // API is already covered end to end by `DataTaskTests`/`RawTaskExecutorDispatchTests`.
@@ -30,7 +30,7 @@ import struct Foundation.URL
 /// `applyCompression()` + `client()` + `execute(client:request:...)` half of that pipeline
 /// (`RawTask.executeTraced` is the other caller of the first of those).
 ///
-/// Compression itself is no longer read off `session.configuration`: it's already captured on
+/// Compression itself isn't read off `session.configuration`: it's already captured on
 /// `requestConfiguration` (via `Property.compression(_:onDuplicateHeader:shouldCompressBodyData:)`)
 /// by the time this runs, same as `RawTask.executeTraced` sees it.
 private func execute(
@@ -83,7 +83,7 @@ struct SessionExecutionTests {
 
             // Same dedicated pool `Session.localServer` (see LocalServerSession.swift) gives the
             // rest of this suite family, not `.shared`. `.shared` is `MultiThreadedEventLoopGroup
-            // .shared` — one thread, process-wide — and this file's own
+            // .shared`, one thread, process-wide, and this file's own
             // `session_whenUploadingFile_shouldBeValid` pushes 100MB through it in the same run
             // as three tests that expect a prompt response; on that single thread, the upload
             // starves the others until they hit `connectTimeout`.
@@ -92,8 +92,7 @@ struct SessionExecutionTests {
             // `LocalServer.ServerManager.shared`'s server-side group (LocalServer.swift) is also
             // process-wide, shared with every other LocalServer-backed suite; AsyncHTTPClient's
             // 10s default connect timeout can be too tight for this suite's requests when heavy
-            // CI contention queues its TLS handshake behind other suites' traffic (ci-triage/
-            // TASKS.md T1b).
+            // CI contention queues its TLS handshake behind other suites' traffic.
             configuration.timeout.connect = 60_000_000_000
 
             session = Internals.Session(

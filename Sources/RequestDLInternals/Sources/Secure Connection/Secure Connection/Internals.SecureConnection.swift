@@ -20,17 +20,20 @@ extension Internals {
         /// - Note: `certificateChain`/`privateKey` (mTLS, via `tlsLocalIdentityNetworkFramework`),
         /// `tlsPins` (SPKI pinning), `additionalTrustRoots`, `.noHostnameVerification`,
         /// `revocationPolicy`, and `trustDecisionObserver` all reach Network.framework, through the
-        /// two trust/identity hooks `Internals.NIOTrustEvaluator`/`makeLocalIdentityForNetworkFramework()`
-        /// install -- except a `certificateChain` resolving to more than one certificate, which
+        /// two trust/identity hooks
+        /// `Internals.NIOTrustEvaluator`/`makeLocalIdentityForNetworkFramework()` install, except a
+        /// `certificateChain` resolving to more than one certificate, which
         /// `networkFrameworkIncompatibilityReasons()` below flags instead, since
         /// `makeLocalIdentityForNetworkFramework()` has no way to carry the rest alongside the
-        /// `SecIdentity` it builds. None of `additionalTrustRoots`/`.noHostnameVerification`/`revocationPolicy`/
+        /// `SecIdentity` it builds. None of
+        /// `additionalTrustRoots`/`.noHostnameVerification`/`revocationPolicy`/
         /// `trustDecisionObserver` has a native Network.framework counterpart (unlike `trustRoots`,
-        /// which `getNWProtocolTLSOptions` does carry over, or NIOSSL's own `certificateVerification`
-        /// flag). `Internals.NIOTrustEvaluator` is what makes all four work there: it installs
-        /// `tlsCustomVerificationNetworkFramework` whenever any one is configured, independently of
-        /// whether SPKI pinning is also active, and swaps in a hostname-less policy and/or a
-        /// revocation policy on the `SecTrust` it's handed only when those are actually configured
+        /// which `getNWProtocolTLSOptions` does carry over, or NIOSSL's own
+        /// `certificateVerification` flag). `Internals.NIOTrustEvaluator` is what makes all four
+        /// work there: it installs `tlsCustomVerificationNetworkFramework` whenever any one is
+        /// configured, independently of whether SPKI pinning is also active, and swaps in a
+        /// hostname-less policy and/or a revocation policy on the `SecTrust` it's handed only when
+        /// those are actually configured
         /// (`Internals.DarwinTrustEvaluation.prepare(_:skipsHostnameVerification:)`).
         ///
         /// `build()`'s NIOSSL-facing `tlsCustomVerification` stays gated to pins, `revocationPolicy`,
@@ -124,23 +127,22 @@ extension Internals {
             if pskIdentityResolver != nil { reasons.append(.pskIdentityResolver) }
             #endif
 
-            // `makeLocalIdentityForNetworkFramework()` below only ever builds the
-            // `SecIdentity`-backed `tlsLocalIdentityNetworkFramework` from the *first* certificate
-            // in the chain: unlike `.urlSession` (`Internals.URLSessionIdentityPolicy`, which
-            // hands the rest to `URLCredential(identity:certificates:persistence:)`) or `.nio`
-            // (whose NIOSSL `TLSConfiguration.certificateChain` carries every certificate),
-            // AsyncHTTPClient's NIOTransportServices bridge has no equivalent "plus these
-            // supplementary certificates" API alongside a `SecIdentity` for this package to use.
-            // A server that doesn't already have the intermediate in its own trust store can't
-            // complete the chain from a leaf-only presentation and rejects the handshake with
-            // `unknown_ca` -- confirmed end to end, not assumed (a real three-level chain against
-            // a server trusting only the root).
+            // `makeLocalIdentityForNetworkFramework()` below only builds the `SecIdentity`-backed
+            // `tlsLocalIdentityNetworkFramework` from the *first* certificate in the chain. Unlike
+            // `.urlSession` (`Internals.URLSessionIdentityPolicy`, which hands the rest to
+            // `URLCredential(identity:certificates:persistence:)`) or `.nio` (whose NIOSSL
+            // `TLSConfiguration.certificateChain` carries every certificate), AsyncHTTPClient's
+            // NIOTransportServices bridge has no equivalent "plus these supplementary certificates"
+            // API alongside a `SecIdentity` for this package to use. A server that doesn't already
+            // have the intermediate in its own trust store can't complete the chain from a
+            // leaf-only presentation and rejects the handshake with `unknown_ca` (confirmed end to
+            // end with a real three-level chain against a server trusting only the root).
             //
             // Only catches `certificateChain`'s `.certificates([Certificate])` case (what
-            // `Certificates { Certificate(leaf); Certificate(intermediate) }` -- the DSL's own
-            // multi-certificate composition -- produces), since counting certificates bundled
-            // inside a `.file`/`.bytes` blob needs parsing it, and every other reason here is a
-            // cheap, synchronous field check. A concatenated multi-certificate PEM handed to
+            // `Certificates { Certificate(leaf); Certificate(intermediate) }`, the DSL's own
+            // multi-certificate composition, produces), since counting certificates bundled inside
+            // a `.file`/`.bytes` blob needs parsing it, and every other reason here is a cheap,
+            // synchronous field check. A concatenated multi-certificate PEM handed to
             // `Certificates(_:)`'s single-file/single-bytes initializer isn't caught by this.
             if case .certificates(let certificates) = certificateChain, certificates.count > 1 {
                 reasons.append(.multipleClientCertificatesUnderNetworkFramework)
@@ -164,15 +166,14 @@ extension Internals {
         ///
         /// Also deliberately does *not* check `minimumTLSVersion` or `maximumTLSVersion`.
         /// `minimumTLSVersion` has a real, reachable equivalent under URLSession (an ATS
-        /// `NSExceptionMinimumTLSVersion` entry in the app's Info.plist), so flagging it here
-        /// would push callers off `.urlSession` even when they have a working alternative.
+        /// `NSExceptionMinimumTLSVersion` entry in the app's Info.plist), so flagging it here would
+        /// push callers off `.urlSession` even when they have a working alternative.
         /// `maximumTLSVersion` has a *direct* equivalent instead: `buildURLSessionConfiguration()`
         /// maps it straight onto `URLSessionConfiguration.tlsMaximumSupportedProtocolVersion`, the
-        /// same way `minimumTLSVersion` maps onto `tlsMinimumSupportedProtocolVersion`. Flagging
-        /// it here used to force every such session onto NIO for no reason, making that mapping
-        /// permanently unreachable dead code. `applicationProtocols` has no such alternative --
-        /// there is no ATS key or `URLSessionConfiguration` property for ALPN -- so that one
-        /// alone *is* still flagged.
+        /// same way `minimumTLSVersion` maps onto `tlsMinimumSupportedProtocolVersion`, so flagging
+        /// it would force every such session onto NIO for no reason. `applicationProtocols` has no
+        /// such alternative (there is no ATS key or `URLSessionConfiguration` property for ALPN),
+        /// so that one alone *is* still flagged.
         package func urlSessionIncompatibilityReasons() -> [Internals.ExecutorIncompatibilityReason] {
             var reasons: [Internals.ExecutorIncompatibilityReason] = []
 
@@ -421,12 +422,12 @@ extension Internals.SecureConnection: Equatable {
             && isKeyLoggerAndPSKEqual
             && lhs.certificateVerification == rhs.certificateVerification
             && lhs.trustRoots == rhs.trustRoots
-            // Latent today: every public path keeps this in lockstep with `trustRoots == nil`,
-            // so no configuration reachable through `Property` can differ here without also
-            // differing above. Compared anyway, because what this equality decides is whether a
-            // pooled client is handed back for a different configuration — the one place where
-            // "these two fields happen to move together right now" is not a safe thing to rely
-            // on the next time someone adds a path that sets them apart.
+            // Latent today: every public path keeps this in lockstep with `trustRoots == nil`, so
+            // no configuration reachable through `Property` can differ here without also differing
+            // above. Compared anyway, because what this equality decides is whether a pooled client
+            // is handed back for a different configuration, and "these two fields happen to move
+            // together right now" is not safe to rely on the next time someone adds a path that
+            // sets them apart.
             && lhs.useDefaultTrustRoots == rhs.useDefaultTrustRoots
             && lhs.additionalTrustRoots == rhs.additionalTrustRoots
             && lhs.signingSignatureAlgorithms == rhs.signingSignatureAlgorithms

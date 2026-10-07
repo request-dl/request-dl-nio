@@ -78,9 +78,9 @@ public struct Authorization: Property {
         property.assertPathway()
         // A plain `HeaderNode`, not a private node of its own: `HeaderGroup` (and `Form`'s
         // per-part headers) collect their content by searching for `HeaderNode`, so a private
-        // node was silently dropped there and the request went out unauthenticated.
+        // node would be silently dropped there and the request would go out unauthenticated.
         // `HeaderNode` already treats `Authorization` as single-valued, so this still replaces
-        // any earlier value exactly like the old direct `headers.set(...)` did.
+        // any earlier value.
         return .leaf(
             HeaderNode(
                 key: "Authorization",

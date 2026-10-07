@@ -134,11 +134,10 @@ struct CachedRequestTests {
     @Test
     func cache_whenUseCachedDataOnlyStrategyWithValidCacheMaxAge() async throws {
         let testState = try await TestState()
-        // A wide `max-age`, not the two seconds `cache_whenUseCachedDataOnlyStrategyWithInvalidCacheMaxAge`
-        // waits past. This test never sleeps, so its window only has to outlast the actual
-        // request/response round trip below — on a loaded CI simulator that alone can exceed a
-        // couple of seconds, which was flaking this test even though the cache itself was still
-        // perfectly valid.
+        // A wide `max-age`, not the two seconds
+        // `cache_whenUseCachedDataOnlyStrategyWithInvalidCacheMaxAge` waits past. This test never
+        // sleeps, so its window only has to outlast the actual request/response round trip below,
+        // which on a loaded CI simulator alone can exceed a couple of seconds.
         let cacheData = await mockCachedData(makeHeaders(maxAgeSeconds: 3_600))
         let cacheKey = "https://localhost:8888" + testState.uri
 
@@ -189,13 +188,13 @@ struct CachedRequestTests {
         #expect(thrownError is EmptyCachedDataError)
     }
 
-    /// Regression test: `isCachedDataValid`'s max-age freshness check used to be guarded by
-    /// `maxAge > .zero`, so `Cache-Control: max-age=0` — a common, valid directive meaning
-    /// "cacheable, but revalidate before every reuse" — skipped the check entirely instead of
-    /// being treated as immediately stale, and (with no `Expires` header, the common modern
-    /// pattern of relying on `Cache-Control` alone) the entry was reported valid forever. No
-    /// sleep needed here, unlike `cache_whenUseCachedDataOnlyStrategyWithInvalidCacheMaxAge`:
-    /// `max-age=0` must already be stale the instant it's checked.
+    /// `isCachedDataValid`'s max-age freshness check must not be skipped for
+    /// `Cache-Control: max-age=0`, a common, valid directive meaning "cacheable, but revalidate
+    /// before every reuse". It has to be treated as immediately stale, since otherwise (with no
+    /// `Expires` header, the common modern pattern of relying on `Cache-Control` alone) the entry
+    /// would be reported valid forever. No sleep needed here, unlike
+    /// `cache_whenUseCachedDataOnlyStrategyWithInvalidCacheMaxAge`: `max-age=0` must already be
+    /// stale the instant it's checked.
     @Test
     func cache_whenUseCachedDataOnlyStrategyWithMaxAgeZero_treatsCacheAsInvalid() async throws {
         let testState = try await TestState()
@@ -223,11 +222,10 @@ struct CachedRequestTests {
     @Test
     func cache_whenUseCachedDataOnlyStrategyWithValidCacheExpires() async throws {
         let testState = try await TestState()
-        // A wide `Expires` window, not the two seconds `cache_whenUseCachedDataOnlyStrategyWithInvalidCacheExpires`
-        // waits past. This test never sleeps, so its window only has to outlast the actual
-        // request/response round trip below — on a loaded CI simulator that alone can exceed a
-        // couple of seconds, which was flaking this test even though the cache itself was still
-        // perfectly valid.
+        // A wide `Expires` window, not the two seconds
+        // `cache_whenUseCachedDataOnlyStrategyWithInvalidCacheExpires` waits past. This test never
+        // sleeps, so its window only has to outlast the actual request/response round trip below,
+        // which on a loaded CI simulator alone can exceed a couple of seconds.
         let cacheData = await mockCachedData(makeHeaders(maxAge: false, expiresOffsetSeconds: 3_600))
         let cacheKey = "https://localhost:8888" + testState.uri
 
@@ -281,7 +279,7 @@ struct CachedRequestTests {
     @Test
     func cache_whenReturnCachedDataElseLoadWithValidCache() async throws {
         let testState = try await TestState()
-        // A wide `max-age` — this test never sleeps, so its window only has to outlast the
+        // A wide `max-age`: this test never sleeps, so its window only has to outlast the
         // actual request/response round trip below, not a fixed couple of seconds. See the
         // identical reasoning on `cache_whenUseCachedDataOnlyStrategyWithValidCacheMaxAge`.
         let cacheData = await mockCachedData(makeHeaders(maxAgeSeconds: 3_600))
@@ -314,24 +312,23 @@ struct CachedRequestTests {
         let encryptionKey = DataCache.EncryptionKey(Data(repeating: 0x07, count: 32))
         testState.dataCache.encryptionKey = encryptionKey
 
-        // `policy: .disk` — the memory tier stays unencrypted and is deliberately out of scope
-        // (see the discussion this feature came out of), so a `.all`-policy entry would let a
-        // memory hit shadow the disk read entirely and this test would pass regardless of
-        // whether the encrypted disk path works at all. Disk-only forces the read this test
-        // actually cares about — which also means it has no memory-tier fast path to fall back
-        // on, so a wide `max-age` matters here too: see the reasoning on
+        // `policy: .disk`: the memory tier stays unencrypted and is deliberately out of scope, so a
+        // `.all`-policy entry would let a memory hit shadow the disk read entirely and this test
+        // would pass regardless of whether the encrypted disk path works at all. Disk-only forces
+        // the read this test actually cares about, which also means it has no memory-tier fast path
+        // to fall back on, so a wide `max-age` matters here too: see the reasoning on
         // `cache_whenUseCachedDataOnlyStrategyWithValidCacheMaxAge`.
         let cacheData = await mockCachedData(makeHeaders(maxAgeSeconds: 3_600), policy: .disk)
         let cacheKey = "https://localhost:8888" + testState.uri
 
-        // When: seeded through the real encrypted disk tier — `setCachedData` routes through
+        // When: seeded through the real encrypted disk tier: `setCachedData` routes through
         // `DiskStorage.allocateBuffer`, honoring whatever key is set on the shared `Storage` this
         // directory resolves to, exactly like a real write would.
         await testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
 
         // Passed through the request too, the way an app configuring encryption per request would.
-        // (Leaving it only on `testState.dataCache` works as well now: a request that doesn't
-        // specify a key leaves the shared `Storage`'s key alone — see `CachePropertiesTests`'
+        // (Leaving it only on `testState.dataCache` works as well: a request that doesn't specify a
+        // key leaves the shared `Storage`'s key alone, see `CachePropertiesTests`'
         // `cache_whenEncryptionKeyNotSpecified_preservesTheCachesExistingKey`.)
         let response = try await performCacheRequest(
             testState: testState,
@@ -347,15 +344,15 @@ struct CachedRequestTests {
             policy: .all
         )
 
-        // Then: this is the critical regression test for at-rest encryption on the disk tier.
+        // Then: this is the critical test for at-rest encryption on the disk tier.
         // `isCachedDataValid` rejects an entry whose `buffer.readableBytes` doesn't match the
-        // origin's `Content-Length` — if `EncryptedFileBufferURL.writtenBytes` ever reported the
+        // origin's `Content-Length`: if `EncryptedFileBufferURL.writtenBytes` ever reported the
         // real (ciphertext-plus-framing) file size instead of the logical plaintext size, that
         // check would fail for every encrypted entry, permanently, and every request would fall
         // through to a live fetch instead of ever hitting the cache. `cacheData.response` is
         // synthetic (a fixed URL/status/headers that bear no resemblance to what the local test
         // server actually returns), so equality here can only hold if the seeded, encrypted entry
-        // was read back and judged valid — a genuine re-fetch could not produce a matching value.
+        // was read back and judged valid; a genuine re-fetch could not produce a matching value.
         #expect(updatedCachedData?.response == cacheData.response)
         #expect(response.head == cacheData.response)
     }
@@ -687,14 +684,14 @@ struct CachedRequestTests {
         #expect(cachedData == nil)
     }
 
-    /// Regression coverage: `getUpdatedHeadersForCache`'s 304 branch used to return
-    /// `cachedData.response.headers` (the stale, already-cached headers) instead of the fresh
-    /// 304 response's own headers. `updateCacheHeaders` then always compared the cached headers
-    /// against themselves, found no difference, and `validateCachedData` returned the cache entry
-    /// completely unmodified — `CachedResponse.date` never refreshed, so a 304 could never
-    /// actually extend an already-cached entry's freshness (RFC 9111 §4.3.4), the one thing
-    /// revalidation exists to do. A 304 carrying a genuinely different `Cache-Control`/`Expires`
-    /// must now be adopted, the same as the non-304 fallback path already does (see
+    /// `getUpdatedHeadersForCache`'s 304 branch must return the fresh 304 response's own headers,
+    /// not `cachedData.response.headers` (the stale, already-cached ones). Otherwise
+    /// `updateCacheHeaders` would always compare the cached headers against themselves, find no
+    /// difference, and `validateCachedData` would return the cache entry completely unmodified:
+    /// `CachedResponse.date` would never refresh, so a 304 could never extend an already-cached
+    /// entry's freshness (RFC 9111 §4.3.4), the one thing revalidation exists to do. A 304
+    /// carrying a genuinely different `Cache-Control`/`Expires` must be adopted, the same as the
+    /// non-304 fallback path does (see
     /// `cache_whenReloadAndValidateCachedDataHeadersChange_updatesCachedHeaders` below).
     @Test
     func cache_whenReloadAndValidateCachedDataReceives304_adoptsFreshCacheDirectives() async throws {
@@ -741,7 +738,7 @@ struct CachedRequestTests {
         await testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
 
         // A non-304, same-`ETag` response takes the fallback path in `getUpdatedHeadersForCache`
-        // that hands back the fresh response's own headers instead of the cached ones — the only
+        // that hands back the fresh response's own headers instead of the cached ones: the only
         // reachable route (given this fixture's server always answers 200) to a genuine
         // `Cache-Control` change between the cached entry and what revalidation just returned.
         let response = try await performCacheRequest(
@@ -883,7 +880,7 @@ struct CachedRequestTests {
         // When
         // A capacity smaller than any real response makes `MemoryStorage`/`DiskStorage`
         // decline the entry for size, so `cacheIfNeeded` writes nowhere and nothing ends up
-        // cached — passed explicitly through `.cache(memoryCapacity:diskCapacity:url:)` rather
+        // cached. It is passed explicitly through `.cache(memoryCapacity:diskCapacity:url:)` rather
         // than mutated on `testState.dataCache` directly, since `Internals.CacheConfiguration`
         // floors any unset/zero capacity back up to 2 MiB (see its `minimumCapacity`), which
         // would silently undo an external override made before the request runs.
@@ -957,7 +954,7 @@ struct CachedRequestTests {
 
         // When
         // `.returnCachedDataElseLoad` alone would hit the network since there's no cached
-        // entry yet — `CacheHeader().onlyIfCached(true)` must escalate this to behave like
+        // entry yet: `CacheHeader().onlyIfCached(true)` must escalate this to behave like
         // `.useCachedDataOnly` instead.
         do {
             _ = try await performCacheRequest(
@@ -980,7 +977,7 @@ struct CachedRequestTests {
         defer { _ = testState }
 
         // When
-        // `only-if-cached` addresses caches downstream of this client (a CDN or proxy) — with no
+        // `only-if-cached` addresses caches downstream of this client (a CDN or proxy): with no
         // `.cachePolicy(_:)` configured, this package's own on-disk cache was never opted into,
         // so the directive must not force `EmptyCachedDataError` locally; the request should just
         // go through normally.
@@ -1008,7 +1005,7 @@ struct CachedRequestTests {
         await testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
 
         // `.returnCachedDataElseLoad` alone would serve the stale cached entry without ever
-        // asking the server — `CacheHeader().cached(false)` (`no-cache`) must escalate this to
+        // asking the server: `CacheHeader().cached(false)` (`no-cache`) must escalate this to
         // revalidate, so the fresh ETag from the server wins.
         let response = try await performCacheRequest(
             testState: testState,
@@ -1185,7 +1182,7 @@ extension CachedRequestTests {
             // reason: the "still valid" tests need a window wide enough to outlast the actual
             // request/response round trip (TLS handshake to the local server, cache lookup, and
             // everything in between) on a loaded CI simulator, not just the fixed two seconds
-            // `waitCacheExpiration()` sleeps past for the "already expired" ones — which is what
+            // `waitCacheExpiration()` sleeps past for the "already expired" ones, which is what
             // the default here still matches.
             headers.append(("Cache-Control", "public, max-age=\(maxAgeSeconds)"))
         } else {

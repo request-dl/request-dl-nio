@@ -18,7 +18,7 @@ enum MultipartFormParserError: Error {
 extension MultipartFormParserError {
 
     /// `LocalizedError` is not part of `FoundationEssentials`, and nothing reads this through
-    /// that protocol — a plain member carries the same description.
+    /// that protocol, so a plain member carries the same description.
     var errorDescription: String? {
         switch self {
         case .rawDataInvalid:

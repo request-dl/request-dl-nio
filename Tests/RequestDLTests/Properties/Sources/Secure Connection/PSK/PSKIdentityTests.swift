@@ -53,8 +53,8 @@ struct PSKIdentityTests {
     @Test
     func identity_whenUsedWithoutEnclosingSecureConnection_shouldStillBeValid() async throws {
         // Given
-        // Regression test: `PSKIdentity` used to require an enclosing `SecureConnection`. The
-        // base `Internals.SecureConnection` is now created lazily the first time it's needed.
+        // `PSKIdentity` must not require an enclosing `SecureConnection`. The base
+        // `Internals.SecureConnection` is created lazily the first time it's needed.
         let identity = "host"
         let key = NIOSSLSecureBytes([0, 1, 2])
 

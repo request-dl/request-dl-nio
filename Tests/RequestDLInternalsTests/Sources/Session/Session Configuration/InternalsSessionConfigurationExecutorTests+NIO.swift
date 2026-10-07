@@ -122,10 +122,10 @@ extension InternalsSessionConfigurationExecutorTests {
         #endif
     }
 
-    /// Regression coverage: `maximumTLSVersion` used to be listed in
-    /// `SecureConnection.urlSessionIncompatibilityReasons()`, pushing resolution away from
-    /// `.urlSession` despite `buildURLSessionConfiguration()` mapping it directly onto
-    /// `URLSessionConfiguration.tlsMaximumSupportedProtocolVersion` -- unlike `applicationProtocols`
+    /// `maximumTLSVersion` must not be listed in
+    /// `SecureConnection.urlSessionIncompatibilityReasons()`, since
+    /// `buildURLSessionConfiguration()` maps it directly onto
+    /// `URLSessionConfiguration.tlsMaximumSupportedProtocolVersion`. Unlike `applicationProtocols`
     /// right below, which genuinely has no URLSession-reachable equivalent and must still fall
     /// back. See `InternalsSecureConnectionTests`'s
     /// `secureConnection_whenMaximumTLSVersionSet_remainsCompatible`.
@@ -185,11 +185,10 @@ extension InternalsSessionConfigurationExecutorTests {
         return secureConnection
     }
 
-    /// Regression coverage for the gap `.clientIdentityWithProxyUnderNetworkFramework` closes:
+    /// The gap `.clientIdentityWithProxyUnderNetworkFramework` closes:
     /// `SecureConnection.networkFrameworkIncompatibilityReasons()` alone can't see this, since
-    /// `proxy` lives one level up, on `Internals.Session.Configuration` itself -- confirmed
-    /// end-to-end (real mTLS handshake through a real `CONNECT` tunnel) by
-    /// `DataTaskTests`'s
+    /// `proxy` lives one level up, on `Internals.Session.Configuration` itself. Confirmed
+    /// end-to-end (real mTLS handshake through a real `CONNECT` tunnel) by `DataTaskTests`'s
     /// `dataTask_whenCAEnabledBehindProxyAndNIOTransportServicesPreferred_fallsBackToNIOAndCompletesHandshake`/
     /// `..._Required_throwsExecutorRequirementError`.
     @Test
@@ -229,7 +228,7 @@ extension InternalsSessionConfigurationExecutorTests {
     func resolveExecutor_whenProxyAndClientIdentitySetAndNIOTransportServicesPreferred_fallsBackToNIO() async throws {
         // Given: compatible with `.urlSession` (mTLS behind a proxy works fine there, via a
         // Keychain round trip), so an unrelated URLSession-incompatible field also has to be set
-        // to isolate this test to the NIOTransportServices-side fallback specifically -- the same
+        // to isolate this test to the NIOTransportServices-side fallback specifically, the same
         // reason `DataTaskTests`'s end-to-end version of this rules `.urlSession` out via proxy
         // `connectHeaders` rather than a bare `connection: .http` proxy.
         var configuration = Internals.Session.Configuration()
@@ -305,9 +304,9 @@ extension InternalsSessionConfigurationExecutorTests {
     /// compatible candidates, not honor the preference anyway. Here, that's all the way to `.nio`,
     /// since the field used also rules out `.urlSession`.
     ///
-    /// There's no longer a field that rules out only `.nioTransportServices` while sparing
-    /// `.urlSession`: `additionalTrustRoots` and `.noHostnameVerification` were the last two, and
-    /// `Internals.NIOTrustEvaluator` closed both gaps (see the `..._resolvesToItOverURLSession`
+    /// No field rules out only `.nioTransportServices` while sparing `.urlSession`:
+    /// `additionalTrustRoots` and `.noHostnameVerification` were the last two, and
+    /// `Internals.NIOTrustEvaluator` closes both gaps (see the `..._resolvesToItOverURLSession`
     /// tests above). Every remaining incompatible field rejects both executors identically (see
     /// `resolveExecutor_whenIncompatibleWithBothURLSessionAndNIOTransportServices_resolvesToNIO`).
     @Test
@@ -355,7 +354,7 @@ extension InternalsSessionConfigurationExecutorTests {
     /// NIOTransportServices-vs-plain-NIO answer drives a real request, `.urlSession`'s default
     /// first-priority position would otherwise silently take over for a caller who only ever set
     /// this flag, changing which transport they get without them touching a single line of their
-    /// own code. This section is the regression coverage for treating the flag as an implicit
+    /// own code. This section covers treating the flag as an implicit
     /// `preferredExecutor(.nioTransportServices)` specifically to prevent that.
     @Test
     func resolveExecutor_whenNetworkFrameworkEnabledWithoutExplicitPreference_resolvesToNIOTransportServices()
@@ -402,16 +401,14 @@ extension InternalsSessionConfigurationExecutorTests {
 
     // MARK: - resolveExecutor() with requiredExecutor
 
-    /// Regression coverage for a real bug end-to-end testing caught: `resolveExecutor()`'s own
-    /// doc comment already claimed `requiredExecutor` "lets a caller override it," but the
-    /// implementation below only ever consulted `preferredExecutor`.
+    /// `resolveExecutor()`'s own doc comment claims `requiredExecutor` "lets a caller override
+    /// it," so it has to consult `requiredExecutor`, not only `preferredExecutor`.
     ///
-    /// `requiredExecutor(.nio)` validated (via `requireExecutor(_:)`, called separately) without
-    /// ever actually being the executor a real request dispatched over; `resolveExecutor()`
-    /// picked `.urlSession` anyway on a compatible config, silently. Caught by a `DataTaskTests`
-    /// test pinning `.requiredExecutor(.nio)` to keep a client-cert mTLS test off `.urlSession`'s
-    /// unconditional Keychain-Sharing gap, which kept hitting that gap anyway until this was
-    /// fixed.
+    /// `requiredExecutor(.nio)` has to be the executor a real request dispatches over, not merely
+    /// validate (via `requireExecutor(_:)`, called separately): resolving to `.urlSession` on a
+    /// compatible config, silently, would defeat a `DataTaskTests` test pinning
+    /// `.requiredExecutor(.nio)` to keep a client-cert mTLS test off `.urlSession`'s
+    /// unconditional Keychain-Sharing gap.
     @Test
     func resolveExecutor_whenNIORequired_resolvesToNIORegardlessOfPreferredExecutorOrCompatibility() async throws {
         // Given: compatible with `.urlSession`, and even prefers it, yet `.nio` is required.
@@ -493,13 +490,12 @@ extension InternalsSessionConfigurationExecutorTests {
         }
     }
 
-    /// Regression coverage for `Internals.ExecutorIncompatibilityReason
-    /// .multipleClientCertificatesUnderNetworkFramework`, proven at the resolution-logic level
-    /// without a live network round trip: `Internals.SecureConnection
-    /// .makeLocalIdentityForNetworkFramework()` only ever builds its `SecIdentity` from a
-    /// `certificateChain`'s first certificate, so a chain of more than one (leaf plus at least
-    /// one intermediate) must steer resolution off `.nioTransportServices` the same way
-    /// `cipherSuiteValues` etc. already do. See `DataTaskTests+NIO`'s
+    /// `Internals.ExecutorIncompatibilityReason .multipleClientCertificatesUnderNetworkFramework`,
+    /// proven at the resolution-logic level without a live network round trip:
+    /// `Internals.SecureConnection .makeLocalIdentityForNetworkFramework()` only ever builds its
+    /// `SecIdentity` from a `certificateChain`'s first certificate, so a chain of more than one
+    /// (leaf plus at least one intermediate) must steer resolution off `.nioTransportServices` the
+    /// same way `cipherSuiteValues` etc. already do. See `DataTaskTests+NIO`'s
     /// `dataTask_whenClientCertificateChainHasIntermediateUnderNIORequired_completesHandshake`/
     /// `dataTask_whenClientCertificateChainHasIntermediateAndNIOTransportServicesRequired_throwsExecutorError`
     /// for the end-to-end confirmation this unit test only asserts the *decision* for.
@@ -547,7 +543,7 @@ extension InternalsSessionConfigurationExecutorTests {
     }
 
     /// Unlike every other `..._fallsBackToNIO` case above, a multi-certificate chain does *not*
-    /// rule out `.urlSession` -- `URLCredential(identity:certificates:persistence:)` genuinely
+    /// rule out `.urlSession`: `URLCredential(identity:certificates:persistence:)` genuinely
     /// carries supplementary certificates alongside an identity, the same way NIOSSL's own
     /// `TLSConfiguration.certificateChain` does. So a preference for `.nioTransportServices` the
     /// configuration can't actually satisfy falls through to `.urlSession` (still ahead of `.nio`
@@ -580,8 +576,8 @@ extension InternalsSessionConfigurationExecutorTests {
 
     @Test
     func requireExecutor_whenNIOTransportServicesPinnedWithAdditionalTrustRootsOnly_doesNotThrow() async throws {
-        // Given: regression coverage for the gap `Internals.NIOTrustEvaluator` closed:
-        // `additionalTrustRoots` alone, with no SPKI pinning, used to throw here.
+        // Given: the gap `Internals.NIOTrustEvaluator` closes: `additionalTrustRoots` alone,
+        // with no SPKI pinning, must not throw here.
         var configuration = Internals.Session.Configuration()
 
         var secureConnection = Internals.SecureConnection()

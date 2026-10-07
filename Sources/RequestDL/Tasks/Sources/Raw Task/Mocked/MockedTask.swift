@@ -5,14 +5,15 @@
 /// A task that mirrors a resolved request back as its own response, without performing any real
 /// network call.
 ///
-/// The `content` block is a request description just like any other task's — ``RequestDL/BaseURL``,
+/// The `content` block is a request description just like any other task's: ``RequestDL/BaseURL``,
 /// ``RequestDL/HeaderGroup``, ``RequestDL/AcceptHeader``, ``RequestDL/Authorization``,
 /// ``RequestDL/Payload``, and so on. Resolving it produces the mocked response: every header the
 /// request would carry (including `Content-Type`/`Content-Length` from ``RequestDL/Payload``) is
 /// copied onto the response, and ``RequestDL/Payload``'s bytes become the response body. That makes
-/// `MockedTask` a way to inspect exactly what a request would look like — URL, headers, encoded body
-/// — by running it through the same result-processing pipeline (``RequestDL/RequestTask/collectData()-3viv5``,
-/// modifiers, `.decode(_:)`, ...) a real task would use, without a live server.
+/// `MockedTask` a way to inspect exactly what a request would look like (URL, headers, encoded
+/// body) by running it through the same result-processing pipeline
+/// (``RequestDL/RequestTask/collectData()-3viv5``, modifiers, `.decode(_:)`, ...) a real task would
+/// use, without a live server.
 ///
 /// ```swift
 /// MockedTask(
@@ -35,16 +36,16 @@
 /// )
 /// ```
 ///
-/// Use `headers` to overlay something that isn't part of the request itself — a synthetic
-/// response-only header, for instance. Use `delay` to simulate network latency, and the
+/// Use `headers` to overlay something that isn't part of the request itself, such as a
+/// synthetic response-only header. Use `delay` to simulate network latency, and the
 /// ``MockedTask/init(throwing:delay:)`` initializer to simulate a transport-level failure (a thrown
 /// error) instead of a response, for exercising a consumer's error-handling paths without a live
 /// server.
 ///
 /// > Note: If `content` configures a data cache and a matching entry already exists for the
-/// resolved URL, that cached response is returned instead of the mocked one —
-/// the mock only supplies what gets *written* to an empty cache, not what is served once one is
-/// populated. A `cacheStrategy(.useCachedDataOnly)` is also remapped internally to
+/// resolved URL, that cached response is returned instead of the mocked one: the mock only
+/// supplies what gets *written* to an empty cache, not what is served once one is populated.
+/// A `cacheStrategy(.useCachedDataOnly)` is also remapped internally to
 /// `.returnCachedDataElseLoad`, since a mock has no real cache to serve on a miss and the original
 /// strategy would otherwise always fail.
 public struct MockedTask: RequestTask {

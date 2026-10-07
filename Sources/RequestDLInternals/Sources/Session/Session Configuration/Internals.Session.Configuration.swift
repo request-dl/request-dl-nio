@@ -40,7 +40,7 @@ extension Internals.Session {
         /// Excluded from `Equatable`: `any Tracer` isn't `Equatable`, and unlike
         /// `Internals.Proxy.connectHeaders` (which carries session-specific secrets and does
         /// factor into `==`), two sessions differing only in tracer are fine sharing a pooled
-        /// client -- a tracer is an observability sink, not a transport-affecting credential.
+        /// client, since a tracer is an observability sink, not a transport-affecting credential.
         package var tracer: any Tracer = NoOpTracer()
 
         /// Where RequestDL reports what it measured of each request, when asked to: `nil` reports
@@ -58,20 +58,14 @@ extension Internals.Session {
         /// Off by default on every platform: decompression is opt-in, matching the fact that
         /// the risky posture is decompressing unbounded, not leaving compressed bytes alone.
         ///
-        /// This used to differ on Apple platforms, matching URLSession's own forced,
-        /// unconditional auto-decompression there; that divergence only existed because there
-        /// was no way to turn URLSession's transparent decoding off.
-        ///
-        /// `requiresManualURLSessionHandling` below now takes over `Accept-Encoding` (`identity`)
-        /// to get real `.disabled` parity on `.urlSession` too, so the two platforms no longer
-        /// need different defaults.
+        /// `requiresManualURLSessionHandling` below takes over `Accept-Encoding` (`identity`) to
+        /// get real `.disabled` parity on `.urlSession` too, so every platform shares one default.
         package var decompression: Internals.Decompression = .disabled
 
         package var dnsOverride: [String: String] = [:]
 
-        /// Renamed from the old `networkFrameworkWaitForConnectivity`: no longer a straight
-        /// forward to AsyncHTTPClient's own field of that name (which only took effect on
-        /// NIOTransportServices). Consumed by `Internals.NetworkPathGate` instead, via
+        /// Not forwarded to AsyncHTTPClient's own field of the same purpose, which only takes
+        /// effect on NIOTransportServices. Consumed by `Internals.NetworkPathGate` instead, via
         /// `networkPathConstraints`, uniformly across every executor. See `build()`.
         package var waitsForConnectivity: Bool?
         package var allowsCellularAccess: Bool?
@@ -207,7 +201,7 @@ extension Internals.Session.Configuration {
 extension Internals.Session.Configuration {
 
     /// `false` when this configuration can be told, statically, never to compare equal to another
-    /// one — its own future self included — which makes *searching* the pool for it pure cost:
+    /// one (its own future self included), which makes *searching* the pool for it pure cost:
     /// `Internals.ClientManager._reusableItem`'s linear scan is guaranteed to walk the whole list
     /// and find nothing, every single time.
     ///
@@ -245,7 +239,7 @@ extension Internals.Session.Configuration {
     /// Starts from `secureConnection?.networkFrameworkIncompatibilityReasons()` (the fields
     /// `SecureConnection` alone already knows are Network.framework-incompatible), then adds
     /// `.clientIdentityWithProxyUnderNetworkFramework` when both a `proxy` and a client identity
-    /// (`certificateChain`/`privateKey`) are configured together -- something `SecureConnection`
+    /// (`certificateChain`/`privateKey`) are configured together, something `SecureConnection`
     /// can't see on its own, since `proxy` lives here, one level up. See that reason's own doc
     /// comment for why the combination doesn't work.
     package func networkFrameworkIncompatibilityReasons() -> [Internals.ExecutorIncompatibilityReason] {
@@ -386,44 +380,36 @@ extension Internals.Session.Configuration {
     /// ATS, HTTP/3 maturity), then NIOTransportServices, then plain NIO as the universal
     /// fallback. `.urlSession` and `.nioTransportServices` are independent capability checks, not
     /// a hierarchy: a field can be reachable on one and not the other (see
-    /// `urlSessionIncompatibilityReasons()`/`networkFrameworkIncompatibilityReasons()`).
-    /// This is a default ordering, not a fixed law: `preferredExecutor`/`requiredExecutor`
-    /// (public API) let a caller override it.
+    /// `urlSessionIncompatibilityReasons()`/`networkFrameworkIncompatibilityReasons()`). This is a
+    /// default ordering: `preferredExecutor`/`requiredExecutor` (public API) let a caller
+    /// override it.
     ///
     /// - Important: `requiredExecutor`, when set, is returned unconditionally, without
     /// re-checking compatibility here: that check already happened, and already threw if it
     /// failed, in `requireExecutor(_:)` (called separately, before this, by `RawTask.result()`).
     /// A caller that reaches this method with `requiredExecutor` set and never called
-    /// `requireExecutor(_:)` first bypasses that guarantee; same contract `Internals.ClientManager
-    /// .resolvedClient(provider:sessionConfiguration:)`'s own callers already have to honor.
+    /// `requireExecutor(_:)` first bypasses that guarantee, the same contract
+    /// `Internals.ClientManager.resolvedClient(provider:sessionConfiguration:)`'s own callers
+    /// have to honor.
     ///
-    /// - Important: `enableNetworkFramework(true)` (`Session.enableNetworkFramework(_:)`, already
-    /// public/released API predating `preferredExecutor`) is treated as an implicit
-    /// `preferredExecutor(.nioTransportServices)` when nothing else already set one.
-    ///
-    /// This is needed because this method's own NIOTransportServices-vs-plain-NIO answer now
-    /// actually drives a real request (rather than only `enableNetworkFramework`, read
-    /// independently by `Internals.ClientManager.client(provider:sessionConfiguration:)`):
-    /// without the implicit preference, `.urlSession`'s default first-priority position would
-    /// otherwise silently take over for anyone calling only `enableNetworkFramework(true)`, a
-    /// transport switch neither this flag's existing callers nor its own doc comment ever
-    /// signed up for.
-    ///
-    /// An explicit `preferredExecutor` (any case, including `.urlSession`) still wins over this
-    /// implicit one.
+    /// - Important: `enableNetworkFramework(true)` (`Session.enableNetworkFramework(_:)`) is
+    /// treated as an implicit `preferredExecutor(.nioTransportServices)` when nothing else already
+    /// set one. Without it, `.urlSession`'s default first-priority position would silently take
+    /// over for anyone calling only `enableNetworkFramework(true)`, a transport switch that flag
+    /// never signed up for. An explicit `preferredExecutor` (any case, including `.urlSession`)
+    /// still wins over the implicit one.
     ///
     /// - Important: A `Decompressor.requiresURLSession` algorithm (`BrotliURLSessionOnlyAlgorithm`)
     /// is deliberately **not** checked here. Automatic resolution has no explicit instruction to
     /// honor, so it degrades gracefully instead of failing a request outright over an algorithm
-    /// that may never even be exercised (the response might never actually come back `br`-encoded
-    /// at all): worst case, `.nio`/`.nioTransportServices` gets picked and the existing
-    /// manual-dispatch machinery reports the mismatch only if and when a `br` response actually
-    /// arrives, exactly as it already does for every other unresolvable `Content-Encoding`.
+    /// that may never be exercised (the response might never come back `br`-encoded at all):
+    /// worst case, `.nio`/`.nioTransportServices` gets picked and the existing manual-dispatch
+    /// machinery reports the mismatch only if and when a `br` response actually arrives, as it
+    /// already does for every other unresolvable `Content-Encoding`.
     ///
     /// `requireExecutor(_:)` is the one that enforces this eagerly: an explicit
     /// `.requiredExecutor(_:)` pin is a deliberate instruction, and honoring it silently despite a
-    /// guaranteed failure would be the same silent-degradation bug class #289 already fixed for
-    /// every other field here.
+    /// guaranteed failure would silently degrade, as with every other field here.
     package func resolveExecutor() -> Internals.Executor {
         if let requiredExecutor {
             return requiredExecutor
@@ -478,10 +464,9 @@ extension Internals.Session.Configuration {
     /// Hard-pins execution to `executor`, throwing rather than silently falling back when this
     /// configuration can't actually run on it.
     ///
-    /// This is the direct fix for the bug class #289 closed: NIOTransportServices used to
-    /// silently drop settings it couldn't carry over instead of failing loudly. A caller pinning
-    /// an executor explicitly is asking for a guarantee, not a best-effort: ignoring what it
-    /// can't do here would just move that same silent-degradation bug to a new call site.
+    /// A caller pinning an executor explicitly is asking for a guarantee, not a best-effort:
+    /// ignoring what it can't do here would silently degrade, the way NIOTransportServices does
+    /// when it drops settings it can't carry over instead of failing loudly.
     package func requireExecutor(_ executor: Internals.Executor) throws {
         let reasons: [Internals.ExecutorIncompatibilityReason]
 
@@ -530,36 +515,29 @@ extension Internals.Session.Configuration {
     /// `timeout.read` maps onto `timeoutIntervalForRequest`; `URLSessionConfiguration` has no
     /// distinct connect-phase timeout to receive `timeout.connect`. `secureConnection`'s
     /// `minimumTLSVersion`/`maximumTLSVersion` map onto `tlsMinimumSupportedProtocolVersion`/
-    /// `tlsMaximumSupportedProtocolVersion`, the one other `SecureConnection` field with a
-    /// direct `URLSessionConfiguration` counterpart.
-    ///
-    /// `connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit` maps onto
-    /// `httpMaximumConnectionsPerHost`, and `multipathServiceType` onto `multipathServiceType`,
-    /// the two other fields with direct `URLSessionConfiguration` counterparts. Both are only
-    /// written when actually configured, so a session that never touched them keeps
+    /// `tlsMaximumSupportedProtocolVersion`,
+    /// `connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit` onto
+    /// `httpMaximumConnectionsPerHost`, and `multipathServiceType` onto its namesake. The last
+    /// two are only written when actually configured, so a session that never touched them keeps
     /// `URLSession`'s own defaults; the per-host limit is a soft limit on the NIO side and a hard
     /// one here, the closest either transport can get to the other. `multipathServiceType` is the
     /// rare case where `.urlSession` is the *more* capable executor: `HTTPClient.Configuration`
     /// only has an on/off `enableMultipath`, so the handover/interactive/aggregate distinction
-    /// survives here and collapses there. `URLSessionConfiguration.multipathServiceType` exists
-    /// only on iOS (including Mac Catalyst, via `targetEnvironment(macCatalyst)`) -- confirmed by
-    /// actual compiler diagnostics, not just Apple's platform-availability docs, which list a
-    /// broader iOS/tvOS/watchOS/visionOS/Catalyst set.
+    /// collapses on the NIO side. It exists only on iOS (including Mac Catalyst, via
+    /// `targetEnvironment(macCatalyst)`), as confirmed by compiler diagnostics rather than
+    /// Apple's broader platform-availability docs.
     ///
-    /// Every other field this configuration could carry that has no `URLSessionConfiguration`
-    /// counterpart (the rest of `connectionPool`, `ignoreUncleanSSLShutdown`,
-    /// `networkFrameworkWaitForConnectivity`) is either NIO/NIOTS-specific with nothing to
-    /// translate to, or, for the fields that matter, like `dnsOverride`/`httpVersion ==
-    /// .http1Only`/`proxy.connectHeaders`/`.socks`/`.bearer`/`decompression == .disabled`,
-    /// already excluded from resolving to `.urlSession` at all by
-    /// `urlSessionIncompatibilityReasons()`, so there is nothing left for a compatible
-    /// configuration to lose in translation.
+    /// Every other field with no `URLSessionConfiguration` counterpart (the rest of
+    /// `connectionPool`, `ignoreUncleanSSLShutdown`, `networkFrameworkWaitForConnectivity`) is
+    /// either NIO/NIOTS-specific with nothing to translate to or already excluded from resolving
+    /// to `.urlSession` by `urlSessionIncompatibilityReasons()` (like `dnsOverride`,
+    /// `httpVersion == .http1Only`, `proxy.connectHeaders`, `.socks`, `.bearer`,
+    /// `decompression == .disabled`), so nothing is left for a compatible configuration to lose.
     ///
-    /// Compression is environment/`Payload`-driven, carried on `RequestConfiguration` rather than
-    /// pooled per session, so there's no field on this type for it to translate.
-    /// `RequestConfiguration.applyCompression()` compresses `RequestBody` itself, once, before
-    /// either this method or `RequestConfiguration.build(eventLoop:)` ever runs: every executor
-    /// receives an already-compressed body, so there is nothing left for this method to translate.
+    /// Compression isn't translated here: `RequestConfiguration.applyCompression()` compresses
+    /// `RequestBody` itself, once, before either this method or
+    /// `RequestConfiguration.build(eventLoop:)` runs, so every executor receives an
+    /// already-compressed body.
     func buildURLSessionConfiguration() -> URLSessionConfiguration {
         let configuration = URLSessionConfiguration.ephemeral
 
@@ -601,8 +579,8 @@ extension Internals.Session.Configuration {
         // .build()`). Has a real `URLSessionConfiguration` equivalent, so it isn't listed in
         // `urlSessionIncompatibilityReasons()`; without mapping it here too, a caller's
         // `Session.maximumConnectionsPerHost(_:)` would silently do nothing under `.urlSession`,
-        // the *default* executor on Darwin. Only written when actually configured -- absence must
-        // stay absence, not get retuned to `Internals.ConnectionPool`'s own default (8), which
+        // the *default* executor on Darwin. Only written when actually configured, since absence
+        // must stay absence, not get retuned to `Internals.ConnectionPool`'s own default (8), which
         // differs from `URLSessionConfiguration`'s (6).
         if let concurrentHTTP1ConnectionsPerHostSoftLimit = connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit {
             configuration.httpMaximumConnectionsPerHost = concurrentHTTP1ConnectionsPerHostSoftLimit
@@ -610,15 +588,13 @@ extension Internals.Session.Configuration {
 
         // Same reasoning for `multipathServiceType`'s `enableMultipath` counterpart, but
         // `URLSessionConfiguration.multipathServiceType` itself is only available on iOS (which
-        // Mac Catalyst compiles as, via `targetEnvironment(macCatalyst)`) -- confirmed by the
-        // actual compiler diagnostics, not just Apple's platform-availability docs, which list a
-        // broader iOS/tvOS/watchOS/visionOS/Catalyst set: `'multipathServiceType' is unavailable
-        // in tvOS` (and the same for watchOS/visionOS) is what CI actually reported for the wider
-        // `#if !os(macOS)` gate this originally shipped with. `HTTPClient.Configuration`'s
-        // `enableMultipath`, by contrast, is available everywhere. `Session.multipathServiceType(_:)`
-        // itself carries no platform gate, so a caller setting it on any platform other than iOS
-        // must keep silently doing nothing under `.urlSession` there specifically -- there is no
-        // API to map onto.
+        // Mac Catalyst compiles as, via `targetEnvironment(macCatalyst)`), as confirmed by compiler
+        // diagnostics rather than Apple's platform-availability docs, which list a broader
+        // iOS/tvOS/watchOS/visionOS/Catalyst set: `'multipathServiceType' is unavailable in tvOS`
+        // (and the same for watchOS/visionOS). `HTTPClient.Configuration`'s `enableMultipath`, by
+        // contrast, is available everywhere. `Session.multipathServiceType(_:)` itself carries no
+        // platform gate, so a caller setting it on any platform other than iOS must keep silently
+        // doing nothing under `.urlSession` there specifically, since there is no API to map onto.
         #if os(iOS)
         configuration.multipathServiceType = multipathServiceType.urlSessionServiceType
         #endif
