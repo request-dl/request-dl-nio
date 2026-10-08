@@ -293,14 +293,15 @@ extension Internals {
                 return nil
             }
 
+            let window = Internals.FlowControlWindow()
+
             let download = await Internals.DownloadBuffer(
-                readingMode: requestConfiguration.readingMode
+                readingMode: requestConfiguration.readingMode,
+                flowControl: window
             )
 
             _Concurrency.Task(priority: .background) {
-                let download = download
-                download.append(cachedData.buffer)
-                download.close()
+                await Self.replay(cachedData.buffer, into: download, window: window)
             }
 
             // Nothing crossed the wire for this response, but it is still part of what happened to
@@ -324,6 +325,9 @@ extension Internals {
 
             return SessionTask(
                 seed: .init {
+                    // Wakes the replay if it is waiting for room, so it ends instead of staying
+                    // parked on a reader that is gone.
+                    window.release()
                     download.failed(Internals.TaskCancelledError())
                     download.close()
                 },
@@ -337,6 +341,47 @@ extension Internals {
                 ),
                 metrics: metrics
             )
+        }
+
+        /// How much of a cached body is handed to the download buffer at a time.
+        ///
+        /// Large enough that a big entry is not read one reading-mode chunk (1 KiB by default)
+        /// per trip to the file system, and small enough that the window is consulted often.
+        static let replayPieceSize = 65_536
+
+        /// Feeds a cached body into `download`, one piece at a time, and waits for room in `window`
+        /// between pieces.
+        ///
+        /// Handing the whole body over in one `append` read it into the download buffer's stream
+        /// regardless of how fast the response was being read, so a large entry sat in memory
+        /// whole behind a slow reader, which a response from the network never does.
+        ///
+        /// Ends, closing `download`, when the body is done, when `window` is released (the reader
+        /// is gone or the task was cancelled), or when the entry cannot be read, which fails
+        /// `download` instead of ending it as if the body were complete.
+        static func replay(
+            _ body: Internals.AnyBuffer,
+            into download: Internals.DownloadBuffer,
+            window: Internals.FlowControlWindow
+        ) async {
+            var body = body
+
+            while body.readableBytes > .zero, !window.isReleased {
+                await window.waitUntilWritable()
+
+                guard !window.isReleased else {
+                    break
+                }
+
+                guard let piece = await body.readBytes(min(body.readableBytes, replayPieceSize)), !piece.isEmpty else {
+                    download.failed(AsyncBytesReadError())
+                    break
+                }
+
+                download.append(await Internals.DataBuffer(piece))
+            }
+
+            download.close()
         }
 
         private func validateCachedData(

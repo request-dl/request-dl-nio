@@ -159,6 +159,11 @@ extension Internals {
                 }
             }
 
+            /// Reads the incoming bytes in blocks of ``readBlockSize``, not in chunks of `length`,
+            /// and cuts the chunks out of each block in memory. Reading `length` at a time made a
+            /// source behind the file system (a cached body) cost one trip per chunk, 1 KiB by
+            /// default.
+            ///
             /// - Throws: ``AsyncBytesReadError`` when `incomeBytes` says it holds bytes and cannot
             ///   give them. See ``readableBytes(_:count:)``.
             private func _appendByLength(
@@ -166,18 +171,28 @@ extension Internals {
                 length: Int,
                 into buffer: inout DataBuffer
             ) async throws {
+                // No chunk size can make progress: reading would loop without ever filling one.
+                guard length > .zero else {
+                    throw AsyncBytesReadError()
+                }
+
                 while incomeBytes.readableBytes > .zero {
-                    let receivedBytes = incomeBytes.readableBytes
-                    let currentBytes = buffer.readableBytes
+                    let block = try await Self.readableBytes(
+                        &incomeBytes,
+                        count: min(incomeBytes.readableBytes, Self.readBlockSize)
+                    )
 
-                    let availableBytes = length - currentBytes
-                    let readableBytes = receivedBytes > availableBytes ? availableBytes : receivedBytes
+                    var offset = block.startIndex
 
-                    let bytes = try await Self.readableBytes(&incomeBytes, count: readableBytes)
-                    await buffer.writeBytes(bytes)
+                    while offset < block.endIndex {
+                        let count = min(length - buffer.readableBytes, block.endIndex - offset)
 
-                    if buffer.readableBytes == length {
-                        await _emit(&buffer)
+                        await buffer.writeBytes(Array(block[offset..<offset + count]))
+                        offset += count
+
+                        if buffer.readableBytes == length {
+                            await _emit(&buffer)
+                        }
                     }
                 }
             }
@@ -279,6 +294,9 @@ extension Internals {
 
                 return lps
             }
+
+            /// How much of the incoming buffer is read at once when cutting it into chunks.
+            private static let readBlockSize = 65_536
 
             /// Reads `count` bytes that `buffer` has just reported it holds.
             ///

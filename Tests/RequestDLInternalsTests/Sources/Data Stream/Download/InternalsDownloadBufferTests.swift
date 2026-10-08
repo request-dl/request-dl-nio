@@ -373,11 +373,10 @@ struct InternalsDownloadBufferTests {
 
     // MARK: - A buffer that cannot be read
 
-    /// Regression test (audit finding N3): `Internals.Buffer` answers `nil` for a read that
-    /// failed, the same answer as the end of the data, and the download buffer took it for the
-    /// end: it stopped copying and the stream closed normally, so a body whose backing storage
-    /// could not be read (here an encrypted entry whose tag no longer matches) reached the
-    /// caller as a short body that had succeeded.
+    /// `Internals.Buffer` answers `nil` for a read that failed, the same answer as the end of
+    /// the data. A body whose backing storage cannot be read (here an encrypted entry whose tag
+    /// does not match) must fail the stream instead of closing it normally, or it reaches the
+    /// caller as a short body that succeeded.
     @Test(arguments: [
         Internals.DownloadStep.ReadingMode.length(1_024),
         .separator(Array("\n".utf8)),
@@ -412,5 +411,53 @@ struct InternalsDownloadBufferTests {
                 _ = try await Array(bytes)
             }
         }
+    }
+
+    // MARK: - Chunks cut out of large blocks
+
+    /// The incoming buffer is read in blocks much larger than a chunk and cut up in memory. The
+    /// chunks must come out the same as if it had been read chunk by chunk, wherever a block
+    /// ends relative to a chunk.
+    @Test(arguments: [1, 1_000, 1_024, 65_536, 70_000, 200_001])
+    func download_whenAppendingMoreThanOneBlock_cutsExactChunksInOrder(_ length: Int) async throws {
+        // Given: not a multiple of any of the chunk sizes, so the last chunk is short.
+        let input = Data((0..<200_000).map { UInt8($0 % 251) })
+        let download = await Internals.DownloadBuffer(readingMode: .length(length))
+
+        // When
+        await download.append(Internals.DataBuffer(input))
+        download.close()
+
+        // Then
+        let bytes = Internals.AsyncBytes(logger: nil, totalSize: input.count, stream: download.stream)
+        let chunks = try await Array(bytes)
+
+        #expect(chunks.dropLast().allSatisfy { $0.count == length })
+        #expect((chunks.last?.count ?? 0) <= length)
+        #expect(chunks.reduce(into: Data()) { $0.append($1) } == input)
+        #expect(chunks.count == (input.count + length - 1) / length)
+    }
+
+    @Test
+    func download_whenAppendingInSeveralCalls_keepsFillingTheSameChunk() async throws {
+        // Given: pieces that do not line up with the chunk size.
+        let download = await Internals.DownloadBuffer(readingMode: .length(1_000))
+        let first = Data(repeating: 1, count: 700)
+        let second = Data(repeating: 2, count: 700)
+        let third = Data(repeating: 3, count: 600)
+
+        // When
+        await download.append(Internals.DataBuffer(first))
+        await download.append(Internals.DataBuffer(second))
+        await download.append(Internals.DataBuffer(third))
+        download.close()
+
+        // Then
+        let bytes = Internals.AsyncBytes(logger: nil, totalSize: 2_000, stream: download.stream)
+        let chunks = try await Array(bytes)
+
+        #expect(chunks.map(\.count) == [1_000, 1_000])
+        #expect(chunks[0] == first + second.prefix(300))
+        #expect(chunks[1] == second.suffix(400) + third)
     }
 }
