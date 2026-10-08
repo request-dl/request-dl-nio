@@ -160,6 +160,19 @@ struct RequestConfigurationCompressionTests {
         }
     }
 
+    /// The error is what a caller reads when a pre-compressed body hits the default, so it has
+    /// to point at the choice that suits that body, not offer `.replace` as equal to `.skip`.
+    @Test
+    func duplicateContentEncodingError_description_saysWhichBehaviorSuitsWhichBody() {
+        // Given
+        let description = DuplicateContentEncodingError(value: "br").description
+
+        // Then
+        #expect(description.contains("\"br\""))
+        #expect(description.contains("already compressed, pass `.skip`"))
+        #expect(description.contains("`.replace`"))
+    }
+
     @Test
     func applyCompression_whenContentEncodingAlreadySet_andBehaviorIsSkip_leavesRequestUntouched() async throws {
         // Given

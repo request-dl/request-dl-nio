@@ -18,8 +18,9 @@ extension DuplicateContentEncodingError: CustomStringConvertible {
     public var description: String {
         """
         RequestDL could not enable request-body compression because a `Content-Encoding` header \
-        ("\(value)") is already set on this request. Pass `.replace` or `.skip` to \
-        .compression(_:onDuplicateHeader:) to allow this, or remove the existing header.
+        ("\(value)") is already set on this request. If the body is already compressed, pass \
+        `.skip` to .compression(_:onDuplicateHeader:) to send it as it is. If the header is \
+        stale and the body is not compressed, pass `.replace`, or remove the existing header.
         """
     }
 }

@@ -55,7 +55,9 @@ extension Property {
     /// - Parameters:
     ///   - algorithm: The algorithm used to compress the request body.
     ///   - behavior: What to do if the request already carries a `Content-Encoding` header.
-    ///   Defaults to ``CompressionDuplicateHeaderBehavior/error``.
+    ///   Defaults to ``CompressionDuplicateHeaderBehavior/error``. Use
+    ///   ``CompressionDuplicateHeaderBehavior/skip`` when the body is already compressed, and
+    ///   ``CompressionDuplicateHeaderBehavior/replace`` only when the header is stale.
     ///   - shouldCompressBodyData: Given the outgoing body's byte count, decides whether to
     ///   compress it. Defaults to `nil`, which always compresses.
     /// - Returns: A modified property with request-body compression configured.
