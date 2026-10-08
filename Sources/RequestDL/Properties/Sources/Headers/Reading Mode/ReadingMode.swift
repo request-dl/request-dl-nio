@@ -54,6 +54,16 @@ public struct ReadingMode: Property {
     /// - Parameter separator: The separator used for reading data. Data will be read up to and
     /// including the separator.
     ///
+    /// > Important: There is no limit on how large one item may grow. A source that never sends
+    /// the separator keeps filling memory. Use `init(separator:maximumItemSize:)` when the
+    /// source is not trusted.
+    ///
+    @available(
+        *,
+        deprecated,
+        message:
+            "Use AsyncBytes.lines(maximumLength:) or AsyncBytes.items(separatedBy:maximumLength:) on the payload instead, which cut the stream as it is read and fail on an item past the maximum."
+    )
     public init(separator: [UInt8]) {
         mode = .separator(separator)
     }
@@ -67,8 +77,71 @@ public struct ReadingMode: Property {
     /// > Note: The separator can be a string protocol conforming type, such as `String` or
     /// `Substring`.
     ///
+    /// > Important: There is no limit on how large one item may grow. A source that never sends
+    /// the separator keeps filling memory. Use `init(separator:maximumItemSize:)` when the
+    /// source is not trusted.
+    ///
+    @available(
+        *,
+        deprecated,
+        message:
+            "Use AsyncBytes.lines(maximumLength:) or AsyncBytes.items(separatedBy:maximumLength:) on the payload instead, which cut the stream as it is read and fail on an item past the maximum."
+    )
     public init<S: StringProtocol>(separator: S) {
         self.init(separator: Array(Data(separator.utf8)))
+    }
+
+    ///
+    /// Creates a reading mode with a separator for reading data, and a limit on how large one item
+    /// may grow.
+    ///
+    /// Without a limit, a separator that never arrives makes the bytes pile up in memory: a server
+    /// that sends a long enough stream with no line break keeps growing the item until the process
+    /// runs out of memory, and the download's flow control cannot slow it down. With one, reading
+    /// fails with ``ReadingModeItemTooLargeError`` as soon as an item cannot fit, and the items
+    /// that came before it have already been delivered.
+    ///
+    /// - Parameters:
+    ///   - separator: The separator used for reading data. Data will be read up to and including
+    ///   the separator.
+    ///   - maximumItemSize: The most bytes one item may take, separator included. Must be greater
+    ///   than zero.
+    ///
+    /// - Precondition: `maximumItemSize > 0`.
+    @available(
+        *,
+        deprecated,
+        message:
+            "Use AsyncBytes.lines(maximumLength:) or AsyncBytes.items(separatedBy:maximumLength:) on the payload instead, which cut the stream as it is read and fail on an item past the maximum."
+    )
+    public init(separator: [UInt8], maximumItemSize: Int) {
+        precondition(
+            maximumItemSize > 0,
+            "ReadingMode(separator:maximumItemSize:) requires maximumItemSize > 0; \(maximumItemSize) fits no item."
+        )
+        mode = .separator(separator, maximumItemSize: maximumItemSize)
+    }
+
+    ///
+    /// Creates a reading mode with a separator for reading data, and a limit on how large one item
+    /// may grow.
+    ///
+    /// See `init(separator:maximumItemSize:)` taking bytes for what the limit is for.
+    ///
+    /// - Parameters:
+    ///   - separator: The separator used for reading data, such as a `String` or `Substring`.
+    ///   - maximumItemSize: The most bytes one item may take, separator included. Must be greater
+    ///   than zero.
+    ///
+    /// - Precondition: `maximumItemSize > 0`.
+    @available(
+        *,
+        deprecated,
+        message:
+            "Use AsyncBytes.lines(maximumLength:) or AsyncBytes.items(separatedBy:maximumLength:) on the payload instead, which cut the stream as it is read and fail on an item past the maximum."
+    )
+    public init<S: StringProtocol>(separator: S, maximumItemSize: Int) {
+        self.init(separator: Array(Data(separator.utf8)), maximumItemSize: maximumItemSize)
     }
 
     // MARK: - Public static methods

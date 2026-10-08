@@ -2,6 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
+import RequestDLInternals
 import Testing
 
 @testable import RequestDL
@@ -60,6 +61,47 @@ struct ReadingModeTests {
 
         // Then
         #expect(resolved.requestConfiguration.readingMode == .separator(Array(Data(separator.utf8))))
+    }
+
+    @Test
+    func readingBySeparatorWithMaximumItemSize() async throws {
+        // Given
+        let separator = Array(Data("\n".utf8))
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                ReadingMode(separator: separator, maximumItemSize: 4_096)
+            }
+        )
+
+        // Then
+        #expect(resolved.requestConfiguration.readingMode == .separator(separator, maximumItemSize: 4_096))
+    }
+
+    @Test
+    func readingByStringSeparatorWithMaximumItemSize() async throws {
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                ReadingMode(separator: "\r\n", maximumItemSize: 64)
+            }
+        )
+
+        // Then
+        #expect(
+            resolved.requestConfiguration.readingMode
+                == .separator(Array(Data("\r\n".utf8)), maximumItemSize: 64)
+        )
+    }
+
+    /// The limit is part of what identifies the mode: the same separator without one is another.
+    @Test
+    func readingBySeparator_withAndWithoutMaximumItemSize_areDifferentModes() {
+        #expect(
+            Internals.DownloadStep.ReadingMode.separator([10])
+                != .separator([10], maximumItemSize: 10)
+        )
     }
 
     @Test func neverBody() async throws {

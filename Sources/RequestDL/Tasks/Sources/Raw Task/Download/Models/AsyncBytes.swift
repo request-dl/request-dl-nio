@@ -43,6 +43,11 @@ public struct AsyncBytes: Sendable, AsyncSequence, Hashable {
                 throw ResourceTimeoutError()
             } catch let error as Internals.DownloadResumptionMismatchError {
                 throw DownloadResumptionError(error)
+            } catch let error as Internals.ReadingModeItemTooLargeError {
+                // The rest of the response is not read, so there is no reason to keep receiving
+                // it for as long as the caller holds these bytes.
+                seed()
+                throw ReadingModeItemTooLargeError(error)
             }
         }
     }
@@ -83,6 +88,15 @@ public struct AsyncBytes: Sendable, AsyncSequence, Hashable {
         self.seed = seed
         self.bytes = bytes
         self.deadline = deadline
+    }
+
+    // MARK: - Internal methods
+
+    /// Ends the transfer now instead of when the last reference to these bytes goes away, which
+    /// is what dropping them does anyway. For a reader that has decided to read nothing more
+    /// while its caller still holds the bytes.
+    func cancelTransfer() {
+        seed()
     }
 
     // MARK: - Public methods

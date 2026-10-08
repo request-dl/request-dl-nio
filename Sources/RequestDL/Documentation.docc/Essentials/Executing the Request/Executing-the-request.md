@@ -10,6 +10,10 @@ Discover the possibilities to execute your request and manipulate the received d
 - <doc:Swift-concurrency>
 - <doc:Exploring-combine>
 
+### Reading a response by line
+
+- <doc:Reading-lines>
+
 ### Changing the behavior of a request
 
 - <doc:Modifiers-and-Interceptors>

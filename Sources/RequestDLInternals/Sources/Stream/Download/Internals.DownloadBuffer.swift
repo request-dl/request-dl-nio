@@ -59,7 +59,7 @@ extension Internals {
                 self.readingMode = readingMode
                 self.flowControl = flowControl
 
-                if case .separator(let separator) = readingMode {
+                if case .separator(let separator, _) = readingMode {
                     self.separatorLPS = Self.computeLPS(separator)
                 } else {
                     self.separatorLPS = []
@@ -136,15 +136,26 @@ extension Internals {
                     return
                 }
 
-                defer { self._buffer = buffer }
-
                 var incomeBytes = incomeBytes
 
-                switch readingMode {
-                case .length(let length):
-                    await _appendByLength(&incomeBytes, length: length, into: &buffer)
-                case .separator(let separator):
-                    await _appendBySeparator(&incomeBytes, separator: separator, into: &buffer)
+                do {
+                    switch readingMode {
+                    case .length(let length):
+                        await _appendByLength(&incomeBytes, length: length, into: &buffer)
+                    case .separator(let separator, let maximumItemSize):
+                        try await _appendBySeparator(
+                            &incomeBytes,
+                            separator: separator,
+                            maximumItemSize: maximumItemSize,
+                            into: &buffer
+                        )
+                    }
+
+                    self._buffer = buffer
+                } catch {
+                    // Ends the stream with the error and drops the accumulated bytes. Whatever
+                    // still arrives is ignored, since there is no buffer left to put it in.
+                    _failed(error)
                 }
             }
 
@@ -179,11 +190,16 @@ extension Internals {
             /// emitted chunk or as the remainder kept for the next call. Matching is done on a
             /// rolling window that survives across calls, so a separator split across two
             /// packets is still found and no trailing byte is dropped.
+            ///
+            /// - Throws: ``Internals/ReadingModeItemTooLargeError`` as soon as an item, separator
+            ///   included, can no longer fit `maximumItemSize`: when the accumulated bytes pass
+            ///   it without a separator, or when the separator ends an item that is over it.
             private func _appendBySeparator(
                 _ incomeBytes: inout Internals.AnyBuffer,
                 separator: [UInt8],
+                maximumItemSize: Int?,
                 into buffer: inout DataBuffer
-            ) async {
+            ) async throws {
                 guard
                     incomeBytes.readableBytes > .zero,
                     let incoming = await incomeBytes.readBytes(incomeBytes.readableBytes)
@@ -213,6 +229,12 @@ extension Internals {
                         continue
                     }
 
+                    // Checked before the bytes are written: an item that is already too large
+                    // is never copied into the accumulator, and not delivered.
+                    if let maximumItemSize, buffer.readableBytes + (index - start + 1) > maximumItemSize {
+                        throw Internals.ReadingModeItemTooLargeError(maximumItemSize: maximumItemSize)
+                    }
+
                     await buffer.writeBytes(Array(incoming[start...index]))
                     start = incoming.index(after: index)
 
@@ -221,6 +243,12 @@ extension Internals {
                 }
 
                 if start < incoming.endIndex {
+                    // The rest belongs to an item that has not ended yet. If it is already over
+                    // the maximum, it can only get larger.
+                    if let maximumItemSize, buffer.readableBytes + (incoming.endIndex - start) > maximumItemSize {
+                        throw Internals.ReadingModeItemTooLargeError(maximumItemSize: maximumItemSize)
+                    }
+
                     await buffer.writeBytes(Array(incoming[start...]))
                 }
             }
@@ -374,6 +402,28 @@ extension Internals.DownloadStep {
 
     package enum ReadingMode: Sendable, Hashable {
         case length(Int)
-        case separator([UInt8])
+
+        /// Items end at `separator`, which they include. `maximumItemSize` is the most bytes one
+        /// item may take, separator included; `nil` puts no limit on it.
+        case separator([UInt8], maximumItemSize: Int? = nil)
+    }
+}
+
+extension Internals {
+
+    /// Thrown to the reader of a download read with a separator when an item grew past the
+    /// `maximumItemSize` without ending.
+    package struct ReadingModeItemTooLargeError: Swift.Error, Sendable, Hashable, CustomStringConvertible {
+
+        /// The limit that was exceeded, in bytes.
+        package let maximumItemSize: Int
+
+        package var description: String {
+            "An item read with a separator grew past \(maximumItemSize) bytes without ending."
+        }
+
+        package init(maximumItemSize: Int) {
+            self.maximumItemSize = maximumItemSize
+        }
     }
 }

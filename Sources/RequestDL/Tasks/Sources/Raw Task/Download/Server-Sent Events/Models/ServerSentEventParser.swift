@@ -15,33 +15,36 @@ import struct Foundation.Data
 /// has to reassemble lines itself.
 struct ServerSentEventParser {
 
+    // MARK: - Internal properties
+
+    /// Whether a line outgrew the maximum. The events before it were returned by the `feed(_:)`
+    /// that found it; the parser takes nothing more after that.
+    private(set) var exceededMaximum = false
+
     // MARK: - Private properties
 
-    private var lineBuffer = Data()
-    /// How many leading bytes of `lineBuffer` have already been scanned for a line terminator
-    /// and confirmed to have none. Lets `extractLines(from:)` resume scanning where the previous
-    /// call left off instead of rescanning the whole buffer, keeping the total scan work for one
-    /// line linear in its length even when it arrives across many small chunks.
-    private var scannedPrefixLength = 0
-    private var sawTrailingCR = false
+    private var splitter: ItemSplitter
 
     private var lastEventId: String?
     private var pendingEventType: String?
     private var pendingDataLines: [String] = []
     private var pendingRetry: Int?
 
+    // MARK: - Inits
+
+    /// - Parameter maximumLineLength: The most bytes one line may take, not counting its line
+    /// break. `nil` puts no limit on it.
+    init(maximumLineLength: Int? = nil) {
+        splitter = ItemSplitter(delimiter: .lineBreak, maximumLength: maximumLineLength)
+    }
+
     // MARK: - Internal methods
 
     mutating func feed(_ chunk: Data) -> [ServerSentEvent] {
-        var events: [ServerSentEvent] = []
+        let output = splitter.feed(chunk)
+        exceededMaximum = exceededMaximum || output.exceededMaximum
 
-        for line in extractLines(from: chunk) {
-            if let event = process(line: line) {
-                events.append(event)
-            }
-        }
-
-        return events
+        return events(from: output.items)
     }
 
     /// Flushes whatever the stream left buffered when it ended: a trailing line with no `CR`/`LF`
@@ -49,68 +52,29 @@ struct ServerSentEventParser {
     /// routinely close the connection right after the last event without emitting that blank line,
     /// so treating end-of-stream as an implicit frame boundary avoids silently dropping it.
     mutating func finish() -> ServerSentEvent? {
-        if !lineBuffer.isEmpty {
-            let line = String(decoding: lineBuffer, as: UTF8.self)
-            lineBuffer.removeAll()
-            scannedPrefixLength = 0
+        let output = splitter.finish()
+        exceededMaximum = exceededMaximum || output.exceededMaximum
 
-            if let event = process(line: line) {
-                return event
-            }
+        if let event = events(from: output.items).first {
+            return event
         }
 
-        return dispatch()
+        // Nothing is dispatched for a frame that a line over the maximum cut short.
+        return exceededMaximum ? nil : dispatch()
     }
 
     // MARK: - Private methods
 
-    private mutating func extractLines(from chunk: Data) -> [String] {
-        var chunk = chunk
+    private mutating func events(from lines: [Data]) -> [ServerSentEvent] {
+        var events: [ServerSentEvent] = []
 
-        if sawTrailingCR {
-            sawTrailingCR = false
-
-            if chunk.first == UInt8(ascii: "\n") {
-                chunk = chunk.dropFirst()
+        for line in lines {
+            if let event = process(line: String(decoding: line, as: UTF8.self)) {
+                events.append(event)
             }
         }
 
-        lineBuffer.append(chunk)
-
-        var lines: [String] = []
-        // Where the line currently being assembled starts. Always `lineBuffer.startIndex` at the
-        // top of this call; only advances when a terminator is actually found.
-        var lineStart = lineBuffer.startIndex
-        // Where to resume searching for the next terminator. Distinct from `lineStart` whenever
-        // the pending line spans more than one `feed(_:)` call: the bytes in between were already
-        // scanned and confirmed terminator-free, but they're still part of the line's content
-        // once a terminator does turn up further along.
-        var searchStart = lineBuffer.index(lineBuffer.startIndex, offsetBy: scannedPrefixLength)
-
-        while let breakIndex = lineBuffer[searchStart...].firstIndex(where: {
-            $0 == UInt8(ascii: "\r") || $0 == UInt8(ascii: "\n")
-        }) {
-            lines.append(String(decoding: lineBuffer[lineStart..<breakIndex], as: UTF8.self))
-
-            var nextIndex = lineBuffer.index(after: breakIndex)
-
-            if lineBuffer[breakIndex] == UInt8(ascii: "\r") {
-                if nextIndex < lineBuffer.endIndex, lineBuffer[nextIndex] == UInt8(ascii: "\n") {
-                    nextIndex = lineBuffer.index(after: nextIndex)
-                } else if nextIndex == lineBuffer.endIndex {
-                    sawTrailingCR = true
-                }
-            }
-
-            lineStart = nextIndex
-            searchStart = nextIndex
-        }
-
-        lineBuffer.removeSubrange(lineBuffer.startIndex..<lineStart)
-        // The loop above already confirmed the remaining buffer holds no terminator, so the next
-        // call can resume searching from its end instead of rechecking it.
-        scannedPrefixLength = lineBuffer.count
-        return lines
+        return events
     }
 
     private mutating func process(line: String) -> ServerSentEvent? {

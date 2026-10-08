@@ -264,4 +264,109 @@ struct InternalsDownloadBufferTests {
 
         #expect(receivedBytes == expectedBytes)
     }
+
+    // MARK: - maximumItemSize
+
+    /// A stream that never sends the separator must not be accumulated without limit. The flow
+    /// control window cannot slow it down, because bytes absorbed into the accumulator are
+    /// credited back at once (they would otherwise hold the window shut against the very bytes
+    /// that complete an item).
+    @Test
+    func download_whenNoSeparatorArrivesWithinTheMaximum_failsWithItemTooLarge() async throws {
+        // Given
+        let download = await Internals.DownloadBuffer(
+            readingMode: .separator(Array("\n".utf8), maximumItemSize: 10)
+        )
+
+        // When: 4 + 4 + 4 bytes, none of them a separator.
+        await download.append(Internals.DataBuffer(Data("aaaa".utf8)))
+        await download.append(Internals.DataBuffer(Data("bbbb".utf8)))
+        await download.append(Internals.DataBuffer(Data("cccc".utf8)))
+        await download.waitUntilIdle()
+
+        // Then
+        let bytes = Internals.AsyncBytes(logger: nil, totalSize: 12, stream: download.stream)
+
+        await #expect(throws: Internals.ReadingModeItemTooLargeError(maximumItemSize: 10)) {
+            _ = try await Array(bytes)
+        }
+    }
+
+    @Test
+    func download_whenItemsFitTheMaximum_areDeliveredWholeAndTheSeparatorCountsTowardsIt() async throws {
+        // Given: each item is exactly 10 bytes including its separator.
+        let download = await Internals.DownloadBuffer(
+            readingMode: .separator(Array("\n".utf8), maximumItemSize: 10)
+        )
+
+        // When
+        await download.append(Internals.DataBuffer(Data("aaaaaaaaa\nbbbbb".utf8)))
+        await download.append(Internals.DataBuffer(Data("bbbb\n".utf8)))
+        download.close()
+
+        // Then
+        let bytes = Internals.AsyncBytes(logger: nil, totalSize: 20, stream: download.stream)
+        let received = try await Array(bytes)
+
+        #expect(received == [Data("aaaaaaaaa\n".utf8), Data("bbbbbbbbb\n".utf8)])
+    }
+
+    @Test
+    func download_whenAnItemIsOneByteOverTheMaximum_fails() async throws {
+        // Given: 11 bytes with the separator, against a maximum of 10.
+        let download = await Internals.DownloadBuffer(
+            readingMode: .separator(Array("\n".utf8), maximumItemSize: 10)
+        )
+
+        // When
+        await download.append(Internals.DataBuffer(Data("aaaaaaaaaa\n".utf8)))
+        await download.waitUntilIdle()
+
+        // Then
+        let bytes = Internals.AsyncBytes(logger: nil, totalSize: 11, stream: download.stream)
+
+        await #expect(throws: Internals.ReadingModeItemTooLargeError(maximumItemSize: 10)) {
+            _ = try await Array(bytes)
+        }
+    }
+
+    @Test
+    func download_whenItemsBeforeTheOversizedOneFit_stillDeliversThemFirst() async throws {
+        // Given
+        let download = await Internals.DownloadBuffer(
+            readingMode: .separator(Array("\n".utf8), maximumItemSize: 5)
+        )
+
+        // When
+        await download.append(Internals.DataBuffer(Data("ab\ncd\nefghijklmn".utf8)))
+        await download.waitUntilIdle()
+
+        // Then
+        let bytes = Internals.AsyncBytes(logger: nil, totalSize: 17, stream: download.stream)
+        var iterator = bytes.makeAsyncIterator()
+
+        #expect(try await iterator.next().map { Array($0) } == Array("ab\n".utf8))
+        #expect(try await iterator.next().map { Array($0) } == Array("cd\n".utf8))
+
+        await #expect(throws: Internals.ReadingModeItemTooLargeError(maximumItemSize: 5)) {
+            _ = try await iterator.next()
+        }
+    }
+
+    @Test
+    func download_whenNoMaximumIsGiven_keepsAccumulatingAsBefore() async throws {
+        // Given
+        let download = await Internals.DownloadBuffer(readingMode: .separator(Array("\n".utf8)))
+        let line = Data(repeating: UInt8(ascii: "x"), count: 100_000)
+
+        // When
+        await download.append(Internals.DataBuffer(line))
+        await download.append(Internals.DataBuffer(Data("\n".utf8)))
+        download.close()
+
+        // Then
+        let bytes = Internals.AsyncBytes(logger: nil, totalSize: line.count + 1, stream: download.stream)
+
+        #expect(try await Array(bytes).map(\.count) == [100_001])
+    }
 }
