@@ -138,7 +138,34 @@ extension Internals.Session {
             #if canImport(Darwin)
             configuration.tlsCustomVerificationNetworkFramework =
                 secureConnectionOutput?.tlsCustomVerificationNetworkFramework
-            configuration.tlsLocalIdentityNetworkFramework = secureConnectionOutput?.localIdentityHandle?.identity
+            #endif
+
+            // The client identity is offered per origin, never set on the configuration as a
+            // whole: set there it goes to every host the client connects to, including the
+            // target of a redirect to another host. The providers answer only for origins a
+            // request was made to (`identityOrigins`, filled by `Internals.Client.execute`), and
+            // a redirect is followed inside AsyncHTTPClient, so its target gets none.
+            let identityOrigins = Internals.IdentityOrigins()
+
+            if let chain = secureConnectionOutput?.nioSSLCertificateChain,
+                let privateKey = secureConnectionOutput?.nioSSLPrivateKey
+            {
+                let identity = HTTPClient.Configuration.NIOSSLClientIdentity(
+                    certificateChain: chain,
+                    privateKey: privateKey
+                )
+
+                configuration.tlsLocalIdentityProviderNIOSSL = { host, port in
+                    identityOrigins.contains(host: host, port: port) ? identity : nil
+                }
+            }
+
+            #if canImport(Darwin)
+            if let secIdentity = secureConnectionOutput?.localIdentityHandle?.identity {
+                configuration.tlsLocalIdentityProviderNetworkFramework = { host, port in
+                    identityOrigins.contains(host: host, port: port) ? secIdentity : nil
+                }
+            }
             #endif
 
             configuration.dnsOverride = dnsOverride
@@ -156,10 +183,11 @@ extension Internals.Session {
             #if canImport(Darwin)
             return Output(
                 httpClientConfiguration: configuration,
-                localIdentityHandle: secureConnectionOutput?.localIdentityHandle
+                localIdentityHandle: secureConnectionOutput?.localIdentityHandle,
+                identityOrigins: identityOrigins
             )
             #else
-            return Output(httpClientConfiguration: configuration)
+            return Output(httpClientConfiguration: configuration, identityOrigins: identityOrigins)
             #endif
         }
 
@@ -179,19 +207,30 @@ extension Internals.Session.Configuration {
     package struct Output: Sendable {
         package let httpClientConfiguration: HTTPClient.Configuration
 
+        /// The origins the client's mTLS identity may be presented to, which the identity
+        /// providers in `httpClientConfiguration` consult. Whoever builds the client hands it to
+        /// `Internals.Client`, which records each request's origin in it.
+        package let identityOrigins: Internals.IdentityOrigins
+
         #if canImport(Darwin)
         package let localIdentityHandle: Internals.IdentityHandle?
 
         package init(
             httpClientConfiguration: HTTPClient.Configuration,
-            localIdentityHandle: Internals.IdentityHandle? = nil
+            localIdentityHandle: Internals.IdentityHandle? = nil,
+            identityOrigins: Internals.IdentityOrigins = .init()
         ) {
             self.httpClientConfiguration = httpClientConfiguration
             self.localIdentityHandle = localIdentityHandle
+            self.identityOrigins = identityOrigins
         }
         #else
-        package init(httpClientConfiguration: HTTPClient.Configuration) {
+        package init(
+            httpClientConfiguration: HTTPClient.Configuration,
+            identityOrigins: Internals.IdentityOrigins = .init()
+        ) {
             self.httpClientConfiguration = httpClientConfiguration
+            self.identityOrigins = identityOrigins
         }
         #endif
     }

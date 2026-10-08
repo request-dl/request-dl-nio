@@ -103,6 +103,7 @@ extension Internals.ClientManager {
             eventLoopGroupProvider: .shared(eventLoopGroupToken.group),
             configuration: output.httpClientConfiguration,
             localIdentityHandle: output.localIdentityHandle,
+            identityOrigins: output.identityOrigins,
             maximumConcurrentConnections: sessionConfiguration.maximumConcurrentConnections,
             eventLoopGroupToken: eventLoopGroupToken
         )
@@ -110,6 +111,7 @@ extension Internals.ClientManager {
         let client = Internals.Client(
             eventLoopGroupProvider: .shared(eventLoopGroupToken.group),
             configuration: output.httpClientConfiguration,
+            identityOrigins: output.identityOrigins,
             maximumConcurrentConnections: sessionConfiguration.maximumConcurrentConnections,
             eventLoopGroupToken: eventLoopGroupToken
         )

@@ -464,9 +464,14 @@ extension InternalsSecureConnectionTests {
         let sut = try secureConnection.build(isCompatibleWithNetworkFramework: false)
 
         // Then: completes without ever attempting the Keychain round-trip, even on a machine
-        // with no Keychain Sharing entitlement at all. `tlsConfiguration.certificateChain` still
-        // carries the mTLS cert, proving `build()` did real work rather than short-circuiting.
-        #expect(!sut.tlsConfiguration.certificateChain.isEmpty)
+        // with no Keychain Sharing entitlement at all. The identity is in `nioSSLCertificateChain`
+        // and `nioSSLPrivateKey`, proving `build()` did real work rather than short-circuiting,
+        // and not on `tlsConfiguration`: set there it would go to every host the client connects
+        // to, redirect targets included (see `Internals.IdentityOrigins`).
+        #expect(sut.nioSSLCertificateChain?.isEmpty == false)
+        #expect(sut.nioSSLPrivateKey != nil)
+        #expect(sut.tlsConfiguration.certificateChain.isEmpty)
+        #expect(sut.tlsConfiguration.privateKey == nil)
         #if canImport(Darwin)
         #expect(sut.localIdentityHandle == nil)
         #endif
