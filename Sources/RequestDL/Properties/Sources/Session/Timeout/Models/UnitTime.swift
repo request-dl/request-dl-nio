@@ -12,9 +12,9 @@ import NIOCore
 ///
 /// Conforms to Hashable and Sendable protocols.
 ///
-/// > Note: The maximum representable time interval is limited by the range of Int64.
-///
-/// > Warning: Be careful when working with large time intervals to avoid overflow.
+/// > Note: The maximum representable time interval is limited by the range of Int64. An amount
+/// or an operation that goes past it saturates at ``Int64/max`` (or ``Int64/min``) instead of
+/// trapping, so a value read from the environment can't crash the process.
 ///
 /// - Remark: Time intervals can be created using various factory methods, such as `nanoseconds(_:)`,
 /// `microseconds(_:)`, `milliseconds(_:)`, `seconds(_:)`, `minutes(_:)`, and
@@ -30,6 +30,11 @@ public struct UnitTime: Sendable, Hashable {
 
     fileprivate init(_ nanoseconds: Int64) {
         self.nanoseconds = nanoseconds
+    }
+
+    fileprivate init(saturating amount: Int64, perUnit nanoseconds: Int64) {
+        let (product, overflow) = amount.multipliedReportingOverflow(by: nanoseconds)
+        self.nanoseconds = overflow ? ((amount < 0) != (nanoseconds < 0) ? .min : .max) : product
     }
 
     // MARK: - Public static methods
@@ -51,7 +56,7 @@ public struct UnitTime: Sendable, Hashable {
     /// - Returns: A `UnitTime` representing the specified number of microseconds.
     ///
     public static func microseconds(_ amount: Int64) -> UnitTime {
-        amount * 1_000
+        .init(saturating: amount, perUnit: 1_000)
     }
 
     ///
@@ -61,7 +66,7 @@ public struct UnitTime: Sendable, Hashable {
     /// - Returns: A `UnitTime` representing the specified number of milliseconds.
     ///
     public static func milliseconds(_ amount: Int64) -> UnitTime {
-        amount * 1_000_000
+        .init(saturating: amount, perUnit: 1_000_000)
     }
 
     ///
@@ -71,7 +76,7 @@ public struct UnitTime: Sendable, Hashable {
     /// - Returns: A `UnitTime` representing the specified number of seconds.
     ///
     public static func seconds(_ amount: Int64) -> UnitTime {
-        amount * 1_000_000_000
+        .init(saturating: amount, perUnit: 1_000_000_000)
     }
 
     ///
@@ -81,7 +86,7 @@ public struct UnitTime: Sendable, Hashable {
     /// - Returns: A `UnitTime` representing the specified number of minutes.
     ///
     public static func minutes(_ amount: Int64) -> UnitTime {
-        amount * 60_000_000_000
+        .init(saturating: amount, perUnit: 60_000_000_000)
     }
 
     ///
@@ -91,7 +96,7 @@ public struct UnitTime: Sendable, Hashable {
     /// - Returns: A `UnitTime` representing the specified number of hours.
     ///
     public static func hours(_ amount: Int64) -> UnitTime {
-        amount * 3_600_000_000_000
+        .init(saturating: amount, perUnit: 3_600_000_000_000)
     }
 
     // MARK: - Internal methods
@@ -146,7 +151,8 @@ extension UnitTime: AdditiveArithmetic {
     }
 
     public static func + (_ lhs: UnitTime, _ rhs: UnitTime) -> UnitTime {
-        .init(lhs.nanoseconds + rhs.nanoseconds)
+        let (sum, overflow) = lhs.nanoseconds.addingReportingOverflow(rhs.nanoseconds)
+        return .init(overflow ? (rhs.nanoseconds < 0 ? .min : .max) : sum)
     }
 
     public static func += (lhs: inout UnitTime, rhs: UnitTime) {
@@ -154,7 +160,8 @@ extension UnitTime: AdditiveArithmetic {
     }
 
     public static func - (lhs: UnitTime, rhs: UnitTime) -> UnitTime {
-        .init(lhs.nanoseconds - rhs.nanoseconds)
+        let (difference, overflow) = lhs.nanoseconds.subtractingReportingOverflow(rhs.nanoseconds)
+        return .init(overflow ? (rhs.nanoseconds < 0 ? .max : .min) : difference)
     }
 
     public static func -= (lhs: inout UnitTime, rhs: UnitTime) {
@@ -170,7 +177,7 @@ extension UnitTime: AdditiveArithmetic {
     /// - Returns: A `UnitTime` representing the result of multiplying the unit of time by the integer value.
     ///
     public static func * <T: BinaryInteger>(lhs: T, rhs: UnitTime) -> UnitTime {
-        .init(Int64(lhs) * rhs.nanoseconds)
+        .init(saturating: Int64(clamping: lhs), perUnit: rhs.nanoseconds)
     }
 
     ///
@@ -182,6 +189,6 @@ extension UnitTime: AdditiveArithmetic {
     /// - Returns: A `UnitTime` representing the result of multiplying the unit of time by the integer value.
     ///
     public static func * <T: BinaryInteger>(lhs: UnitTime, rhs: T) -> UnitTime {
-        .init(lhs.nanoseconds * Int64(rhs))
+        .init(saturating: Int64(clamping: rhs), perUnit: lhs.nanoseconds)
     }
 }

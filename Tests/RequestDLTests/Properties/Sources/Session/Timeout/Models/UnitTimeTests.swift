@@ -197,6 +197,40 @@ struct UnitTimeTests {
         #expect(lhs * value == .hours(2))
     }
 
+    /// The factories saturate on overflow, so a large amount (a `timeout` read from the
+    /// environment, say) cannot trap the process.
+    @Test
+    func unitTime_whenAmountOverflows_saturates() async throws {
+        #expect(UnitTime.seconds(.max).nanoseconds == .max)
+        #expect(UnitTime.seconds(.min).nanoseconds == .min)
+        #expect(UnitTime.seconds(10_000_000_000).nanoseconds == .max)
+        #expect(UnitTime.minutes(.max).nanoseconds == .max)
+        #expect(UnitTime.hours(.max).nanoseconds == .max)
+        #expect(UnitTime.milliseconds(.max).nanoseconds == .max)
+        #expect(UnitTime.microseconds(.max).nanoseconds == .max)
+    }
+
+    @Test
+    func unitTime_whenAmountFits_isExact() async throws {
+        #expect(UnitTime.seconds(9_000_000_000).nanoseconds == 9_000_000_000_000_000_000)
+        #expect(UnitTime.seconds(-5).nanoseconds == -5_000_000_000)
+    }
+
+    @Test
+    func unitTime_whenMultiplyingOverflows_saturates() async throws {
+        #expect(UnitTime.hours(1) * Int.max == .nanoseconds(.max))
+        #expect(Int.max * UnitTime.hours(1) == .nanoseconds(.max))
+        #expect(UnitTime.hours(1) * UInt64.max == .nanoseconds(.max))
+        #expect(UnitTime.hours(-1) * Int.max == .nanoseconds(.min))
+        #expect(UnitTime.hours(-1) * Int.min == .nanoseconds(.max))
+    }
+
+    @Test
+    func unitTime_whenAddingOrSubtractingOverflows_saturates() async throws {
+        #expect(UnitTime.nanoseconds(.max) + .seconds(1) == .nanoseconds(.max))
+        #expect(UnitTime.nanoseconds(.min) - .seconds(1) == .nanoseconds(.min))
+    }
+
     @Test
     func unitTime_withStringLossless() async throws {
         // Given

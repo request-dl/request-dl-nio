@@ -143,6 +143,36 @@ struct InternalsResourceDeadlineTests {
         #expect(await !ranFlag.ran)
     }
 
+    /// A negative resource timeout is an already-elapsed deadline on every platform, not a
+    /// `UInt64(_:)` trap on Darwin.
+    @Test
+    func race_whenDeadlineIsNegative_throwsLikeAnElapsedOne() async throws {
+        // Given
+        let deadline = Internals.ResourceDeadline(nanoseconds: -1_000_000_000)
+
+        // When / Then
+        await #expect(throws: Internals.ResourceTimeoutError.self) {
+            try await deadline.race {
+                try await Task.sleep(nanoseconds: 50_000_000)
+                return "done"
+            }
+        }
+    }
+
+    /// The other end of the range: a deadline too far away to represent must not wrap around
+    /// into the past and expire at once.
+    @Test
+    func race_whenDeadlineIsInfinitelyFar_doesNotExpire() async throws {
+        // Given
+        let deadline = Internals.ResourceDeadline(nanoseconds: .max)
+
+        // When
+        let result = try await deadline.race { "done" }
+
+        // Then
+        #expect(result == "done")
+    }
+
     /// Companion to the test above: an already-elapsed deadline must cancel `seed` too, the same
     /// as the outlives-deadline path already does. `RawTask`/`AsyncResponse.Iterator` depend on
     /// that to tear down a connection this fast path now bypasses starting `operation` for.
