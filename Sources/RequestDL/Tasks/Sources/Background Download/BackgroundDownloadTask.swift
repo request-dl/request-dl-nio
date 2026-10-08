@@ -40,6 +40,20 @@ import struct Foundation.URL
 /// freely: none of them need a Keychain round-trip to survive a relaunch, only the certificate
 /// bytes themselves, which travel alongside `id`/`destination` in the scheduled task's own state.
 ///
+/// ## Redirects
+///
+/// The system runs a background download and follows its redirects on its own, without asking the
+/// app, which is how `URLSession` behaves for any background transfer. So the redirect handling
+/// the other tasks apply does not exist here:
+///
+/// - Headers are not removed when a redirect leaves the host. `Authorization` is the exception,
+///   because the system removes it on every redirect, to the same host as well. A `Cookie`, a
+///   `Proxy-Authorization` or an API-key header set on the request is sent to whichever host the
+///   redirect names, so only point a background download at a server you trust not to redirect
+///   somewhere else, or authenticate with `Authorization` or a signed URL.
+/// - ``Session/disableRedirect()``, ``Session/enableRedirectFollow(max:allowCycles:)`` and
+///   ``Session/redirectStrategy(_:)`` have no effect.
+///
 /// A client certificate (mTLS) works too, as long as both ``Certificate`` and ``PrivateKey`` come
 /// from a **file path**, not in-memory bytes. See ``BackgroundDownloadUnsupportedConfigurationError``
 /// for the specific cases that still aren't supported.
