@@ -43,6 +43,14 @@ import struct Foundation.Data
 /// .Configuration.dnsOverride`) is incompatible with the `.urlSession` executor, so a command
 /// using it will only run under `.nio`/`.nioTransportServices`.
 ///
+/// - Important: Pass only commands you wrote or trust. A command is a program for the request
+/// engine, not just data. `-F name=@path` reads that local file and uploads it. `--cert`/`-E`/
+/// `--key` and `--cacert` read the files they name. `-k`/`--insecure` turns certificate
+/// verification off, and `-x`/`--proxy` and `--resolve` redirect where the request goes. A
+/// command built from user input, a pasted snippet or a network response can therefore leak
+/// local files to a host of its choosing or strip TLS protection. Reject or inspect such a
+/// command before handing it to `CURLTask`, or build the request with ``DataTask`` instead.
+///
 /// The command is parsed straight into a ``RequestConfiguration`` rather than through
 /// `@PropertyBuilder`, since there is nothing to declare a `Property` tree from until the
 /// string is parsed at runtime. Resolution and execution still go through the same pipeline

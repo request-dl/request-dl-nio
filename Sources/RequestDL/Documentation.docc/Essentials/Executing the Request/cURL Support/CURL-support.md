@@ -22,6 +22,8 @@ let result = try await CURLTask("""
 
 `CURLTask` parses the command straight into a ``RequestDL/RequestConfiguration`` — there's no `@PropertyBuilder` tree to declare from a string only known at runtime — but resolution and execution still go through the same pipeline ``RequestDL/DataTask`` uses, so caching, tracing, and executor requirements all apply exactly the same way.
 
+> Important: Run only curl commands you wrote or trust. A command is a program for the request engine, not just data: `-F name=@path` uploads the local file it names, `--cert`, `--key` and `--cacert` read files from disk, `-k` / `--insecure` turns certificate verification off, and `-x` / `--proxy` and `--resolve` change where the request goes. A command assembled from user input, a pasted snippet or a network response can leak local files to a host of its choosing or remove TLS protection. Reject or inspect such a command first, or declare the request with ``RequestDL/DataTask`` instead.
+
 ### From a request to curl
 
 ```swift
