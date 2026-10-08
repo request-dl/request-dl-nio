@@ -526,6 +526,12 @@ public struct DataCache: Sendable, Equatable {
         }
 
         if policy.contains(.memory), let cachedData = await storage.memoryStorage[key] {
+            storage.withMemoryStorage { $0.markUsed(key) }
+
+            if policy.contains(.disk) {
+                storage.diskStorage.markUsed(key)
+            }
+
             return cachedData
         }
 
@@ -752,8 +758,8 @@ public struct DataCache: Sendable, Equatable {
 
         let actualSize = Int64(buffer.readableBytes)
 
-        // A tier the body outgrew holds nothing of it any more: its usage goes back to what it
-        // was before this write, not to the size of a body it did not keep.
+        // A tier the body outgrew holds nothing of it, so its usage goes back to what it was
+        // before this write, not to the size of a body it did not keep.
         if buffer.memoryDataURL != nil {
             storage.reconcileMemoryUsage(
                 contentLengthHint: contentLengthHint,

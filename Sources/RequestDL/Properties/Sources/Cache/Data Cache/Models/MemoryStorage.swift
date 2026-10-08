@@ -24,6 +24,9 @@ struct MemoryStorage: Sendable {
         let key: String
         let date: Date
 
+        /// When this record was last read or written, which is what `freeSpace` orders by.
+        var lastUsed: Date
+
         let cachedResponse: CachedResponse
         var dataURL: Internals.ByteURL
 
@@ -35,6 +38,7 @@ struct MemoryStorage: Sendable {
         ) {
             self.key = key
             self.date = cachedResponse.date
+            self.lastUsed = Date()
             self.cachedResponse = cachedResponse
             self.dataURL = .init()
         }
@@ -68,6 +72,11 @@ struct MemoryStorage: Sendable {
 
     mutating func remove(_ key: String) {
         records[key] = nil
+    }
+
+    /// Records that `key` was just served, so `freeSpace` evicts it after entries that were not.
+    mutating func markUsed(_ key: String) {
+        records[key]?.lastUsed = Date()
     }
 
     /// Removes `key` only if its currently stored record is still the exact one `dataURL`
@@ -153,7 +162,8 @@ struct MemoryStorage: Sendable {
         return (record.dataURL, usageAfterEviction + contentLength)
     }
 
-    /// Evicts the oldest entries, if any, until usage is at or under `maximumCapacity`.
+    /// Evicts the least recently used entries, if any, until usage is at or under
+    /// `maximumCapacity`. An entry is used when it is written, revalidated or served.
     ///
     /// - Parameter knownUsage: A caller-tracked usage estimate. When it already fits under
     /// `maximumCapacity`, the full scan below is skipped, since nothing would be evicted anyway.
@@ -161,10 +171,10 @@ struct MemoryStorage: Sendable {
     /// that method's doc), which avoids paying the O(current entry count) scan on every write
     /// and turning a cache's whole lifetime into O(n²).
     ///
-    /// Entries are ordered by `Record.date` here instead of maintaining a reorderable index that
-    /// every `allocateBuffer`/`updateCached` call would have to update, as `DiskStorage.freeSpace`
-    /// does for its own records. Sorting is paid only on this guarded rescan path, not as an
-    /// O(current entry count) shift on every write.
+    /// Entries are ordered by `Record.lastUsed` here instead of maintaining a reorderable index
+    /// that every `allocateBuffer`/`updateCached` call would have to update, as
+    /// `DiskStorage.freeSpace` does for its own records. Sorting is paid only on this guarded
+    /// rescan path, not as an O(current entry count) shift on every write.
     ///
     /// - Returns: Usage immediately after this call: either the untouched `knownUsage` when
     /// skipped, or the freshly measured total otherwise.
@@ -182,7 +192,7 @@ struct MemoryStorage: Sendable {
         var accumulatedSize: Int64 = 0
         var deleteOnly = false
 
-        for entry in records.values.sorted(by: { $0.date > $1.date }) {
+        for entry in records.values.sorted(by: { $0.lastUsed > $1.lastUsed }) {
             if !deleteOnly, accumulatedSize + entry.size <= maximumCapacity {
                 accumulatedSize += entry.size
                 continue

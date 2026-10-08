@@ -211,6 +211,7 @@ struct DiskStorage: Sendable {
         private let lock = Lock()
 
         private var locationsByKey: [String: URL] = [:]
+        private var lastUsedByKey: [String: Date] = [:]
         private var refreshTask: Task<Void, Never>?
 
         // MARK: - Internal methods
@@ -254,6 +255,21 @@ struct DiskStorage: Sendable {
             lock.withLock { locationsByKey[key] = url }
         }
 
+        /// Records that `key` was just served, for `freeSpace` to evict it after entries that
+        /// were not. Kept for the life of the process only: the order on disk is the creation
+        /// order, which is what a freshly launched process starts from.
+        func markUsed(_ key: String) {
+            lock.withLock {
+                if locationsByKey[key] != nil {
+                    lastUsedByKey[key] = Date()
+                }
+            }
+        }
+
+        func lastUsed(_ key: String) -> Date? {
+            lock.withLock { lastUsedByKey[key] }
+        }
+
         /// Removes the mapping for `key` only if it still points at `url`.
         ///
         /// Guards against a slower removal of a stale or superseded directory clobbering a
@@ -264,6 +280,7 @@ struct DiskStorage: Sendable {
             lock.withLock {
                 if locationsByKey[key] == url {
                     locationsByKey[key] = nil
+                    lastUsedByKey[key] = nil
                 }
             }
         }
@@ -271,6 +288,7 @@ struct DiskStorage: Sendable {
         func removeAll() {
             lock.withLock {
                 locationsByKey = [:]
+                lastUsedByKey = [:]
             }
         }
     }
@@ -315,6 +333,8 @@ struct DiskStorage: Sendable {
                     from: responseData
                 )
             else { return nil }
+
+            index.markUsed(key)
 
             return await .init(
                 cachedResponse: cachedResponse,
@@ -474,6 +494,12 @@ struct DiskStorage: Sendable {
 
         private let lock = Lock()
         private var _value = 0
+    }
+
+    /// Counts a serve from another tier as a use here too, so an entry the memory tier keeps
+    /// answering for is not the first one the disk tier drops.
+    func markUsed(_ key: String) {
+        index.markUsed(key)
     }
 
     func remove(_ key: String) async {
@@ -675,7 +701,9 @@ struct DiskStorage: Sendable {
             return .zero
         }
 
-        entries.sort { $0.date < $1.date }
+        // Least recently used first. An entry nobody read since this process started is ordered
+        // by when it was created.
+        entries.sort { lastUsed(of: $0) < lastUsed(of: $1) }
 
         var totalSize: Int64 = 0
         var entrySizes: [(Record, Int64)] = []
@@ -700,6 +728,10 @@ struct DiskStorage: Sendable {
     }
 
     // MARK: - Private methods
+
+    private func lastUsed(of record: Record) -> Date {
+        max(index.lastUsed(record.key) ?? record.date, record.date)
+    }
 
     /// Writes `data` to `url`, replacing whatever was there, and closes the handle on every
     /// path, including the one where the write itself throws.

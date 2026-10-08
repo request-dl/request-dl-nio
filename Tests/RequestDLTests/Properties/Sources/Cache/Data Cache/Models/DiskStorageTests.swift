@@ -123,6 +123,37 @@ struct DiskStorageTests {
     }
 
     @Test
+    func freeSpace_evictsTheLeastRecentlyUsedEntry_notTheOldestWritten() async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            let storage = DiskStorage(directory: directoryURL)
+
+            // Given: three entries written in the order k1, k2, k3.
+            for key in ["k1", "k2", "k3"] {
+                var (buffer, _, _) = await storage.allocateBuffer(
+                    key: key,
+                    cachedResponse: makeCachedResponse(key: key),
+                    contentLength: 0,
+                    maximumCapacity: .max
+                )
+                await buffer?.writeData(Data([0x1, 0x2, 0x3, 0x4]))
+                try? await buffer?.close()
+                try? await Task.sleep(nanoseconds: 5_000_000)
+            }
+
+            // When: the oldest one is served, and room for one entry less than all three is
+            // then asked for.
+            #expect(await storage["k1"] != nil)
+            let total = await storage.freeSpace(.max)
+            await storage.freeSpace(total - 1)
+
+            // Then: k2 went, not k1. It is the least recently used, though k1 was written first.
+            #expect(await storage["k2"] == nil)
+            #expect(await storage["k1"] != nil)
+            #expect(await storage["k3"] != nil)
+        }
+    }
+
+    @Test
     func record_whenReadThroughAFreshInstanceShortlyAfterAnotherWroteAnEntry_isFoundThroughAColdScan() async throws {
         try await withTemporaryFileURL(createPath: false) { directoryURL in
             // Given: an entry written through one `DiskStorage` value, standing in for a different
