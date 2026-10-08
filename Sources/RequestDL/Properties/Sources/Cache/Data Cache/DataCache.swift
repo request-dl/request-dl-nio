@@ -675,12 +675,34 @@ public struct DataCache: Sendable, Equatable {
             writeToken.end()
         }
 
+        // What a tier holds of this write goes when the body outgrows the tier: the exact record
+        // this write allocated, by reference, as `discardFailedWrite(_:forKey:)` does.
+        let storage = self.storage
+        let memoryRecord = memoryDataURL
+        let diskRecord = diskRecordURL
+
+        let onOverflow: @Sendable (Buffer.Tier) async -> Void = { tier in
+            switch tier {
+            case .memory:
+                if let memoryRecord {
+                    storage.withMemoryStorage { $0.remove(key, ifDataURL: memoryRecord) }
+                }
+            case .disk:
+                if let diskRecord {
+                    await storage.diskStorage.removeRecord(at: diskRecord)
+                }
+            }
+        }
+
         return .init(
             memoryBuffer: memoryBuffer,
             diskBuffer: diskBuffer,
             diskRecordURL: diskRecordURL,
             memoryDataURL: memoryDataURL,
-            writeToken: writeToken
+            writeToken: writeToken,
+            memoryCapacity: storage.memoryCapacity,
+            diskCapacity: storage.diskCapacity,
+            onOverflow: onOverflow
         )
     }
 
@@ -730,12 +752,20 @@ public struct DataCache: Sendable, Equatable {
 
         let actualSize = Int64(buffer.readableBytes)
 
+        // A tier the body outgrew holds nothing of it any more: its usage goes back to what it
+        // was before this write, not to the size of a body it did not keep.
         if buffer.memoryDataURL != nil {
-            storage.reconcileMemoryUsage(contentLengthHint: contentLengthHint, actualSize: actualSize)
+            storage.reconcileMemoryUsage(
+                contentLengthHint: contentLengthHint,
+                actualSize: buffer.memoryOverflowed ? 0 : actualSize
+            )
         }
 
         if buffer.diskRecordURL != nil {
-            storage.reconcileDiskUsage(contentLengthHint: contentLengthHint, actualSize: actualSize)
+            storage.reconcileDiskUsage(
+                contentLengthHint: contentLengthHint,
+                actualSize: buffer.diskOverflowed ? 0 : actualSize
+            )
         }
     }
 
