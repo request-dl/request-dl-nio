@@ -192,6 +192,91 @@ struct URLOverrideTests {
         #expect(resolved.requestConfiguration.url == "https://apple.com/v2")
     }
 
+    // MARK: - What counts as the same origin
+
+    /// Scheme and host are compared case-insensitively and a port left out is the scheme's
+    /// default, so the same origin spelled another way still matches its rule.
+    @Test
+    func origin_matchesWhateverTheCaseOfSchemeAndHost() async throws {
+        let ruleInUpperCase = try await resolve(
+            TestProperty {
+                BaseURL("google.com")
+                URLOverride("https://apple.com", from: "HTTPS://Google.COM")
+            }
+        )
+
+        let requestInUpperCase = try await resolve(
+            TestProperty {
+                BaseURL("Google.COM")
+                URLOverride("https://apple.com", from: "https://google.com")
+            }
+        )
+
+        #expect(ruleInUpperCase.requestConfiguration.url == "https://apple.com")
+        #expect(requestInUpperCase.requestConfiguration.url == "https://apple.com")
+    }
+
+    @Test
+    func origin_whenTheRequestNamesTheDefaultPort_matchesARuleThatDoesNot() async throws {
+        let https = try await resolve(
+            TestProperty {
+                BaseURL(.https, host: "google.com:443")
+                URLOverride("https://apple.com", from: "https://google.com")
+            }
+        )
+
+        let http = try await resolve(
+            TestProperty {
+                BaseURL(.http, host: "google.com:80")
+                URLOverride("http://apple.com", from: "http://google.com")
+            }
+        )
+
+        #expect(https.requestConfiguration.url == "https://apple.com")
+        #expect(http.requestConfiguration.url == "http://apple.com")
+    }
+
+    @Test
+    func origin_whenTheRuleNamesTheDefaultPort_matchesARequestThatDoesNot() async throws {
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL("google.com")
+                URLOverride("https://apple.com", from: "https://google.com:443")
+            }
+        )
+
+        #expect(resolved.requestConfiguration.url == "https://apple.com")
+    }
+
+    /// A port that is not the scheme's default is a different origin, as before.
+    @Test
+    func origin_whenThePortIsNotTheDefault_stillDiffers() async throws {
+        let requestOnAnotherPort = try await resolve(
+            TestProperty {
+                BaseURL(.https, host: "google.com:8443")
+                URLOverride("https://apple.com", from: "https://google.com")
+            }
+        )
+
+        let ruleOnAnotherPort = try await resolve(
+            TestProperty {
+                BaseURL("google.com")
+                URLOverride("https://apple.com", from: "https://google.com:8443")
+            }
+        )
+
+        let otherSchemeDefault = try await resolve(
+            TestProperty {
+                BaseURL(.http, host: "google.com:443")
+                URLOverride("https://apple.com", from: "http://google.com")
+            }
+        )
+
+        #expect(requestOnAnotherPort.requestConfiguration.url == "https://google.com:8443")
+        #expect(ruleOnAnotherPort.requestConfiguration.url == "https://google.com")
+        #expect(otherSchemeDefault.requestConfiguration.url == "http://google.com:443")
+    }
+
     @Test
     func originScheme_mustMatch() async throws {
         // Given / When

@@ -181,9 +181,7 @@ struct Resolve<Root: Property>: Sendable {
 
         for rule in make.urlOverrides {
             guard
-                rule.origin.scheme == origin.scheme,
-                rule.origin.host == origin.host,
-                rule.origin.port == origin.port,
+                rule.origin.isSameOrigin(as: origin),
                 pathComponents.starts(with: rule.origin.pathComponents)
             else {
                 continue
