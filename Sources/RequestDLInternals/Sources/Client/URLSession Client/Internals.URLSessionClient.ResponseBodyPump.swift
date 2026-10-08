@@ -107,7 +107,7 @@ extension Internals.URLSessionClient {
                     }
                 }
 
-            case .separator(let separator) where !separator.isEmpty:
+            case .separator(let separator, _) where !separator.isEmpty:
                 // Only the separator's last byte can complete a match, so it is the only one
                 // worth flushing on; `Internals.DownloadBuffer` decides whether it actually did.
                 let terminator = separator[separator.count - 1]

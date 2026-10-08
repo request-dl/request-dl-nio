@@ -43,6 +43,8 @@ public struct AsyncBytes: Sendable, AsyncSequence, Hashable {
                 throw ResourceTimeoutError()
             } catch let error as Internals.DownloadResumptionMismatchError {
                 throw DownloadResumptionError(error)
+            } catch let error as Internals.ReadingModeItemTooLargeError {
+                throw ReadingModeItemTooLargeError(error)
             }
         }
     }
