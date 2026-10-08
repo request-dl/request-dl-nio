@@ -222,6 +222,24 @@ struct AsyncBytesItemsTests {
         try await eventually { cancelled.isSet }
     }
 
+    @Test
+    func readingModeItemTooLarge_cancelsTheTransferWhileTheCallerStillHoldsTheBytes() async throws {
+        let cancelled = CancelFlag()
+        let stream = Internals.AsyncStream<Internals.DataBuffer>()
+        let internalBytes = Internals.AsyncBytes(logger: nil, totalSize: 0, stream: stream)
+        let bytes = AsyncBytes(seed: Internals.TaskSeed { cancelled.set() }, bytes: internalBytes)
+
+        await stream.append(.failure(Internals.ReadingModeItemTooLargeError(maximumItemSize: 5)))
+        stream.close()
+
+        await #expect(throws: ReadingModeItemTooLargeError.self) {
+            for try await _ in bytes {}
+        }
+
+        #expect(cancelled.isSet)
+        withExtendedLifetime(bytes) {}
+    }
+
     // MARK: - ItemSplitter
 
     @Test

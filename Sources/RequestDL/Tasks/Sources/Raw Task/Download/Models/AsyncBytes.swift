@@ -44,6 +44,9 @@ public struct AsyncBytes: Sendable, AsyncSequence, Hashable {
             } catch let error as Internals.DownloadResumptionMismatchError {
                 throw DownloadResumptionError(error)
             } catch let error as Internals.ReadingModeItemTooLargeError {
+                // The rest of the response is not read, so there is no reason to keep receiving
+                // it for as long as the caller holds these bytes.
+                seed()
                 throw ReadingModeItemTooLargeError(error)
             }
         }
