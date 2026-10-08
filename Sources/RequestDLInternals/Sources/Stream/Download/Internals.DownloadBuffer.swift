@@ -141,7 +141,7 @@ extension Internals {
                 do {
                     switch readingMode {
                     case .length(let length):
-                        await _appendByLength(&incomeBytes, length: length, into: &buffer)
+                        try await _appendByLength(&incomeBytes, length: length, into: &buffer)
                     case .separator(let separator, let maximumItemSize):
                         try await _appendBySeparator(
                             &incomeBytes,
@@ -159,11 +159,13 @@ extension Internals {
                 }
             }
 
+            /// - Throws: ``AsyncBytesReadError`` when `incomeBytes` says it holds bytes and cannot
+            ///   give them. See ``readableBytes(_:count:)``.
             private func _appendByLength(
                 _ incomeBytes: inout Internals.AnyBuffer,
                 length: Int,
                 into buffer: inout DataBuffer
-            ) async {
+            ) async throws {
                 while incomeBytes.readableBytes > .zero {
                     let receivedBytes = incomeBytes.readableBytes
                     let currentBytes = buffer.readableBytes
@@ -171,11 +173,8 @@ extension Internals {
                     let availableBytes = length - currentBytes
                     let readableBytes = receivedBytes > availableBytes ? availableBytes : receivedBytes
 
-                    if let data = await incomeBytes.readData(readableBytes) {
-                        await buffer.writeData(data)
-                    } else {
-                        break
-                    }
+                    let bytes = try await Self.readableBytes(&incomeBytes, count: readableBytes)
+                    await buffer.writeBytes(bytes)
 
                     if buffer.readableBytes == length {
                         await _emit(&buffer)
@@ -200,10 +199,9 @@ extension Internals {
                 maximumItemSize: Int?,
                 into buffer: inout DataBuffer
             ) async throws {
-                guard
-                    incomeBytes.readableBytes > .zero,
-                    let incoming = await incomeBytes.readBytes(incomeBytes.readableBytes)
-                else { return }
+                guard incomeBytes.readableBytes > .zero else { return }
+
+                let incoming = try await Self.readableBytes(&incomeBytes, count: incomeBytes.readableBytes)
 
                 guard !separator.isEmpty else {
                     // Degenerate configuration: there is nothing to split on, so everything is
@@ -280,6 +278,24 @@ extension Internals {
                 }
 
                 return lps
+            }
+
+            /// Reads `count` bytes that `buffer` has just reported it holds.
+            ///
+            /// `Internals.Buffer` answers `nil` for a read that failed, and that is also its answer
+            /// at the end of the data. Told apart by the caller already knowing there is more: a
+            /// `nil` for bytes that were reported readable is a failure (an encrypted entry whose
+            /// tag no longer matches, a file removed after it was looked up, an I/O error), not the
+            /// end. Taking it for the end would close the stream normally, and a body cut short
+            /// would reach the reader as one that succeeded.
+            ///
+            /// - Throws: ``AsyncBytesReadError``.
+            private static func readableBytes(_ buffer: inout Internals.AnyBuffer, count: Int) async throws -> [UInt8] {
+                guard let bytes = await buffer.readBytes(count), !bytes.isEmpty else {
+                    throw AsyncBytesReadError()
+                }
+
+                return bytes
             }
 
             /// Dispatches the accumulated bytes as one chunk and resets the buffer.

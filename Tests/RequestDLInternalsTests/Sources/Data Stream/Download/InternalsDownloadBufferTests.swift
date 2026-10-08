@@ -2,6 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Crypto
 import SwiftAsyncTesting
 import Testing
 
@@ -368,5 +369,48 @@ struct InternalsDownloadBufferTests {
         let bytes = Internals.AsyncBytes(logger: nil, totalSize: line.count + 1, stream: download.stream)
 
         #expect(try await Array(bytes).map(\.count) == [100_001])
+    }
+
+    // MARK: - A buffer that cannot be read
+
+    /// Regression test (audit finding N3): `Internals.Buffer` answers `nil` for a read that
+    /// failed, the same answer as the end of the data, and the download buffer took it for the
+    /// end: it stopped copying and the stream closed normally, so a body whose backing storage
+    /// could not be read (here an encrypted entry whose tag no longer matches) reached the
+    /// caller as a short body that had succeeded.
+    @Test(arguments: [
+        Internals.DownloadStep.ReadingMode.length(1_024),
+        .separator(Array("\n".utf8)),
+    ])
+    func download_whenTheIncomingBufferCannotBeRead_failsInsteadOfEndingTheBody(
+        _ readingMode: Internals.DownloadStep.ReadingMode
+    ) async throws {
+        try await withTemporaryFileURL("encrypted.bin") { fileURL in
+            // Given: an encrypted buffer written whole, then one byte of it changed.
+            let url = Internals.EncryptedFileBufferURL(inner: .init(fileURL), key: .init(size: .bits256))
+
+            var writer = await Internals.Buffer<Internals.EncryptedFileStreamBuffer>(addressing: url)
+            await writer.writeData(Data("some content of the response\n".utf8))
+            try await writer.close()
+
+            var raw = try Data(contentsOf: fileURL)
+            raw[raw.count - 1] ^= 0xFF
+            try raw.write(to: fileURL)
+
+            let reader = await Internals.Buffer<Internals.EncryptedFileStreamBuffer>(addressing: url)
+            #expect(reader.readableBytes > 0)
+
+            // When
+            let download = await Internals.DownloadBuffer(readingMode: readingMode)
+            await download.append(reader)
+            download.close()
+
+            // Then
+            let bytes = Internals.AsyncBytes(logger: nil, totalSize: reader.readableBytes, stream: download.stream)
+
+            await #expect(throws: AsyncBytesReadError.self) {
+                _ = try await Array(bytes)
+            }
+        }
     }
 }
