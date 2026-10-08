@@ -1167,6 +1167,19 @@ extension Internals.URLSessionClient {
     /// Mirrors `HTTPClientError.redirectCycleDetected` from the NIO executor.
     package struct RedirectCycleDetectedError: Error, Sendable {}
 
+    /// Thrown when a redirect strategy answers `.follow` with a URL that can't be parsed.
+    /// Mirrors the invalid URL failure AsyncHTTPClient raises for the same decision on the NIO
+    /// executor, rather than quietly following the `Location` the server sent instead.
+    package struct InvalidRedirectURLError: Error, Sendable {
+
+        /// The URL the strategy returned.
+        package let url: String
+
+        package init(url: String) {
+            self.url = url
+        }
+    }
+
     /// Lets a `withTaskCancellationHandler`'s `onCancel` closure reach a `URLSessionTask` that a
     /// concurrently-running `operation` closure is still in the middle of creating.
     ///
@@ -1445,7 +1458,16 @@ extension Internals.URLSessionClient {
                 case .doNotFollow:
                     completionHandler(nil)
                 case .follow(let redirectRequest):
-                    let newRequest = sanitizedRequest.applyingRedirectDecision(redirectRequest)
+                    let newRequest: URLRequest
+
+                    do {
+                        newRequest = try sanitizedRequest.applyingRedirectDecision(redirectRequest)
+                    } catch {
+                        lock.withLock { _redirectError = error }
+                        completionHandler(nil)
+                        return
+                    }
+
                     lock.withLock {
                         _lastRequest = newRequest
                         _strategyRedirectCount += 1

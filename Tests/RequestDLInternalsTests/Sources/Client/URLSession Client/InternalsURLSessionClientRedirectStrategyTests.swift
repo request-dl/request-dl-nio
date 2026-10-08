@@ -216,6 +216,50 @@ struct InternalsURLSessionClientRedirectStrategyTests {
             // Then: expected
         }
     }
+
+    /// A strategy that answers `.follow` with a URL that doesn't parse fails the request on
+    /// `.urlSession`, as it does on the NIO executor, instead of following the server's own
+    /// `Location`.
+    @Test
+    func execute_whenStrategyFollowsAnInvalidURL_failsInsteadOfFollowingTheLocation() async throws {
+        // Given
+        let localServer = try await LocalServer(.standard)
+        let origin = "/" + UUID().uuidString
+        let destination = "/" + UUID().uuidString
+
+        localServer.cleanup(at: origin)
+        localServer.cleanup(at: destination)
+
+        localServer.insert(
+            LocalServer.ResponseConfiguration(status: .found, headers: ["Location": destination], data: Data()),
+            at: origin
+        )
+        localServer.insert(try LocalServer.ResponseConfiguration(jsonObject: "reached"), at: destination)
+
+        defer {
+            localServer.cleanup(at: origin)
+            localServer.cleanup(at: destination)
+        }
+
+        let client = try Internals.URLSessionClient(
+            configuration: .ephemeral,
+            redirectConfiguration: .strategy(InvalidURLRedirectStrategy())
+        )
+
+        let url = try #require(URL(string: "https://\(localServer.baseURL)\(origin)"))
+
+        // When
+        do {
+            _ = try await client.execute(
+                request: URLRequest(url: url),
+                delegate: AcceptAnyServerTrustDelegate()
+            )
+            Issue.record("Not expecting success")
+        } catch let error as Internals.URLSessionClient.InvalidRedirectURLError {
+            // Then
+            #expect(error.url == "")
+        }
+    }
 }
 
 // MARK: - Test doubles
@@ -250,6 +294,15 @@ private struct DoNotFollowRedirectStrategy: Internals.RedirectStrategy {
 
     func redirectDecision(for context: Internals.RedirectContext) throws -> Internals.RedirectDecision {
         .doNotFollow
+    }
+}
+
+private struct InvalidURLRedirectStrategy: Internals.RedirectStrategy {
+
+    func redirectDecision(for context: Internals.RedirectContext) throws -> Internals.RedirectDecision {
+        var request = context.redirectRequest
+        request.url = ""
+        return .follow(request)
     }
 }
 
