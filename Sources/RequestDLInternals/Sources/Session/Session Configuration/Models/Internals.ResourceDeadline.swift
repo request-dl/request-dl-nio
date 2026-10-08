@@ -44,7 +44,11 @@ extension Internals {
         /// overhead: the path every request without `.resource` configured takes.
         package init(nanoseconds: Int64?) {
             #if canImport(Darwin)
-            deadlineUptimeNanoseconds = nanoseconds.map { DispatchTime.now().uptimeNanoseconds &+ UInt64($0) }
+            // Clamped: a negative timeout is a deadline that has already passed, as it is
+            // everywhere else, not a reason to trap.
+            deadlineUptimeNanoseconds = nanoseconds.map {
+                DispatchTime.now().uptimeNanoseconds &+ UInt64(clamping: $0)
+            }
             #else
             instant = nanoseconds.map { ContinuousClock.now.advanced(by: .nanoseconds($0)) }
             #endif

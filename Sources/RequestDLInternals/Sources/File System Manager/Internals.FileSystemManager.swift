@@ -91,6 +91,9 @@ extension Internals {
         /// idle on any platform this trait targets, and CI's constrained core count would otherwise
         /// size the pool too small for a single suite's own concurrency burst (one test alone fires
         /// 64 tasks at once) on top of everything else the portable test run has in flight.
+        /// That figure is a ceiling, not a count: threads start as work needs them (see
+        /// `PortableBlockingPool`), so a process that only reads a file now and then does not hold
+        /// 96 to 160 of them, each with a 1 MiB stack.
         package static func run<T: Sendable>(
             _ body: @escaping @Sendable () throws -> T
         ) async throws -> T {
@@ -119,7 +122,7 @@ extension Internals {
 /// `DispatchQueue.global()`: threads started here only ever run work handed to this pool, so
 /// they cannot be starved by unrelated `.utility`-queue work elsewhere in the process the way a
 /// shared GCD queue's own worker ramp-up was observed to under heavy concurrent test load.
-private final class PortableBlockingPool: @unchecked Sendable {
+final class PortableBlockingPool: @unchecked Sendable {
 
     // MARK: - Private properties
 
@@ -130,21 +133,29 @@ private final class PortableBlockingPool: @unchecked Sendable {
     // in amortized O(1) instead.
     private var workItems = FIFOQueue<() -> Void>()
 
+    private let maximumThreadCount: Int
+    private var queuedCount = 0
+    private var idleCount = 0
+
+    /// Threads started so far, exposed for tests. Guarded by `condition`.
+    private var _startedThreadCount = 0
+
+    // MARK: - Internal properties
+
+    var startedThreadCount: Int {
+        condition.lock()
+        defer { condition.unlock() }
+        return _startedThreadCount
+    }
+
     // MARK: - Inits
 
+    /// - Parameter threadCount: The most threads this pool ever starts. None are started here:
+    ///   a thread starts when work is queued and no waiting thread is free to take it, so the
+    ///   limit stays reachable by a burst (the reason it is high) without a process that only
+    ///   reads a file now and then paying for every one of them.
     init(threadCount: Int) {
-        for index in 0..<threadCount {
-            let thread = Thread { [self] in
-                _runLoop()
-            }
-            thread.name = "com.requestdl.portable-blocking-pool.\(index)"
-            // Matches the default main thread stack size. The work run here is plain,
-            // non-recursive file I/O, so the platform default has never been a constraint; this
-            // just avoids inheriting whatever (possibly much smaller) stack size the thread that
-            // happens to construct this pool was given.
-            thread.stackSize = 1 << 20
-            thread.start()
-        }
+        maximumThreadCount = threadCount
     }
 
     // MARK: - Internal methods
@@ -160,12 +171,36 @@ private final class PortableBlockingPool: @unchecked Sendable {
                     continuation.resume(throwing: error)
                 }
             }
+            queuedCount += 1
+
+            // More queued than there are waiting threads to take it: one more is needed, if the
+            // limit allows. A waiting thread that was signalled but has not woken yet still
+            // counts as waiting, which is why this compares against everything queued.
+            if queuedCount > idleCount, _startedThreadCount < maximumThreadCount {
+                _startThread()
+            }
+
             condition.signal()
             condition.unlock()
         }
     }
 
     // MARK: - Private methods
+
+    /// Starts one worker. Called with `condition` locked.
+    private func _startThread() {
+        let thread = Thread { [self] in
+            _runLoop()
+        }
+        thread.name = "com.requestdl.portable-blocking-pool.\(_startedThreadCount)"
+        // Matches the default main thread stack size. The work run here is plain,
+        // non-recursive file I/O, so the platform default has never been a constraint; this
+        // just avoids inheriting whatever (possibly much smaller) stack size the thread that
+        // happens to start it was given.
+        thread.stackSize = 1 << 20
+        _startedThreadCount += 1
+        thread.start()
+    }
 
     /// Body of every thread this pool starts. Never returns, matching every other fixed-size
     /// thread pool: the thread exists for exactly as long as the process does.
@@ -174,7 +209,9 @@ private final class PortableBlockingPool: @unchecked Sendable {
             condition.lock()
 
             while workItems.isEmpty {
+                idleCount += 1
                 condition.wait()
+                idleCount -= 1
             }
 
             // `isEmpty` was just checked under this same lock, with no unlock in between, so this
@@ -185,6 +222,7 @@ private final class PortableBlockingPool: @unchecked Sendable {
                 condition.unlock()
                 continue
             }
+            queuedCount -= 1
             condition.unlock()
 
             workItem()

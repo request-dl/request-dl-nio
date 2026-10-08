@@ -19,6 +19,10 @@ import struct Foundation.Data
 /// it, and every other call that arrives before it finishes awaits the same result instead of
 /// starting a second request. This is separate from, and on top of, RequestDL's own response
 /// cache, which is what makes a *later*, non-concurrent request for the same image cheap.
+///
+/// The shared download is cancelled once every call waiting for it has been cancelled. While at
+/// least one is still waiting it keeps running, so cancelling one call never takes the image
+/// away from another.
 public actor RDLImageLoader {
 
     /// The shared loader instance, used by RequestDL's SwiftUI, UIKit, AppKit and WatchKit
@@ -40,7 +44,19 @@ public actor RDLImageLoader {
     /// Cleared as soon as the task finishes (success or failure): this tracks concurrency, not
     /// results. A request that lands after this is cleared starts fresh, and RequestDL's own
     /// cache is what makes that repeat request cheap.
-    private var tasks: [String: Task<SendableImage, Error>] = [:]
+    private var tasks: [String: InFlight] = [:]
+
+    private var nextGeneration = 0
+
+    /// A download in flight and how many calls are waiting for it.
+    ///
+    /// `generation` tells one download for an `id` from the next one, so a late cancellation of
+    /// a call that waited for an earlier download never touches a newer one.
+    private struct InFlight {
+        let task: Task<SendableImage, Error>
+        let generation: Int
+        var waiters: Int
+    }
 
     // MARK: - Inits
 
@@ -91,8 +107,11 @@ public actor RDLImageLoader {
         id: String,
         task: Content
     ) async throws -> PlatformImage {
-        if let existing = tasks[id] {
-            return try await existing.value.image
+        if var existing = tasks[id] {
+            existing.waiters += 1
+            tasks[id] = existing
+
+            return try await waitFor(existing.task, id: id, generation: existing.generation)
         }
 
         // `.detached` rather than a plain `Task { ... }`: a plain `Task` would inherit this actor's
@@ -109,10 +128,12 @@ public actor RDLImageLoader {
             return SendableImage(image)
         }
 
-        tasks[id] = newTask
-        defer { tasks[id] = nil }
+        let generation = nextGeneration
+        nextGeneration += 1
 
-        return try await newTask.value.image
+        tasks[id] = InFlight(task: newTask, generation: generation, waiters: 1)
+
+        return try await waitFor(newTask, id: id, generation: generation)
     }
 
     ///
@@ -156,6 +177,51 @@ public actor RDLImageLoader {
         @PropertyBuilder content: () -> Content
     ) async throws -> PlatformImage {
         try await load(id: id, task: DataTask(content: content))
+    }
+
+    // MARK: - Private methods
+
+    /// Waits for `task`, which the caller already counted as one of its waiters.
+    ///
+    /// A plain `await task.value` would ignore this caller's cancellation, since the download
+    /// runs in a detached task of its own. The cancellation handler gives the caller's place
+    /// back instead, and the last one to leave cancels the download.
+    private func waitFor(
+        _ task: Task<SendableImage, Error>,
+        id: String,
+        generation: Int
+    ) async throws -> PlatformImage {
+        defer { finish(id: id, generation: generation) }
+
+        return try await withTaskCancellationHandler {
+            try await task.value.image
+        } onCancel: {
+            Task { await self.leave(id: id, generation: generation) }
+        }
+    }
+
+    /// Gives up one waiter's place, cancelling the download when it was the last.
+    private func leave(id: String, generation: Int) {
+        guard var inFlight = tasks[id], inFlight.generation == generation else {
+            return
+        }
+
+        inFlight.waiters -= 1
+
+        guard inFlight.waiters <= 0 else {
+            tasks[id] = inFlight
+            return
+        }
+
+        inFlight.task.cancel()
+        tasks[id] = nil
+    }
+
+    /// Forgets the download once a call has its outcome, unless a newer one took its place.
+    private func finish(id: String, generation: Int) {
+        if tasks[id]?.generation == generation {
+            tasks[id] = nil
+        }
     }
 }
 

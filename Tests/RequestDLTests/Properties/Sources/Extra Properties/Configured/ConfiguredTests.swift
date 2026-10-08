@@ -81,6 +81,30 @@ struct ConfiguredTests {
         #expect(resolved.session.configuration.timeout.read == UnitTime.seconds(75).nanoseconds)
     }
 
+    /// `timeout` is an `Int` read from the environment or a file, and a value past what fits in
+    /// nanoseconds saturates instead of trapping while the property resolves.
+    @Test
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func timeout_whenTooLargeForNanoseconds_saturates() async throws {
+        // Given
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "timeout": .init(.int(Int.max), isSecret: false)
+            ])
+        )
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                Configured(reader)
+            }
+        )
+
+        // Then
+        #expect(resolved.session.configuration.timeout.connect == .max)
+        #expect(resolved.session.configuration.timeout.read == .max)
+    }
+
     @Test
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func headers() async throws {

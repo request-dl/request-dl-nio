@@ -14,6 +14,25 @@ import NIOCore
 
 extension Internals {
 
+    /// A part of a request body could not be read when the body was being sent.
+    package struct RequestBodyPartUnreadableError: Swift.Error, Sendable, CustomStringConvertible {
+
+        /// How many bytes the part had said it could still give.
+        package let expectedBytes: Int
+
+        package var description: String {
+            """
+            A part of the request body could not be read while it was being sent: it reported \
+            \(expectedBytes) readable bytes and gave none. A file that backs the body was likely \
+            removed or changed after the body was assembled.
+            """
+        }
+
+        package init(expectedBytes: Int) {
+            self.expectedBytes = expectedBytes
+        }
+    }
+
     /// Cuts a list of buffers into fixed size chunks for the request body writer.
     package struct BodySequence: Sendable, AsyncSequence {
 
@@ -69,7 +88,11 @@ extension Internals {
             /// Iterative on purpose. Recursing once per source buffer meant the stack depth
             /// tracked the number of buffers feeding a single chunk, which a body assembled
             /// from many small parts turns into an overflow.
-            package mutating func next() async -> Internals.Bytes? {
+            ///
+            /// - Throws: ``RequestBodyPartUnreadableError`` when a part reported readable bytes and
+            ///   could not give them, which a file that was removed or cut short after the body was
+            ///   assembled does.
+            package mutating func next() async throws -> Internals.Bytes? {
                 guard chunkSize > .zero else {
                     return nil
                 }
@@ -89,20 +112,13 @@ extension Internals {
                     }
 
                     guard let data = await buffer.readData(length) else {
-                        // The buffer advertised readable bytes and then failed to produce
-                        // them. Dropping it sends a body shorter than the declared length and
-                        // leaves the peer waiting for the rest, so at least say so in debug
-                        // rather than letting it pass unnoticed.
-                        //
-                        // Through `Internals`, not `Swift`. The package has an override for
-                        // this precisely so a test can intercept it, and calling the standard
-                        // library directly walks straight past it.
-                        Internals.assertionFailure(
-                            "Buffer reported \(buffer.readableBytes) readable bytes but returned none"
-                        )
-
-                        bufferIndex += 1
-                        continue
+                        // The part advertised readable bytes and then failed to produce them,
+                        // typically a file that was removed or cut short after the body was
+                        // assembled. Skipping it would send a body shorter than the length
+                        // declared for it, and leave the peer waiting for the rest; asserting
+                        // would take a debug build down over something outside the program. The
+                        // request fails with the reason instead.
+                        throw RequestBodyPartUnreadableError(expectedBytes: buffer.readableBytes)
                     }
 
                     bytes.writeBytes(data)

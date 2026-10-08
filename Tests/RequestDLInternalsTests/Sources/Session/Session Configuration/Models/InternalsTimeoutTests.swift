@@ -116,7 +116,7 @@ struct InternalsTimeoutTests {
     }
 
     @Test
-    func timeout_whenBuildWithNilFields_mapsToNil() {
+    func timeout_whenBuildWithNilFields_connectIsNilAndReadIsDefault() {
         // Given
         let timeout = Internals.Timeout()
 
@@ -125,7 +125,35 @@ struct InternalsTimeoutTests {
 
         // Then
         #expect(sut.connect == nil)
-        #expect(sut.read == nil)
+        #expect(sut.read == .nanoseconds(Internals.Timeout.defaultRead))
+    }
+
+    /// AsyncHTTPClient has no idle read timeout of its own, so an unset `read` would leave a
+    /// `.nio` request to a server that stops sending hanging forever, while `.urlSession` fails
+    /// the same request after its 60 s `timeoutIntervalForRequest`.
+    @Test
+    func timeout_whenBuildWithoutRead_matchesURLSessionDefaultOfSixtySeconds() {
+        // Given
+        let timeout = Internals.Timeout()
+
+        // When
+        let sut = timeout.build()
+
+        // Then
+        #expect(Internals.Timeout.defaultRead == 60_000_000_000)
+        #expect(sut.read == .seconds(60))
+    }
+
+    @Test
+    func timeout_whenBuildWithExplicitRead_overridesDefault() {
+        // Given
+        let timeout = Internals.Timeout(read: 5_000_000_000)
+
+        // When
+        let sut = timeout.build()
+
+        // Then
+        #expect(sut.read == .seconds(5))
     }
 
     /// `resource` has no `HTTPClient.Configuration.Timeout` counterpart (see `Internals.Timeout
@@ -143,7 +171,7 @@ struct InternalsTimeoutTests {
 
         // Then
         #expect(sut.connect == nil)
-        #expect(sut.read == nil)
+        #expect(sut.read == .nanoseconds(Internals.Timeout.defaultRead))
     }
     #endif
 }

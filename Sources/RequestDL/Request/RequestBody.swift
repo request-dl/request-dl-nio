@@ -289,8 +289,8 @@ extension RequestBody: AsyncSequence {
         ///
         /// - Returns: The next `Data` chunk in the sequence, or `nil` if there are no more elements.
         /// - Throws: Whatever a configured ``Compressor``'s ``CompressorStream`` throws, for a
-        /// compressing body. A fixed body never throws, but shares this signature so callers
-        /// don't need to know which kind of `RequestBody` they were handed.
+        /// compressing body, and for either kind of body the error for a part that cannot be read
+        /// while it is being sent (a file behind the body that was removed or cut short).
         ///
         /// - Note: `.noCopy`, not the default `.automatic`: `asData(byteTransferStrategy:)`'s
         /// `.automatic` heuristic (`NIOCore.ByteBuffer.getData`'s own) copies any chunk at or
@@ -323,7 +323,7 @@ extension RequestBody: AsyncSequence {
         mutating func next() async throws -> Internals.Bytes? {
             switch backing {
             case .fixed(var iterator):
-                let element = await iterator.next()
+                let element = try await iterator.next()
                 backing = .fixed(iterator)
                 return element
 

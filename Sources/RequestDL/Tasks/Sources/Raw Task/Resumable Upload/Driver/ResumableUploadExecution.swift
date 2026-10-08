@@ -261,8 +261,10 @@ final class ResumableUploadExecution: @unchecked Sendable {
                     return
 
                 case .partial(let held):
+                    // An answer that holds no more than was already known moved nothing, and
+                    // must spend the budget like any other attempt that did not.
                     sent.discard()
-                    try advance(&budget, to: held)
+                    try advance(&budget, to: held, countsAsAttempt: true)
                     continue
 
                 case .conflict(let held):

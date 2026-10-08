@@ -16,6 +16,9 @@ extension Internals {
         package var connect: Int64?
 
         /// Nanoseconds, matching `UnitTime.nanoseconds` (`RequestDL`'s public unit of time).
+        ///
+        /// `nil` means "not configured", not "never": `build()` falls back to
+        /// ``defaultRead``, as `URLSession`'s `timeoutIntervalForRequest` does.
         package var read: Int64?
 
         /// Nanoseconds, matching `UnitTime.nanoseconds` (`RequestDL`'s public unit of time).
@@ -25,13 +28,19 @@ extension Internals {
         /// forward it. `RawTask` reads it directly to drive `Internals.ResourceDeadline` instead.
         package var resource: Int64?
 
+        /// The idle read timeout applied when `read` isn't set, in nanoseconds.
+        ///
+        /// AsyncHTTPClient has none by default, so a server that stops sending would hang a
+        /// `.nio` request forever while `.urlSession` fails it after 60 s.
+        package static let defaultRead: Int64 = 60_000_000_000
+
         // MARK: - Internal methods
 
         #if canImport(NIOCore)
         package func build() -> HTTPClient.Configuration.Timeout {
             .init(
                 connect: connect.map { .nanoseconds($0) },
-                read: read.map { .nanoseconds($0) }
+                read: .nanoseconds(read ?? Self.defaultRead)
             )
         }
         #endif
