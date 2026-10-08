@@ -254,11 +254,8 @@ struct InternalsBodySequenceTests {
         #expect(combined == expecting)
     }
 
-    /// Regression test (audit finding N14): a file behind the body that was removed, or cut
-    /// short, after the body was assembled made the sequence call `Internals.assertionFailure`,
-    /// which traps a debug build (a user's file, an external condition), and then go on without
-    /// the part it could not read, so that a release build sent a body shorter than the length it
-    /// had declared.
+    /// A file behind a part that is removed after the body was assembled fails the read. Going
+    /// on without the part would send a body shorter than the length declared for it.
     @Test
     func bodySequence_whenTheFileBehindAPartIsRemoved_throwsInsteadOfSkippingIt() async throws {
         // Given
@@ -292,6 +289,35 @@ struct InternalsBodySequenceTests {
         }
 
         #expect(captured.wrappedValue.isEmpty)
+    }
+
+    /// A file that is still there but shorter than when the body was assembled fails the read
+    /// too, for the same reason.
+    @Test
+    func bodySequence_whenTheFileBehindAPartIsCutShort_throwsInsteadOfSendingAShortBody() async throws {
+        // Given
+        let fileURLManager = try await InternalsFileBufferTests.FileURLManager()
+        defer { _ = fileURLManager }
+
+        let fileURL = fileURLManager.url
+        try Data(repeating: 0x61, count: 10_000).write(to: fileURL)
+
+        let bodySequence = await makeBodySequence(
+            chunkSize: 4_096,
+            [
+                Internals.DataBuffer(Data("head".utf8)),
+                Internals.FileBuffer(fileURL),
+                Internals.DataBuffer(Data("tail".utf8)),
+            ]
+        )
+
+        // When: the file is cut to a hundred bytes between assembling the body and sending it.
+        try Data(repeating: 0x61, count: 100).write(to: fileURL)
+
+        // Then
+        await #expect(throws: Internals.RequestBodyPartUnreadableError.self) {
+            _ = try await Array(bodySequence)
+        }
     }
 
     @Test
