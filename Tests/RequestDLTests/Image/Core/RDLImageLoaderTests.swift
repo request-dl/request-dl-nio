@@ -6,6 +6,7 @@ import Foundation
 import Testing
 
 @_spi(Private) @testable import RequestDL
+@testable import RequestDLTestSupport
 
 #if canImport(UIKit) || canImport(AppKit)
 struct RDLImageLoaderTests {
@@ -129,6 +130,111 @@ struct RDLImageLoaderTests {
         // Then
         #expect(await counter.value == 2)
     }
+
+    @Test
+    func cancellingTheOnlyWaiter_cancelsTheRequest() async throws {
+        // Given: a request that stays in flight until it is cancelled.
+        let probe = RequestProbe()
+        let task = StubImageTask {
+            await probe.started()
+
+            do {
+                try await Task.sleep(nanoseconds: 30_000_000_000)
+            } catch {
+                await probe.cancelled()
+                throw error
+            }
+
+            return .init(head: .stub, payload: .onePixelPNG)
+        }
+
+        let loader = RDLImageLoader()
+        let load = Task { try await loader.load(id: "cancelled", task: task) }
+
+        try await eventually { await probe.didStart }
+
+        // When: the only caller waiting for it goes away, as a list row scrolled off screen does.
+        load.cancel()
+
+        // Then: the request is cancelled instead of running to the end for nobody, and the
+        // caller does not get an image.
+        try await eventually { await probe.wasCancelled }
+
+        do {
+            _ = try await load.value
+            Issue.record("Expected the cancelled load to throw")
+        } catch {
+            // expected
+        }
+    }
+
+    @Test
+    func cancellingOneOfTwoWaiters_keepsTheRequestForTheOther() async throws {
+        // Given: two callers sharing one request.
+        let probe = RequestProbe()
+        let task = StubImageTask {
+            await probe.started()
+
+            do {
+                try await Task.sleep(nanoseconds: 200_000_000)
+            } catch {
+                await probe.cancelled()
+                throw error
+            }
+
+            return .init(head: .stub, payload: .onePixelPNG)
+        }
+
+        let loader = RDLImageLoader()
+        let first = Task { try await loader.load(id: "shared", task: task) }
+        try await eventually { await probe.didStart }
+        let second = Task { try await loader.load(id: "shared", task: task) }
+
+        // Let the second caller register before the first one leaves.
+        try await Task.sleep(nanoseconds: 50_000_000)
+
+        // When: one of them is cancelled.
+        first.cancel()
+
+        // Then: the other still gets its image, and the request was never cancelled.
+        let image = try await second.value
+        #expect(image.size.width > 0)
+        #expect(await probe.wasCancelled == false)
+        #expect(await probe.startCount == 1)
+    }
+
+    @Test
+    func loadingAgain_afterTheOnlyWaiterWasCancelled_startsANewRequest() async throws {
+        // Given: a request that was cancelled together with its only waiter.
+        let probe = RequestProbe()
+        let task = StubImageTask {
+            await probe.started()
+
+            if await probe.startCount == 1 {
+                do {
+                    try await Task.sleep(nanoseconds: 30_000_000_000)
+                } catch {
+                    await probe.cancelled()
+                    throw error
+                }
+            }
+
+            return .init(head: .stub, payload: .onePixelPNG)
+        }
+
+        let loader = RDLImageLoader()
+        let abandoned = Task { try await loader.load(id: "again", task: task) }
+        try await eventually { await probe.didStart }
+        abandoned.cancel()
+        try await eventually { await probe.wasCancelled }
+
+        // When: the same image is asked for again.
+        let image = try await loader.load(id: "again", task: task)
+
+        // Then: it starts a fresh request instead of joining the cancelled one.
+        #expect(image.size.width > 0)
+        #expect(await probe.startCount == 2)
+    }
 }
 
 // MARK: - Test helpers
@@ -139,6 +245,22 @@ private struct StubImageTask: RequestTask {
 
     func result() async throws -> TaskResult<Data> {
         try await onResult()
+    }
+}
+
+private actor RequestProbe {
+
+    private(set) var startCount = 0
+    private(set) var wasCancelled = false
+
+    var didStart: Bool { startCount > 0 }
+
+    func started() {
+        startCount += 1
+    }
+
+    func cancelled() {
+        wasCancelled = true
     }
 }
 
