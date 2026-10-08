@@ -206,10 +206,10 @@ struct InternalsClientMetricsTests {
 
     @Test
     func revalidation_whenTheRequestFails_recordsTheTransactionWithItsError() async throws {
-        // Given: a port nothing listens on any more.
-        let server = try TransferServer(resource: .init(length: 1))
-        let port = server.port
-        await server.stop()
+        // Given: a port that refuses connections.
+        let refused = try RefusedPort()
+        defer { refused.release() }
+        let port = refused.port
 
         let session = makeSession()
         let client = try await session.client()
@@ -233,10 +233,10 @@ struct InternalsClientMetricsTests {
 
     @Test
     func whenConnectionRefused_recordsTheErrorOnTheTransaction() async throws {
-        // Given: a port nothing listens on any more.
-        let server = try TransferServer(resource: .init(length: 1))
-        let port = server.port
-        await server.stop()
+        // Given: a port that refuses connections.
+        let refused = try RefusedPort()
+        defer { refused.release() }
+        let port = refused.port
 
         let session = makeSession()
         let client = try await session.client()

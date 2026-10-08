@@ -173,10 +173,10 @@ struct InternalsURLSessionClientMetricsTests {
 
     @Test
     func sessionTask_whenConnectionRefused_recordsTheErrorOnTheTransaction() async throws {
-        // Given: a port nothing listens on any more.
-        let server = try TransferServer(resource: .init(length: 1))
-        let port = server.port
-        await server.stop()
+        // Given: a port that refuses connections.
+        let refused = try RefusedPort()
+        defer { refused.release() }
+        let port = refused.port
 
         let url = try #require(URL(string: "http://127.0.0.1:\(port)/resource"))
         let client = try Internals.URLSessionClient(configuration: .ephemeral)
