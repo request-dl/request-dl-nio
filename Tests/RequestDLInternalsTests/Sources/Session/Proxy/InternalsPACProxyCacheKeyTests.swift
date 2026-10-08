@@ -2,6 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
+import SwiftAsyncStream
 import Testing
 
 @testable import RequestDLInternals
@@ -23,8 +24,8 @@ struct InternalsPACProxyCacheKeyTests {
 
     // MARK: - The target a script is asked about
 
-    /// Regression test: the cache was keyed by the whole target URL, so requests that differ
-    /// only in their query (pagination, signed URLs) each started a thread and a script run.
+    /// The cache is keyed by origin for secure targets, so requests that differ only in their
+    /// query (pagination, signed URLs) share one thread and one script run.
     @Test
     func proxy_whenSecureTargetsDifferOnlyInPathOrQuery_evaluatesOnceForTheOrigin() async throws {
         // Given
@@ -98,7 +99,7 @@ struct InternalsPACProxyCacheKeyTests {
 
     // MARK: - How many evaluations run at once
 
-    /// Regression test: every cache miss started its own dedicated thread, with no ceiling.
+    /// Cache misses do not each start a dedicated thread without a ceiling.
     @Test
     func proxy_whenManyDistinctTargetsMiss_neverRunsMoreEvaluationsThanTheLimit() async throws {
         // Given: an evaluator that holds every evaluation until told otherwise.
@@ -140,23 +141,28 @@ struct InternalsPACProxyCacheKeyTests {
 
     // MARK: - A failed evaluation
 
-    /// Regression test: a PAC download that failed once (a dropped connection, the 30s timeout)
-    /// was remembered as "go direct" for the full five minutes, so every request in that window
-    /// skipped the corporate proxy even though the script was fine.
+    /// A PAC download that failed once (a dropped connection, the 30s timeout) is remembered as
+    /// "go direct" only for a short window, not for the full five minutes, so requests do not
+    /// skip the corporate proxy for long when the script itself is fine.
     @Test
     func proxy_whenEvaluationFails_isAskedAgainOnceTheShortFailureWindowPasses() async throws {
-        // Given: an evaluator that fails the first time and then works.
+        // Given: an evaluator that fails the first time and then works, and a clock the test moves.
         let evaluator = ScriptedEvaluator(results: [.failure, .proxy("proxy.example.com")])
+        let clock = TestClock()
         let cache = Internals.PACProxyCache(
-            failureLifetime: 100_000_000,
+            failureLifetime: 100,
+            now: clock.now,
             evaluate: evaluator.evaluate
         )
         let target = try Self.url("https://example.com/")
 
         // When
         let first = await cache.proxy(forScriptURL: Self.scriptURL, targetURL: target)
+
+        clock.advance(by: 50)
         let beforeWindowEnds = await cache.proxy(forScriptURL: Self.scriptURL, targetURL: target)
-        try await Task.sleep(nanoseconds: 400_000_000)
+
+        clock.advance(by: 100)
         let afterWindowEnds = await cache.proxy(forScriptURL: Self.scriptURL, targetURL: target)
 
         // Then: still fails safe to direct meanwhile, without asking again, then recovers.
@@ -171,15 +177,17 @@ struct InternalsPACProxyCacheKeyTests {
     func proxy_whenScriptAnswersDirect_isNotAskedAgainAfterTheFailureWindow() async throws {
         // Given
         let evaluator = ScriptedEvaluator(results: [.direct, .proxy("proxy.example.com")])
+        let clock = TestClock()
         let cache = Internals.PACProxyCache(
-            failureLifetime: 100_000_000,
+            failureLifetime: 100,
+            now: clock.now,
             evaluate: evaluator.evaluate
         )
         let target = try Self.url("https://example.com/")
 
         // When
         _ = await cache.proxy(forScriptURL: Self.scriptURL, targetURL: target)
-        try await Task.sleep(nanoseconds: 400_000_000)
+        clock.advance(by: 1_000)
         let again = await cache.proxy(forScriptURL: Self.scriptURL, targetURL: target)
 
         // Then
@@ -202,6 +210,21 @@ struct InternalsPACProxyCacheKeyTests {
             }
             try await Task.sleep(nanoseconds: 10_000_000)
         }
+    }
+}
+
+/// A clock that only moves when the test says so, in the nanoseconds the cache ages entries by.
+private final class TestClock: @unchecked Sendable {
+
+    private let lock = Lock()
+    private var value: UInt64 = 1_000_000
+
+    var now: @Sendable () -> UInt64 {
+        { self.lock.withLock { self.value } }
+    }
+
+    func advance(by nanoseconds: UInt64) {
+        lock.withLock { value += nanoseconds }
     }
 }
 
@@ -267,7 +290,9 @@ private actor Evaluations {
         holds = false
         let continuations = held
         held = []
-        continuations.forEach { $0.resume() }
+        for continuation in continuations {
+            continuation.resume()
+        }
     }
 
     private func evaluate(_ target: URL) async {

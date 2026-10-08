@@ -94,6 +94,7 @@ extension Internals {
         private let maximumCount: Int
         private let maximumConcurrentEvaluations: Int
         private let failureLifetime: Int64
+        private let now: @Sendable () -> UInt64
         private let evaluate: @Sendable (URL, URL, Double) async throws -> Internals.Proxy?
 
         private var runningEvaluations = 0
@@ -117,11 +118,13 @@ extension Internals {
         /// entries instead of needing hundreds of real PAC evaluations to exceed it.
         ///
         /// `evaluate` defaults to the real `Internals.PACEvaluator`; a test replaces it to control
-        /// when an evaluation finishes and to see what it was asked.
+        /// when an evaluation finishes and to see what it was asked. `now` is the monotonic clock
+        /// entries are aged by, in nanoseconds; a test replaces it to move time without waiting.
         package init(
             maximumCount: Int = PACProxyCache.maximumCount,
             maximumConcurrentEvaluations: Int = PACProxyCache.maximumConcurrentEvaluations,
             failureLifetime: Int64 = PACProxyCache.failureLifetime,
+            now: @escaping @Sendable () -> UInt64 = { DispatchTime.now().uptimeNanoseconds },
             evaluate: @escaping @Sendable (URL, URL, Double) async throws -> Internals.Proxy? = {
                 try await Internals.PACEvaluator.evaluate(scriptURL: $0, targetURL: $1, timeout: $2)
             }
@@ -129,6 +132,7 @@ extension Internals {
             self.maximumCount = maximumCount
             self.maximumConcurrentEvaluations = max(maximumConcurrentEvaluations, 1)
             self.failureLifetime = failureLifetime
+            self.now = now
             self.evaluate = evaluate
         }
 
@@ -248,7 +252,7 @@ extension Internals {
             inFlight[key] = nil
             storage[key] = Entry(
                 proxy: evaluation.proxy,
-                readAt: DispatchTime.now().uptimeNanoseconds,
+                readAt: now(),
                 lifetime: evaluation.failed ? failureLifetime : Self.lifetime
             )
             evictIfNeeded()
@@ -275,7 +279,7 @@ extension Internals {
         // MARK: - Private methods
 
         private func isExpired(_ entry: Entry) -> Bool {
-            DispatchTime.now().uptimeNanoseconds - entry.readAt > entry.lifetime
+            now() - entry.readAt > entry.lifetime
         }
 
         /// Brings `storage` back under `maximumCount`, oldest first. Drops down to three
