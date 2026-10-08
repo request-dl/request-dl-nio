@@ -89,4 +89,50 @@ struct CURLTokenizerTests {
 
         #expect(tokens == ["curl", "\u{301}x"])
     }
+
+    // MARK: - ANSI-C escapes and unfinished input
+
+    @Test
+    func tokenize_whenAnANSICLiteralHasTheOtherEscapes_decodesThem() throws {
+        // Tab, backslash, single and double quote, and NUL.
+        let tokens = try CURLTokenizer.tokenize(#"curl -d $'a\tb\\c\'d\"e\0f'"#)
+
+        #expect(tokens == ["curl", "-d", "a\tb\\c'd\"e\0f"])
+    }
+
+    @Test
+    func tokenize_whenAnANSICLiteralHasAMalformedHexEscape_keepsTheLetterAndTheRest() throws {
+        let tokens = try CURLTokenizer.tokenize(#"curl -d $'a\xZb'"#)
+
+        #expect(tokens == ["curl", "-d", "axZb"])
+    }
+
+    @Test
+    func tokenize_whenADoubleQuotedStringHasAnEscape_keepsTheEscapedCharacter() throws {
+        let tokens = try CURLTokenizer.tokenize(#"curl -d "a\"b""#)
+
+        #expect(tokens == ["curl", "-d", "a\"b"])
+    }
+
+    @Test
+    func tokenize_whenAnANSICLiteralHasHexBytes_decodesThemTogetherAsUTF8() throws {
+        // `\xc3\xa9` is the two bytes of "é".
+        let tokens = try CURLTokenizer.tokenize(#"curl -d $'caf\xc3\xa9'"#)
+
+        #expect(tokens == ["curl", "-d", "caf\u{e9}"])
+    }
+
+    @Test(arguments: ["curl -d $'abc", "curl -d 'abc", "curl -d \"abc"])
+    func tokenize_whenAQuoteIsNeverClosed_throws(_ command: String) {
+        #expect(throws: CURLParsingError.self) {
+            try CURLTokenizer.tokenize(command)
+        }
+    }
+
+    @Test
+    func tokenize_whenTheCommandEndsInABackslash_throws() {
+        #expect(throws: CURLParsingError.self) {
+            try CURLTokenizer.tokenize("curl https://example.com\\")
+        }
+    }
 }
