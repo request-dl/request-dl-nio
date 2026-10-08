@@ -341,31 +341,34 @@ extension Internals {
                 // *imported* EC key (see `store(...)`'s own doc comment), so this only widens which
                 // *signed* macOS apps get a working path.
                 do {
-                    return try Self.store(
+                    let identity = try Self.store(
                         certificate: certificate,
                         secKey: secKey,
                         label: label,
                         useDataProtectionKeychain: true
                     )
+                    return (identity, true)
                 } catch Error.missingKeychainSharingEntitlement {
                     Self.removeExistingKeychainItems(label: label, useDataProtectionKeychain: true)
-                    return try Self.store(
+                    let identity = try Self.store(
                         certificate: certificate,
                         secKey: secKey,
                         label: label,
                         useDataProtectionKeychain: false
                     )
+                    return (identity, false)
                 }
                 #else
                 // Not present on iOS/tvOS/watchOS, where there is only the data-protection
                 // keychain and a properly signed/provisioned app already carries the entitlement
                 // it needs.
-                return try Self.store(
+                let identity = try Self.store(
                     certificate: certificate,
                     secKey: secKey,
                     label: label,
                     useDataProtectionKeychain: true
                 )
+                return (identity, true)
                 #endif
             }
         }

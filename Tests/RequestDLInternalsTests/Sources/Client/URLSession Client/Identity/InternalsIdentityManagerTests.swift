@@ -85,6 +85,62 @@ struct InternalsIdentityManagerTests {
     }
 }
 
+extension InternalsIdentityManagerTests {
+
+    private struct Deletion: Equatable, Sendable {
+        let label: String
+        let useDataProtectionKeychain: Bool
+    }
+
+    /// On macOS the build stores in the data-protection Keychain when the process may use it, so
+    /// the release must delete from the Keychain the handle was built in, or the imported
+    /// private key stays behind.
+    @Test(arguments: [true, false])
+    func release_whenLastHandleGoesAway_deletesFromTheKeychainItWasBuiltIn(
+        _ useDataProtectionKeychain: Bool
+    ) throws {
+        // Given: a real identity (what `SecIdentity` is only ever made of), wrapped by a manager
+        // that records deletions instead of touching the Keychain.
+        let client = Certificates().client()
+        let secureConnection = Internals.SecureConnection.testMTLSConnection(client: client)
+
+        let certificateChain = try #require(secureConnection.certificateChain)
+        let certificateDER = try #require(
+            try Internals.RawBytesIdentityBuilder.certificateDERs(from: certificateChain).first
+        )
+        let privateKeySource = try #require(secureConnection.privateKey)
+        let privateKeyDER = try Internals.RawBytesIdentityBuilder.privateKeyDER(from: privateKeySource)
+
+        let source = try Internals.RawBytesIdentityBuilder.makeIdentity(
+            certificateDER: certificateDER,
+            privateKeyDER: privateKeyDER
+        )
+
+        let deletions = LockedValueBox<[Deletion]>([])
+        let manager = Internals.IdentityManager { label, useDataProtectionKeychain in
+            deletions.withLockedValue {
+                $0.append(Deletion(label: label, useDataProtectionKeychain: useDataProtectionKeychain))
+            }
+        }
+
+        // When
+        var handle: Internals.IdentityHandle? = try manager.handle(for: "test.label") {
+            (source.identity, useDataProtectionKeychain)
+        }
+
+        // Then: nothing is deleted while the handle is alive.
+        #expect(handle != nil)
+        #expect(deletions.withLockedValue { $0 }.isEmpty)
+
+        handle = nil
+
+        #expect(
+            deletions.withLockedValue { $0 }
+                == [Deletion(label: "test.label", useDataProtectionKeychain: useDataProtectionKeychain)]
+        )
+    }
+}
+
 extension Internals.SecureConnection {
 
     fileprivate static func testMTLSConnection(client: CertificateResource) -> Self {
