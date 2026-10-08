@@ -222,6 +222,7 @@ struct DiskStorage: Sendable {
         private let lock = Lock()
 
         private let minimumRescanInterval: UInt64
+        private let now: @Sendable () -> UInt64
 
         private var locationsByKey: [String: URL] = [:]
         private var lastUsedByKey: [String: Date] = [:]
@@ -231,10 +232,13 @@ struct DiskStorage: Sendable {
 
         // MARK: - Inits
 
-        /// - Parameter minimumRescanInterval: Seconds a miss waits after the last scan before
-        /// it may start another. Zero scans on every miss.
-        init(minimumRescanInterval: Double) {
+        /// - Parameters:
+        ///   - minimumRescanInterval: Seconds a miss waits after the last scan before it may
+        ///   start another. Zero scans on every miss.
+        ///   - now: A monotonic clock, in nanoseconds. Only a test replaces it.
+        init(minimumRescanInterval: Double, now: @escaping @Sendable () -> UInt64 = Index.uptime) {
             self.minimumRescanInterval = UInt64(max(0, minimumRescanInterval) * 1_000_000_000)
+            self.now = now
         }
 
         // MARK: - Internal properties
@@ -259,7 +263,7 @@ struct DiskStorage: Sendable {
 
                 // The last scan was a moment ago and did not find `key`: nothing this instance
                 // wrote since is missing from the index, so another scan would only repeat it.
-                if let lastScanEnd, Self.now() - lastScanEnd < minimumRescanInterval {
+                if let lastScanEnd, now() - lastScanEnd < minimumRescanInterval {
                     return nil
                 }
 
@@ -277,7 +281,7 @@ struct DiskStorage: Sendable {
                         }
 
                         refreshTask = nil
-                        lastScanEnd = Self.now()
+                        lastScanEnd = now()
                     }
                 }
 
@@ -295,7 +299,8 @@ struct DiskStorage: Sendable {
         }
 
         /// Monotonic, so a clock that moves backwards cannot freeze or skip the window.
-        private static func now() -> UInt64 {
+        @Sendable
+        static func uptime() -> UInt64 {
             DispatchTime.now().uptimeNanoseconds
         }
 
@@ -359,9 +364,13 @@ struct DiskStorage: Sendable {
     // MARK: - Inits
     /// - Parameter missRescanInterval: Seconds a cache miss waits after the last directory
     /// scan before it may scan again; see `Index`. Zero scans on every miss.
-    init(directory: URL, missRescanInterval: Double = 1) {
+    init(
+        directory: URL,
+        missRescanInterval: Double = 1,
+        now: @escaping @Sendable () -> UInt64 = Index.uptime
+    ) {
         self.directory = directory
-        self.index = Index(minimumRescanInterval: missRescanInterval)
+        self.index = Index(minimumRescanInterval: missRescanInterval, now: now)
     }
 
     /// Directory scans the lookup index has started, exposed for tests.
@@ -706,8 +715,8 @@ struct DiskStorage: Sendable {
         _ = try? await Internals.fileSystem.removeItem(at: url.filePath)
 
         // `allocateBuffer` pointed the index at this directory. Left there, the next read of the
-        // key is sent to a directory that is gone and spends its whole retry budget (up to 15s)
-        // finding that out, for an answer that is simply "no entry".
+        // key would go to a directory that is gone and spend its whole retry budget (up to 15s)
+        // on an answer that is simply "no entry".
         if let (key, _) = Record.getKeyAndDate(url) {
             index.remove(key, ifLocation: url)
         }

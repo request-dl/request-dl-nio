@@ -219,19 +219,27 @@ struct DiskStorageTests {
     @Test
     func subscript_whenAnotherInstanceWritesAfterAMiss_findsTheEntryOnceTheIntervalPassed() async throws {
         try await withTemporaryFileURL(createPath: false) { directoryURL in
-            let reader = DiskStorage(directory: directoryURL, missRescanInterval: 0.3)
+            // A clock the test moves by hand, so how long the lookups take does not matter.
+            let clock = LockedValueBox<UInt64>(0)
+            let reader = DiskStorage(
+                directory: directoryURL,
+                missRescanInterval: 1,
+                now: { clock.withLockedValue { $0 } }
+            )
             #expect(await reader["k1"] == nil)
 
             try await write(["k1"], through: DiskStorage(directory: directoryURL))
 
             // Inside the interval the reader trusts its last scan. That is the cost of not
             // scanning on every miss, and all it costs is a miss.
+            clock.withLockedValue { $0 += 999_999_999 }
             #expect(await reader["k1"] == nil)
+            #expect(reader.scanCount == 1)
 
             // Once the interval has passed, the next miss scans again and finds it.
-            try await eventually {
-                await reader["k1"] != nil
-            }
+            clock.withLockedValue { $0 += 2 }
+            #expect(await reader["k1"] != nil)
+            #expect(reader.scanCount == 2)
         }
     }
 

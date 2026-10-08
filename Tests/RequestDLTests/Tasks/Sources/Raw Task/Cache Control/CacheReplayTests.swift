@@ -14,15 +14,19 @@ import FoundationEssentials
 import struct Foundation.Data
 #endif
 
-/// Regression tests (audit finding N6): a cached body was handed to the download buffer in one
-/// `append`, so it was read into the response's stream whole however slowly it was being read,
-/// and read in chunks of the reading mode (1 KiB by default), one trip to the file system each.
+/// A cached body is fed to the download buffer in pieces with a flow-control window between
+/// them, so it is not read into the response's stream whole however slowly it is being read, and
+/// it is read in large blocks, not in chunks of the reading mode (1 KiB by default), one trip to
+/// the file system each.
 struct CacheReplayTests {
 
     private let size = 8 * 1_024 * 1_024
 
     private func body() async -> Internals.AnyBuffer {
-        await Internals.DataBuffer(Data((0..<size).map { UInt8($0 % 251) }))
+        // Not built element by element: 8 million closure calls in a debug build took the better
+        // part of the wait under a loaded full run. These tests look at how much of it is read,
+        // not at what it holds.
+        await Internals.DataBuffer(Data(repeating: 0x5A, count: size))
     }
 
     @Test
