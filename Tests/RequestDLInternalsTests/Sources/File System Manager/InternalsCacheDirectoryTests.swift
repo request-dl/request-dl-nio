@@ -8,7 +8,7 @@ import Testing
 
 @testable import RequestDLInternals
 
-/// Where the cache lives and who can see into it (audit findings S5 and V2).
+/// Where the cache lives and who can see into it.
 struct InternalsCacheDirectoryTests {
 
     // MARK: - Where
@@ -48,12 +48,24 @@ struct InternalsCacheDirectoryTests {
         #expect(FilePath.xdgCacheDirectory(environment: ["HOME": "relative"]) == nil)
     }
 
+    #if os(Linux)
+    /// The property itself, with the process's real environment: the cache lives where the helper
+    /// above says when it can say, and under the temporary directory only when it cannot.
+    @Test
+    func cachesDirectory_onLinux_isTheUsersCacheDirectoryWhenThereIsOne() {
+        let expected =
+            FilePath.xdgCacheDirectory(environment: ProcessInfo.processInfo.environment)
+            ?? FilePath.temporaryDirectory
+
+        #expect(FilePath.cachesDirectory == expected)
+    }
+    #endif
+
     // MARK: - Who
 
-    /// Regression test (audit finding S5): the directories holding a cache are named after the
-    /// URL they cache, and were created readable by every user of the machine, so the URLs
-    /// (query tokens included) could be listed by anyone. Every directory the call creates,
-    /// the ones above the leaf too, is now owner only.
+    /// The directories holding a cache are named after the URL they cache, so they must not be
+    /// readable by every user of the machine, or the URLs (query tokens included) can be listed
+    /// by anyone. Every directory the call creates, the ones above the leaf too, is owner only.
     @Test
     func createDirectory_withOwnerOnlyPermissions_createsEveryLevelAsOwnerOnly() async throws {
         // Given
