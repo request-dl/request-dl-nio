@@ -58,6 +58,12 @@ public struct ReadingMode: Property {
     /// the separator keeps filling memory. Use `init(separator:maximumItemSize:)` when the
     /// source is not trusted.
     ///
+    @available(
+        *,
+        deprecated,
+        message:
+            "Use AsyncBytes.lines(maximumLength:) or AsyncBytes.items(separatedBy:maximumLength:) on the payload instead, which cut the stream as it is read and fail on an item past the maximum."
+    )
     public init(separator: [UInt8]) {
         mode = .separator(separator)
     }
@@ -75,6 +81,12 @@ public struct ReadingMode: Property {
     /// the separator keeps filling memory. Use `init(separator:maximumItemSize:)` when the
     /// source is not trusted.
     ///
+    @available(
+        *,
+        deprecated,
+        message:
+            "Use AsyncBytes.lines(maximumLength:) or AsyncBytes.items(separatedBy:maximumLength:) on the payload instead, which cut the stream as it is read and fail on an item past the maximum."
+    )
     public init<S: StringProtocol>(separator: S) {
         self.init(separator: Array(Data(separator.utf8)))
     }
@@ -96,6 +108,12 @@ public struct ReadingMode: Property {
     ///   than zero.
     ///
     /// - Precondition: `maximumItemSize > 0`.
+    @available(
+        *,
+        deprecated,
+        message:
+            "Use AsyncBytes.lines(maximumLength:) or AsyncBytes.items(separatedBy:maximumLength:) on the payload instead, which cut the stream as it is read and fail on an item past the maximum."
+    )
     public init(separator: [UInt8], maximumItemSize: Int) {
         precondition(
             maximumItemSize > 0,
@@ -116,6 +134,12 @@ public struct ReadingMode: Property {
     ///   than zero.
     ///
     /// - Precondition: `maximumItemSize > 0`.
+    @available(
+        *,
+        deprecated,
+        message:
+            "Use AsyncBytes.lines(maximumLength:) or AsyncBytes.items(separatedBy:maximumLength:) on the payload instead, which cut the stream as it is read and fail on an item past the maximum."
+    )
     public init<S: StringProtocol>(separator: S, maximumItemSize: Int) {
         self.init(separator: Array(Data(separator.utf8)), maximumItemSize: maximumItemSize)
     }
