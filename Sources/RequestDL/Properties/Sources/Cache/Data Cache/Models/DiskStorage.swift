@@ -169,7 +169,7 @@ struct DiskStorage: Sendable {
             return getKeyAndDate(url)?.0
         }
 
-        private static func getKeyAndDate(_ url: URL) -> (String, Date)? {
+        static func getKeyAndDate(_ url: URL) -> (String, Date)? {
             var components = url.deletingPathExtension().lastPathComponent.split(separator: ".")
             guard let bitPattern = components.first.flatMap({ UInt64($0, radix: 36) }) else { return nil }
             components.removeFirst()
@@ -626,6 +626,13 @@ struct DiskStorage: Sendable {
     /// already knows.
     func removeRecord(at url: URL) async {
         _ = try? await Internals.fileSystem.removeItem(at: url.filePath)
+
+        // `allocateBuffer` pointed the index at this directory. Left there, the next read of the
+        // key is sent to a directory that is gone and spends its whole retry budget (up to 15s)
+        // finding that out, for an answer that is simply "no entry".
+        if let (key, _) = Record.getKeyAndDate(url) {
+            index.remove(key, ifLocation: url)
+        }
     }
 
     /// Evicts the oldest entries, if any, until usage is at or under `maximumCapacity`.

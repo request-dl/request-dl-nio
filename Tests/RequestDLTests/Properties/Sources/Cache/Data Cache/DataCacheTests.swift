@@ -812,6 +812,10 @@ extension DataCacheTests {
         // replaced its record.
         await dataCache.discardFailedWrite(failedBuffer, forKey: key)
 
+        // The key stays unreadable until the good write is finished too: it is still going on.
+        #expect(await dataCache.getCachedData(forKey: key, policy: .memory) == nil)
+        await dataCache.finalizeWrite(goodBuffer, contentLengthHint: 4)
+
         // Then: the good write's entry survives.
         let cachedMemory = await dataCache.getCachedData(forKey: key, policy: .memory)
         let cachedMemoryData = await cachedMemory?.data
@@ -855,7 +859,7 @@ extension DataCacheTests {
         await chunkedBuffer.writeBuffer(Internals.DataBuffer(chunkedData))
 
         // When: the write finishes and reconciles the estimate with the real byte count.
-        dataCache.finalizeWrite(chunkedBuffer, contentLengthHint: 0)
+        await dataCache.finalizeWrite(chunkedBuffer, contentLengthHint: 0)
 
         // A second, ordinarily-sized write that, combined with the first entry's *real* size,
         // exceeds the 10,000-byte capacity, but would not if the first write's usage were still
@@ -869,7 +873,7 @@ extension DataCacheTests {
         )
         let secondData = await Data.randomData(length: 8_000)
         await secondBuffer.writeBuffer(Internals.DataBuffer(secondData))
-        dataCache.finalizeWrite(secondBuffer, contentLengthHint: 8_000)
+        await dataCache.finalizeWrite(secondBuffer, contentLengthHint: 8_000)
 
         // Then: the real rescan `freeSpace` runs once usage is reconciled and evicts the older
         // ("chunked") entry to make room, exactly as it would if both content lengths had been

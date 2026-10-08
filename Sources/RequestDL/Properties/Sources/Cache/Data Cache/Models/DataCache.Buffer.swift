@@ -33,6 +33,10 @@ extension DataCache {
         /// a concurrent request.
         let memoryDataURL: Internals.ByteURL?
 
+        /// Keeps the key this write is for out of ``DataCache/getCachedData(forKey:policy:)`` until
+        /// the write is finished or discarded. See ``DataCache/WriteToken``.
+        let writeToken: DataCache.WriteToken?
+
         // MARK: - Private properties
 
         private var memoryBuffer: Internals.AnyBuffer?
@@ -44,12 +48,14 @@ extension DataCache {
             memoryBuffer: Internals.AnyBuffer?,
             diskBuffer: Internals.AnyBuffer?,
             diskRecordURL: URL? = nil,
-            memoryDataURL: Internals.ByteURL? = nil
+            memoryDataURL: Internals.ByteURL? = nil,
+            writeToken: DataCache.WriteToken? = nil
         ) {
             self.memoryBuffer = memoryBuffer
             self.diskBuffer = diskBuffer
             self.diskRecordURL = diskRecordURL
             self.memoryDataURL = memoryDataURL
+            self.writeToken = writeToken
         }
 
         // MARK: - Internal methods
@@ -61,6 +67,13 @@ extension DataCache {
 
             await memoryBuffer?.writeBytes(bytes)
             await diskBuffer?.writeBytes(bytes)
+        }
+
+        /// Closes the disk buffer, so everything written through it is on disk and, with an
+        /// encryption key, the final chunk is sealed. Left to the buffer's own teardown, that
+        /// happens after the entry is already being served.
+        func closeDiskBuffer() async {
+            try? await diskBuffer?.close()
         }
     }
 }

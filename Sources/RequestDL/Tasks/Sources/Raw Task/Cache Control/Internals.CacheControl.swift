@@ -642,7 +642,7 @@ extension Internals {
                         // `contentLength` (a pre-write hint, `0` for chunked/unknown-length
                         // responses) to the real byte count now that it's known. See
                         // `DataCache.finalizeWrite(_:contentLengthHint:)`.
-                        dataCache.finalizeWrite(cacheBuffer, contentLengthHint: Int64(contentLength))
+                        await dataCache.finalizeWrite(cacheBuffer, contentLengthHint: Int64(contentLength))
 
                         logger?.log(
                             level: .debug,
