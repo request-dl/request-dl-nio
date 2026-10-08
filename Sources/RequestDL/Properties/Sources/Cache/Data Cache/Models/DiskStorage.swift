@@ -131,9 +131,13 @@ struct DiskStorage: Sendable {
             self.dataURL = dataURL
 
             do {
+                // Owner only, the cache root and the directories above it included: their names
+                // are derived from the URL they cache, and the default (readable by everyone)
+                // would list those to every other user of the machine.
                 try await Internals.fileSystem.createDirectory(
                     at: url.filePath,
-                    withIntermediateDirectories: true
+                    withIntermediateDirectories: true,
+                    permissions: .ownerReadWriteExecute
                 )
             } catch {
                 // Silent. Whoever writes through this record reports the failure with context.

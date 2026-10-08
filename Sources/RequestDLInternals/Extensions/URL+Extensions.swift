@@ -105,7 +105,8 @@ extension URL {
         if try await Internals.fileSystem.info(forFileAt: directoryPath) == nil {
             try await Internals.fileSystem.createDirectory(
                 at: directoryPath,
-                withIntermediateDirectories: true
+                withIntermediateDirectories: true,
+                permissions: .ownerReadWriteExecute
             )
         }
 
