@@ -254,6 +254,72 @@ struct InternalsBodySequenceTests {
         #expect(combined == expecting)
     }
 
+    /// Regression test (audit finding N14): a file behind the body that was removed, or cut
+    /// short, after the body was assembled made the sequence call `Internals.assertionFailure`,
+    /// which traps a debug build (a user's file, an external condition), and then go on without
+    /// the part it could not read, so that a release build sent a body shorter than the length it
+    /// had declared.
+    @Test
+    func bodySequence_whenTheFileBehindAPartIsRemoved_throwsInsteadOfSkippingIt() async throws {
+        // Given
+        let fileURLManager = try await InternalsFileBufferTests.FileURLManager()
+        defer { _ = fileURLManager }
+
+        let fileURL = fileURLManager.url
+        try Data(repeating: 0x61, count: 10_000).write(to: fileURL)
+
+        let bodySequence = await makeBodySequence(
+            chunkSize: 4_096,
+            [
+                Internals.DataBuffer(Data("head".utf8)),
+                Internals.FileBuffer(fileURL),
+                Internals.DataBuffer(Data("tail".utf8)),
+            ]
+        )
+
+        // When: the file goes away between assembling the body and sending it.
+        try await Internals.fileSystem.removeItem(at: fileURL.filePath)
+
+        let captured = InlineProperty<[String]>(wrappedValue: [])
+
+        // Then: reading the body fails, and no assertion trips.
+        await #expect(throws: Internals.RequestBodyPartUnreadableError.self) {
+            try await Internals.Override.AssertionFailure.replace { message, _, _ in
+                captured.withValue { $0.append(message) }
+            } perform: {
+                _ = try await Array(bodySequence)
+            }
+        }
+
+        #expect(captured.wrappedValue.isEmpty)
+    }
+
+    @Test
+    func bodySequence_whenEverythingIsReadable_stillYieldsTheWholeBody() async throws {
+        // Given
+        let fileURLManager = try await InternalsFileBufferTests.FileURLManager()
+        defer { _ = fileURLManager }
+
+        let fileURL = fileURLManager.url
+        let content = Data(repeating: 0x62, count: 10_000)
+        try content.write(to: fileURL)
+
+        let bodySequence = await makeBodySequence(
+            chunkSize: 4_096,
+            [
+                Internals.DataBuffer(Data("head".utf8)),
+                Internals.FileBuffer(fileURL),
+                Internals.DataBuffer(Data("tail".utf8)),
+            ]
+        )
+
+        // When
+        let combined = try await Array(bodySequence).resolveData().reduce(Data(), +)
+
+        // Then
+        #expect(combined == Data("head".utf8) + content + Data("tail".utf8))
+    }
+
     @Test
     func bodySequence_whenSingleUnreadFileBuffer_wholeFileURLReturnsThatFile() async throws {
         // Given
