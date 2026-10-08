@@ -197,8 +197,10 @@ struct InternalsPACProxyCacheKeyTests {
 
     // MARK: - Helpers
 
+    /// The default is far above what the condition takes on a quiet machine: a CI runner running
+    /// the whole suite in parallel has stalled every task in the process for 10 s at a time.
     private func waitUntil(
-        timeout: TimeInterval = 10,
+        timeout: TimeInterval = 60,
         _ condition: @Sendable () async -> Bool
     ) async throws {
         let deadline = Date().addingTimeInterval(timeout)
