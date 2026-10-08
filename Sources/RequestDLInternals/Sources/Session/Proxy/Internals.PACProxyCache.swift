@@ -10,6 +10,7 @@ import SwiftAsyncStream
 import FoundationEssentials
 #else
 import struct Foundation.URL
+import struct Foundation.URLComponents
 import struct Foundation.DispatchTime
 #endif
 
@@ -19,6 +20,16 @@ extension Internals {
     /// so a burst of requests to the same host doesn't each pay for a fresh network fetch and
     /// JavaScript evaluation of the same PAC script: the cost the original "PAC is skipped
     /// entirely" version of this resolver was written specifically to avoid paying per request.
+    ///
+    /// The target of a secure URL (`https`, `wss`) is reduced to its origin before it is cached
+    /// or evaluated, which is what browsers hand a PAC script for those schemes: the path and
+    /// query of a secure URL are not available to a proxy, and often carry tokens a PAC script
+    /// has no business seeing. Requests that differ only in path or query (pagination, signed
+    /// URLs) then share one evaluation instead of each paying for a thread and a script run.
+    /// Plain `http` URLs keep their full address, since a script may legitimately route on it.
+    ///
+    /// At most `maximumConcurrentEvaluations` evaluations run at once, because each one holds a
+    /// dedicated thread (see `Internals.PACEvaluator`); the rest wait for a slot.
     package actor PACProxyCache {
 
         // MARK: - Internal static properties
@@ -45,6 +56,10 @@ extension Internals {
         /// distinct image URLs, say) could grow this table for the lifetime of the process.
         package static let maximumCount = 256
 
+        /// Evaluations allowed to hold a thread at the same time. A burst of distinct `http`
+        /// URLs would otherwise start one thread each, up to 30s per thread.
+        package static let maximumConcurrentEvaluations = 8
+
         // MARK: - Internal properties
 
         /// `storage.count`, exposed for tests: verifying eviction black-box (query an old key
@@ -62,9 +77,17 @@ extension Internals {
         /// test actually needs.
         package private(set) var evaluationCount = 0
 
+        /// The most evaluations that ever ran at once, exposed for tests.
+        package private(set) var peakConcurrentEvaluations = 0
+
         // MARK: - Private properties
 
         private let maximumCount: Int
+        private let maximumConcurrentEvaluations: Int
+        private let evaluate: @Sendable (URL, URL, Double) async throws -> Internals.Proxy?
+
+        private var runningEvaluations = 0
+        private var waitingForSlot: [CheckedContinuation<Void, Never>] = []
 
         private var storage: [Key: Entry] = [:]
 
@@ -82,8 +105,19 @@ extension Internals {
         /// pollution through the process-wide singleton. `maximumCount` likewise defaults to the
         /// real ceiling but is overridable, so a test can exercise eviction with a handful of
         /// entries instead of needing hundreds of real PAC evaluations to exceed it.
-        package init(maximumCount: Int = PACProxyCache.maximumCount) {
+        ///
+        /// `evaluate` defaults to the real `Internals.PACEvaluator`; a test replaces it to control
+        /// when an evaluation finishes and to see what it was asked.
+        package init(
+            maximumCount: Int = PACProxyCache.maximumCount,
+            maximumConcurrentEvaluations: Int = PACProxyCache.maximumConcurrentEvaluations,
+            evaluate: @escaping @Sendable (URL, URL, Double) async throws -> Internals.Proxy? = {
+                try await Internals.PACEvaluator.evaluate(scriptURL: $0, targetURL: $1, timeout: $2)
+            }
+        ) {
             self.maximumCount = maximumCount
+            self.maximumConcurrentEvaluations = max(maximumConcurrentEvaluations, 1)
+            self.evaluate = evaluate
         }
 
         // MARK: - Internal methods
@@ -96,6 +130,7 @@ extension Internals {
         /// `Internals.SystemProxyResolver.firstResolution(in:)` already makes for any other
         /// proxy-list entry it can't parse.
         package func proxy(forScriptURL scriptURL: URL, targetURL: URL) async -> Internals.Proxy? {
+            let targetURL = Self.evaluationTarget(for: targetURL)
             let key = Key(scriptURL: scriptURL, targetURL: targetURL)
 
             if let entry = storage[key], !isExpired(entry) {
@@ -109,16 +144,21 @@ extension Internals {
             } else {
                 evaluationCount += 1
 
+                let evaluate = evaluate
+
                 let newTask = _Concurrency.Task<Internals.Proxy?, Never> {
+                    await self.acquireEvaluationSlot()
+
+                    let proxy: Internals.Proxy?
+
                     do {
-                        return try await Internals.PACEvaluator.evaluate(
-                            scriptURL: scriptURL,
-                            targetURL: targetURL,
-                            timeout: Self.evaluationTimeout
-                        )
+                        proxy = try await evaluate(scriptURL, targetURL, Self.evaluationTimeout)
                     } catch {
-                        return nil
+                        proxy = nil
                     }
+
+                    await self.releaseEvaluationSlot()
+                    return proxy
                 }
                 inFlight[key] = newTask
                 task = newTask
@@ -143,6 +183,47 @@ extension Internals {
             // instead, without disturbing the shared evaluation other, still-live callers for the
             // same key are waiting on.
             return await Self.awaitingCancellably(task)
+        }
+
+        private func acquireEvaluationSlot() async {
+            if runningEvaluations < maximumConcurrentEvaluations {
+                runningEvaluations += 1
+                peakConcurrentEvaluations = max(peakConcurrentEvaluations, runningEvaluations)
+                return
+            }
+
+            // The slot is handed over by `releaseEvaluationSlot()` without going through
+            // `runningEvaluations`, which is why it is not incremented again here.
+            await withCheckedContinuation { waitingForSlot.append($0) }
+        }
+
+        private func releaseEvaluationSlot() {
+            if waitingForSlot.isEmpty {
+                runningEvaluations -= 1
+            } else {
+                waitingForSlot.removeFirst().resume()
+            }
+        }
+
+        /// What a PAC script is asked about for `url`: the origin only, for a secure scheme.
+        private static func evaluationTarget(for url: URL) -> URL {
+            guard
+                let scheme = url.scheme?.lowercased(),
+                scheme == "https" || scheme == "wss",
+                var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+            else {
+                return url
+            }
+
+            components.scheme = scheme
+            components.host = components.host?.lowercased()
+            components.user = nil
+            components.password = nil
+            components.path = "/"
+            components.query = nil
+            components.fragment = nil
+
+            return components.url ?? url
         }
 
         private func finishEvaluation(key: Key, resolved: Internals.Proxy?) {
