@@ -9,11 +9,12 @@
 #if canImport(NIOCore)
 
 import Dispatch
-import Foundation
+import NIOConcurrencyHelpers
 import NIOCore
 import NIOEmbedded
 import NIOHTTP1
 import NIOHTTPCompression
+import NIOPosix
 
 extension Internals.Compression.Algorithm {
 
@@ -73,12 +74,6 @@ extension Internals {
             }
 
             deinit {
-                guard !worker.isCurrent else {
-                    channel = nil
-                    worker.stop()
-                    return
-                }
-
                 // `handle` is built inside this `if let` (rather than a function-scope `guard
                 // let`) so `channel`'s local, unwrapped binding goes out of scope, releasing
                 // its own reference, right here, before the job below ever runs. That leaves the
@@ -107,55 +102,29 @@ extension Internals {
             }
         }
 
-        /// An OS thread that runs the jobs handed to it one at a time, in order, and ends once
-        /// it is stopped.
-        ///
-        /// Not an `EventLoop`, on purpose: see the doc comment of the enclosing type.
+        /// A thread of its own that runs the jobs handed to it one at a time, in order, and ends
+        /// once it is stopped: a `NIOThreadPool` of one thread, which is not an `EventLoop`, on
+        /// purpose (see the doc comment of the enclosing type). Not Foundation's `Thread`, which
+        /// would link `libFoundation` on Linux.
         private final class Worker: @unchecked Sendable {
 
             // MARK: - Private properties
 
-            private let condition = NSCondition()
-            private var jobs: [@Sendable () -> Void] = []
+            private let pool = NIOThreadPool(numberOfThreads: 1)
+            private let lock = NIOLock()
             private var isStopped = false
             private var hasExited = false
-
-            /// Set once, by the thread itself, before it takes its first job.
-            private var thread: Thread?
 
             // MARK: - Internal properties
 
             var isRunning: Bool {
-                condition.lock()
-                defer { condition.unlock() }
-
-                return !hasExited
-            }
-
-            var isCurrent: Bool {
-                condition.lock()
-                defer { condition.unlock() }
-
-                return thread === Thread.current
+                lock.withLock { !hasExited }
             }
 
             // MARK: - Inits
 
             init() {
-                let started = DispatchSemaphore(value: 0)
-
-                let thread = Thread { [self] in
-                    condition.lock()
-                    self.thread = Thread.current
-                    condition.unlock()
-
-                    started.signal()
-                    run()
-                }
-
-                thread.name = "com.requestdl.compression"
-                thread.start()
-                started.wait()
+                pool.start()
             }
 
             // MARK: - Internal methods
@@ -166,16 +135,21 @@ extension Internals {
             /// - Throws: `ChannelAlreadyFinishedError` if the worker was already stopped, which
             /// is a call after `finish()`; otherwise whatever `body` threw.
             func perform<Output: Sendable>(_ body: @escaping @Sendable () throws -> Output) throws -> Output {
+                guard lock.withLock({ !isStopped }) else {
+                    throw ChannelAlreadyFinishedError()
+                }
+
                 let slot = Slot<Output>()
                 let done = DispatchSemaphore(value: 0)
 
-                let accepted = enqueue {
-                    slot.result = Result { try body() }
-                    done.signal()
-                }
+                // A job the pool drops (it shut down meanwhile) is still called, as cancelled,
+                // so the caller is always released.
+                pool.submit { state in
+                    if case .active = state {
+                        slot.result = Result { try body() }
+                    }
 
-                guard accepted else {
-                    throw ChannelAlreadyFinishedError()
+                    done.signal()
                 }
 
                 done.wait()
@@ -189,56 +163,28 @@ extension Internals {
 
             /// Ends the thread once the jobs already queued, and then `last`, have run. Does not
             /// wait for any of it.
+            ///
+            /// `last` is queued as a job instead of run after the shutdown because the pool
+            /// cancels what is still queued when it shuts down, and `last` has to run on the
+            /// thread.
             func stop(after last: (@Sendable () -> Void)? = nil) {
-                condition.lock()
-                defer { condition.unlock() }
+                let isFirst = lock.withLock {
+                    defer { isStopped = true }
+                    return !isStopped
+                }
 
-                guard !isStopped else {
+                guard isFirst else {
                     return
                 }
 
-                isStopped = true
-
-                if let last {
-                    jobs.append(last)
-                }
-
-                condition.signal()
-            }
-
-            // MARK: - Private methods
-
-            private func enqueue(_ job: @escaping @Sendable () -> Void) -> Bool {
-                condition.lock()
-                defer { condition.unlock() }
-
-                guard !isStopped else {
-                    return false
-                }
-
-                jobs.append(job)
-                condition.signal()
-                return true
-            }
-
-            private func run() {
-                while true {
-                    condition.lock()
-
-                    while jobs.isEmpty {
-                        guard !isStopped else {
-                            hasExited = true
-                            condition.unlock()
-                            return
-                        }
-
-                        condition.wait()
+                pool.submit { [self] state in
+                    if case .active = state {
+                        last?()
                     }
 
-                    let job = jobs.removeFirst()
-                    condition.unlock()
-
-                    job()
+                    pool.shutdownGracefully(queue: .global()) { [self] _ in
+                        lock.withLock { hasExited = true }
+                    }
                 }
             }
         }
@@ -309,7 +255,9 @@ extension Internals {
             var bytes = bytes
             let buffer = bytes.asByteBuffer()
 
-            return try box.worker.perform { [box] in
+            // Jobs hold the box `unowned(unsafe)`: this call holds it until the job is done, and
+            // a job holding the last reference would release it on the worker thread.
+            return try box.worker.perform { [unowned(unsafe) box] in
                 guard let channel = box.channel else {
                     throw ChannelAlreadyFinishedError()
                 }
@@ -320,7 +268,7 @@ extension Internals {
         }
 
         package func finish() throws -> Internals.Bytes {
-            let result = try box.worker.perform { [box] in
+            let result = try box.worker.perform { [unowned(unsafe) box] in
                 guard let channel = box.channel else {
                     throw ChannelAlreadyFinishedError()
                 }
