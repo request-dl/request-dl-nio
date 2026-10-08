@@ -153,6 +153,88 @@ struct DiskStorageTests {
         }
     }
 
+    /// Writes `keys` through `storage` and returns once each one can be read back.
+    private func write(_ keys: [String], through storage: DiskStorage) async throws {
+        for key in keys {
+            var (buffer, _, _) = await storage.allocateBuffer(
+                key: key,
+                cachedResponse: makeCachedResponse(key: key),
+                contentLength: 0,
+                maximumCapacity: .max
+            )
+            await buffer?.writeData(Data([0x1]))
+            try? await buffer?.close()
+        }
+    }
+
+    @Test
+    func subscript_whenManyUncachedKeysAreLookedUp_scansTheDirectoryOnce() async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            // Given: a directory with entries written by another instance, so this one has to
+            // find them by scanning.
+            try await write(["k1", "k2", "k3"], through: DiskStorage(directory: directoryURL))
+            let storage = DiskStorage(directory: directoryURL, missRescanInterval: 3_600)
+
+            // When: twenty keys that are not cached are looked up one after the other.
+            for index in 0..<20 {
+                #expect(await storage["missing-\(index)"] == nil)
+            }
+
+            // Then: the directory was scanned once, not once per miss, and what the scan found
+            // is still served.
+            #expect(storage.scanCount == 1)
+            #expect(await storage["k2"] != nil)
+            #expect(storage.scanCount == 1)
+        }
+    }
+
+    @Test
+    func subscript_whenTheRescanIntervalIsZero_scansOnEveryMiss() async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            try await write(["k1"], through: DiskStorage(directory: directoryURL))
+            let storage = DiskStorage(directory: directoryURL, missRescanInterval: 0)
+
+            for index in 0..<5 {
+                #expect(await storage["missing-\(index)"] == nil)
+            }
+
+            #expect(storage.scanCount == 5)
+        }
+    }
+
+    @Test
+    func subscript_whenThisInstanceWritesAfterAMiss_findsTheEntryWithoutScanning() async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            let storage = DiskStorage(directory: directoryURL, missRescanInterval: 3_600)
+            #expect(await storage["k1"] == nil)
+            #expect(storage.scanCount == 1)
+
+            try await write(["k1"], through: storage)
+
+            #expect(await storage["k1"] != nil)
+            #expect(storage.scanCount == 1)
+        }
+    }
+
+    @Test
+    func subscript_whenAnotherInstanceWritesAfterAMiss_findsTheEntryOnceTheIntervalPassed() async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            let reader = DiskStorage(directory: directoryURL, missRescanInterval: 0.3)
+            #expect(await reader["k1"] == nil)
+
+            try await write(["k1"], through: DiskStorage(directory: directoryURL))
+
+            // Inside the interval the reader trusts its last scan. That is the cost of not
+            // scanning on every miss, and all it costs is a miss.
+            #expect(await reader["k1"] == nil)
+
+            // Once the interval has passed, the next miss scans again and finds it.
+            try await eventually {
+                await reader["k1"] != nil
+            }
+        }
+    }
+
     @Test
     func record_whenReadThroughAFreshInstanceShortlyAfterAnotherWroteAnEntry_isFoundThroughAColdScan() async throws {
         try await withTemporaryFileURL(createPath: false) { directoryURL in

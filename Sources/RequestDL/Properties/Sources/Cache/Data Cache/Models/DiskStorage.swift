@@ -3,6 +3,7 @@
 //
 
 import Crypto
+import Dispatch
 import RequestDLInternals
 import SwiftAsyncStream
 import SystemPackage
@@ -193,10 +194,20 @@ struct DiskStorage: Sendable {
     /// there is nothing to retry against within one scan. Trusting a first scan's absence
     /// forever would turn that transient gap into a permanent false miss, silently.
     ///
-    /// So a miss here always re-scans before answering: it shares that scan across concurrent
+    /// So a miss here re-scans before answering: it shares that scan across concurrent
     /// callers who miss at the same time (e.g. a list of images loading at once, before any of
     /// them is cached yet) rather than each starting their own, and always merges forward
-    /// rather than caching a negative result.
+    /// rather than caching a negative result for a key.
+    ///
+    /// What a miss does not do is scan again while the last scan is still recent. Every scan
+    /// costs a directory listing plus two stats per entry, so a miss per scan makes `M` lookups
+    /// of keys that are not cached over `N` entries cost `N * M`, which a screenful of new
+    /// images over a full cache turns into thousands of stats a second. A miss inside
+    /// `minimumRescanInterval` of the last scan answers `nil` straight away. This is safe for
+    /// what this instance wrote, since a write publishes its location into the index and never
+    /// depends on a scan. The one thing it can miss is an entry another instance or process
+    /// wrote after that scan, which becomes visible within the interval, and a cache miss on a
+    /// shared directory is a cost, not a wrong answer.
     ///
     /// - Important: This index only tracks writes and removals made through *this* value's
     /// own methods. A location written by a different `DiskStorage`/process sharing the same
@@ -210,9 +221,28 @@ struct DiskStorage: Sendable {
 
         private let lock = Lock()
 
+        private let minimumRescanInterval: UInt64
+
         private var locationsByKey: [String: URL] = [:]
         private var lastUsedByKey: [String: Date] = [:]
         private var refreshTask: Task<Void, Never>?
+        private var lastScanEnd: UInt64?
+        private var _scanCount = 0
+
+        // MARK: - Inits
+
+        /// - Parameter minimumRescanInterval: Seconds a miss waits after the last scan before
+        /// it may start another. Zero scans on every miss.
+        init(minimumRescanInterval: Double) {
+            self.minimumRescanInterval = UInt64(max(0, minimumRescanInterval) * 1_000_000_000)
+        }
+
+        // MARK: - Internal properties
+
+        /// Directory scans started so far, exposed for tests.
+        var scanCount: Int {
+            lock.withLock { _scanCount }
+        }
 
         // MARK: - Internal methods
 
@@ -222,10 +252,18 @@ struct DiskStorage: Sendable {
                 return hit
             }
 
-            let task: Task<Void, Never> = lock.withLock {
+            let task: Task<Void, Never>? = lock.withLock {
                 if let refreshTask {
                     return refreshTask
                 }
+
+                // The last scan was a moment ago and did not find `key`: nothing this instance
+                // wrote since is missing from the index, so another scan would only repeat it.
+                if let lastScanEnd, Self.now() - lastScanEnd < minimumRescanInterval {
+                    return nil
+                }
+
+                _scanCount += 1
 
                 let newTask = Task {
                     let scanned = await scan()
@@ -239,6 +277,7 @@ struct DiskStorage: Sendable {
                         }
 
                         refreshTask = nil
+                        lastScanEnd = Self.now()
                     }
                 }
 
@@ -246,13 +285,18 @@ struct DiskStorage: Sendable {
                 return newTask
             }
 
-            await task.value
+            await task?.value
 
             return lock.withLock { locationsByKey[key] }
         }
 
         func set(_ key: String, location url: URL) {
             lock.withLock { locationsByKey[key] = url }
+        }
+
+        /// Monotonic, so a clock that moves backwards cannot freeze or skip the window.
+        private static func now() -> UInt64 {
+            DispatchTime.now().uptimeNanoseconds
         }
 
         /// Records that `key` was just served, for `freeSpace` to evict it after entries that
@@ -295,7 +339,7 @@ struct DiskStorage: Sendable {
 
     // MARK: - Private properties
     private let directory: URL
-    private let index = Index()
+    private let index: Index
 
     // MARK: - Internal properties
 
@@ -313,8 +357,16 @@ struct DiskStorage: Sendable {
     var encryptionKey: DataCache.EncryptionKey?
 
     // MARK: - Inits
-    init(directory: URL) {
+    /// - Parameter missRescanInterval: Seconds a cache miss waits after the last directory
+    /// scan before it may scan again; see `Index`. Zero scans on every miss.
+    init(directory: URL, missRescanInterval: Double = 1) {
         self.directory = directory
+        self.index = Index(minimumRescanInterval: missRescanInterval)
+    }
+
+    /// Directory scans the lookup index has started, exposed for tests.
+    var scanCount: Int {
+        index.scanCount
     }
 
     // MARK: - Internal methods
