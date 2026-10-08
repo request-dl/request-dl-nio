@@ -10,12 +10,17 @@
 /// `$'...'` ANSI-C quoting (`\n \t \r \\ \' \" \xHH`). A trailing `\` at the end of a physical
 /// line is a continuation and is removed before tokenizing even begins, since multi-line curl
 /// exports are the common case in practice.
+///
+/// Walks the command as Unicode scalars, not `Character`s. A `Character` is a grapheme cluster, so
+/// `"\r\n"` is one `Character` equal to neither `"\r"` nor `"\n"`, and a quote or a space followed
+/// by a combining mark is one `Character` equal to neither of them. Both are plain delimiters to
+/// a shell, which works on bytes.
 enum CURLTokenizer {
 
     // MARK: - Internal static methods
 
     static func tokenize(_ command: String) throws -> [String] {
-        let characters = Array(removingLineContinuations(command))
+        let characters = Array(removingLineContinuations(command).unicodeScalars)
 
         var tokens: [String] = []
         var current = ""
@@ -43,7 +48,7 @@ enum CURLTokenizer {
                 index += 1
 
                 while index < characters.endIndex, characters[index] != "'" {
-                    current.append(characters[index])
+                    current.unicodeScalars.append(characters[index])
                     index += 1
                 }
 
@@ -60,12 +65,12 @@ enum CURLTokenizer {
                 while index < characters.endIndex, characters[index] != "\"" {
                     if characters[index] == "\\",
                         index + 1 < characters.endIndex,
-                        "\"\\$`".contains(characters[index + 1])
+                        "\"\\$`".unicodeScalars.contains(characters[index + 1])
                     {
-                        current.append(characters[index + 1])
+                        current.unicodeScalars.append(characters[index + 1])
                         index += 2
                     } else {
-                        current.append(characters[index])
+                        current.unicodeScalars.append(characters[index])
                         index += 1
                     }
                 }
@@ -89,12 +94,12 @@ enum CURLTokenizer {
                     throw CURLParsingError(.danglingEscape)
                 }
 
-                current.append(characters[index])
+                current.unicodeScalars.append(characters[index])
                 index += 1
 
             default:
                 hasToken = true
-                current.append(character)
+                current.unicodeScalars.append(character)
                 index += 1
             }
         }
@@ -107,17 +112,21 @@ enum CURLTokenizer {
 
     /// `\<newline>` (and `\<CRLF>`) removed outright. That is what a shell does before a
     /// command is ever tokenized, and it is how multi-line "copy as cURL" output is written.
+    ///
+    /// A backslash before a lone carriage return is not a continuation and is left for the
+    /// tokenizer, which escapes the carriage return.
     private static func removingLineContinuations(_ command: String) -> String {
-        var result = ""
-        var iterator = command.makeIterator()
+        var result = String.UnicodeScalarView()
+        var iterator = command.unicodeScalars.makeIterator()
 
-        while let character = iterator.next() {
-            guard character == "\\" else {
-                result.append(character)
+        while let scalar = iterator.next() {
+            guard scalar == "\\" else {
+                result.append(scalar)
                 continue
             }
 
             var lookahead = iterator
+
             switch lookahead.next() {
             case "\n":
                 iterator = lookahead
@@ -125,14 +134,14 @@ enum CURLTokenizer {
                 if lookahead.next() == "\n" {
                     iterator = lookahead
                 } else {
-                    result.append(character)
+                    result.append(scalar)
                 }
             default:
-                result.append(character)
+                result.append(scalar)
             }
         }
 
-        return result
+        return String(result)
     }
 
     /// Reads the body of a `$'...'` literal, starting just past the opening `$'`.
@@ -143,7 +152,7 @@ enum CURLTokenizer {
     /// turning each byte into its own Unicode scalar instead (Latin-1) re-encoded `é`
     /// (`\xc3\xa9`) as the two characters `Ã©` on the way back out.
     private static func readANSICQuoted(
-        _ characters: [Character],
+        _ characters: [Unicode.Scalar],
         index: inout Int,
         into current: inout String
     ) throws {
@@ -161,7 +170,7 @@ enum CURLTokenizer {
         while index < characters.endIndex, characters[index] != "'" {
             guard characters[index] == "\\", index + 1 < characters.endIndex else {
                 flushPendingBytes()
-                current.append(characters[index])
+                current.unicodeScalars.append(characters[index])
                 index += 1
                 continue
             }
@@ -171,7 +180,8 @@ enum CURLTokenizer {
             if escape == "x" {
                 let hexStart = index + 2
                 let hexEnd = min(hexStart + 2, characters.endIndex)
-                let hex = String(characters[hexStart..<hexEnd])
+                var hex = ""
+                hex.unicodeScalars.append(contentsOf: characters[hexStart..<hexEnd])
 
                 if !hex.isEmpty, let byte = UInt8(hex, radix: 16) {
                     pendingBytes.append(byte)
@@ -184,24 +194,24 @@ enum CURLTokenizer {
 
             switch escape {
             case "n":
-                current.append("\n")
+                current.unicodeScalars.append("\n")
                 index += 2
             case "t":
-                current.append("\t")
+                current.unicodeScalars.append("\t")
                 index += 2
             case "r":
-                current.append("\r")
+                current.unicodeScalars.append("\r")
                 index += 2
             case "\\", "'", "\"":
-                current.append(escape)
+                current.unicodeScalars.append(escape)
                 index += 2
             case "0":
-                current.append("\0")
+                current.unicodeScalars.append("\0")
                 index += 2
             default:
                 // Includes a malformed `\x` (no valid hex digits after it), kept as a literal
                 // `x` exactly as before.
-                current.append(escape)
+                current.unicodeScalars.append(escape)
                 index += 2
             }
         }
@@ -216,11 +226,11 @@ enum CURLTokenizer {
     }
 }
 
-// MARK: - [Character] extension
+// MARK: - [Unicode.Scalar] extension
 
-extension Array where Element == Character {
+extension Array where Element == Unicode.Scalar {
 
-    fileprivate subscript(safe index: Int) -> Character? {
+    fileprivate subscript(safe index: Int) -> Unicode.Scalar? {
         indices.contains(index) ? self[index] : nil
     }
 }
