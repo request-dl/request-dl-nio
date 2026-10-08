@@ -357,7 +357,7 @@ struct DiskStorage: Sendable {
         }
 
         let buffer = try? await handle.readToEnd(maximumSizeAllowed: .unlimited)
-        try? await handle.close()
+        try? await Internals.uncancellable { try await handle.close() }
 
         guard let buffer else {
             return nil
@@ -754,9 +754,9 @@ struct DiskStorage: Sendable {
 
         do {
             try await handle.write(contentsOf: payload, toAbsoluteOffset: .zero)
-            try await handle.close()
+            try await Internals.uncancellable { try await handle.close() }
         } catch {
-            try? await handle.close()
+            try? await Internals.uncancellable { try await handle.close() }
             throw error
         }
     }

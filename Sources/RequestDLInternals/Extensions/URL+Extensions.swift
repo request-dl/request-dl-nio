@@ -115,7 +115,7 @@ extension URL {
             options: .newFile(replaceExisting: false, permissions: .ownerReadWrite)
         )
 
-        try await handle.close()
+        try await Internals.uncancellable { try await handle.close() }
     }
 
     /// Removes whatever is here, if anything is.
@@ -139,14 +139,14 @@ extension URL {
 
         do {
             let buffer = try await handle.readToEnd(maximumSizeAllowed: .unlimited)
-            try await handle.close()
+            try await Internals.uncancellable { try await handle.close() }
             #if canImport(NIOCore)
             return Data(buffer.readableBytesView)
             #else
             return buffer
             #endif
         } catch {
-            try? await handle.close()
+            try? await Internals.uncancellable { try await handle.close() }
             throw error
         }
     }
@@ -164,9 +164,9 @@ extension URL {
 
         do {
             try await handle.write(contentsOf: data, toAbsoluteOffset: .zero)
-            try await handle.close()
+            try await Internals.uncancellable { try await handle.close() }
         } catch {
-            try? await handle.close()
+            try? await Internals.uncancellable { try await handle.close() }
             throw error
         }
     }

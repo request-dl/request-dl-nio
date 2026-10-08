@@ -221,11 +221,14 @@ extension Internals {
 
                 _isClosed = true
 
+                // Through `uncancellable`: a request that is cancelled closes its streams from
+                // a cancelled Task, where `NIOFileSystem` would drop the close and then trap
+                // on the leaked descriptor.
                 switch handle {
                 case .read(let readHandle):
-                    try await readHandle.close()
+                    try await Internals.uncancellable { try await readHandle.close() }
                 case .write(let writeHandle):
-                    try await writeHandle.close()
+                    try await Internals.uncancellable { try await writeHandle.close() }
                 }
             }
         }
