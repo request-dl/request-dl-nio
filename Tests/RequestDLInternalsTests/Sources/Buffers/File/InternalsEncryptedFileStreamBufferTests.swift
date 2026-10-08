@@ -41,6 +41,30 @@ struct InternalsEncryptedFileStreamBufferTests {
         }
     }
 
+    /// `close()` closes the inner stream even when writing the header or the final chunk throws
+    /// (a full disk, here a cancelled Task, whose `writeData` is refused). An inner handle left
+    /// open is a `fatalError` in `NIOFileSystem` ("Leaking file descriptor") when it is
+    /// released, in release builds too.
+    @Test
+    func close_whenSealingTheFinalChunkFails_stillClosesTheInnerHandleAndThrows() async throws {
+        try await withTemporaryFileURL("encrypted.bin") { fileURL in
+            let stream = try await Internals.EncryptedFileStreamBuffer(writingTo: makeURL(fileURL))
+            try await stream.writeData(Data("some content".utf8))
+
+            let task = _Concurrency.Task<Void, Error> {
+                withUnsafeCurrentTask { $0?.cancel() }
+                try await stream.close()
+            }
+
+            // The final chunk could not be written, so the close reports it.
+            await #expect(throws: CancellationError.self) {
+                try await task.value
+            }
+
+            // Releasing `stream` at the end of this scope must not kill the process.
+        }
+    }
+
     @Test
     func writeThenRead_whenContentIsEmpty_shouldRoundTripToEmptyData() async throws {
         try await withTemporaryFileURL("encrypted.bin") { fileURL in
