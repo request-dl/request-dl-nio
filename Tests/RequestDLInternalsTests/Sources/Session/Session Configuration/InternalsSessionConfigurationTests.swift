@@ -229,6 +229,64 @@ struct InternalsSessionConfigurationTests {
         )
     }
 
+    /// The three network-access flags are also set on the `URLSessionConfiguration`, which
+    /// enforces them for the whole transfer. `Internals.NetworkPathGate` only checks once, before
+    /// the request goes out.
+    @Test
+    func configuration_whenNetworkAccessFlagsSet_urlSessionConfigurationMatches() async throws {
+        // Given
+        var configuration = Internals.Session.Configuration()
+        configuration.allowsCellularAccess = false
+        configuration.allowsExpensiveNetworkAccess = false
+        configuration.allowsConstrainedNetworkAccess = false
+
+        // When
+        let urlSessionConfiguration = configuration.buildURLSessionConfiguration()
+
+        // Then
+        #expect(urlSessionConfiguration.allowsCellularAccess == false)
+        #expect(urlSessionConfiguration.allowsExpensiveNetworkAccess == false)
+        #expect(urlSessionConfiguration.allowsConstrainedNetworkAccess == false)
+    }
+
+    @Test
+    func configuration_whenNetworkAccessFlagsAllowed_urlSessionConfigurationAllows() async throws {
+        // Given: an explicit `true` is what the system default already is.
+        var configuration = Internals.Session.Configuration()
+        configuration.allowsCellularAccess = true
+        configuration.allowsExpensiveNetworkAccess = true
+        configuration.allowsConstrainedNetworkAccess = true
+
+        // When
+        let urlSessionConfiguration = configuration.buildURLSessionConfiguration()
+
+        // Then
+        #expect(urlSessionConfiguration.allowsCellularAccess)
+        #expect(urlSessionConfiguration.allowsExpensiveNetworkAccess)
+        #expect(urlSessionConfiguration.allowsConstrainedNetworkAccess)
+    }
+
+    @Test
+    func configuration_whenNetworkAccessFlagsOmitted_urlSessionConfigurationKeepsSystemDefault() async throws {
+        // Given: absence must stay absence
+        let configuration = Internals.Session.Configuration()
+        let defaultConfiguration = URLSessionConfiguration.ephemeral
+
+        // When
+        let urlSessionConfiguration = configuration.buildURLSessionConfiguration()
+
+        // Then
+        #expect(urlSessionConfiguration.allowsCellularAccess == defaultConfiguration.allowsCellularAccess)
+        #expect(
+            urlSessionConfiguration.allowsExpensiveNetworkAccess
+                == defaultConfiguration.allowsExpensiveNetworkAccess
+        )
+        #expect(
+            urlSessionConfiguration.allowsConstrainedNetworkAccess
+                == defaultConfiguration.allowsConstrainedNetworkAccess
+        )
+    }
+
     /// Same bug class as the TLS-version pair above: `Session.maximumConnectionsPerHost(_:)`
     /// reaches AsyncHTTPClient's `concurrentHTTP1ConnectionsPerHostSoftLimit` and must not be
     /// silently dropped under `.urlSession`, since `httpMaximumConnectionsPerHost` is an exact
