@@ -97,6 +97,17 @@ import Crypto
 /// `@PropertyBuilder` block still wins, following the same "last one wins" precedent already
 /// established by ``BaseURL`` and ``DNSOverride``.
 ///
+/// ## Secrets
+///
+/// Values that carry credentials are read as secret, so a `ConfigReader` with an access
+/// reporter or logger redacts them instead of writing them out: `headers`, `queries`,
+/// `authorization.password`, `authorization.credentials`, `authorization.token`, the same three
+/// under `proxy.authorization`, `proxy.connectHeaders`, and the private key password in the
+/// certificate settings. The two lists are marked as a whole because an entry can be an
+/// `Authorization` header or an API key in a query, and which one is not known until it is read.
+/// `baseURL` is not: it is read as a plain value even though a URL can carry a user name and
+/// password in it, so keep credentials out of it.
+///
 /// - Throws: ``ConfiguredError`` if `authorization.scheme` or `proxy.authorization.scheme` is
 ///   specified but invalid, if the fields the specified scheme requires are missing, if
 ///   `proxy.enabled` is `true`
@@ -144,11 +155,11 @@ public struct Configured: Property {
                 Timeout(.seconds(Int64(timeout)))
             }
 
-            if let headerPairs = reader.stringArray(forKey: "headers") {
+            if let headerPairs = reader.stringArray(forKey: "headers", isSecret: true) {
                 HeaderGroup(Self.pairs(headerPairs, separatedBy: ":"))
             }
 
-            if let queryPairs = reader.stringArray(forKey: "queries") {
+            if let queryPairs = reader.stringArray(forKey: "queries", isSecret: true) {
                 QueryGroup(Self.pairs(queryPairs, separatedBy: "="))
             }
 
@@ -402,7 +413,7 @@ public struct Configured: Property {
         }
 
         let authorization = try Self.proxyAuthorization(reader.scoped(to: "authorization"))
-        let connectHeaderPairs = reader.stringArray(forKey: "connectHeaders")
+        let connectHeaderPairs = reader.stringArray(forKey: "connectHeaders", isSecret: true)
 
         switch reader.string(forKey: "type", default: "http") {
         case "http":
@@ -454,16 +465,16 @@ public struct Configured: Property {
         switch scheme {
         case "basic":
             if let username = reader.string(forKey: "username"),
-                let password = reader.string(forKey: "password")
+                let password = reader.string(forKey: "password", isSecret: true)
             {
                 return .basic(username: username, password: password)
-            } else if let credentials = reader.string(forKey: "credentials") {
+            } else if let credentials = reader.string(forKey: "credentials", isSecret: true) {
                 return .basic(credentials: credentials)
             } else {
                 throw ConfiguredError(context: .invalidAuthorizationConfiguration)
             }
         case "bearer":
-            guard let token = reader.string(forKey: "token") else {
+            guard let token = reader.string(forKey: "token", isSecret: true) else {
                 throw ConfiguredError(context: .invalidAuthorizationConfiguration)
             }
             return .bearer(tokens: token)
@@ -480,16 +491,16 @@ public struct Configured: Property {
         switch scheme {
         case "basic":
             if let username = reader.string(forKey: "username"),
-                let password = reader.string(forKey: "password")
+                let password = reader.string(forKey: "password", isSecret: true)
             {
                 return Authorization(username: username, password: password)
-            } else if let credentials = reader.string(forKey: "credentials") {
+            } else if let credentials = reader.string(forKey: "credentials", isSecret: true) {
                 return Authorization(.basic, token: credentials)
             } else {
                 throw ConfiguredError(context: .invalidAuthorizationConfiguration)
             }
         case "bearer":
-            guard let token = reader.string(forKey: "token") else {
+            guard let token = reader.string(forKey: "token", isSecret: true) else {
                 throw ConfiguredError(context: .invalidAuthorizationConfiguration)
             }
             return Authorization(.bearer, token: token)
