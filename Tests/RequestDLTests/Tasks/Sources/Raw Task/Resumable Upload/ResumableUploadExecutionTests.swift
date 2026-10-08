@@ -227,6 +227,30 @@ struct ResumableUploadExecutionTests {
         }
     }
 
+    /// A `2xx` that holds no more than what was already known is an attempt that moved nothing,
+    /// so it spends the retry budget instead of being sent again for as long as the server
+    /// keeps answering it.
+    @Test(arguments: Executor.allCases)
+    private func aServerThatKeepsNothingOfTheBody_isGivenUpOn(_ executor: Executor) async throws {
+        let scenario = Case(executor: executor, kind: .tus)
+
+        try await Self.withUploadServer(scenario) { server in
+            // Given: each `PATCH` is answered with an offset where the upload already was.
+            server.keepsAtMostPerPatch = 0
+
+            // Then
+            await #expect(throws: UploadResumptionError(.conflictingOffsets)) {
+                _ = try await Self.upload(to: server, scenario, attempts: 2).result()
+            }
+
+            // The first, and the two that follow it, which is what was allowed. The server records
+            // a request once it is done with it, which can be after the client has failed, so
+            // the list is waited on before it is counted.
+            try await eventually(timeout: 30) { server.requests.filter { $0.method == "PATCH" }.count >= 3 }
+            #expect(server.requests.filter { $0.method == "PATCH" }.count == 3)
+        }
+    }
+
     @Test(arguments: cases)
     private func aServerThatKeepsRejectingTheOffset_isGivenUpOn(_ scenario: Case) async throws {
         try await Self.withUploadServer(scenario) { server in
