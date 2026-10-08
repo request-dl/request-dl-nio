@@ -24,6 +24,12 @@
 /// > Note: A request timeout is the amount of time a client will wait for a response from the server
 /// before terminating the connection. The timeout parameter is the duration of time before the timeout
 /// occurs, and the source parameter specifies the type of timeout to be applied
+///
+/// > Note: Without a `Timeout` for ``Timeout/Source/read``, a request fails once nothing arrives
+/// from the server for 60 seconds, on every executor. That is `URLSession`'s own default, and
+/// `.nio` applies it too so a server that stops sending can't hang a request forever. A body
+/// that stays silent for longer than that, such as an event stream without heartbeats, needs a
+/// larger value.
 public struct Timeout: Property {
 
     private struct Node: PropertyNode {
