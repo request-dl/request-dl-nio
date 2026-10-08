@@ -200,6 +200,89 @@ struct DownloadResumptionPointTests {
         }
     }
 
+    // MARK: - A stored validator that cannot be trusted
+
+    /// A decoded point holds only a validator a response could have given, because the validator
+    /// is sent as the `If-Range` header: a stored point that was edited (or a store that was
+    /// corrupted) must not get a line break, and with it a header of its own, into the
+    /// continuation request.
+    @Test(
+        arguments: [
+            // A line break in an entity tag, the shape of header injection.
+            "\\\"abc\\r\\nX-Injected: 1\\\"",
+            "\\\"abc\\nX-Injected: 1\\\"",
+            "\\\"abc\\rX-Injected: 1\\\"",
+            // Not a strong entity tag, which is the only kind a point is ever made from.
+            "W/\\\"abc\\\"",
+            "abc",
+            "\\\"",
+            "",
+            // A quote inside the tag, a space, a control character.
+            "\\\"a\\\"b\\\"",
+            "\\\"a b\\\"",
+            "\\\"a\\u0000b\\\"",
+            "\\\"a\\u007Fb\\\"",
+        ]
+    )
+    func anEntityTagThatIsNotAStrongOne_failsToDecode(value: String) {
+        let stored = #"{"offset":0,"validator":{"kind":"entityTag","value":"\#(value)"},"version":1}"#
+
+        #expect(throws: DecodingError.self) {
+            _ = try JSONDecoder().decode(DownloadResumptionPoint.self, from: Data(stored.utf8))
+        }
+    }
+
+    @Test(
+        arguments: [
+            "Wed, 21 Oct 2015 07:28:00 GMT\\r\\nX-Injected: 1",
+            "Wed, 21 Oct 2015 07:28:00 GMT\\n",
+            "not a date",
+            "",
+        ]
+    )
+    func aLastModifiedThatIsNotAnHTTPDate_failsToDecode(value: String) {
+        let stored = #"{"offset":0,"validator":{"kind":"lastModified","value":"\#(value)"},"version":1}"#
+
+        #expect(throws: DecodingError.self) {
+            _ = try JSONDecoder().decode(DownloadResumptionPoint.self, from: Data(stored.utf8))
+        }
+    }
+
+    @Test
+    func aNegativeCompleteLength_failsToDecode() {
+        let stored =
+            #"{"completeLength":-1,"offset":0,"validator":{"kind":"entityTag","value":"\"a\""},"version":1}"#
+
+        #expect(throws: DecodingError.self) {
+            _ = try JSONDecoder().decode(DownloadResumptionPoint.self, from: Data(stored.utf8))
+        }
+    }
+
+    /// What real servers send still decodes.
+    @Test(
+        arguments: [
+            "\\\"abc\\\"",
+            "\\\"33a64df551425fcc55e4d42a148795d9f25f89d4\\\"",
+            "\\\"1234-5678/9\\\"",
+            "\\\"\\\"",
+        ]
+    )
+    func aStrongEntityTag_decodes(value: String) throws {
+        let stored = #"{"offset":10,"validator":{"kind":"entityTag","value":"\#(value)"},"version":1}"#
+
+        let point = try JSONDecoder().decode(DownloadResumptionPoint.self, from: Data(stored.utf8))
+
+        #expect(point.offset == 10)
+    }
+
+    @Test
+    func anHTTPDateLastModified_decodes() throws {
+        let stored =
+            #"{"offset":10,"validator":{"kind":"lastModified","value":"Wed, 21 Oct 2015 07:28:00 GMT"},"version":1}"#
+
+        _ = try JSONDecoder().decode(DownloadResumptionPoint.self, from: Data(stored.utf8))
+    }
+
     // MARK: - Error
 
     @Test
