@@ -6,10 +6,10 @@ import Testing
 
 @testable import RequestDL
 
-/// Regression tests (audit finding N11): the tokenizer walked the command as `Character`s, and
-/// Swift reads `"\r\n"` as a single `Character`, equal to neither `"\r"` nor `"\n"`. A command
-/// whose lines end in CRLF (a Windows text file, an HTTP-style paste) was not split where its
-/// lines break, and a `\` before a CRLF was not a line continuation.
+/// The tokenizer walks the command as `Unicode.Scalar`s: Swift reads `"\r\n"` as a single
+/// `Character`, equal to neither `"\r"` nor `"\n"`, so a command whose lines end in CRLF (a
+/// Windows text file, an HTTP-style paste) must still split where its lines break, and a `\`
+/// before a CRLF is a line continuation.
 struct CURLTokenizerTests {
 
     @Test
@@ -49,6 +49,18 @@ struct CURLTokenizerTests {
         #expect(try CURLTokenizer.tokenize("curl -d \"a\r\nb\"") == ["curl", "-d", "a\r\nb"])
     }
 
+    /// The `$'...'` branch walks scalars too: a raw CRLF in it is data, the `\r\n` escapes make
+    /// the same two scalars, and a CRLF after the closing quote still separates tokens.
+    @Test
+    func tokenize_whenACRLFIsInsideAnANSICLiteral_keepsItInTheToken() throws {
+        #expect(try CURLTokenizer.tokenize("curl -d $'a\r\nb'") == ["curl", "-d", "a\r\nb"])
+        #expect(try CURLTokenizer.tokenize("curl -d $'a\\r\\nb'") == ["curl", "-d", "a\r\nb"])
+        #expect(
+            try CURLTokenizer.tokenize("curl -d $'a\\r\\nb'\r\nhttps://example.com")
+                == ["curl", "-d", "a\r\nb", "https://example.com"]
+        )
+    }
+
     @Test
     func tokenize_whenALoneCarriageReturnSeparatesTokens_splitsThem() throws {
         #expect(try CURLTokenizer.tokenize("curl\rhttps://example.com") == ["curl", "https://example.com"])
@@ -62,8 +74,8 @@ struct CURLTokenizerTests {
 
     // MARK: - The same family: a delimiter followed by a combining mark
 
-    /// A closing quote followed by a combining mark is one `Character` and no longer equals the
-    /// quote, so the quoted string ran on to the end of the command and "ended unterminated".
+    /// A closing quote followed by a combining mark is one `Character` that doesn't equal the
+    /// quote, but it still closes the quoted string.
     @Test
     func tokenize_whenAQuoteIsFollowedByACombiningMark_stillClosesIt() throws {
         let tokens = try CURLTokenizer.tokenize("curl -H 'X: a'\u{301} https://example.com")
