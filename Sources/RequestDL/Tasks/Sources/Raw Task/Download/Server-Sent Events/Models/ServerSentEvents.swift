@@ -21,12 +21,15 @@ public struct ServerSentEvents: Sendable, AsyncSequence {
     ///
     public struct AsyncIterator: AsyncIteratorProtocol {
 
+        fileprivate let bytes: AsyncBytes
         fileprivate var bytesIterator: AsyncBytes.AsyncIterator
-        fileprivate var parser = ServerSentEventParser()
+        fileprivate var parser: ServerSentEventParser
+        fileprivate let maximumLineLength: Int?
 
         fileprivate var pendingEvents: [ServerSentEvent] = []
         fileprivate var pendingIndex = 0
         fileprivate var isFinished = false
+        fileprivate var hasReportedFailure = false
 
         ///
         /// Returns the next event in the stream, or `nil` when the underlying byte stream ends.
@@ -38,6 +41,19 @@ public struct ServerSentEvents: Sendable, AsyncSequence {
                 if pendingIndex < pendingEvents.count {
                     defer { pendingIndex += 1 }
                     return pendingEvents[pendingIndex]
+                }
+
+                // After the events that came before the line, and also when the line was the
+                // last thing the stream had.
+                if parser.exceededMaximum, let maximumLineLength {
+                    guard !hasReportedFailure else {
+                        return nil
+                    }
+
+                    hasReportedFailure = true
+                    isFinished = true
+                    bytes.cancelTransfer()
+                    throw AsyncBytesItemTooLargeError(maximumLength: maximumLineLength)
                 }
 
                 guard !isFinished else {
@@ -62,11 +78,13 @@ public struct ServerSentEvents: Sendable, AsyncSequence {
     // MARK: - Private properties
 
     private let bytes: AsyncBytes
+    private let maximumLineLength: Int?
 
     // MARK: - Inits
 
-    init(bytes: AsyncBytes) {
+    init(bytes: AsyncBytes, maximumLineLength: Int? = nil) {
         self.bytes = bytes
+        self.maximumLineLength = maximumLineLength
     }
 
     // MARK: - Public methods
@@ -77,6 +95,11 @@ public struct ServerSentEvents: Sendable, AsyncSequence {
     /// - Returns: An async iterator for the server-sent events.
     ///
     public func makeAsyncIterator() -> AsyncIterator {
-        .init(bytesIterator: bytes.makeAsyncIterator())
+        .init(
+            bytes: bytes,
+            bytesIterator: bytes.makeAsyncIterator(),
+            parser: ServerSentEventParser(maximumLineLength: maximumLineLength),
+            maximumLineLength: maximumLineLength
+        )
     }
 }
