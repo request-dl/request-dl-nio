@@ -473,9 +473,15 @@ struct InternalsClientManagerTests {
 
         // When
         // `AsyncLock` never aborts acquisition, so this only fails if `client(provider:
-        // sessionConfiguration:)` checks cancellation itself once inside the lock.
+        // sessionConfiguration:)` checks cancellation itself once inside the lock. The task waits
+        // for the cancellation before it asks, or it can run past the check before `cancel()` is
+        // called, which a stalled runner makes likely.
         let task = _Concurrency.Task<Internals.Client, Error> {
-            try await manager.client(
+            while !_Concurrency.Task.isCancelled {
+                try? await _Concurrency.Task.sleep(nanoseconds: 1_000_000)
+            }
+
+            return try await manager.client(
                 provider: provider,
                 sessionConfiguration: sessionConfiguration
             )
