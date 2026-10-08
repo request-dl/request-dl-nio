@@ -75,7 +75,8 @@ struct ItemIterator {
     }
 }
 
-/// An `AsyncSequence` of the lines of an ``AsyncBytes``, made by ``AsyncBytes/lines(maximumLength:)``.
+/// An `AsyncSequence` of the lines of an ``AsyncBytes``, made by
+/// ``AsyncBytes/lines(maximumLength:)``.
 public struct AsyncBytesLines: Sendable, AsyncSequence {
 
     public typealias Element = String
@@ -113,7 +114,7 @@ public struct AsyncBytesLines: Sendable, AsyncSequence {
 }
 
 /// An `AsyncSequence` of the items of an ``AsyncBytes`` between a separator, made by
-/// ``AsyncBytes/items(separatedBy:maximumLength:)``.
+/// ``AsyncBytes/items(separatedBy:maximumLength:)-([UInt8],_)``.
 public struct AsyncBytesItems: Sendable, AsyncSequence {
 
     public typealias Element = Data

@@ -75,7 +75,7 @@ extension AsyncBytes {
 
     /// Reads the byte stream as items between a separator written as text.
     ///
-    /// See ``items(separatedBy:maximumLength:)``; the separator is taken as UTF-8.
+    /// See ``items(separatedBy:maximumLength:)-([UInt8],_)``; the separator is taken as UTF-8.
     public func items<S: StringProtocol>(separatedBy separator: S, maximumLength: Int = 1_048_576) -> AsyncBytesItems {
         items(separatedBy: Array(separator.utf8), maximumLength: maximumLength)
     }

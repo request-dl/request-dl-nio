@@ -2,9 +2,9 @@
 // See LICENSE for this package's licensing information.
 //
 
-/// Thrown while reading ``AsyncBytes/lines(maximumLength:)``, ``AsyncBytes/items(separatedBy:maximumLength:)``
-/// or ``AsyncBytes/events(maximumLineLength:)``, when one item grew past its maximum without
-/// ending.
+/// Thrown while reading ``AsyncBytes/lines(maximumLength:)``,
+/// ``AsyncBytes/items(separatedBy:maximumLength:)-([UInt8],_)`` or
+/// ``AsyncBytes/events(maximumLineLength:)``, when one item grew past its maximum without ending.
 ///
 /// The items that ended before it have already been delivered. The sequence ends with this error
 /// and reads nothing more.

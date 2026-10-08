@@ -11,7 +11,7 @@ import struct Foundation.Data
 /// Cuts a stream of arbitrary chunks into items, one delimiter at a time, keeping at most one
 /// unfinished item in memory.
 ///
-/// Shared by ``AsyncBytes/lines(maximumLength:)``, ``AsyncBytes/items(separatedBy:maximumLength:)``
+/// Shared by `AsyncBytes.lines(maximumLength:)`, `AsyncBytes.items(separatedBy:maximumLength:)`
 /// and the Server-Sent Events parser, so all of them cut at the same places and all of them can
 /// stop an item that never ends.
 struct ItemSplitter {
