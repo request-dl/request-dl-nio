@@ -138,6 +138,55 @@ struct InternalsPACProxyCacheKeyTests {
         #expect(await cache.evaluationCount == 6)
     }
 
+    // MARK: - A failed evaluation
+
+    /// Regression test: a PAC download that failed once (a dropped connection, the 30s timeout)
+    /// was remembered as "go direct" for the full five minutes, so every request in that window
+    /// skipped the corporate proxy even though the script was fine.
+    @Test
+    func proxy_whenEvaluationFails_isAskedAgainOnceTheShortFailureWindowPasses() async throws {
+        // Given: an evaluator that fails the first time and then works.
+        let evaluator = ScriptedEvaluator(results: [.failure, .proxy("proxy.example.com")])
+        let cache = Internals.PACProxyCache(
+            failureLifetime: 100_000_000,
+            evaluate: evaluator.evaluate
+        )
+        let target = try Self.url("https://example.com/")
+
+        // When
+        let first = await cache.proxy(forScriptURL: Self.scriptURL, targetURL: target)
+        let beforeWindowEnds = await cache.proxy(forScriptURL: Self.scriptURL, targetURL: target)
+        try await Task.sleep(nanoseconds: 400_000_000)
+        let afterWindowEnds = await cache.proxy(forScriptURL: Self.scriptURL, targetURL: target)
+
+        // Then: still fails safe to direct meanwhile, without asking again, then recovers.
+        #expect(first == nil)
+        #expect(beforeWindowEnds == nil)
+        #expect(await evaluator.callCount == 2)
+        #expect(afterWindowEnds?.host == "proxy.example.com")
+    }
+
+    /// A script that answers DIRECT is an answer, not a failure: it is kept for the full lifetime.
+    @Test
+    func proxy_whenScriptAnswersDirect_isNotAskedAgainAfterTheFailureWindow() async throws {
+        // Given
+        let evaluator = ScriptedEvaluator(results: [.direct, .proxy("proxy.example.com")])
+        let cache = Internals.PACProxyCache(
+            failureLifetime: 100_000_000,
+            evaluate: evaluator.evaluate
+        )
+        let target = try Self.url("https://example.com/")
+
+        // When
+        _ = await cache.proxy(forScriptURL: Self.scriptURL, targetURL: target)
+        try await Task.sleep(nanoseconds: 400_000_000)
+        let again = await cache.proxy(forScriptURL: Self.scriptURL, targetURL: target)
+
+        // Then
+        #expect(again == nil)
+        #expect(await evaluator.callCount == 1)
+    }
+
     // MARK: - Helpers
 
     private func waitUntil(
@@ -152,6 +201,42 @@ struct InternalsPACProxyCacheKeyTests {
                 return
             }
             try await Task.sleep(nanoseconds: 10_000_000)
+        }
+    }
+}
+
+/// Answers each evaluation with the next scripted result.
+private actor ScriptedEvaluator {
+
+    enum Result {
+        case failure
+        case direct
+        case proxy(String)
+    }
+
+    struct Failure: Error {}
+
+    private var results: [Result]
+    private(set) var callCount = 0
+
+    init(results: [Result]) {
+        self.results = results
+    }
+
+    nonisolated var evaluate: @Sendable (URL, URL, Double) async throws -> Internals.Proxy? {
+        { _, _, _ in try await self.next() }
+    }
+
+    private func next() throws -> Internals.Proxy? {
+        callCount += 1
+
+        switch results.removeFirst() {
+        case .failure:
+            throw Failure()
+        case .direct:
+            return nil
+        case .proxy(let host):
+            return Internals.Proxy(host: host, port: 8_080, connection: .http, authorization: nil)
         }
     }
 }

@@ -38,9 +38,18 @@ extension Internals {
 
         // MARK: - Private static properties
 
-        /// How long a resolved (or failed-to-resolve) entry is trusted before being re-evaluated.
+        /// How long an entry the script answered is trusted before being re-evaluated. A failed
+        /// evaluation is remembered for `failureLifetime` instead.
         /// Matches `Internals.Storage`/`Internals.ClientManager`'s own default lifetime.
         private static let lifetime: Int64 = 5 * 60 * 1_000_000_000
+
+        /// How long a failed evaluation (the script could not be fetched or run) is remembered.
+        /// Short, unlike `lifetime`: a script that answers is a stable fact about the network,
+        /// but a failure is usually a dropped connection or a slow server, and remembering it
+        /// for minutes would send every request in that window around the proxy the script
+        /// would have chosen. It is not zero, because an unreachable PAC server otherwise makes
+        /// every request wait out the whole evaluation timeout.
+        package static let failureLifetime: Int64 = 10 * 1_000_000_000
 
         /// Bounds one evaluation's fetch-and-execute time. Without this, an unreachable PAC
         /// server would hang every request routed through it, not just the first. 30s, not a
@@ -84,6 +93,7 @@ extension Internals {
 
         private let maximumCount: Int
         private let maximumConcurrentEvaluations: Int
+        private let failureLifetime: Int64
         private let evaluate: @Sendable (URL, URL, Double) async throws -> Internals.Proxy?
 
         private var runningEvaluations = 0
@@ -96,7 +106,7 @@ extension Internals {
         /// concurrent requests to the same host (a screenful of images loading at once, say)
         /// shares the one evaluation already in progress instead of each opening its own
         /// dedicated `Thread` in `Internals.PACEvaluator`.
-        private var inFlight: [Key: _Concurrency.Task<Internals.Proxy?, Never>] = [:]
+        private var inFlight: [Key: _Concurrency.Task<Evaluation, Never>] = [:]
 
         // MARK: - Inits
 
@@ -111,12 +121,14 @@ extension Internals {
         package init(
             maximumCount: Int = PACProxyCache.maximumCount,
             maximumConcurrentEvaluations: Int = PACProxyCache.maximumConcurrentEvaluations,
+            failureLifetime: Int64 = PACProxyCache.failureLifetime,
             evaluate: @escaping @Sendable (URL, URL, Double) async throws -> Internals.Proxy? = {
                 try await Internals.PACEvaluator.evaluate(scriptURL: $0, targetURL: $1, timeout: $2)
             }
         ) {
             self.maximumCount = maximumCount
             self.maximumConcurrentEvaluations = max(maximumConcurrentEvaluations, 1)
+            self.failureLifetime = failureLifetime
             self.evaluate = evaluate
         }
 
@@ -125,6 +137,9 @@ extension Internals {
         /// The proxy `scriptURL`'s PAC script resolves `targetURL` to, or `nil` for a direct
         /// connection, including when evaluation itself fails (a stale/misconfigured PAC file,
         /// an unreachable PAC server, a script that throws).
+        ///
+        /// A failure is remembered for `failureLifetime` only, so a script that was briefly
+        /// unreachable is asked again soon, and a script that answers is kept for `lifetime`.
         ///
         /// Failing safe to direct is the same choice
         /// `Internals.SystemProxyResolver.firstResolution(in:)` already makes for any other
@@ -137,7 +152,7 @@ extension Internals {
                 return entry.proxy
             }
 
-            let task: _Concurrency.Task<Internals.Proxy?, Never>
+            let task: _Concurrency.Task<Evaluation, Never>
 
             if let inFlightTask = inFlight[key] {
                 task = inFlightTask
@@ -146,19 +161,22 @@ extension Internals {
 
                 let evaluate = evaluate
 
-                let newTask = _Concurrency.Task<Internals.Proxy?, Never> {
+                let newTask = _Concurrency.Task<Evaluation, Never> {
                     await self.acquireEvaluationSlot()
 
-                    let proxy: Internals.Proxy?
+                    let evaluation: Evaluation
 
                     do {
-                        proxy = try await evaluate(scriptURL, targetURL, Self.evaluationTimeout)
+                        evaluation = Evaluation(
+                            proxy: try await evaluate(scriptURL, targetURL, Self.evaluationTimeout),
+                            failed: false
+                        )
                     } catch {
-                        proxy = nil
+                        evaluation = Evaluation(proxy: nil, failed: true)
                     }
 
                     await self.releaseEvaluationSlot()
-                    return proxy
+                    return evaluation
                 }
                 inFlight[key] = newTask
                 task = newTask
@@ -169,8 +187,8 @@ extension Internals {
                 // evaluation is itself still being awaited below, since it may have already
                 // returned early after its own task was cancelled.
                 _Concurrency.Task { [weak self] in
-                    let resolved = await newTask.value
-                    await self?.finishEvaluation(key: key, resolved: resolved)
+                    let evaluation = await newTask.value
+                    await self?.finishEvaluation(key: key, evaluation: evaluation)
                 }
             }
 
@@ -226,17 +244,18 @@ extension Internals {
             return components.url ?? url
         }
 
-        private func finishEvaluation(key: Key, resolved: Internals.Proxy?) {
+        private func finishEvaluation(key: Key, evaluation: Evaluation) {
             inFlight[key] = nil
             storage[key] = Entry(
-                proxy: resolved,
-                readAt: DispatchTime.now().uptimeNanoseconds
+                proxy: evaluation.proxy,
+                readAt: DispatchTime.now().uptimeNanoseconds,
+                lifetime: evaluation.failed ? failureLifetime : Self.lifetime
             )
             evictIfNeeded()
         }
 
         private static func awaitingCancellably(
-            _ task: _Concurrency.Task<Internals.Proxy?, Never>
+            _ task: _Concurrency.Task<Evaluation, Never>
         ) async -> Internals.Proxy? {
             let box = PACCacheAwaitBox()
 
@@ -245,7 +264,7 @@ extension Internals {
                     box.attach(continuation)
 
                     _Concurrency.Task {
-                        box.resolve(returning: await task.value)
+                        box.resolve(returning: await task.value.proxy)
                     }
                 }
             } onCancel: {
@@ -256,7 +275,7 @@ extension Internals {
         // MARK: - Private methods
 
         private func isExpired(_ entry: Entry) -> Bool {
-            DispatchTime.now().uptimeNanoseconds - entry.readAt > Self.lifetime
+            DispatchTime.now().uptimeNanoseconds - entry.readAt > entry.lifetime
         }
 
         /// Brings `storage` back under `maximumCount`, oldest first. Drops down to three
@@ -289,6 +308,13 @@ extension Internals {
             let targetURL: URL
         }
 
+        /// What one evaluation came to. `failed` tells an error (the script could not be fetched
+        /// or run) apart from a script that answered "direct", which is `proxy == nil` alone.
+        private struct Evaluation: Sendable {
+            let proxy: Internals.Proxy?
+            let failed: Bool
+        }
+
         private struct Entry {
             let proxy: Internals.Proxy?
             // Monotonic, not wall clock: same rationale as `Internals.Storage`/
@@ -296,6 +322,7 @@ extension Internals {
             // the system clock, and this must not advance while the device is suspended either
             // way.
             let readAt: UInt64
+            let lifetime: Int64
         }
     }
 }
