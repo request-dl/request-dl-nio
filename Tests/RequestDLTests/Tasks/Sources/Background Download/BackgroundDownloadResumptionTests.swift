@@ -295,6 +295,11 @@ struct BackgroundDownloadResumptionTests {
             task.resume()
             try await eventually(timeout: 120) { observer.isHeld }
 
+            // `suspend()` is applied asynchronously: a task reports `.running` for a while after
+            // it, as the test above found on a CI runner. Cancelling before the suspension has
+            // landed is cancelling a task in transition, which has produced no resume data.
+            try await eventually(timeout: 30) { task.state == .suspended }
+
             // When
             let resumeData = try #require(await BackgroundDownloads.Session.cancelProducingResumeData(of: task))
 
@@ -328,6 +333,11 @@ struct BackgroundDownloadResumptionTests {
             let task = session.downloadTask(with: Self.url(server))
             task.resume()
             try await eventually(timeout: 120) { observer.isHeld }
+
+            // `suspend()` is applied asynchronously: a task reports `.running` for a while after
+            // it, as the test above found on a CI runner. Cancelling before the suspension has
+            // landed is cancelling a task in transition, which has produced no resume data.
+            try await eventually(timeout: 30) { task.state == .suspended }
 
             let resumeData = try #require(await BackgroundDownloads.Session.cancelProducingResumeData(of: task))
             server.resource = .init(length: Self.length, seed: 7, validator: .entityTag("\"v2\""))
