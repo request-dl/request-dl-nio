@@ -28,9 +28,14 @@ import struct Foundation.UUID
 @Suite(.concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog)
 struct InternalsClientMetricsTests {
 
+    /// - Parameter connectTimeout: Nanoseconds a connection may take to be established. The
+    /// default is generous because TLS handshakes queue up on a loaded runner. It is also how long
+    /// AsyncHTTPClient keeps retrying a refused connection before it gives up, so a test that
+    /// expects one to be refused passes a short one.
     private func makeSession(
         collectDNSMetrics: Bool = false,
-        redirectConfiguration: Internals.RedirectConfiguration? = nil
+        redirectConfiguration: Internals.RedirectConfiguration? = nil,
+        connectTimeout: Int64 = 60_000_000_000
     ) -> Internals.Session {
         var configuration = Internals.Session.Configuration()
         configuration.redirectConfiguration = redirectConfiguration
@@ -38,7 +43,7 @@ struct InternalsClientMetricsTests {
 
         secureConnection.certificateVerification = .some(.none)
         configuration.secureConnection = secureConnection
-        configuration.timeout.connect = 60_000_000_000
+        configuration.timeout.connect = connectTimeout
         configuration.collectDNSMetrics = collectDNSMetrics
 
         return Internals.Session(
@@ -211,7 +216,7 @@ struct InternalsClientMetricsTests {
         defer { refused.release() }
         let port = refused.port
 
-        let session = makeSession()
+        let session = makeSession(connectTimeout: 5_000_000_000)
         let client = try await session.client()
         let collector = Internals.RequestMetricsCollector()
 
@@ -238,7 +243,7 @@ struct InternalsClientMetricsTests {
         defer { refused.release() }
         let port = refused.port
 
-        let session = makeSession()
+        let session = makeSession(connectTimeout: 5_000_000_000)
         let client = try await session.client()
         let urlString = "http://127.0.0.1:\(port)/resource"
 
