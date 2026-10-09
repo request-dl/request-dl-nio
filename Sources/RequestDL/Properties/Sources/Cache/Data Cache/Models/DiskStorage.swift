@@ -204,24 +204,24 @@ struct DiskStorage: Sendable {
         // MARK: - Internal methods
 
         func run(_ work: @escaping @Sendable () async -> Value) async -> Value {
-            let task = lock.withLock { () -> Task<Value, Never> in
-                if let task {
-                    return task
+            let running = lock.withLock { () -> Task<Value, Never> in
+                if let current = self.task {
+                    return current
                 }
 
                 _runCount += 1
 
-                let newTask = Task {
+                let started = Task {
                     let value = await work()
-                    lock.withLock { task = nil }
+                    self.lock.withLock { self.task = nil }
                     return value
                 }
 
-                task = newTask
-                return newTask
+                self.task = started
+                return started
             }
 
-            return await task.value
+            return await running.value
         }
     }
 
