@@ -223,31 +223,12 @@ private final class LocalPACServer: @unchecked Sendable {
         )
         let response = header + body
 
-        listener.newConnectionHandler = { connection in
-            connection.start(queue: .main)
-            connection.receive(minimumIncompleteLength: 1, maximumLength: 65_536) { _, _, _, _ in
-                func send() {
-                    connection.send(
-                        content: response,
-                        completion: .contentProcessed { _ in
-                            connection.cancel()
-                        }
-                    )
-                }
-
-                guard responseDelay > 0 else {
-                    send()
-                    return
-                }
-
-                _Concurrency.Task {
-                    try? await _Concurrency.Task.sleep(nanoseconds: UInt64(responseDelay * 1_000_000_000))
-                    send()
-                }
-            }
-        }
-
         let queue = DispatchQueue(label: "InternalsPACProxyCacheTests.LocalPACServer")
+
+        listener.newConnectionHandler = { connection in
+            connection.start(queue: queue)
+            SingleHTTPResponse.serve(connection, with: response, after: responseDelay, on: queue)
+        }
 
         let port = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<UInt16, Error>) in
             let box = PortContinuationBox(continuation)

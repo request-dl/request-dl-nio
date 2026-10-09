@@ -270,19 +270,13 @@ private final class LocalPACServer: @unchecked Sendable {
         )
         response.append(body)
 
-        listener.newConnectionHandler = { connection in
-            connection.start(queue: .main)
-            connection.receive(minimumIncompleteLength: 1, maximumLength: 65_536) { _, _, _, _ in
-                connection.send(
-                    content: response,
-                    completion: .contentProcessed { _ in
-                        connection.cancel()
-                    }
-                )
-            }
-        }
-
         let queue = DispatchQueue(label: "InternalsPACEvaluatorTests.LocalPACServer")
+        let answer = response
+
+        listener.newConnectionHandler = { connection in
+            connection.start(queue: queue)
+            SingleHTTPResponse.serve(connection, with: answer, on: queue)
+        }
 
         let port = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<UInt16, Error>) in
             let box = PortContinuationBox(continuation)
