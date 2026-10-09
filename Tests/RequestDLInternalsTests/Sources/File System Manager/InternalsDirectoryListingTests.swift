@@ -71,4 +71,27 @@ struct InternalsDirectoryListingTests {
             #expect(Set(names).count == 1_500)
         }
     }
+
+    @Test
+    func modificationDate_ofADirectory_movesWhenAnEntryIsCreatedInIt() async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+
+            let before = try #require(await Internals.modificationDate(atPath: directoryURL.path))
+            #expect(abs(before.timeIntervalSinceNow) < 60)
+
+            try await Task.sleep(nanoseconds: 50_000_000)
+            try Data().write(to: directoryURL.appendingPathComponent("entry"))
+
+            let after = try #require(await Internals.modificationDate(atPath: directoryURL.path))
+            #expect(after > before)
+        }
+    }
+
+    @Test
+    func modificationDate_ofAMissingPath_isNil() async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            #expect(await Internals.modificationDate(atPath: directoryURL.path) == nil)
+        }
+    }
 }

@@ -348,6 +348,7 @@ struct DiskStorage: Sendable {
     // MARK: - Private properties
     private let directory: URL
     private let index: Index
+    private let orphanAge: Double
 
     // MARK: - Internal properties
 
@@ -367,12 +368,18 @@ struct DiskStorage: Sendable {
     // MARK: - Inits
     /// - Parameter missRescanInterval: Seconds a cache miss waits after the last directory
     /// scan before it may scan again; see `Index`. Zero scans on every miss.
+    /// - Parameter orphanAge: Seconds an incomplete record directory has to sit untouched before
+    /// it is taken for what a killed process left behind and removed. A write that is still
+    /// going on finishes creating its two files within moments, so the default is far above
+    /// that. Zero takes any incomplete directory for an orphan.
     init(
         directory: URL,
         missRescanInterval: Double = 1,
+        orphanAge: Double = 600,
         now: @escaping @Sendable () -> UInt64 = Index.uptime
     ) {
         self.directory = directory
+        self.orphanAge = orphanAge
         self.index = Index(minimumRescanInterval: missRescanInterval, now: now)
     }
 
@@ -755,7 +762,10 @@ struct DiskStorage: Sendable {
             return knownUsage
         }
 
-        var entries = await records()
+        let scanned = await scan()
+        var entries = scanned.whole
+
+        await removeOrphans(among: scanned.incomplete)
 
         if maximumCapacity == .zero {
             for entry in entries {
@@ -961,12 +971,14 @@ struct DiskStorage: Sendable {
     /// launch from costing a read of every entry in the cache.
     ///
     /// Only the entry of `targetKey`, the one the caller is about to read, is looked into. The
-    /// newest directory of that key that is whole wins, checked without the retry budget, so an
-    /// incomplete one next to a good one (a write cut short by the process being killed) costs
-    /// nothing. Only when none is whole is the newest given the full budget, which covers a
-    /// file another process wrote a moment ago that a stat has not seen yet. Every other key
-    /// is recorded as found, unchecked: it is checked when it is looked up, and an entry that
-    /// turns out to be gone is dropped from the index then.
+    /// newest directory of that key that is whole wins, checked without the retry budget. An
+    /// incomplete one next to it is looked at too: when it has sat untouched for `orphanAge` it
+    /// is what a write cut short by the process being killed leaves, and it is removed. When
+    /// none is whole, the newest of the incomplete ones that remain is given the full budget,
+    /// which covers a file another process wrote a moment ago that a stat has not seen yet. A
+    /// key whose directories are all orphans costs no retry at all. Every other key is recorded
+    /// as found, unchecked: it is checked when it is looked up, and an entry that turns out to
+    /// be gone is dropped from the index then.
     ///
     /// Several directories for one key (a write that lost a race, a revalidation) are not
     /// ambiguous: the newest wins.
@@ -997,16 +1009,22 @@ struct DiskStorage: Sendable {
         candidates.sort { $0.date > $1.date }
 
         var chosen: URL?
+        var incomplete: [URL] = []
 
         for candidate in candidates {
             if await Record(candidate.url, retryOnMiss: false) != nil {
                 chosen = candidate.url
                 break
             }
+
+            incomplete.append(candidate.url)
         }
 
-        if chosen == nil, let newestCandidate = candidates.first, await Record(newestCandidate.url) != nil {
-            chosen = newestCandidate.url
+        let orphans = await removeOrphans(among: incomplete)
+        incomplete.removeAll { orphans.contains($0) }
+
+        if chosen == nil, let newestIncomplete = incomplete.first, await Record(newestIncomplete) != nil {
+            chosen = newestIncomplete
         }
 
         if let chosen {
@@ -1024,8 +1042,14 @@ struct DiskStorage: Sendable {
     /// stays visible and gets swept up like any other entry. A miss on an entry is as likely a
     /// write still in progress as a missing one, so none is given the retry budget.
     private func records() async -> [Record] {
+        await scan().whole
+    }
+
+    /// The entries of the directory, whole ones as records and the others, the incomplete ones,
+    /// as their URLs. Names that are not a record directory's are left out of both.
+    private func scan() async -> (whole: [Record], incomplete: [URL]) {
         guard let names = try? await Internals.directoryEntryNames(atPath: directory.filePath.string) else {
-            return []
+            return ([], [])
         }
 
         let urls =
@@ -1033,7 +1057,45 @@ struct DiskStorage: Sendable {
             .filter { $0.hasSuffix(".\(Record.pathExtension)") }
             .map { directory.appendingPathComponent($0) }
 
-        return await Self.mapConcurrently(urls) { await Record($0, retryOnMiss: false) }.compactMap { $0 }
+        let checked = await Self.mapConcurrently(urls) { (url: $0, record: await Record($0, retryOnMiss: false)) }
+
+        return (
+            checked.compactMap(\.record),
+            checked.filter { $0.record == nil && Record.getKeyAndDate($0.url) != nil }.map(\.url)
+        )
+    }
+
+    /// Removes each of `urls` that has gone untouched for `orphanAge` and returns the ones it
+    /// removed.
+    ///
+    /// Only for directories already found incomplete. A write creates the two files of its
+    /// record directory moments after the directory itself, and every one of those creations
+    /// moves the directory's modification date, so one that stays incomplete and unmoved for
+    /// this long belongs to a process that is gone. The directory name's own date is no help
+    /// here: it is the date of the response, not of the write. A directory whose date cannot be
+    /// read is left alone.
+    @discardableResult
+    private func removeOrphans(among urls: [URL]) async -> Set<URL> {
+        guard !urls.isEmpty else {
+            return []
+        }
+
+        let limit = Date().addingTimeInterval(-orphanAge)
+
+        let ages = await Self.mapConcurrently(urls) {
+            await Internals.modificationDate(atPath: $0.filePath.string)
+        }
+
+        var removed: Set<URL> = []
+
+        for (url, modified) in zip(urls, ages) {
+            if let modified, modified <= limit {
+                await removeRecord(at: url)
+                removed.insert(url)
+            }
+        }
+
+        return removed
     }
 
     /// `transform` applied to every input, a few at a time, in the order of the inputs.

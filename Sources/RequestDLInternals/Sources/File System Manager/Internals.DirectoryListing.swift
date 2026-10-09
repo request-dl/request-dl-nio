@@ -14,6 +14,12 @@ import Android
 import Foundation
 #endif
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.Date
+#endif
+
 extension Internals {
 
     /// Thrown when a directory could not be opened or read.
@@ -36,7 +42,31 @@ extension Internals {
         try await FileSystemManager.run { try readDirectoryEntryNames(atPath: path) }
     }
 
+    /// When the entry at `path` was last modified, or `nil` where it cannot be read.
+    ///
+    /// For a directory this moves when an entry is created in it or moved into it, which is what
+    /// tells a directory somebody is still filling from one nobody has touched in a long while.
+    package static func modificationDate(atPath path: String) async -> Date? {
+        try? await FileSystemManager.run { try readModificationDate(atPath: path) }
+    }
+
     #if canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android)
+
+    private static func readModificationDate(atPath path: String) throws -> Date {
+        var info = stat()
+
+        guard stat(path, &info) == 0 else {
+            throw DirectoryListingError(code: errno)
+        }
+
+        #if canImport(Darwin)
+        let time = info.st_mtimespec
+        #else
+        let time = info.st_mtim
+        #endif
+
+        return Date(timeIntervalSince1970: Double(time.tv_sec) + Double(time.tv_nsec) / 1_000_000_000)
+    }
 
     private static func readDirectoryEntryNames(atPath path: String) throws -> [String] {
         guard let directory = opendir(path) else {
@@ -63,6 +93,16 @@ extension Internals {
     }
 
     #else
+
+    private static func readModificationDate(atPath path: String) throws -> Date {
+        let attributes = try FileManager.default.attributesOfItem(atPath: path)
+
+        guard let date = attributes[.modificationDate] as? Date else {
+            throw DirectoryListingError(code: 0)
+        }
+
+        return date
+    }
 
     private static func readDirectoryEntryNames(atPath path: String) throws -> [String] {
         do {
