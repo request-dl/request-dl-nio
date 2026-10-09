@@ -263,6 +263,36 @@ extension Internals {
             value.count >= 2 && value.hasPrefix("\"") && value.hasSuffix("\"")
         }
 
+        /// Whether `validator` is something a plan could have been made with from a response: what
+        /// a stored one has to be before it is sent back as `If-Range`.
+        ///
+        /// A plan built from a response passes through `isStrongEntityTag` or the date parser and
+        /// came out of a parsed header, so it cannot hold a line break. One read back from storage
+        /// has had none of that, and goes into a request header as it is.
+        ///
+        /// - An entity tag is a strong one (`"..."`, never `W/"..."`) whose tag holds only the
+        ///   characters RFC 9110 §8.8.3 allows in it: no space, no control character, no `"`.
+        /// - A `Last-Modified` is an HTTP date, and holds no control character.
+        package static func isWellFormed(_ validator: Validator) -> Bool {
+            switch validator {
+            case .entityTag(let value):
+                let scalars = Array(value.unicodeScalars)
+
+                guard scalars.count >= 2, scalars.first == "\"", scalars.last == "\"" else {
+                    return false
+                }
+
+                return scalars.dropFirst().dropLast().allSatisfy { scalar in
+                    scalar.value > 0x20 && scalar != "\"" && scalar.value != 0x7F
+                        && !(0x80...0x9F).contains(scalar.value)
+                }
+
+            case .lastModified(let value):
+                return Date(httpDate: value) != nil
+                    && value.unicodeScalars.allSatisfy { $0.value >= 0x20 && $0.value != 0x7F }
+            }
+        }
+
         /// RFC 9110 §8.8.2.2: a `Last-Modified` is only strong when the response's own `Date` is
         /// at least a second after it (anything closer could have changed within the same
         /// second without the date changing).

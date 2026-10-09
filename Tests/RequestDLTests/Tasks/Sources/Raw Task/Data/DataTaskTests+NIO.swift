@@ -84,6 +84,72 @@ extension DataTaskTests {
         #expect(result.response == output)
     }
 
+    /// The client identity is offered per origin, not through the client-wide
+    /// `TLSConfiguration`, so a server that redirects to another host that asks for a certificate
+    /// is not handed it. `URLSession` answers such a challenge only for the host the request was
+    /// made to. The two servers here differ in port, which is enough to be different origins.
+    @Test
+    func dataTask_whenRedirectedToAnotherOriginThatAsksForACertificate_doesNotPresentTheIdentity() async throws {
+        // Given: a target that requires a client certificate, and an origin that redirects to it.
+        let server = Certificates().server()
+        let client = Certificates().client()
+
+        let uri = "/" + UUID().uuidString
+
+        let target = try await LocalServer(
+            LocalServer.Configuration(host: "localhost", port: 8899, option: .client(client))
+        )
+        let origin = try await LocalServer(.standard)
+
+        target.cleanup(at: uri)
+        origin.cleanup(at: uri)
+        defer {
+            target.cleanup(at: uri)
+            origin.cleanup(at: uri)
+        }
+
+        target.insert(try LocalServer.ResponseConfiguration(jsonObject: "reached"), at: uri)
+        origin.insert(
+            LocalServer.ResponseConfiguration(
+                status: .found,
+                headers: ["Location": "https://\(target.baseURL)\(uri)"],
+                data: Data()
+            ),
+            at: uri
+        )
+
+        func request(to server: LocalServer) -> DataTask<some Property> {
+            DataTask {
+                BaseURL(server.baseURL)
+                Path(uri)
+
+                Session.localServer
+                    .requiredExecutor(.nio)
+
+                SecureConnection {
+                    TrustRoots(Certificates().server().certificateURL.absolutePath(percentEncoded: false))
+                    RequestDL.Certificates(client.certificateURL.absolutePath(percentEncoded: false))
+                    PrivateKey(client.privateKeyURL.absolutePath(percentEncoded: false))
+                }
+                .verification(.fullVerification)
+            }
+        }
+
+        // When / Then: reached through the redirect, it is another origin and gets none, so the
+        // handshake it requires a certificate for fails.
+        await #expect(throws: (any Error).self) {
+            _ = try await request(to: origin).extractPayload().result()
+        }
+
+        // Control, after the redirect on purpose: an origin requested directly keeps getting the
+        // identity from then on. Asked for directly, the target answers, so the failure above
+        // was the identity and not the setup.
+        let direct = try await request(to: target).extractPayload().result()
+        #expect(try HTTPResult<String>(direct).response == "reached")
+
+        _ = server
+    }
+
     /// `certificateChain`/`privateKey` must not land on the `TLSConfiguration` that
     /// AsyncHTTPClient's NIOTransportServices bridge also reads, which `preconditionFailure`s the
     /// instant either is non-empty, regardless of the Network.framework-native identity also

@@ -137,18 +137,36 @@ public struct DownloadResumptionPoint: Sendable, Hashable, Codable {
         let validator = try container.decode(ValidatorCoding.self, forKey: .validator)
         let completeLength = try container.decodeIfPresent(Int64.self, forKey: .completeLength)
 
+        if let completeLength, completeLength < .zero {
+            throw DecodingError.dataCorruptedError(
+                forKey: .completeLength,
+                in: container,
+                debugDescription: "A download resumption point can't have a negative complete length"
+            )
+        }
+
+        let storedValidator: Internals.RangeResumptionPlan.Validator
+
+        switch validator.kind {
+        case .entityTag:
+            storedValidator = .entityTag(validator.value)
+        case .lastModified:
+            storedValidator = .lastModified(validator.value)
+        }
+
+        // The validator is sent back as the `If-Range` header, so a stored one is held to what a
+        // point made from a response could have: a strong entity tag, or an HTTP date, and no
+        // control character, a line break above all.
+        guard Internals.RangeResumptionPlan.isWellFormed(storedValidator) else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .validator,
+                in: container,
+                debugDescription: "A download resumption point's validator is not a strong entity tag or an HTTP date"
+            )
+        }
+
         self.init(
-            plan: Internals.RangeResumptionPlan(
-                validator: {
-                    switch validator.kind {
-                    case .entityTag:
-                        return .entityTag(validator.value)
-                    case .lastModified:
-                        return .lastModified(validator.value)
-                    }
-                }(),
-                completeLength: completeLength
-            ),
+            plan: Internals.RangeResumptionPlan(validator: storedValidator, completeLength: completeLength),
             offset: offset
         )
     }

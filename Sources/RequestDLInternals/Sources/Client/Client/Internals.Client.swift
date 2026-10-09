@@ -87,6 +87,10 @@ extension Internals {
         private let localIdentityHandle: Internals.IdentityHandle?
         #endif
 
+        /// Where the identity providers of this client's configuration look up the origins they
+        /// may answer for. Every request made through `execute` records its origin here.
+        private let identityOrigins: Internals.IdentityOrigins?
+
         // MARK: - Unsafe properties
 
         private var _isClosed: Bool
@@ -101,6 +105,7 @@ extension Internals {
             eventLoopGroupProvider: HTTPClient.EventLoopGroupProvider,
             configuration: HTTPClient.Configuration,
             localIdentityHandle: Internals.IdentityHandle? = nil,
+            identityOrigins: Internals.IdentityOrigins? = nil,
             maximumConcurrentConnections: Int? = nil,
             eventLoopGroupToken: Internals.EventLoopGroupToken? = nil
         ) {
@@ -113,12 +118,14 @@ extension Internals {
                 maximumConcurrentConnections: maximumConcurrentConnections
             )
             self.localIdentityHandle = localIdentityHandle
+            self.identityOrigins = identityOrigins
             self.eventLoopGroupToken = eventLoopGroupToken
         }
         #else
         package init(
             eventLoopGroupProvider: HTTPClient.EventLoopGroupProvider,
             configuration: HTTPClient.Configuration,
+            identityOrigins: Internals.IdentityOrigins? = nil,
             maximumConcurrentConnections: Int? = nil,
             eventLoopGroupToken: Internals.EventLoopGroupToken? = nil
         ) {
@@ -130,6 +137,7 @@ extension Internals {
             throttledExecutor = Internals.ThrottledExecutor(
                 maximumConcurrentConnections: maximumConcurrentConnections
             )
+            self.identityOrigins = identityOrigins
             self.eventLoopGroupToken = eventLoopGroupToken
         }
         #endif
@@ -209,6 +217,10 @@ extension Internals {
                 release()
                 throw CancellationError()
             }
+
+            // Before the request goes out: the identity provider is asked when its connection is
+            // opened, and answers only for origins recorded here.
+            identityOrigins?.register(host: request.host, port: request.port)
 
             // Registered before the request goes out, so the client counts as busy from the
             // moment it is asked to do anything.

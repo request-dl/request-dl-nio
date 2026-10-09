@@ -215,14 +215,16 @@ extension Internals {
         ///     identity, and shouldn't need Keychain Sharing entitlement (or a working Keychain at
         ///     all) just because `certificateChain`/`privateKey` happen to be configured for some
         ///     other executor's mTLS.
-        ///   - When `true`, `makeTLSConfigurationByContext()` below leaves `certificateChain`/
-        ///     `privateKey` off the returned `TLSConfiguration` entirely. mTLS travels through
-        ///     `tlsLocalIdentityNetworkFramework`/`localIdentityHandle` for Network.framework
-        ///     instead, and leaving both set on the same `TLSConfiguration` this build also hands
-        ///     to `HTTPClient.Configuration` is fatal, not just redundant: AsyncHTTPClient's
-        ///     NIOTransportServices bridge (`TLSConfiguration.getNWProtocolTLSOptions()`)
-        ///     `preconditionFailure`s the instant either is non-empty, unconditionally, regardless
-        ///     of whether a local identity was also supplied.
+        ///   - When `true`, mTLS travels through `HTTPClient.Configuration
+        ///     .tlsLocalIdentityProviderNetworkFramework` (`localIdentityHandle`) for
+        ///     Network.framework. The NIOSSL identity (`nioSSLCertificateChain`/`nioSSLPrivateKey`)
+        ///     is not built at all.
+        ///
+        /// Either way the identity stays off the returned `TLSConfiguration`. Set there, it would
+        /// go to every host the client connects to, redirect targets included, and
+        /// AsyncHTTPClient's NIOTransportServices bridge (`TLSConfiguration
+        /// .getNWProtocolTLSOptions()`) `preconditionFailure`s the instant either field is
+        /// non-empty. See `Internals.IdentityOrigins` for how the providers decide who gets it.
         ///
         /// Defaults to `true`, matching this method's original unconditional behavior for the
         /// identity-building half, for callers that don't know or don't care which executor will
@@ -304,6 +306,9 @@ extension Internals {
                 }
             }
 
+            let nioSSLIdentity = try makeNIOSSLIdentity(
+                isCompatibleWithNetworkFramework: isCompatibleWithNetworkFramework
+            )
             let trustEvaluator = try Internals.NIOTrustEvaluator.resolve(from: self)
 
             // NIOSSL already honors both `additionalTrustRoots` (via the plain
@@ -320,12 +325,17 @@ extension Internals {
                 tlsConfiguration: tlsConfiguration,
                 tlsCustomVerification: needsNIOSSLCustomVerification ? trustEvaluator?.tlsCustomVerification : nil,
                 tlsCustomVerificationNetworkFramework: trustEvaluator?.tlsCustomVerificationNetworkFramework,
-                localIdentityHandle: isCompatibleWithNetworkFramework ? try makeLocalIdentityForNetworkFramework() : nil
+                localIdentityHandle: isCompatibleWithNetworkFramework
+                    ? try makeLocalIdentityForNetworkFramework() : nil,
+                nioSSLCertificateChain: nioSSLIdentity?.certificateChain,
+                nioSSLPrivateKey: nioSSLIdentity?.privateKey
             )
             #else
             return .init(
                 tlsConfiguration: tlsConfiguration,
-                tlsCustomVerification: needsNIOSSLCustomVerification ? trustEvaluator?.tlsCustomVerification : nil
+                tlsCustomVerification: needsNIOSSLCustomVerification ? trustEvaluator?.tlsCustomVerification : nil,
+                nioSSLCertificateChain: nioSSLIdentity?.certificateChain,
+                nioSSLPrivateKey: nioSSLIdentity?.privateKey
             )
             #endif
         }
@@ -345,17 +355,24 @@ extension Internals {
 
             tlsConfiguration = .makeClientConfiguration()
 
-            if !isCompatibleWithNetworkFramework {
-                if let certificateChain {
-                    tlsConfiguration.certificateChain = try certificateChain.build()
-                }
+            return tlsConfiguration
+        }
 
-                if let privateKey {
-                    tlsConfiguration.privateKey = try privateKey.build()
-                }
+        /// The client identity for connections that use NIOSSL, or `nil` when none is configured
+        /// or when the connection will run over Network.framework instead (which gets its
+        /// identity from `makeLocalIdentityForNetworkFramework()`).
+        ///
+        /// Handed to `HTTPClient.Configuration.tlsLocalIdentityProviderNIOSSL` rather than put on
+        /// the `TLSConfiguration`: set there it would go to every host the client connects to,
+        /// redirect targets included.
+        private func makeNIOSSLIdentity(
+            isCompatibleWithNetworkFramework: Bool
+        ) throws -> (certificateChain: [NIOSSLCertificateSource], privateKey: NIOSSLPrivateKeySource)? {
+            guard !isCompatibleWithNetworkFramework, let certificateChain, let privateKey else {
+                return nil
             }
 
-            return tlsConfiguration
+            return (try certificateChain.build(), try privateKey.build())
         }
 
         #if canImport(Darwin)
@@ -471,6 +488,11 @@ extension Internals.SecureConnection {
         /// releases the underlying Keychain items once nothing else references them.
         package let localIdentityHandle: Internals.IdentityHandle?
         #endif
+
+        /// The client identity for connections that use NIOSSL, kept off `tlsConfiguration` so it
+        /// can be offered per origin. See `Internals.IdentityOrigins`.
+        package let nioSSLCertificateChain: [NIOSSLCertificateSource]?
+        package let nioSSLPrivateKey: NIOSSLPrivateKeySource?
     }
 }
 #endif

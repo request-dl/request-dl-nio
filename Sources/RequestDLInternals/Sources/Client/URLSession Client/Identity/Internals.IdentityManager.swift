@@ -25,13 +25,27 @@ extension Internals {
         package let identity: SecIdentity
         fileprivate let label: String
 
-        fileprivate init(identity: SecIdentity, label: String) {
+        /// Which Keychain the items behind `identity` were stored in, so that releasing the
+        /// handle deletes from that same one. On macOS the build can land in either, depending
+        /// on whether the process carries the Keychain Sharing entitlement.
+        fileprivate let useDataProtectionKeychain: Bool
+
+        private let manager: IdentityManager
+
+        fileprivate init(
+            identity: SecIdentity,
+            label: String,
+            useDataProtectionKeychain: Bool,
+            manager: IdentityManager
+        ) {
             self.identity = identity
             self.label = label
+            self.useDataProtectionKeychain = useDataProtectionKeychain
+            self.manager = manager
         }
 
         deinit {
-            IdentityManager.shared.release(label: label)
+            manager.release(label: label, useDataProtectionKeychain: useDataProtectionKeychain)
         }
     }
 
@@ -55,27 +69,40 @@ extension Internals {
     /// rebuilt while I was waiting for the lock" apart from "a new handle already owns this
     /// label," and never delete out from under the latter.
     package final class IdentityManager: @unchecked Sendable {
-        package static let shared = IdentityManager()
+        package static let shared = IdentityManager(deleteItems: IdentityManager.deleteKeychainItems)
 
         private let lock = Lock()
         private var live: [String: Weak<IdentityHandle>] = [:]
+        private let deleteItems: @Sendable (_ label: String, _ useDataProtectionKeychain: Bool) -> Void
 
-        private init() {}
+        /// - Parameter deleteItems: Removes the key and certificate items stored under `label`
+        ///   from the given Keychain. Only a test replaces it, to observe which Keychain a
+        ///   release targets.
+        init(deleteItems: @escaping @Sendable (_ label: String, _ useDataProtectionKeychain: Bool) -> Void) {
+            self.deleteItems = deleteItems
+        }
 
         /// Returns the already-live handle for `label`, if some other caller still holds a
         /// strong reference to one, without touching the Keychain again. Otherwise runs `build`
         /// (the actual Keychain round trip) and registers its result.
+        ///
+        /// `build` also reports which Keychain it stored the items in.
         package func handle(
             for label: String,
-            build: () throws -> SecIdentity
+            build: () throws -> (identity: SecIdentity, useDataProtectionKeychain: Bool)
         ) throws -> IdentityHandle {
             try lock.withLock {
                 if let existing = live[label]?.value {
                     return existing
                 }
 
-                let identity = try build()
-                let handle = IdentityHandle(identity: identity, label: label)
+                let built = try build()
+                let handle = IdentityHandle(
+                    identity: built.identity,
+                    label: label,
+                    useDataProtectionKeychain: built.useDataProtectionKeychain,
+                    manager: self
+                )
                 live[label] = Weak(handle)
                 return handle
             }
@@ -90,28 +117,29 @@ extension Internals {
         /// actually acquiring `lock` (see this type's own doc comment). When that has happened,
         /// the newer handle owns these Keychain items now, and this call must leave both the
         /// registry slot and the Keychain alone.
-        fileprivate func release(label: String) {
+        ///
+        /// The deletion targets the Keychain the releasing handle was built in, not a fixed one:
+        /// a signed macOS app stores in the data-protection Keychain, and deleting from the
+        /// legacy one would leave the imported private key behind for good.
+        fileprivate func release(label: String, useDataProtectionKeychain: Bool) {
             lock.withLock {
                 guard live[label]?.value == nil else {
                     return
                 }
 
                 live[label] = nil
+                deleteItems(label, useDataProtectionKeychain)
+            }
+        }
 
-                #if os(macOS)
-                let useDataProtectionKeychain = false
-                #else
-                let useDataProtectionKeychain = true
-                #endif
-
-                for itemClass in [kSecClassKey, kSecClassCertificate] {
-                    let query: [CFString: Any] = [
-                        kSecClass: itemClass,
-                        kSecAttrLabel: label,
-                        kSecUseDataProtectionKeychain: useDataProtectionKeychain,
-                    ]
-                    SecItemDelete(query as CFDictionary)
-                }
+        private static func deleteKeychainItems(label: String, useDataProtectionKeychain: Bool) {
+            for itemClass in [kSecClassKey, kSecClassCertificate] {
+                let query: [CFString: Any] = [
+                    kSecClass: itemClass,
+                    kSecAttrLabel: label,
+                    kSecUseDataProtectionKeychain: useDataProtectionKeychain,
+                ]
+                SecItemDelete(query as CFDictionary)
             }
         }
     }

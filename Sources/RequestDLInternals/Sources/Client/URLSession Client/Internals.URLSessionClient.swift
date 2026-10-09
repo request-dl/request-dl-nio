@@ -1383,10 +1383,10 @@ extension Internals.URLSessionClient {
         ///
         /// Both `.follow` and `.strategy` strip `Authorization`/`Cookie`/`Origin`/
         /// `Proxy-Authorization` from `request` when it no longer shares the previously sent
-        /// request's origin (scheme, host, and port). `URLSession` does not do this on its own,
-        /// unlike the NIO executor's `followingRedirect`/`transformRequestForRedirect`, which this
-        /// mirrors so a redirect leaking credentials to a different host fails the same way under
-        /// either transport.
+        /// request's origin (scheme, host, and port). `URLSession` does not do this on its own
+        /// (it only ever removes `Authorization`, on every redirect), unlike the NIO executor's
+        /// `followingRedirect`/`transformRequestForRedirect`, which this mirrors so a redirect
+        /// leaking credentials to a different host fails the same way under either transport.
         func urlSession(
             _ session: URLSession,
             task: URLSessionTask,
