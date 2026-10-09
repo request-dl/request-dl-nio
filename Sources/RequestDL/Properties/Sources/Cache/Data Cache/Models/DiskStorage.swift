@@ -188,7 +188,7 @@ struct DiskStorage: Sendable {
     /// A HIT is trusted immediately, with no disk access at all: once a write records a
     /// location for a key, only an explicit, guarded removal ever clears it. A MISS never is.
     ///
-    /// `dir.listContents()` racing a burst of very recent creates can come back incomplete, the
+    /// Listing the directory while a burst of very recent creates is going on can come back incomplete, the
     /// same class of transient filesystem flake `Record.init?`'s own retry loop already
     /// tolerates for a single file, just one layer up, at the directory-listing level, where
     /// there is nothing to retry against within one scan. Trusting a first scan's absence
@@ -200,9 +200,9 @@ struct DiskStorage: Sendable {
     /// rather than caching a negative result for a key.
     ///
     /// What a miss does not do is scan again while the last scan is still recent. Every scan
-    /// costs a directory listing plus two stats per entry, so a miss per scan makes `M` lookups
-    /// of keys that are not cached over `N` entries cost `N * M`, which a screenful of new
-    /// images over a full cache turns into thousands of stats a second. A miss inside
+    /// reads the names of the whole directory, so a miss per scan makes `M` lookups of keys that
+    /// are not cached over `N` entries cost `N * M`, which a screenful of new images over a
+    /// full cache turns into thousands of directory reads. A miss inside
     /// `minimumRescanInterval` of the last scan answers `nil` straight away. This is safe for
     /// what this instance wrote, since a write publishes its location into the index and never
     /// depends on a scan. The one thing it can miss is an entry another instance or process
@@ -251,7 +251,10 @@ struct DiskStorage: Sendable {
         // MARK: - Internal methods
 
         /// Looks up `key`, kicking off or joining a rescan first if it isn't already known.
-        func location(for key: String, scan: @escaping @Sendable () async -> [Record]) async -> URL? {
+        func location(
+            for key: String,
+            scan: @escaping @Sendable () async -> [(key: String, url: URL)]
+        ) async -> URL? {
             if let hit = lock.withLock({ locationsByKey[key] }) {
                 return hit
             }
@@ -276,8 +279,8 @@ struct DiskStorage: Sendable {
                         // Only fills gaps. A write or removal that landed after this scan
                         // started already knows more than a snapshot taken before it did; this
                         // must not overwrite that with stale information.
-                        for record in scanned where locationsByKey[record.key] == nil {
-                            locationsByKey[record.key] = record.url
+                        for location in scanned where locationsByKey[location.key] == nil {
+                            locationsByKey[location.key] = location.url
                         }
 
                         refreshTask = nil
@@ -768,8 +771,9 @@ struct DiskStorage: Sendable {
 
         var totalSize: Int64 = 0
         var entrySizes: [(Record, Int64)] = []
-        for entry in entries {
-            let size = await entry.size
+        let sizes = await Self.mapConcurrently(entries) { await $0.size }
+
+        for (entry, size) in zip(entries, sizes) {
             totalSize += size
             entrySizes.append((entry, size))
         }
@@ -930,13 +934,11 @@ struct DiskStorage: Sendable {
     /// of a full directory scan. See `Index`'s doc for what keeps this in sync with writes and
     /// removals, and what it deliberately doesn't cover.
     private func record(forKey key: String) async -> Record? {
-        // `retryOnMiss: false`: this scan only decides *which directory* holds `key`, and the
-        // record it finds is re-opened with the full retry budget right below. Every entry it walks
-        // past belongs to another key, and paying up to 15s per incomplete one, serially, would
-        // turn one cold miss into a multi-second stall. A write made through this same instance
-        // never needs the scan: `allocateBuffer`/`updateCached` publish their location into `index`
-        // directly, so that entry is already a hit above.
-        guard let url = await index.location(for: key, scan: { await self.records(retryOnMissFor: key) })
+        // The scan only decides *which directory* holds `key`, from the names alone, and the
+        // record it finds is re-opened with the full retry budget right below. A write made
+        // through this same instance never needs the scan: `allocateBuffer`/`updateCached`
+        // publish their location into `index` directly, so that entry is already a hit above.
+        guard let url = await index.location(for: key, scan: { await self.scannedLocations(for: key) })
         else {
             return nil
         }
@@ -952,39 +954,122 @@ struct DiskStorage: Sendable {
         return record
     }
 
-    /// The full, live directory scan `index` exists to keep off the read path.
+    /// Where the entries of the directory are, read from their names alone.
     ///
-    /// Still the source of truth for anything that has to see every entry regardless of what
-    /// `index` knows: `freeSpace`'s eviction accounting and `removeAll(since:)` call this
-    /// directly, so a duplicate directory from a lost write race (two concurrent writers for
-    /// the same key) stays visible and gets swept up like any other entry.
+    /// A record directory is named after its creation date and its key, so finding out where a
+    /// key lives needs no `stat` of any entry: that is what keeps the first lookup after a
+    /// launch from costing a read of every entry in the cache.
     ///
-    /// - Parameter targetKey: The single key, if any, whose entry is worth the full
-    /// `Record.init?(_:retryOnMiss:)` retry budget. `record(forKey:)`'s cold-start scan passes
-    /// the key it is looking up, since that entry may have been written moments ago and missing
-    /// it would turn a transient stat flake into a false cache miss. A miss on any other entry
-    /// is as likely a write still in progress, and paying 15s for each, serially, would turn
-    /// one cold lookup into a multi-second stall. `freeSpace`/`removeAll(since:)` pass nothing,
-    /// since a bulk sweep has no target key.
-    private func records(retryOnMissFor targetKey: String? = nil) async -> [Record] {
-        let dirPath = directory.filePath
-        var foundRecords: [Record] = []
+    /// Only the entry of `targetKey`, the one the caller is about to read, is looked into. The
+    /// newest directory of that key that is whole wins, checked without the retry budget, so an
+    /// incomplete one next to a good one (a write cut short by the process being killed) costs
+    /// nothing. Only when none is whole is the newest given the full budget, which covers a
+    /// file another process wrote a moment ago that a stat has not seen yet. Every other key
+    /// is recorded as found, unchecked: it is checked when it is looked up, and an entry that
+    /// turns out to be gone is dropped from the index then.
+    ///
+    /// Several directories for one key (a write that lost a race, a revalidation) are not
+    /// ambiguous: the newest wins.
+    private func scannedLocations(for targetKey: String) async -> [(key: String, url: URL)] {
+        guard let names = try? await Internals.directoryEntryNames(atPath: directory.filePath.string) else {
+            return []
+        }
 
-        do {
-            try await Internals.fileSystem.withDirectoryHandle(atPath: dirPath) { dir in
-                for try await entry in dir.listContents() {
-                    if entry.name.string.hasSuffix(".\(Record.pathExtension)") {
-                        let entryURL = directory.appendingPathComponent(entry.name.string)
-                        let retryOnMiss = targetKey != nil && Record.key(at: entryURL) == targetKey
+        var newest: [String: (url: URL, date: Date)] = [:]
+        var candidates: [(url: URL, date: Date)] = []
 
-                        if let record = await Record(entryURL, retryOnMiss: retryOnMiss) {
-                            foundRecords.append(record)
-                        }
-                    }
-                }
+        for name in names where name.hasSuffix(".\(Record.pathExtension)") {
+            let url = directory.appendingPathComponent(name)
+
+            guard let (key, date) = Record.getKeyAndDate(url) else {
+                continue
             }
-        } catch {}
 
-        return foundRecords
+            if key == targetKey {
+                candidates.append((url, date))
+            } else if date > (newest[key]?.date ?? .distantPast) {
+                newest[key] = (url, date)
+            }
+        }
+
+        var locations = newest.map { (key: $0.key, url: $0.value.url) }
+
+        candidates.sort { $0.date > $1.date }
+
+        var chosen: URL?
+
+        for candidate in candidates {
+            if await Record(candidate.url, retryOnMiss: false) != nil {
+                chosen = candidate.url
+                break
+            }
+        }
+
+        if chosen == nil, let newestCandidate = candidates.first, await Record(newestCandidate.url) != nil {
+            chosen = newestCandidate.url
+        }
+
+        if let chosen {
+            locations.append((key: targetKey, url: chosen))
+        }
+
+        return locations
+    }
+
+    /// Every entry of the directory that is whole, checked with no retry.
+    ///
+    /// The source of truth for anything that has to see every entry regardless of what `index`
+    /// knows: `freeSpace`'s eviction accounting and `removeAll(since:)` call this directly, so a
+    /// duplicate directory from a lost write race (two concurrent writers for the same key)
+    /// stays visible and gets swept up like any other entry. A miss on an entry is as likely a
+    /// write still in progress as a missing one, so none is given the retry budget.
+    private func records() async -> [Record] {
+        guard let names = try? await Internals.directoryEntryNames(atPath: directory.filePath.string) else {
+            return []
+        }
+
+        let urls =
+            names
+            .filter { $0.hasSuffix(".\(Record.pathExtension)") }
+            .map { directory.appendingPathComponent($0) }
+
+        return await Self.mapConcurrently(urls) { await Record($0, retryOnMiss: false) }.compactMap { $0 }
+    }
+
+    /// `transform` applied to every input, a few at a time, in the order of the inputs.
+    ///
+    /// For file system calls that each wait for a turn on the file pool: one after another they
+    /// add their latencies up, a few at once they overlap.
+    private static func mapConcurrently<Input: Sendable, Output: Sendable>(
+        _ inputs: [Input],
+        width: Int = 16,
+        _ transform: @escaping @Sendable (Input) async -> Output
+    ) async -> [Output] {
+        await withTaskGroup(of: (Int, Output).self) { group in
+            var results: [(Int, Output)] = []
+            var next = 0
+
+            func addNext() {
+                guard next < inputs.count else {
+                    return
+                }
+
+                let index = next
+                next += 1
+
+                group.addTask { (index, await transform(inputs[index])) }
+            }
+
+            for _ in 0..<min(width, inputs.count) {
+                addNext()
+            }
+
+            for await result in group {
+                results.append(result)
+                addNext()
+            }
+
+            return results.sorted { $0.0 < $1.0 }.map(\.1)
+        }
     }
 }

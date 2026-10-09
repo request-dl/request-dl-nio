@@ -747,6 +747,74 @@ struct DiskStorageTests {
         }
     }
 
+    /// A launched app has an empty index, and the first lookup has to find where its entry is. It
+    /// does that from the names of the directory, once, for every key.
+    @Test
+    func subscript_whenTheStorageIsCold_findsEveryEntryFromOneScanOfTheNames() async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            let keys = (0..<60).map { "key\($0)" }
+            try await write(keys, through: DiskStorage(directory: directoryURL))
+
+            let cold = DiskStorage(directory: directoryURL, missRescanInterval: 3_600)
+
+            #expect(await cold["key7"] != nil)
+            #expect(cold.scanCount == 1)
+
+            // The one scan told where all of them are.
+            for key in keys {
+                #expect(await cold[key] != nil)
+            }
+
+            #expect(cold.scanCount == 1)
+            #expect(await cold["missing"] == nil)
+        }
+    }
+
+    /// A write cut short by the process being killed leaves a directory with no data. Next to a
+    /// whole one for the same key it must cost nothing.
+    @Test
+    func subscript_whenTheNewestDirectoryOfAKeyIsIncomplete_servesTheOlderWholeOne() async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            try await write(["key"], through: DiskStorage(directory: directoryURL))
+
+            // Newer than the whole one, and empty.
+            _ = await DiskStorage.Record(directory: directoryURL, key: "key", at: Date().addingTimeInterval(60))
+
+            let cold = DiskStorage(directory: directoryURL)
+            let retriesBefore = DiskStorage.retryCount
+            let found = await cold["key"]
+            let retries = DiskStorage.retryCount - retriesBefore
+
+            // Counted, not timed, as in the test above: the incomplete directory used to cost the
+            // 15 s retry budget, 299 retries of 50 ms.
+            #expect(found != nil)
+            #expect(retries < 100)
+        }
+    }
+
+    @Test
+    func subscript_whenAKeyHasTwoWholeDirectories_servesTheNewest() async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            let writer = DiskStorage(directory: directoryURL)
+
+            for name in ["older", "newer"] {
+                var (buffer, _, _) = await writer.allocateBuffer(
+                    key: "key",
+                    cachedResponse: makeCachedResponse(key: name),
+                    contentLength: 1,
+                    maximumCapacity: .max
+                )
+                await buffer?.writeData(Data([0x1]))
+                try? await buffer?.close()
+                try? await Task.sleep(nanoseconds: 5_000_000)
+            }
+
+            let found = await DiskStorage(directory: directoryURL)["key"]
+
+            #expect(found?.cachedResponse.response.url.hasSuffix("/newer") == true)
+        }
+    }
+
     @Test
     func allocateBuffer_whenNoBodyBytesAreEverWritten_leavesADiscoverableRecordNotAnOrphan() async throws {
         try await withTemporaryFileURL(createPath: false) { directoryURL in
