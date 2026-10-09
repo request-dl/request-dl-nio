@@ -3,6 +3,7 @@
 //
 
 import RequestDLInternals
+import SwiftAsyncStream
 import Testing
 
 @testable import RequestDL
@@ -905,6 +906,134 @@ struct DiskStorageTests {
             #expect(await cold["key"] != nil)
             let names = try await entryNames(in: directoryURL)
             #expect(names.count == 1)
+        }
+    }
+
+    private final class Counter: @unchecked Sendable {
+        private let lock = Lock()
+        private var _value = 0
+
+        var value: Int {
+            lock.withLock { _value }
+        }
+
+        func increment() {
+            lock.withLock { _value += 1 }
+        }
+    }
+
+    /// Holds a run open until `release()`, so that the callers that join it do so while it goes on.
+    private final class Gate: @unchecked Sendable {
+        private let lock = Lock()
+        private var continuation: CheckedContinuation<Void, Never>?
+        private var isOpen = false
+
+        func wait() async {
+            await withCheckedContinuation { continuation in
+                let resume = lock.withLock { () -> Bool in
+                    if isOpen {
+                        return true
+                    }
+
+                    self.continuation = continuation
+                    return false
+                }
+
+                if resume {
+                    continuation.resume()
+                }
+            }
+        }
+
+        func release() {
+            let continuation = lock.withLock { () -> CheckedContinuation<Void, Never>? in
+                isOpen = true
+                defer { self.continuation = nil }
+                return self.continuation
+            }
+
+            continuation?.resume()
+        }
+    }
+
+    @Test
+    func singleFlight_whenCallersAskWhileItRuns_runsOnceAndGivesThemAllTheResult() async throws {
+        let flight = DiskStorage.SingleFlight<Int>()
+        let gate = Gate()
+        let calls = Counter()
+
+        let first = Task {
+            await flight.run {
+                calls.increment()
+                await gate.wait()
+                return 42
+            }
+        }
+
+        // The first run is going on once it has been counted.
+        try await eventually(timeout: 30) { flight.runCount == 1 }
+
+        let others = (0..<5).map { _ in
+            Task {
+                await flight.run {
+                    calls.increment()
+                    return 7
+                }
+            }
+        }
+
+        // Give the joiners the time to ask before the run is let go.
+        try await Task.sleep(nanoseconds: 100_000_000)
+        gate.release()
+
+        #expect(await first.value == 42)
+
+        for other in others {
+            #expect(await other.value == 42)
+        }
+
+        #expect(flight.runCount == 1)
+        #expect(calls.value == 1)
+    }
+
+    @Test
+    func singleFlight_whenAskedAgainAfterItFinished_runsAgain() async {
+        let flight = DiskStorage.SingleFlight<Int>()
+        let counter = Counter()
+
+        let first = await flight.run {
+            counter.increment()
+            return counter.value
+        }
+
+        let second = await flight.run {
+            counter.increment()
+            return counter.value
+        }
+
+        #expect(first == 1)
+        #expect(second == 2)
+        #expect(flight.runCount == 2)
+    }
+
+    @Test
+    func freeSpace_whenManyAskWithoutAnEstimate_stillKeepsTheDirectoryUnderCapacity() async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            try await write((0..<30).map { "key\($0)" }, through: DiskStorage(directory: directoryURL))
+
+            let cold = DiskStorage(directory: directoryURL)
+            let measured = await cold.freeSpace(.max)
+            let capacity = measured / 2
+
+            await withTaskGroup(of: Void.self) { group in
+                for _ in 0..<10 {
+                    group.addTask { await cold.freeSpace(capacity) }
+                }
+            }
+
+            let after = await DiskStorage(directory: directoryURL).freeSpace(.max)
+            #expect(after <= capacity)
+            #expect(after > 0)
         }
     }
 
