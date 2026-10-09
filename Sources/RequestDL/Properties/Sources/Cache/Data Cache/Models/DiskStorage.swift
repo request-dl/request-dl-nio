@@ -3,6 +3,7 @@
 //
 
 import Crypto
+import Dispatch
 import RequestDLInternals
 import SwiftAsyncStream
 import SystemPackage
@@ -131,9 +132,13 @@ struct DiskStorage: Sendable {
             self.dataURL = dataURL
 
             do {
+                // Owner only, the cache root and the directories above it included: their names
+                // are derived from the URL they cache, and the default (readable by everyone)
+                // would list those to every other user of the machine.
                 try await Internals.fileSystem.createDirectory(
                     at: url.filePath,
-                    withIntermediateDirectories: true
+                    withIntermediateDirectories: true,
+                    permissions: .ownerReadWriteExecute
                 )
             } catch {
                 // Silent. Whoever writes through this record reports the failure with context.
@@ -165,7 +170,7 @@ struct DiskStorage: Sendable {
             return getKeyAndDate(url)?.0
         }
 
-        private static func getKeyAndDate(_ url: URL) -> (String, Date)? {
+        static func getKeyAndDate(_ url: URL) -> (String, Date)? {
             var components = url.deletingPathExtension().lastPathComponent.split(separator: ".")
             guard let bitPattern = components.first.flatMap({ UInt64($0, radix: 36) }) else { return nil }
             components.removeFirst()
@@ -189,10 +194,20 @@ struct DiskStorage: Sendable {
     /// there is nothing to retry against within one scan. Trusting a first scan's absence
     /// forever would turn that transient gap into a permanent false miss, silently.
     ///
-    /// So a miss here always re-scans before answering: it shares that scan across concurrent
+    /// So a miss here re-scans before answering: it shares that scan across concurrent
     /// callers who miss at the same time (e.g. a list of images loading at once, before any of
     /// them is cached yet) rather than each starting their own, and always merges forward
-    /// rather than caching a negative result.
+    /// rather than caching a negative result for a key.
+    ///
+    /// What a miss does not do is scan again while the last scan is still recent. Every scan
+    /// costs a directory listing plus two stats per entry, so a miss per scan makes `M` lookups
+    /// of keys that are not cached over `N` entries cost `N * M`, which a screenful of new
+    /// images over a full cache turns into thousands of stats a second. A miss inside
+    /// `minimumRescanInterval` of the last scan answers `nil` straight away. This is safe for
+    /// what this instance wrote, since a write publishes its location into the index and never
+    /// depends on a scan. The one thing it can miss is an entry another instance or process
+    /// wrote after that scan, which becomes visible within the interval, and a cache miss on a
+    /// shared directory is a cost, not a wrong answer.
     ///
     /// - Important: This index only tracks writes and removals made through *this* value's
     /// own methods. A location written by a different `DiskStorage`/process sharing the same
@@ -206,8 +221,32 @@ struct DiskStorage: Sendable {
 
         private let lock = Lock()
 
+        private let minimumRescanInterval: UInt64
+        private let now: @Sendable () -> UInt64
+
         private var locationsByKey: [String: URL] = [:]
+        private var lastUsedByKey: [String: Date] = [:]
         private var refreshTask: Task<Void, Never>?
+        private var lastScanEnd: UInt64?
+        private var _scanCount = 0
+
+        // MARK: - Inits
+
+        /// - Parameters:
+        ///   - minimumRescanInterval: Seconds a miss waits after the last scan before it may
+        ///   start another. Zero scans on every miss.
+        ///   - now: A monotonic clock, in nanoseconds. Only a test replaces it.
+        init(minimumRescanInterval: Double, now: @escaping @Sendable () -> UInt64 = Index.uptime) {
+            self.minimumRescanInterval = UInt64(max(0, minimumRescanInterval) * 1_000_000_000)
+            self.now = now
+        }
+
+        // MARK: - Internal properties
+
+        /// Directory scans started so far, exposed for tests.
+        var scanCount: Int {
+            lock.withLock { _scanCount }
+        }
 
         // MARK: - Internal methods
 
@@ -217,10 +256,18 @@ struct DiskStorage: Sendable {
                 return hit
             }
 
-            let task: Task<Void, Never> = lock.withLock {
+            let task: Task<Void, Never>? = lock.withLock {
                 if let refreshTask {
                     return refreshTask
                 }
+
+                // The last scan was a moment ago and did not find `key`: nothing this instance
+                // wrote since is missing from the index, so another scan would only repeat it.
+                if let lastScanEnd, now() - lastScanEnd < minimumRescanInterval {
+                    return nil
+                }
+
+                _scanCount += 1
 
                 let newTask = Task {
                     let scanned = await scan()
@@ -234,6 +281,7 @@ struct DiskStorage: Sendable {
                         }
 
                         refreshTask = nil
+                        lastScanEnd = now()
                     }
                 }
 
@@ -241,13 +289,34 @@ struct DiskStorage: Sendable {
                 return newTask
             }
 
-            await task.value
+            await task?.value
 
             return lock.withLock { locationsByKey[key] }
         }
 
         func set(_ key: String, location url: URL) {
             lock.withLock { locationsByKey[key] = url }
+        }
+
+        /// Monotonic, so a clock that moves backwards cannot freeze or skip the window.
+        @Sendable
+        static func uptime() -> UInt64 {
+            DispatchTime.now().uptimeNanoseconds
+        }
+
+        /// Records that `key` was just served, for `freeSpace` to evict it after entries that
+        /// were not. Kept for the life of the process only: the order on disk is the creation
+        /// order, which is what a freshly launched process starts from.
+        func markUsed(_ key: String) {
+            lock.withLock {
+                if locationsByKey[key] != nil {
+                    lastUsedByKey[key] = Date()
+                }
+            }
+        }
+
+        func lastUsed(_ key: String) -> Date? {
+            lock.withLock { lastUsedByKey[key] }
         }
 
         /// Removes the mapping for `key` only if it still points at `url`.
@@ -260,6 +329,7 @@ struct DiskStorage: Sendable {
             lock.withLock {
                 if locationsByKey[key] == url {
                     locationsByKey[key] = nil
+                    lastUsedByKey[key] = nil
                 }
             }
         }
@@ -267,13 +337,14 @@ struct DiskStorage: Sendable {
         func removeAll() {
             lock.withLock {
                 locationsByKey = [:]
+                lastUsedByKey = [:]
             }
         }
     }
 
     // MARK: - Private properties
     private let directory: URL
-    private let index = Index()
+    private let index: Index
 
     // MARK: - Internal properties
 
@@ -291,8 +362,20 @@ struct DiskStorage: Sendable {
     var encryptionKey: DataCache.EncryptionKey?
 
     // MARK: - Inits
-    init(directory: URL) {
+    /// - Parameter missRescanInterval: Seconds a cache miss waits after the last directory
+    /// scan before it may scan again; see `Index`. Zero scans on every miss.
+    init(
+        directory: URL,
+        missRescanInterval: Double = 1,
+        now: @escaping @Sendable () -> UInt64 = Index.uptime
+    ) {
         self.directory = directory
+        self.index = Index(minimumRescanInterval: missRescanInterval, now: now)
+    }
+
+    /// Directory scans the lookup index has started, exposed for tests.
+    var scanCount: Int {
+        index.scanCount
     }
 
     // MARK: - Internal methods
@@ -311,6 +394,8 @@ struct DiskStorage: Sendable {
                     from: responseData
                 )
             else { return nil }
+
+            index.markUsed(key)
 
             return await .init(
                 cachedResponse: cachedResponse,
@@ -353,7 +438,7 @@ struct DiskStorage: Sendable {
         }
 
         let buffer = try? await handle.readToEnd(maximumSizeAllowed: .unlimited)
-        try? await handle.close()
+        try? await Internals.uncancellable { try await handle.close() }
 
         guard let buffer else {
             return nil
@@ -470,6 +555,12 @@ struct DiskStorage: Sendable {
 
         private let lock = Lock()
         private var _value = 0
+    }
+
+    /// Counts a serve from another tier as a use here too, so an entry the memory tier keeps
+    /// answering for is not the first one the disk tier drops.
+    func markUsed(_ key: String) {
+        index.markUsed(key)
     }
 
     func remove(_ key: String) async {
@@ -622,6 +713,13 @@ struct DiskStorage: Sendable {
     /// already knows.
     func removeRecord(at url: URL) async {
         _ = try? await Internals.fileSystem.removeItem(at: url.filePath)
+
+        // `allocateBuffer` pointed the index at this directory. Left there, the next read of the
+        // key would go to a directory that is gone and spend its whole retry budget (up to 15s)
+        // on an answer that is simply "no entry".
+        if let (key, _) = Record.getKeyAndDate(url) {
+            index.remove(key, ifLocation: url)
+        }
     }
 
     /// Evicts the oldest entries, if any, until usage is at or under `maximumCapacity`.
@@ -664,7 +762,9 @@ struct DiskStorage: Sendable {
             return .zero
         }
 
-        entries.sort { $0.date < $1.date }
+        // Least recently used first. An entry nobody read since this process started is ordered
+        // by when it was created.
+        entries.sort { lastUsed(of: $0) < lastUsed(of: $1) }
 
         var totalSize: Int64 = 0
         var entrySizes: [(Record, Int64)] = []
@@ -689,6 +789,10 @@ struct DiskStorage: Sendable {
     }
 
     // MARK: - Private methods
+
+    private func lastUsed(of record: Record) -> Date {
+        max(index.lastUsed(record.key) ?? record.date, record.date)
+    }
 
     /// Writes `data` to `url`, replacing whatever was there, and closes the handle on every
     /// path, including the one where the write itself throws.
@@ -750,9 +854,9 @@ struct DiskStorage: Sendable {
 
         do {
             try await handle.write(contentsOf: payload, toAbsoluteOffset: .zero)
-            try await handle.close()
+            try await Internals.uncancellable { try await handle.close() }
         } catch {
-            try? await handle.close()
+            try? await Internals.uncancellable { try await handle.close() }
             throw error
         }
     }

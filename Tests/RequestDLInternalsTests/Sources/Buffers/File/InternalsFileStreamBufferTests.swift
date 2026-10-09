@@ -48,6 +48,29 @@ struct InternalsFileStreamBufferTests {
         }
     }
 
+    /// `close()` still closes the handle when the calling Task is already cancelled.
+    /// `NIOFileSystem` hands the close to its thread pool with `runIfActive`, which drops the work
+    /// with a `CancellationError` in that case and leaves the descriptor open, and releasing the
+    /// handle then calls `fatalError("Leaking file descriptor...")`, in release builds too. A
+    /// cancelled request closes its streams from exactly such a Task.
+    @Test
+    func close_whenCallingTaskIsCancelled_stillClosesTheHandle() async throws {
+        try await withTemporaryFileURL("stream.bin") { url in
+            let stream = try await Internals.FileStreamBuffer(writingTo: .init(url))
+
+            let task = _Concurrency.Task<Void, Error> {
+                withUnsafeCurrentTask { $0?.cancel() }
+                #expect(_Concurrency.Task.isCancelled)
+
+                try await stream.close()
+            }
+
+            try await task.value
+
+            // Releasing `stream` at the end of this scope must not kill the process.
+        }
+    }
+
     @Test
     func readData_whenCallingTaskIsCancelledBeforeItRuns_shouldThrowCancellationError() async throws {
         try await withTemporaryFileURL("stream.bin") { url in

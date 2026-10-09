@@ -18,6 +18,7 @@ import struct Foundation.Data
 import struct Foundation.UUID
 import struct Foundation.URL
 import struct Foundation.Date
+import class Foundation.JSONDecoder
 import class Foundation.JSONEncoder
 #endif
 
@@ -1118,6 +1119,183 @@ struct CachedRequestTests {
         // Then
         #expect(cachedData != nil)
     }
+
+    // MARK: - Vary and credentials in the cache key
+
+    /// `DataCache` is keyed by URL alone, so a response's `Vary` has to be checked or a response
+    /// that varies on `Cookie` is replayed to a request carrying another account's cookie.
+    @Test
+    func cache_whenResponseVariesOnACookie_doesNotServeItToADifferentCookie() async throws {
+        let testState = try await TestState()
+        defer { _ = testState }
+
+        // Given: an entry stored for one cookie.
+        let vary = makeHeaders(maxAgeSeconds: 3_600) + [("Vary", "Cookie")]
+
+        _ = try await performCacheRequest(
+            testState: testState,
+            headers: vary,
+            cacheStrategy: .returnCachedDataElseLoad,
+            requestHeaders: [("Cookie", "session=alice")],
+            output: "alice"
+        )
+        await testState.dataCache.waitUntilIdle()
+
+        // When: a different cookie asks for the same URL.
+        let other = try await performCacheRequest(
+            testState: testState,
+            headers: vary,
+            cacheStrategy: .returnCachedDataElseLoad,
+            requestHeaders: [("Cookie", "session=bob")],
+            output: "bob"
+        )
+
+        // Then
+        #expect(try responseText(other) == "bob")
+    }
+
+    @Test
+    func cache_whenResponseVariesOnACookie_stillServesTheSameCookie() async throws {
+        let testState = try await TestState()
+        defer { _ = testState }
+
+        // Given
+        let vary = makeHeaders(maxAgeSeconds: 3_600) + [("Vary", "Cookie")]
+
+        _ = try await performCacheRequest(
+            testState: testState,
+            headers: vary,
+            cacheStrategy: .returnCachedDataElseLoad,
+            requestHeaders: [("Cookie", "session=alice")],
+            output: "first"
+        )
+        await testState.dataCache.waitUntilIdle()
+
+        // When
+        let again = try await performCacheRequest(
+            testState: testState,
+            headers: vary,
+            cacheStrategy: .returnCachedDataElseLoad,
+            requestHeaders: [("Cookie", "session=alice")],
+            output: "second"
+        )
+
+        // Then: answered from the cache, not the network.
+        #expect(try responseText(again) == "first")
+    }
+
+    /// The common case must keep working: `Vary: Accept-Encoding` is on most CDN responses, and
+    /// two requests that agree on it are the same variant.
+    @Test
+    func cache_whenResponseVariesOnAFieldTheRequestsAgreeOn_stillServesTheCache() async throws {
+        let testState = try await TestState()
+        defer { _ = testState }
+
+        // Given
+        let vary = makeHeaders(maxAgeSeconds: 3_600) + [("Vary", "Accept-Language, Accept-Encoding")]
+
+        _ = try await performCacheRequest(
+            testState: testState,
+            headers: vary,
+            cacheStrategy: .returnCachedDataElseLoad,
+            requestHeaders: [("Accept-Language", "pt-BR")],
+            output: "first"
+        )
+        await testState.dataCache.waitUntilIdle()
+
+        // When
+        let same = try await performCacheRequest(
+            testState: testState,
+            headers: vary,
+            cacheStrategy: .returnCachedDataElseLoad,
+            requestHeaders: [("Accept-Language", "pt-BR")],
+            output: "second"
+        )
+
+        // The server queues what each call hands it and the cache hit above never took its
+        // answer, so it is dropped before the next request asks for one.
+        testState.localServer.cleanup(at: testState.uri)
+
+        let different = try await performCacheRequest(
+            testState: testState,
+            headers: vary,
+            cacheStrategy: .returnCachedDataElseLoad,
+            requestHeaders: [("Accept-Language", "en-US")],
+            output: "third"
+        )
+
+        // Then
+        #expect(try responseText(same) == "first")
+        #expect(try responseText(different) == "third")
+    }
+
+    @Test
+    func cache_whenResponseVariesOnEverything_isNotStored() async throws {
+        let testState = try await TestState()
+        defer { _ = testState }
+
+        // Given
+        let cacheKey = "https://localhost:8888" + testState.uri
+
+        // When
+        _ = try await performCacheRequest(
+            testState: testState,
+            headers: makeHeaders(maxAgeSeconds: 3_600) + [("Vary", "*")],
+            cacheStrategy: .returnCachedDataElseLoad
+        )
+        await testState.dataCache.waitUntilIdle()
+
+        // Then
+        #expect(await testState.dataCache.getCachedData(forKey: cacheKey, policy: .all) == nil)
+    }
+
+    /// An entry written before `Vary` was recorded cannot be matched to a request, so it is not
+    /// served for a response that varies.
+    @Test
+    func cache_whenStoredResponseVariesButNoRequestWasRecorded_isNotServed() async throws {
+        let testState = try await TestState()
+        defer { _ = testState }
+
+        // Given
+        let cacheKey = "https://localhost:8888" + testState.uri
+        let legacy = await mockCachedData(makeHeaders(maxAgeSeconds: 3_600) + [("Vary", "Accept-Language")])
+        await testState.dataCache.setCachedData(legacy, forKey: cacheKey)
+
+        // When
+        let response = try await performCacheRequest(
+            testState: testState,
+            headers: makeHeaders(maxAgeSeconds: 3_600),
+            cacheStrategy: .returnCachedDataElseLoad,
+            output: "network"
+        )
+
+        // Then
+        #expect(try responseText(response) == "network")
+    }
+
+    /// `Authorization` was already treated as a credential: a response to it is only stored
+    /// when it says a cache may. `Cookie` carries the same kind of identity, and the package
+    /// turns the cookie jar off, so it is always set by hand.
+    @Test
+    func cache_whenRequestHasCookieAndResponseDoesNotPermitSharedCaching_skipsCaching() async throws {
+        let testState = try await TestState()
+        defer { _ = testState }
+
+        // Given
+        let cacheKey = "https://localhost:8888" + testState.uri
+
+        // When
+        _ = try await performCacheRequest(
+            testState: testState,
+            headers: [("Cache-Control", "max-age=1000")],
+            cacheStrategy: .returnCachedDataElseLoad,
+            requestHeaders: [("Cookie", "session=alice")]
+        )
+        await testState.dataCache.waitUntilIdle()
+
+        // Then
+        #expect(await testState.dataCache.getCachedData(forKey: cacheKey, policy: .all) == nil)
+    }
 }
 
 extension CachedRequestTests {
@@ -1283,6 +1461,12 @@ extension CachedRequestTests {
         #expect(monitor.states() == ["started", "finished"])
     }
 
+    /// What the server put in `response` of the body, whether it came off the network or out of
+    /// the cache.
+    func responseText(_ result: TaskResult<Data>) throws -> String {
+        try JSONDecoder().decode(HTTPResult<String>.self, from: result.payload).response
+    }
+
     func performCacheRequest(
         testState: TestState,
         headers: [(String, String)],
@@ -1294,11 +1478,13 @@ extension CachedRequestTests {
         encryptionKey: DataCache.EncryptionKey? = nil,
         cacheHeader: CacheHeader? = nil,
         includesAuthorizationHeader: Bool = false,
+        requestHeaders: [(String, String)] = [],
+        output: String? = nil,
         executor: Session.Executor? = nil,
         logger: Logger? = nil,
         monitor: RecordingMonitor? = nil
     ) async throws -> TaskResult<Data> {
-        let response = try responseConfiguration(headers, testState.output, status: status)
+        let response = try responseConfiguration(headers, output ?? testState.output, status: status)
 
         testState.localServer.insert(response, at: testState.uri)
 
@@ -1337,6 +1523,10 @@ extension CachedRequestTests {
 
             if includesAuthorizationHeader {
                 RequestDL.Authorization(.bearer, token: "test-token")
+            }
+
+            PropertyForEach(requestHeaders, id: \.0) {
+                CustomHeader(name: $0.0, value: $0.1)
             }
         }
         .environment(\.logger, logger)

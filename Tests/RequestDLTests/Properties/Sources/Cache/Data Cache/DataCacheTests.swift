@@ -490,7 +490,46 @@ struct DataCacheTests {
         #expect(newest != nil)
     }
 
-    /// `MemoryStorage` orders entries by `Record.date` only inside `freeSpace`'s own
+    /// An entry the memory tier keeps answering for is hot, whatever its age on disk. Reading it
+    /// from memory has to count as a use of its disk entry too, or the disk tier drops it first
+    /// the next time it needs room.
+    @Test
+    func cache_whenAnEntryIsServedFromMemory_theDiskTierEvictsAnotherOneFirst() async throws {
+        let testState = await TestState()
+        // Given: two entries in both tiers, on a disk capacity that cannot hold a third.
+        let dataCache = testState.dataCache
+
+        dataCache.diskCapacity = 25_000
+        await dataCache.waitUntilIdle()
+
+        for index in 0..<2 {
+            let cachedData = await mockCachedData(
+                url: "https://memory-hit-marks-disk.example.com/\(index)",
+                length: 10_000,
+                policy: .all
+            )
+            await dataCache.setCachedData(cachedData, forKey: "key\(index)")
+            await dataCache.waitUntilIdle()
+        }
+
+        // When: the older one is read, from memory only, and then a third entry needs room.
+        #expect(await dataCache.getCachedData(forKey: "key0", policy: .all) != nil)
+
+        let third = await mockCachedData(
+            url: "https://memory-hit-marks-disk.example.com/2",
+            length: 10_000,
+            policy: .all
+        )
+        await dataCache.setCachedData(third, forKey: "key2")
+        await dataCache.waitUntilIdle()
+
+        // Then: on disk, the entry nobody asked for went, not the older one that was served.
+        #expect(await dataCache.getCachedData(forKey: "key0", policy: .disk) != nil)
+        #expect(await dataCache.getCachedData(forKey: "key1", policy: .disk) == nil)
+        #expect(await dataCache.getCachedData(forKey: "key2", policy: .disk) != nil)
+    }
+
+    /// `MemoryStorage` orders entries by `Record.lastUsed` only inside `freeSpace`'s own
     /// already-guarded rescan, the same shape `DiskStorage.freeSpace` uses, instead of keeping an
     /// index that moves a key to the most-recently-written end on every single write (an
     /// unconditional O(current entry count) shift). Mirrors
@@ -812,6 +851,10 @@ extension DataCacheTests {
         // replaced its record.
         await dataCache.discardFailedWrite(failedBuffer, forKey: key)
 
+        // The key stays unreadable until the good write is finished too: it is still going on.
+        #expect(await dataCache.getCachedData(forKey: key, policy: .memory) == nil)
+        await dataCache.finalizeWrite(goodBuffer, contentLengthHint: 4)
+
         // Then: the good write's entry survives.
         let cachedMemory = await dataCache.getCachedData(forKey: key, policy: .memory)
         let cachedMemoryData = await cachedMemory?.data
@@ -855,7 +898,7 @@ extension DataCacheTests {
         await chunkedBuffer.writeBuffer(Internals.DataBuffer(chunkedData))
 
         // When: the write finishes and reconciles the estimate with the real byte count.
-        dataCache.finalizeWrite(chunkedBuffer, contentLengthHint: 0)
+        await dataCache.finalizeWrite(chunkedBuffer, contentLengthHint: 0)
 
         // A second, ordinarily-sized write that, combined with the first entry's *real* size,
         // exceeds the 10,000-byte capacity, but would not if the first write's usage were still
@@ -869,7 +912,7 @@ extension DataCacheTests {
         )
         let secondData = await Data.randomData(length: 8_000)
         await secondBuffer.writeBuffer(Internals.DataBuffer(secondData))
-        dataCache.finalizeWrite(secondBuffer, contentLengthHint: 8_000)
+        await dataCache.finalizeWrite(secondBuffer, contentLengthHint: 8_000)
 
         // Then: the real rescan `freeSpace` runs once usage is reconciled and evicts the older
         // ("chunked") entry to make room, exactly as it would if both content lengths had been

@@ -122,7 +122,7 @@ extension Internals {
                     options: .newFile(replaceExisting: true, permissions: .ownerReadWrite)
                 )
 
-                try await handle.close()
+                try await Internals.uncancellable { try await handle.close() }
             } catch {}
         }
 

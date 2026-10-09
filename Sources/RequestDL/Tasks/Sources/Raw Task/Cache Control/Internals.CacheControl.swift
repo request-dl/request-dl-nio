@@ -102,10 +102,68 @@ extension Internals {
                 return nil
             }
 
-            return await dataCache.getCachedData(
-                forKey: requestConfiguration.url,
-                policy: requestConfiguration.cachePolicy
+            guard
+                let cachedData = await dataCache.getCachedData(
+                    forKey: requestConfiguration.url,
+                    policy: requestConfiguration.cachePolicy
+                ),
+                matchesVary(of: cachedData.cachedResponse)
+            else {
+                return nil
+            }
+
+            return cachedData
+        }
+
+        /// Whether the stored response may be given to this request, given the headers its
+        /// `Vary` says it depends on (RFC 9111 §4.1).
+        ///
+        /// A stored response is kept per URL, so a request that disagrees is a miss, and its own
+        /// response replaces the stored one.
+        private func matchesVary(of cachedResponse: CachedResponse) -> Bool {
+            let responseHeaders = RequestDL.HTTPHeaders(
+                cachedResponse.response.headers.map { ($0.name, $0.value) }
             )
+
+            switch varyFields(of: responseHeaders) {
+            case .none:
+                return true
+
+            case .any:
+                return false
+
+            case .fields(let fields):
+                guard let recorded = cachedResponse.varyRequestHeaders else {
+                    return false
+                }
+
+                return fields.allSatisfy { recorded[$0] == requestValue(forVaryField: $0) }
+            }
+        }
+
+        private enum Vary {
+            case none
+            case any
+            case fields([String])
+        }
+
+        private func varyFields(of responseHeaders: RequestDL.HTTPHeaders) -> Vary {
+            let fields = directives(responseHeaders["Vary"] ?? [])
+                .map { $0.lowercased() }
+                .filter { !$0.isEmpty }
+
+            if fields.contains("*") {
+                return .any
+            }
+
+            return fields.isEmpty ? .none : .fields(Array(Set(fields)).sorted())
+        }
+
+        /// What this request sends for `field`, normalized the way it is recorded.
+        private func requestValue(forVaryField field: String) -> String {
+            (requestConfiguration.headers[field] ?? [])
+                .map { $0.trimming(where: \.isWhitespace) }
+                .joined(separator: ", ")
         }
 
         /// The strategy actually applied, folding request-side ``CacheHeader`` directives on top
@@ -164,8 +222,15 @@ extension Internals {
         /// one account's cached, authenticated response to another: nothing here folds the
         /// request's own credentials into the cache key, or a `Vary` response header, the way a
         /// browser's shared cache would.
+        ///
+        /// `Cookie` and `Proxy-Authorization` count as well: they identify the account in the
+        /// same way, and the package turns the cookie jar off on both executors, so a session
+        /// cookie is always one the caller put on the request by hand. A response that is
+        /// explicitly shareable, or that says what it varies on, can still be stored.
         private var requestCarriesCredentials: Bool {
-            !(requestConfiguration.headers["Authorization"] ?? []).isEmpty
+            ["Authorization", "Cookie", "Proxy-Authorization"].contains {
+                !(requestConfiguration.headers[$0] ?? []).isEmpty
+            }
         }
 
         /// Whether the response's own `Cache-Control` explicitly permits a cache to store a
@@ -228,14 +293,15 @@ extension Internals {
                 return nil
             }
 
+            let window = Internals.FlowControlWindow()
+
             let download = await Internals.DownloadBuffer(
-                readingMode: requestConfiguration.readingMode
+                readingMode: requestConfiguration.readingMode,
+                flowControl: window
             )
 
             _Concurrency.Task(priority: .background) {
-                let download = download
-                download.append(cachedData.buffer)
-                download.close()
+                await Self.replay(cachedData.buffer, into: download, window: window)
             }
 
             // Nothing crossed the wire for this response, but it is still part of what happened to
@@ -259,6 +325,9 @@ extension Internals {
 
             return SessionTask(
                 seed: .init {
+                    // Wakes the replay if it is waiting for room, so it ends instead of staying
+                    // parked on a reader that is gone.
+                    window.release()
                     download.failed(Internals.TaskCancelledError())
                     download.close()
                 },
@@ -272,6 +341,47 @@ extension Internals {
                 ),
                 metrics: metrics
             )
+        }
+
+        /// How much of a cached body is handed to the download buffer at a time.
+        ///
+        /// Large enough that a big entry is not read one reading-mode chunk (1 KiB by default)
+        /// per trip to the file system, and small enough that the window is consulted often.
+        static let replayPieceSize = 65_536
+
+        /// Feeds a cached body into `download`, one piece at a time, and waits for room in `window`
+        /// between pieces.
+        ///
+        /// Handing the whole body over in one `append` read it into the download buffer's stream
+        /// regardless of how fast the response was being read, so a large entry sat in memory
+        /// whole behind a slow reader, which a response from the network never does.
+        ///
+        /// Ends, closing `download`, when the body is done, when `window` is released (the reader
+        /// is gone or the task was cancelled), or when the entry cannot be read, which fails
+        /// `download` instead of ending it as if the body were complete.
+        static func replay(
+            _ body: Internals.AnyBuffer,
+            into download: Internals.DownloadBuffer,
+            window: Internals.FlowControlWindow
+        ) async {
+            var body = body
+
+            while body.readableBytes > .zero, !window.isReleased {
+                await window.waitUntilWritable()
+
+                guard !window.isReleased else {
+                    break
+                }
+
+                guard let piece = await body.readBytes(min(body.readableBytes, replayPieceSize)), !piece.isEmpty else {
+                    download.failed(AsyncBytesReadError())
+                    break
+                }
+
+                download.append(await Internals.DataBuffer(piece))
+            }
+
+            download.close()
         }
 
         private func validateCachedData(
@@ -467,8 +577,17 @@ extension Internals {
                     headers: updatedHeaders.map { Internals.ResponseHead.HeaderField(name: $0.name, value: $0.value) },
                     isKeepAlive: cachedResponse.response.isKeepAlive
                 ),
-                policy: cachedResponse.policy
+                policy: cachedResponse.policy,
+                varyRequestHeaders: cachedResponse.varyRequestHeaders
             )
+        }
+
+        private func isAny(_ vary: Vary) -> Bool {
+            if case .any = vary {
+                return true
+            }
+
+            return false
         }
 
         /// Whether a response with this status may be stored at all: RFC 9110 §15.1's
@@ -495,14 +614,28 @@ extension Internals {
             return { head -> Internals.AsyncStream<Internals.DataBuffer>? in
                 let headHeaders = RequestDL.HTTPHeaders(head.headers.map { ($0.name, $0.value) })
 
+                let vary = varyFields(of: headHeaders)
+
                 guard
                     Self.isCacheableByDefault(statusCode: head.status.code),
                     !containsNoCache(headers: headHeaders["Cache-Control"] ?? []),
                     !requestForbidsStoring,
                     !requestCarriesCredentials
-                        || permitsCachingCredentialedResponse(headers: headHeaders["Cache-Control"] ?? [])
+                        || permitsCachingCredentialedResponse(headers: headHeaders["Cache-Control"] ?? []),
+                    // `Vary: *` is a response that no later request can be said to match.
+                    !isAny(vary)
                 else {
                     return nil
+                }
+
+                let varyRequestHeaders: [String: String]?
+
+                if case .fields(let fields) = vary {
+                    varyRequestHeaders = Dictionary(
+                        uniqueKeysWithValues: fields.map { ($0, requestValue(forVaryField: $0)) }
+                    )
+                } else {
+                    varyRequestHeaders = nil
                 }
 
                 // A capacity hint for the allocation below, not a correctness check, so `0` is a
@@ -529,7 +662,8 @@ extension Internals {
                             key: requestConfiguration.url,
                             cachedResponse: .init(
                                 response: head,
-                                policy: requestConfiguration.cachePolicy
+                                policy: requestConfiguration.cachePolicy,
+                                varyRequestHeaders: varyRequestHeaders
                             ),
                             contentLength: Int64(contentLength)
                         )
@@ -553,7 +687,7 @@ extension Internals {
                         // `contentLength` (a pre-write hint, `0` for chunked/unknown-length
                         // responses) to the real byte count now that it's known. See
                         // `DataCache.finalizeWrite(_:contentLengthHint:)`.
-                        dataCache.finalizeWrite(cacheBuffer, contentLengthHint: Int64(contentLength))
+                        await dataCache.finalizeWrite(cacheBuffer, contentLengthHint: Int64(contentLength))
 
                         logger?.log(
                             level: .debug,

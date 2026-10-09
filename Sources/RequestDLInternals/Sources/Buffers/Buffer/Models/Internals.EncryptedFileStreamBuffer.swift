@@ -300,12 +300,23 @@ extension Internals {
                 case .read(let readStream):
                     try await readStream.close()
                 case .write(let writeStream):
-                    if !_headerWritten {
-                        try await writeHeader(writeStream)
-                    }
+                    // The inner stream is closed on every path. Writing the header or the final
+                    // chunk can fail (a full disk, a cancelled Task), and returning from here
+                    // without closing leaves its `NIOFileSystem` handle open, which is a
+                    // `fatalError` the moment the handle is released. The error is still
+                    // thrown: the file has no authenticated final chunk, which the read side
+                    // already treats as a failed decrypt.
+                    do {
+                        if !_headerWritten {
+                            try await writeHeader(writeStream)
+                        }
 
-                    try await seal(_pendingPlaintext, isLast: true, to: writeStream)
-                    _pendingPlaintext.removeAll()
+                        try await seal(_pendingPlaintext, isLast: true, to: writeStream)
+                        _pendingPlaintext.removeAll()
+                    } catch {
+                        try? await writeStream.close()
+                        throw error
+                    }
 
                     try await writeStream.close()
                 }

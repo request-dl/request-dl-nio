@@ -153,4 +153,39 @@ struct MemoryStorageTests {
 
         #expect(await storage["k1"] == nil)
     }
+
+    @Test
+    func freeSpace_evictsTheLeastRecentlyUsedEntry_notTheOldestWritten() async throws {
+        var storage = MemoryStorage(directory: URL(fileURLWithPath: "/tmp"))
+
+        // Given: three entries of four bytes each, written in the order k1, k2, k3.
+        for key in ["k1", "k2", "k3"] {
+            let (dataURL, _) = storage.allocateBuffer(
+                key: key,
+                cachedResponse: makeCachedResponse(key: key),
+                contentLength: 4,
+                maximumCapacity: .max
+            )
+            try #require(dataURL).replace(with: Data([0x1, 0x2, 0x3, 0x4]))
+            try? await Task.sleep(nanoseconds: 5_000_000)
+        }
+
+        // When: the oldest one is served, and room for only two is then asked for.
+        storage.markUsed("k1")
+        storage.freeSpace(8)
+
+        // Then: k2 went, not k1. It is the least recently used, though k1 was written first.
+        #expect(await storage["k1"] != nil)
+        #expect(await storage["k2"] == nil)
+        #expect(await storage["k3"] != nil)
+    }
+
+    @Test
+    func markUsed_whenTheKeyIsNotStored_shouldNotCreateAnEntry() async throws {
+        var storage = MemoryStorage(directory: URL(fileURLWithPath: "/tmp"))
+
+        storage.markUsed("missing")
+
+        #expect(await storage["missing"] == nil)
+    }
 }

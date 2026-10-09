@@ -77,6 +77,12 @@ extension Internals {
             lock.withLock { _isWritable }
         }
 
+        /// Whether ``release()`` has been called. A released window holds nothing back, so a
+        /// producer that sees this has no reader left to wait for and can stop.
+        package var isReleased: Bool {
+            lock.withLock { _isReleased }
+        }
+
         /// Whether ``suspend()`` is in effect. Stays `true` after ``release()`` if it was, even
         /// though a released window no longer holds anything back.
         package var isSuspended: Bool {

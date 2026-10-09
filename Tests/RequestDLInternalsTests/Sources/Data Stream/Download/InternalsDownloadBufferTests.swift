@@ -2,6 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Crypto
 import SwiftAsyncTesting
 import Testing
 
@@ -368,5 +369,95 @@ struct InternalsDownloadBufferTests {
         let bytes = Internals.AsyncBytes(logger: nil, totalSize: line.count + 1, stream: download.stream)
 
         #expect(try await Array(bytes).map(\.count) == [100_001])
+    }
+
+    // MARK: - A buffer that cannot be read
+
+    /// `Internals.Buffer` answers `nil` for a read that failed, the same answer as the end of
+    /// the data. A body whose backing storage cannot be read (here an encrypted entry whose tag
+    /// does not match) must fail the stream instead of closing it normally, or it reaches the
+    /// caller as a short body that succeeded.
+    @Test(arguments: [
+        Internals.DownloadStep.ReadingMode.length(1_024),
+        .separator(Array("\n".utf8)),
+    ])
+    func download_whenTheIncomingBufferCannotBeRead_failsInsteadOfEndingTheBody(
+        _ readingMode: Internals.DownloadStep.ReadingMode
+    ) async throws {
+        try await withTemporaryFileURL("encrypted.bin") { fileURL in
+            // Given: an encrypted buffer written whole, then one byte of it changed.
+            let url = Internals.EncryptedFileBufferURL(inner: .init(fileURL), key: .init(size: .bits256))
+
+            var writer = await Internals.Buffer<Internals.EncryptedFileStreamBuffer>(addressing: url)
+            await writer.writeData(Data("some content of the response\n".utf8))
+            try await writer.close()
+
+            var raw = try Data(contentsOf: fileURL)
+            raw[raw.count - 1] ^= 0xFF
+            try raw.write(to: fileURL)
+
+            let reader = await Internals.Buffer<Internals.EncryptedFileStreamBuffer>(addressing: url)
+            #expect(reader.readableBytes > 0)
+
+            // When
+            let download = await Internals.DownloadBuffer(readingMode: readingMode)
+            await download.append(reader)
+            download.close()
+
+            // Then
+            let bytes = Internals.AsyncBytes(logger: nil, totalSize: reader.readableBytes, stream: download.stream)
+
+            await #expect(throws: AsyncBytesReadError.self) {
+                _ = try await Array(bytes)
+            }
+        }
+    }
+
+    // MARK: - Chunks cut out of large blocks
+
+    /// The incoming buffer is read in blocks much larger than a chunk and cut up in memory. The
+    /// chunks must come out the same as if it had been read chunk by chunk, wherever a block
+    /// ends relative to a chunk.
+    @Test(arguments: [1, 1_000, 1_024, 65_536, 70_000, 200_001])
+    func download_whenAppendingMoreThanOneBlock_cutsExactChunksInOrder(_ length: Int) async throws {
+        // Given: not a multiple of any of the chunk sizes, so the last chunk is short.
+        let input = Data((0..<200_000).map { UInt8($0 % 251) })
+        let download = await Internals.DownloadBuffer(readingMode: .length(length))
+
+        // When
+        await download.append(Internals.DataBuffer(input))
+        download.close()
+
+        // Then
+        let bytes = Internals.AsyncBytes(logger: nil, totalSize: input.count, stream: download.stream)
+        let chunks = try await Array(bytes)
+
+        #expect(chunks.dropLast().allSatisfy { $0.count == length })
+        #expect((chunks.last?.count ?? 0) <= length)
+        #expect(chunks.reduce(into: Data()) { $0.append($1) } == input)
+        #expect(chunks.count == (input.count + length - 1) / length)
+    }
+
+    @Test
+    func download_whenAppendingInSeveralCalls_keepsFillingTheSameChunk() async throws {
+        // Given: pieces that do not line up with the chunk size.
+        let download = await Internals.DownloadBuffer(readingMode: .length(1_000))
+        let first = Data(repeating: 1, count: 700)
+        let second = Data(repeating: 2, count: 700)
+        let third = Data(repeating: 3, count: 600)
+
+        // When
+        await download.append(Internals.DataBuffer(first))
+        await download.append(Internals.DataBuffer(second))
+        await download.append(Internals.DataBuffer(third))
+        download.close()
+
+        // Then
+        let bytes = Internals.AsyncBytes(logger: nil, totalSize: 2_000, stream: download.stream)
+        let chunks = try await Array(bytes)
+
+        #expect(chunks.map(\.count) == [1_000, 1_000])
+        #expect(chunks[0] == first + second.prefix(300))
+        #expect(chunks[1] == second.suffix(400) + third)
     }
 }

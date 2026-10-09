@@ -74,8 +74,33 @@ extension FilePath {
         if let url = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first {
             return FilePath(url.path)
         }
+        #elseif os(Linux)
+        if let directory = xdgCacheDirectory(environment: ProcessInfo.processInfo.environment) {
+            return directory
+        }
         #endif
 
         return temporaryDirectory
+    }
+
+    /// The per-user cache directory of the XDG Base Directory specification: `$XDG_CACHE_HOME`,
+    /// or `$HOME/.cache` when it is not set. `nil` when neither names a usable absolute path,
+    /// and the caller falls back to the temporary directory.
+    ///
+    /// The specification says a relative `$XDG_CACHE_HOME` is invalid and must be ignored. A
+    /// per-user directory is the point: the temporary directory is shared by every user of the
+    /// machine, at a path anyone can predict.
+    ///
+    /// Takes the environment as a parameter so it can be tested without changing the process's.
+    package static func xdgCacheDirectory(environment: [String: String]) -> FilePath? {
+        if let cacheHome = environment["XDG_CACHE_HOME"], cacheHome.hasPrefix("/") {
+            return FilePath(cacheHome)
+        }
+
+        if let home = environment["HOME"], home.hasPrefix("/") {
+            return FilePath(home).appending(".cache")
+        }
+
+        return nil
     }
 }

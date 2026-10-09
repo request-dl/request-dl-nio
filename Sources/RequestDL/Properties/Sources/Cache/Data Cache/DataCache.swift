@@ -149,7 +149,30 @@ public struct DataCache: Sendable, Equatable {
         /// that method's doc for the safety argument.
         private var _memoryUsageEstimate: Int64?
 
+        /// How many writes are in progress for each key. Guarded by `lock`.
+        private var _writesInProgress: [String: Int] = [:]
+
         // MARK: - Internal methods
+
+        /// Starts a write for `key`: until the token ends, ``isWriting(key:)`` answers `true`.
+        func beginWrite(key: String) -> WriteToken {
+            lock.withLock { _writesInProgress[key, default: 0] += 1 }
+            return WriteToken { [weak self] in self?.endWrite(key: key) }
+        }
+
+        fileprivate func endWrite(key: String) {
+            lock.withLock {
+                guard let count = _writesInProgress[key] else {
+                    return
+                }
+
+                _writesInProgress[key] = count > 1 ? count - 1 : nil
+            }
+        }
+
+        func isWriting(key: String) -> Bool {
+            lock.withLock { _writesInProgress[key] != nil }
+        }
 
         /// Mutates the memory tier inside a single critical section.
         ///
@@ -495,7 +518,20 @@ public struct DataCache: Sendable, Equatable {
     public func getCachedData(forKey key: String, policy: DataCache.Policy.Set) async -> CachedData? {
         let key = base64EncodedKey(key)
 
+        // A write that is not finished is not a response. Its entry is already in the tiers, with
+        // what has been written so far (nothing at all, for an encrypted file whose last chunk
+        // is sealed on close), and would be served as if it were the whole body.
+        guard !storage.isWriting(key: key) else {
+            return nil
+        }
+
         if policy.contains(.memory), let cachedData = await storage.memoryStorage[key] {
+            storage.withMemoryStorage { $0.markUsed(key) }
+
+            if policy.contains(.disk) {
+                storage.diskStorage.markUsed(key)
+            }
+
             return cachedData
         }
 
@@ -525,6 +561,10 @@ public struct DataCache: Sendable, Equatable {
         )
 
         await buffer?.writeBuffer(cachedData.buffer)
+
+        if let buffer {
+            await finalizeWrite(buffer, contentLengthHint: Int64(cachedData.buffer.readableBytes))
+        }
     }
 
     ///
@@ -603,6 +643,9 @@ public struct DataCache: Sendable, Equatable {
 
         let key = base64EncodedKey(key)
 
+        // Before anything is installed in a tier: from then on the entry exists, empty.
+        let writeToken = storage.beginWrite(key: key)
+
         var memoryBuffer: Internals.AnyBuffer?
         var memoryDataURL: Internals.ByteURL?
         var diskBuffer: Internals.AnyBuffer?
@@ -632,11 +675,40 @@ public struct DataCache: Sendable, Equatable {
             )
         }
 
+        // Nothing was installed (the entry did not fit, or the disk write could not start), so
+        // there is no write to wait for.
+        if memoryBuffer == nil, diskBuffer == nil {
+            writeToken.end()
+        }
+
+        // What a tier holds of this write goes when the body outgrows the tier: the exact record
+        // this write allocated, by reference, as `discardFailedWrite(_:forKey:)` does.
+        let storage = self.storage
+        let memoryRecord = memoryDataURL
+        let diskRecord = diskRecordURL
+
+        let onOverflow: @Sendable (Buffer.Tier) async -> Void = { tier in
+            switch tier {
+            case .memory:
+                if let memoryRecord {
+                    storage.withMemoryStorage { $0.remove(key, ifDataURL: memoryRecord) }
+                }
+            case .disk:
+                if let diskRecord {
+                    await storage.diskStorage.removeRecord(at: diskRecord)
+                }
+            }
+        }
+
         return .init(
             memoryBuffer: memoryBuffer,
             diskBuffer: diskBuffer,
             diskRecordURL: diskRecordURL,
-            memoryDataURL: memoryDataURL
+            memoryDataURL: memoryDataURL,
+            writeToken: writeToken,
+            memoryCapacity: storage.memoryCapacity,
+            diskCapacity: storage.diskCapacity,
+            onOverflow: onOverflow
         )
     }
 
@@ -662,6 +734,8 @@ public struct DataCache: Sendable, Equatable {
         if let diskRecordURL = buffer.diskRecordURL {
             await storage.diskStorage.removeRecord(at: diskRecordURL)
         }
+
+        buffer.writeToken?.end()
     }
 
     /// Reconciles each tier's tracked usage estimate with a completed write's real byte count,
@@ -674,16 +748,30 @@ public struct DataCache: Sendable, Equatable {
     /// `Storage.reconcileMemoryUsage(contentLengthHint:actualSize:)`.
     ///
     /// Not called from ``discardFailedWrite(_:forKey:)``'s path, since a write that never
-    /// finished removes its own record outright.
-    func finalizeWrite(_ buffer: Buffer, contentLengthHint: Int64) {
+    /// finished removes its own record outright and has no usage left to have miscounted.
+    func finalizeWrite(_ buffer: Buffer, contentLengthHint: Int64) async {
+        // Closed here, before the entry can be read: the disk buffer is otherwise closed when it is
+        // released, and an encrypted file has no final chunk until then.
+        await buffer.closeDiskBuffer()
+
+        defer { buffer.writeToken?.end() }
+
         let actualSize = Int64(buffer.readableBytes)
 
+        // A tier the body outgrew holds nothing of it, so its usage goes back to what it was
+        // before this write, not to the size of a body it did not keep.
         if buffer.memoryDataURL != nil {
-            storage.reconcileMemoryUsage(contentLengthHint: contentLengthHint, actualSize: actualSize)
+            storage.reconcileMemoryUsage(
+                contentLengthHint: contentLengthHint,
+                actualSize: buffer.memoryOverflowed ? 0 : actualSize
+            )
         }
 
         if buffer.diskRecordURL != nil {
-            storage.reconcileDiskUsage(contentLengthHint: contentLengthHint, actualSize: actualSize)
+            storage.reconcileDiskUsage(
+                contentLengthHint: contentLengthHint,
+                actualSize: buffer.diskOverflowed ? 0 : actualSize
+            )
         }
     }
 

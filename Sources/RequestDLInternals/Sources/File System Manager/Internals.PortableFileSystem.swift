@@ -263,14 +263,18 @@ extension Internals {
             }
         }
 
+        /// - Parameter permissions: The mode of every directory this creates, intermediate ones
+        ///   included; `nil` leaves it to the umask, as `NIOFileSystem` does with its default.
         package static func createDirectory(
             at path: FilePath,
-            withIntermediateDirectories: Bool
+            withIntermediateDirectories: Bool,
+            permissions: FilePermissions? = nil
         ) async throws {
             try await Internals.FileSystemManager.run {
                 try FileManager.default.createDirectory(
                     atPath: path.string,
-                    withIntermediateDirectories: withIntermediateDirectories
+                    withIntermediateDirectories: withIntermediateDirectories,
+                    attributes: permissions.map { [.posixPermissions: Int($0.rawValue)] }
                 )
             }
         }
