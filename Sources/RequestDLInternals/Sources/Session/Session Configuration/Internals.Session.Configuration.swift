@@ -564,6 +564,23 @@ extension Internals.Session.Configuration {
             configuration.timeoutIntervalForRequest = TimeInterval(read) / 1_000_000_000
         }
 
+        // Also enforced up front by `Internals.NetworkPathGate`, which is what turns a refusal
+        // into a `NetworkAvailabilityError` before anything is sent. This is the part the gate
+        // can't do: `URLSession` keeps enforcing them for the whole transfer, so a connection
+        // that moves to a path the caller refused right after that check doesn't carry on over it.
+        // Only written when configured: absence stays absence.
+        if let allowsCellularAccess {
+            configuration.allowsCellularAccess = allowsCellularAccess
+        }
+
+        if let allowsExpensiveNetworkAccess {
+            configuration.allowsExpensiveNetworkAccess = allowsExpensiveNetworkAccess
+        }
+
+        if let allowsConstrainedNetworkAccess {
+            configuration.allowsConstrainedNetworkAccess = allowsConstrainedNetworkAccess
+        }
+
         #if canImport(Network)
         if let minimumTLSVersion = secureConnection?.minimumTLSVersion {
             configuration.tlsMinimumSupportedProtocolVersion = minimumTLSVersion.urlSessionProtocolVersion

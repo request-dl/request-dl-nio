@@ -14,15 +14,57 @@ struct URLOverrideEndpoint: Sendable, Equatable {
 
     let scheme: String
     let host: String
-    /// `nil` when the endpoint carries no explicit port (matches/rewrites regardless of the
-    /// other side's port). Kept distinct from `host`, which like `URLComponents.host` never
-    /// includes it, so a rule origin/destination declaring a non-default port doesn't silently
-    /// match or rewrite to the wrong one. See `init(baseURL:)`.
+    /// `nil` when the endpoint carries no explicit port, which for matching means the scheme's
+    /// default (see ``isSameOrigin(as:)``). Kept distinct from `host`, which like
+    /// `URLComponents.host` never includes it, so a rule origin/destination declaring a
+    /// non-default port doesn't silently match or rewrite to the wrong one. See `init(baseURL:)`.
     let port: Int?
     let pathComponents: [String]
 }
 
 extension URLOverrideEndpoint {
+
+    /// Whether `self` and `other` name the same origin: the same scheme, host and port.
+    ///
+    /// Scheme and host are compared without regard to case, since neither is case sensitive
+    /// (RFC 3986 §3.1, §3.2.2), and a bracketed IPv6 host is the same as the bare one. A port is
+    /// compared as the port the connection would use: one left out is the scheme's default, so
+    /// `https://example.com` and `https://example.com:443` are the same origin. A port that is not
+    /// the default still tells two origins apart, and so does a scheme with no default port.
+    func isSameOrigin(as other: URLOverrideEndpoint) -> Bool {
+        normalizedScheme == other.normalizedScheme
+            && normalizedHost == other.normalizedHost
+            && effectivePort == other.effectivePort
+    }
+
+    private var normalizedScheme: String {
+        scheme.lowercased()
+    }
+
+    private var normalizedHost: String {
+        var host = self.host.lowercased()
+
+        if host.hasPrefix("["), host.hasSuffix("]") {
+            host = String(host.dropFirst().dropLast())
+        }
+
+        return host
+    }
+
+    private var effectivePort: Int? {
+        port ?? Self.defaultPort(forScheme: normalizedScheme)
+    }
+
+    private static func defaultPort(forScheme scheme: String) -> Int? {
+        switch scheme {
+        case "http", "ws":
+            return 80
+        case "https", "wss":
+            return 443
+        default:
+            return nil
+        }
+    }
 
     /// Parses a user-supplied origin/destination string.
     ///

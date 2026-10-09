@@ -16,10 +16,20 @@ public enum CompressionDuplicateHeaderBehavior: Sendable, Hashable {
     /// Throws ``DuplicateContentEncodingError``. The default.
     case error
 
-    /// Replaces the existing header value with the configured algorithm's.
+    /// Replaces the existing header value with the configured algorithm's, and compresses the
+    /// body.
+    ///
+    /// Meant for a header that is stale or wrong, on a body that is not encoded yet. It is not
+    /// for a body that was already compressed: that body is compressed a second time while the
+    /// header names only the new algorithm, so the server decodes once and is left with the first
+    /// layer. Use ``skip`` for a body that was compressed by the caller.
     case replace
 
-    /// Silently skips compression when the header already exists.
+    /// Silently skips compression when the header already exists, sending the body and the header
+    /// exactly as they are.
+    ///
+    /// The choice for a body the caller compressed themselves (a file already gzipped on disk,
+    /// say).
     case skip
 
     // MARK: - Internal methods
