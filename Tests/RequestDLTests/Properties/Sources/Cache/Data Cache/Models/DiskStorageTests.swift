@@ -813,6 +813,76 @@ struct DiskStorageTests {
         }
     }
 
+    private func entryNames(in directoryURL: URL) async throws -> [String] {
+        try await Internals.directoryEntryNames(atPath: directoryURL.path)
+    }
+
+    /// What a process killed halfway through a write leaves: a record directory with no files.
+    @Test
+    func freeSpace_removesTheIncompleteDirectoriesOfEveryKey() async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            let storage = DiskStorage(directory: directoryURL, orphanAge: 0)
+            try await write(["whole"], through: storage)
+
+            _ = await DiskStorage.Record(directory: directoryURL, key: "a", at: Date())
+            _ = await DiskStorage.Record(directory: directoryURL, key: "b", at: Date())
+            let before = try await entryNames(in: directoryURL)
+            #expect(before.count == 3)
+
+            await DiskStorage(directory: directoryURL, orphanAge: 0).freeSpace(.max)
+
+            let names = try await entryNames(in: directoryURL)
+            #expect(names.count == 1)
+            #expect(names.allSatisfy { $0.contains(".whole.") })
+        }
+    }
+
+    /// A write going on in another process has the same shape for a moment.
+    @Test
+    func freeSpace_keepsAnIncompleteDirectoryThatWasJustCreated() async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            _ = await DiskStorage.Record(directory: directoryURL, key: "writing", at: Date())
+
+            await DiskStorage(directory: directoryURL).freeSpace(.max)
+
+            let names = try await entryNames(in: directoryURL)
+            #expect(names.count == 1)
+        }
+    }
+
+    @Test
+    func subscript_whenAKeyHasOnlyOrphans_costsNoRetryAndRemovesThem() async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            _ = await DiskStorage.Record(directory: directoryURL, key: "key", at: Date())
+            _ = await DiskStorage.Record(directory: directoryURL, key: "key", at: Date().addingTimeInterval(-5))
+
+            let cold = DiskStorage(directory: directoryURL, orphanAge: 0)
+            let retriesBefore = DiskStorage.retryCount
+            let found = await cold["key"]
+            let retries = DiskStorage.retryCount - retriesBefore
+
+            // Counted, not timed: the budget is 299 retries of 50 ms.
+            #expect(found == nil)
+            #expect(retries < 100)
+            let names = try await entryNames(in: directoryURL)
+            #expect(names.isEmpty)
+        }
+    }
+
+    @Test
+    func subscript_whenTheNewestDirectoryIsAnOrphan_servesTheOlderWholeOneAndRemovesIt() async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            try await write(["key"], through: DiskStorage(directory: directoryURL))
+            _ = await DiskStorage.Record(directory: directoryURL, key: "key", at: Date().addingTimeInterval(60))
+
+            let cold = DiskStorage(directory: directoryURL, orphanAge: 0)
+
+            #expect(await cold["key"] != nil)
+            let names = try await entryNames(in: directoryURL)
+            #expect(names.count == 1)
+        }
+    }
+
     @Test
     func allocateBuffer_whenNoBodyBytesAreEverWritten_leavesADiscoverableRecordNotAnOrphan() async throws {
         try await withTemporaryFileURL(createPath: false) { directoryURL in
