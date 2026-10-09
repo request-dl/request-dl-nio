@@ -102,6 +102,8 @@ struct ResumableUploadExecutionTests {
 
             // Then
             #expect(server.heldUploads[1]?.data == Self.body())
+            try await Self.waitForRequests("PATCH", in: server, atLeast: 3)
+
             #expect(
                 server.requests.filter { $0.method == "PATCH" }.map { $0.header("Upload-Offset") } == [
                     "0", "50000", "120000",
@@ -125,6 +127,8 @@ struct ResumableUploadExecutionTests {
 
             // Then: the conflict is answered with where the server really is.
             #expect(server.heldUploads[1]?.data == Self.body())
+            try await Self.waitForRequests("PATCH", in: server, atLeast: 3)
+
             #expect(
                 server.requests.filter { $0.method == "PATCH" }.map { $0.header("Upload-Offset") }
                     == ["0", "100000", "60000"]
@@ -143,6 +147,8 @@ struct ResumableUploadExecutionTests {
                 _ = try await Self.upload(to: server, scenario).result()
             }
 
+            try await Self.waitForRequests("PATCH", in: server, atLeast: 1)
+
             #expect(server.requests.filter { $0.method == "PATCH" }.count == 1)
         }
     }
@@ -160,11 +166,21 @@ struct ResumableUploadExecutionTests {
 
             // Then: the body is sent in pieces, each from where the server says it is.
             #expect(server.heldUploads[1]?.data == Self.body())
+            try await Self.waitForRequests("PATCH", in: server, atLeast: 4)
+
             #expect(
                 server.requests.filter { $0.method == "PATCH" }.map { $0.header("Upload-Offset") }
                     == ["0", "100000", "200000", "300000"]
             )
         }
+    }
+
+    /// Waits until the server recorded at least `count` requests with this method.
+    ///
+    /// A server records a request once it is done with it, which can be after the client already
+    /// has its answer or has failed, so a test that counts them right after sees one fewer.
+    private static func waitForRequests(_ method: String, in server: TransferServer, atLeast count: Int) async throws {
+        try await eventually(timeout: 30) { server.requests.filter { $0.method == method }.count >= count }
     }
 
     @Test(arguments: cases)
@@ -179,6 +195,8 @@ struct ResumableUploadExecutionTests {
 
             // Then
             #expect(server.heldUploads[1]?.data == Self.body())
+            try await Self.waitForRequests("HEAD", in: server, atLeast: 3)
+
             #expect(server.requests.filter { $0.method == "HEAD" }.map(\.status) == [503, 429, 204])
         }
     }
@@ -194,6 +212,8 @@ struct ResumableUploadExecutionTests {
             await #expect(throws: UploadResumptionError(.serverUnavailable(status: 503))) {
                 _ = try await Self.upload(to: server, scenario, attempts: 2).result()
             }
+
+            try await Self.waitForRequests("HEAD", in: server, atLeast: 2)
 
             #expect(server.requests.filter { $0.method == "HEAD" }.count == 2)
         }
@@ -263,6 +283,8 @@ struct ResumableUploadExecutionTests {
             }
 
             // The first, and the two that follow it, which is what was allowed.
+            try await Self.waitForRequests("PATCH", in: server, atLeast: 3)
+
             #expect(server.requests.filter { $0.method == "PATCH" }.count == 3)
         }
     }
@@ -279,6 +301,8 @@ struct ResumableUploadExecutionTests {
             await #expect(throws: UploadResumptionError(.uploadLost(status: 404))) {
                 _ = try await Self.upload(to: server, scenario).result()
             }
+
+            try await Self.waitForRequests("PATCH", in: server, atLeast: 1)
 
             #expect(server.requests.filter { $0.method == "PATCH" }.count == 1)
         }
@@ -298,6 +322,8 @@ struct ResumableUploadExecutionTests {
             }
 
             // Then: the first, and the two that follow it, which is what was allowed.
+            try await Self.waitForRequests("PATCH", in: server, atLeast: 3)
+
             #expect(server.requests.filter { $0.method == "PATCH" }.count == 3)
             #expect(server.heldUploads[1]?.data.isEmpty == true)
         }
@@ -354,6 +380,8 @@ struct ResumableUploadExecutionTests {
             }
 
             #expect(server.heldUploads[1]?.data == Self.body())
+            try await Self.waitForRequests("PATCH", in: server, atLeast: 1)
+
             #expect(server.requests.filter { $0.method == "PATCH" }.count == 1)
         }
     }
