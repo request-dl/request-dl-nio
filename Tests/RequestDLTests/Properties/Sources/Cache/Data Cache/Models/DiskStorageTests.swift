@@ -439,17 +439,15 @@ struct DiskStorageTests {
             // "data.record" deliberately never created: this entry never completes.
 
             // When
-            let clock = ContinuousClock()
-            let start = clock.now
+            let retriesBefore = DiskStorage.retryCount
             await storage.removeAll()
-            let elapsed = clock.now - start
+            let retries = DiskStorage.retryCount - retriesBefore
 
-            // Then: under the 15s retry budget a by-key lookup would spend on the same miss. A
-            // regression (falling back to that retry loop) takes at least those 15s whatever the
-            // load, so the bound only has to sit below them, and can be as loose as that allows:
-            // CI scheduler contention already pushed this as high as 2.3s at a 2s margin, then to
-            // 9.2s at an 8s one.
-            #expect(elapsed < .seconds(14))
+            // Then: counted, not timed. Falling back to the retry loop of a by-key lookup spends
+            // 299 retries of 50 ms on this entry, while a clock bound has to sit below the 15 s
+            // that costs and a loaded runner can already take most of that for nothing (a full
+            // run on a busy machine measured 11 s for a call that takes milliseconds alone).
+            #expect(retries < 100)
         }
     }
 
