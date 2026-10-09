@@ -439,17 +439,15 @@ struct DiskStorageTests {
             // "data.record" deliberately never created: this entry never completes.
 
             // When
-            let clock = ContinuousClock()
-            let start = clock.now
+            let retriesBefore = DiskStorage.retryCount
             await storage.removeAll()
-            let elapsed = clock.now - start
+            let retries = DiskStorage.retryCount - retriesBefore
 
-            // Then: under the 15s retry budget a by-key lookup would spend on the same miss. A
-            // regression (falling back to that retry loop) takes at least those 15s whatever the
-            // load, so the bound only has to sit below them, and can be as loose as that allows:
-            // CI scheduler contention already pushed this as high as 2.3s at a 2s margin, then to
-            // 9.2s at an 8s one.
-            #expect(elapsed < .seconds(14))
+            // Then: counted, not timed. Falling back to the retry loop of a by-key lookup spends
+            // 299 retries of 50 ms on this entry, while a clock bound has to sit below the 15 s
+            // that costs and a loaded runner can already take most of that for nothing (a full
+            // run on a busy machine measured 11 s for a call that takes milliseconds alone).
+            #expect(retries < 100)
         }
     }
 
@@ -744,6 +742,169 @@ struct DiskStorageTests {
             // running at the same time do, which the count includes.
             #expect(found != nil)
             #expect(retries < 100)
+        }
+    }
+
+    /// A launched app has an empty index, and the first lookup has to find where its entry is. It
+    /// does that from the names of the directory, once, for every key.
+    @Test
+    func subscript_whenTheStorageIsCold_findsEveryEntryFromOneScanOfTheNames() async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            let keys = (0..<60).map { "key\($0)" }
+            try await write(keys, through: DiskStorage(directory: directoryURL))
+
+            let cold = DiskStorage(directory: directoryURL, missRescanInterval: 3_600)
+
+            #expect(await cold["key7"] != nil)
+            #expect(cold.scanCount == 1)
+
+            // The one scan told where all of them are.
+            for key in keys {
+                #expect(await cold[key] != nil)
+            }
+
+            #expect(cold.scanCount == 1)
+            #expect(await cold["missing"] == nil)
+        }
+    }
+
+    /// A write cut short by the process being killed leaves a directory with no data. Next to a
+    /// whole one for the same key it must cost nothing.
+    @Test
+    func subscript_whenTheNewestDirectoryOfAKeyIsIncomplete_servesTheOlderWholeOne() async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            try await write(["key"], through: DiskStorage(directory: directoryURL))
+
+            // Newer than the whole one, and empty.
+            _ = await DiskStorage.Record(directory: directoryURL, key: "key", at: Date().addingTimeInterval(60))
+
+            let cold = DiskStorage(directory: directoryURL)
+            let retriesBefore = DiskStorage.retryCount
+            let found = await cold["key"]
+            let retries = DiskStorage.retryCount - retriesBefore
+
+            // Counted, not timed, as in the test above: the incomplete directory used to cost the
+            // 15 s retry budget, 299 retries of 50 ms.
+            #expect(found != nil)
+            #expect(retries < 100)
+        }
+    }
+
+    /// A name with the right suffix that is not a record directory's is not an entry. The scan
+    /// passes over it, and the sweep leaves it where it is.
+    @Test
+    func subscript_whenTheDirectoryHoldsANameThatIsNoRecord_ignoresIt() async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            try await write(["key"], through: DiskStorage(directory: directoryURL))
+
+            let stranger = directoryURL.appendingPathComponent("not-a-record.cached", isDirectory: true)
+            try await Internals.fileSystem.createDirectory(
+                at: stranger.filePath,
+                withIntermediateDirectories: true
+            )
+
+            let cold = DiskStorage(directory: directoryURL, orphanAge: 0)
+
+            #expect(await cold["key"] != nil)
+            #expect(await cold["missing"] == nil)
+
+            await cold.freeSpace(.max)
+
+            let names = try await entryNames(in: directoryURL)
+            #expect(names.contains("not-a-record.cached"))
+        }
+    }
+
+    @Test
+    func subscript_whenAKeyHasTwoWholeDirectories_servesTheNewest() async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            let writer = DiskStorage(directory: directoryURL)
+
+            for name in ["older", "newer"] {
+                var (buffer, _, _) = await writer.allocateBuffer(
+                    key: "key",
+                    cachedResponse: makeCachedResponse(key: name),
+                    contentLength: 1,
+                    maximumCapacity: .max
+                )
+                await buffer?.writeData(Data([0x1]))
+                try? await buffer?.close()
+                try? await Task.sleep(nanoseconds: 5_000_000)
+            }
+
+            let found = await DiskStorage(directory: directoryURL)["key"]
+
+            #expect(found?.cachedResponse.response.url.hasSuffix("/newer") == true)
+        }
+    }
+
+    private func entryNames(in directoryURL: URL) async throws -> [String] {
+        try await Internals.directoryEntryNames(atPath: directoryURL.path)
+    }
+
+    /// What a process killed halfway through a write leaves: a record directory with no files.
+    @Test
+    func freeSpace_removesTheIncompleteDirectoriesOfEveryKey() async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            let storage = DiskStorage(directory: directoryURL, orphanAge: 0)
+            try await write(["whole"], through: storage)
+
+            _ = await DiskStorage.Record(directory: directoryURL, key: "a", at: Date())
+            _ = await DiskStorage.Record(directory: directoryURL, key: "b", at: Date())
+            let before = try await entryNames(in: directoryURL)
+            #expect(before.count == 3)
+
+            await DiskStorage(directory: directoryURL, orphanAge: 0).freeSpace(.max)
+
+            let names = try await entryNames(in: directoryURL)
+            #expect(names.count == 1)
+            #expect(names.allSatisfy { $0.contains(".whole.") })
+        }
+    }
+
+    /// A write going on in another process has the same shape for a moment.
+    @Test
+    func freeSpace_keepsAnIncompleteDirectoryThatWasJustCreated() async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            _ = await DiskStorage.Record(directory: directoryURL, key: "writing", at: Date())
+
+            await DiskStorage(directory: directoryURL).freeSpace(.max)
+
+            let names = try await entryNames(in: directoryURL)
+            #expect(names.count == 1)
+        }
+    }
+
+    @Test
+    func subscript_whenAKeyHasOnlyOrphans_costsNoRetryAndRemovesThem() async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            _ = await DiskStorage.Record(directory: directoryURL, key: "key", at: Date())
+            _ = await DiskStorage.Record(directory: directoryURL, key: "key", at: Date().addingTimeInterval(-5))
+
+            let cold = DiskStorage(directory: directoryURL, orphanAge: 0)
+            let retriesBefore = DiskStorage.retryCount
+            let found = await cold["key"]
+            let retries = DiskStorage.retryCount - retriesBefore
+
+            // Counted, not timed: the budget is 299 retries of 50 ms.
+            #expect(found == nil)
+            #expect(retries < 100)
+            let names = try await entryNames(in: directoryURL)
+            #expect(names.isEmpty)
+        }
+    }
+
+    @Test
+    func subscript_whenTheNewestDirectoryIsAnOrphan_servesTheOlderWholeOneAndRemovesIt() async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            try await write(["key"], through: DiskStorage(directory: directoryURL))
+            _ = await DiskStorage.Record(directory: directoryURL, key: "key", at: Date().addingTimeInterval(60))
+
+            let cold = DiskStorage(directory: directoryURL, orphanAge: 0)
+
+            #expect(await cold["key"] != nil)
+            let names = try await entryNames(in: directoryURL)
+            #expect(names.count == 1)
         }
     }
 

@@ -22,6 +22,10 @@ struct CacheReplayTests {
 
     private let size = 8 * 1_024 * 1_024
 
+    // The waits below are for the replay to be scheduled at all, not for it to be fast. A full
+    // run on a busy Linux runner has stalled every task for longer than 30 s, which failed these
+    // two on two runs in a row while the replay itself takes milliseconds.
+
     private func body() async -> Internals.AnyBuffer {
         // Not built element by element: 8 million closure calls in a debug build took the better
         // part of the wait under a loaded full run. These tests look at how much of it is read,
@@ -40,7 +44,7 @@ struct CacheReplayTests {
             await Internals.CacheControl.replay(await body(), into: download, window: window)
         }
 
-        try await eventually(timeout: 30) { window.bufferedBytesForTesting > window.highWatermark }
+        try await eventually(timeout: 120) { window.bufferedBytesForTesting > window.highWatermark }
         await download.waitUntilIdle()
 
         // Then: it has paused, short of the whole body, by about one piece past the mark.
@@ -72,7 +76,7 @@ struct CacheReplayTests {
             await Internals.CacheControl.replay(await body(), into: download, window: window)
         }
 
-        try await eventually(timeout: 30) { window.bufferedBytesForTesting > window.highWatermark }
+        try await eventually(timeout: 120) { window.bufferedBytesForTesting > window.highWatermark }
         await download.waitUntilIdle()
         let bufferedWhenParked = window.bufferedBytesForTesting
 
