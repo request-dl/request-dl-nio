@@ -790,6 +790,31 @@ struct DiskStorageTests {
         }
     }
 
+    /// A name with the right suffix that is not a record directory's is not an entry. The scan
+    /// passes over it, and the sweep leaves it where it is.
+    @Test
+    func subscript_whenTheDirectoryHoldsANameThatIsNoRecord_ignoresIt() async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            try await write(["key"], through: DiskStorage(directory: directoryURL))
+
+            let stranger = directoryURL.appendingPathComponent("not-a-record.cached", isDirectory: true)
+            try await Internals.fileSystem.createDirectory(
+                at: stranger.filePath,
+                withIntermediateDirectories: true
+            )
+
+            let cold = DiskStorage(directory: directoryURL, orphanAge: 0)
+
+            #expect(await cold["key"] != nil)
+            #expect(await cold["missing"] == nil)
+
+            await cold.freeSpace(.max)
+
+            let names = try await entryNames(in: directoryURL)
+            #expect(names.contains("not-a-record.cached"))
+        }
+    }
+
     @Test
     func subscript_whenAKeyHasTwoWholeDirectories_servesTheNewest() async throws {
         try await withTemporaryFileURL(createPath: false) { directoryURL in
