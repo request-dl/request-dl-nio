@@ -480,10 +480,11 @@ struct RequestMonitorTests {
 
     @Test(arguments: Executor.allCases)
     private func aRequestThatNeverGetsSent_isReportedAsStartedThenFailed(_ executor: Executor) async throws {
-        // Given: a port nothing listens on any more. One a server held a moment ago, so that the
-        // connection is refused, and not a well-known one (`1` is `tcpmux`), whose treatment is up
-        // to whatever machine runs this.
-        let port = try await withTransferServer(.init(length: 1)) { $0.port }
+        // Given: a port that refuses connections, and not a well-known one (`1` is `tcpmux`),
+        // whose treatment is up to whatever machine runs this.
+        let refused = try RefusedPort()
+        defer { refused.release() }
+        let port = refused.port
         let monitor = RecordingMonitor()
         let start = DispatchTime.now().uptimeNanoseconds
 

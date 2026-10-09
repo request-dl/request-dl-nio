@@ -1372,3 +1372,13 @@ private enum Glue {
         #endif
     }
 }
+
+/// Waits until `server` has recorded at least `count` requests.
+///
+/// A ``TransferServer`` records a request once it is done with it, which can be after the client
+/// already has its response (or has seen its connection end). Read straight away, the list can
+/// still be missing the last one under load, so anything asserting on it after the client's side
+/// of the exchange finished waits for it first.
+package func awaitRecordedRequests(_ server: TransferServer, atLeast count: Int = 1) async throws {
+    try await eventually(timeout: 30) { server.requests.count >= count }
+}
