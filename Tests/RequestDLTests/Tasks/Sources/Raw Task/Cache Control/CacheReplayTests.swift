@@ -18,6 +18,11 @@ import struct Foundation.Data
 /// them, so it is not read into the response's stream whole however slowly it is being read, and
 /// it is read in large blocks, not in chunks of the reading mode (1 KiB by default), one trip to
 /// the file system each.
+@Suite(
+    .toleratingSimulatorFlake(
+        "It waits for a replay to be scheduled, which a simulator runner starved of CPU for minutes (a test of this suite has waited 480s there) can't promise; the other platforms are what catch a regression"
+    )
+)
 struct CacheReplayTests {
 
     private let size = 8 * 1_024 * 1_024
