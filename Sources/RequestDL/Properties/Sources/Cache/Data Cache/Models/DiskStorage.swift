@@ -440,11 +440,6 @@ struct DiskStorage: Sendable {
         index.scanCount
     }
 
-    /// Measurements of the whole directory `freeSpace` has started, exposed for tests.
-    var measurementCount: Int {
-        measuring.runCount
-    }
-
     // MARK: - Internal methods
 
     subscript(_ key: String) -> CachedData? {
