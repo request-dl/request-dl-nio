@@ -51,7 +51,7 @@ public struct DataCache: Sendable, Equatable {
         }
     }
 
-    private final class Storage: @unchecked Sendable {
+    final class Storage: @unchecked Sendable {
 
         // MARK: - Internal properties
 
@@ -152,11 +152,23 @@ public struct DataCache: Sendable, Equatable {
         /// How many writes are in progress for each key. Guarded by `lock`.
         private var _writesInProgress: [String: Int] = [:]
 
+        /// Keys whose entry is being read from the disk tier to be kept in the memory tier. The
+        /// value says whether what was read is still what the cache holds: any write, revalidation
+        /// or removal of the key since the read began sets it to `false`. Guarded by `lock`.
+        private var _promotions: [String: Bool] = [:]
+
         // MARK: - Internal methods
 
         /// Starts a write for `key`: until the token ends, ``isWriting(key:)`` answers `true`.
         func beginWrite(key: String) -> WriteToken {
-            lock.withLock { _writesInProgress[key, default: 0] += 1 }
+            lock.withLock {
+                _writesInProgress[key, default: 0] += 1
+
+                if _promotions[key] != nil {
+                    _promotions[key] = false
+                }
+            }
+
             return WriteToken { [weak self] in self?.endWrite(key: key) }
         }
 
@@ -167,6 +179,76 @@ public struct DataCache: Sendable, Equatable {
                 }
 
                 _writesInProgress[key] = count > 1 ? count - 1 : nil
+            }
+        }
+
+        /// Starts reading `key` from the disk tier to keep it in memory. Answers `false` when
+        /// there is nothing to do: the key is being written, is already in memory, or is already
+        /// being promoted by another reader.
+        func beginPromotion(key: String) -> Bool {
+            lock.withLock {
+                guard
+                    _writesInProgress[key] == nil,
+                    _promotions[key] == nil,
+                    !_memoryStorage.contains(key)
+                else {
+                    return false
+                }
+
+                _promotions[key] = true
+                return true
+            }
+        }
+
+        func cancelPromotion(key: String) {
+            lock.withLock { _promotions[key] = nil }
+        }
+
+        /// Marks what a promotion of `key` has read as out of date.
+        func invalidatePromotion(key: String) {
+            lock.withLock {
+                if _promotions[key] != nil {
+                    _promotions[key] = false
+                }
+            }
+        }
+
+        func invalidateAllPromotions() {
+            lock.withLock {
+                for key in _promotions.keys {
+                    _promotions[key] = false
+                }
+            }
+        }
+
+        /// Keeps what a promotion read, unless the cache changed under it.
+        ///
+        /// - Returns: Whether the entry is now in the memory tier.
+        func finishPromotion(
+            key: String,
+            cachedResponse: CachedResponse,
+            dataURL: Internals.ByteURL
+        ) -> Bool {
+            lock.withLock {
+                let isCurrent = _promotions.removeValue(forKey: key) ?? false
+
+                guard isCurrent, _writesInProgress[key] == nil, !_memoryStorage.contains(key) else {
+                    return false
+                }
+
+                let (installed, usage) = _memoryStorage.install(
+                    key: key,
+                    cachedResponse: cachedResponse,
+                    dataURL: dataURL,
+                    maximumCapacity: _memoryCapacity,
+                    knownUsage: _memoryUsageEstimate
+                )
+
+                if let usage {
+                    _memoryUsageEstimate = usage
+                }
+
+                return installed
             }
         }
 
@@ -353,7 +435,7 @@ public struct DataCache: Sendable, Equatable {
 
     // MARK: - Private properties
 
-    private let storage: Storage
+    let storage: Storage
     private let logger: Logger?
 
     // MARK: - Inits
@@ -536,7 +618,18 @@ public struct DataCache: Sendable, Equatable {
         }
 
         if policy.contains(.disk) {
-            return await storage.diskStorage[key]
+            guard let cachedData = await storage.diskStorage[key] else {
+                return nil
+            }
+
+            // The entry came from the disk because memory has not seen it since the process
+            // started. Keep it where the next read is cheapest, as long as it was stored for
+            // memory too.
+            guard policy.contains(.memory), cachedData.policy.contains(.memory) else {
+                return cachedData
+            }
+
+            return await promotingToMemory(cachedData, forKey: key)
         }
 
         return nil
@@ -544,6 +637,45 @@ public struct DataCache: Sendable, Equatable {
         // memory entry whenever the memory tier refuses the new one. Without that, a response
         // too large for memory but small enough for disk would leave a stale entry in front of
         // a fresh one.
+    }
+
+    /// The largest entry read from the disk tier that is kept in memory, as a share of the memory
+    /// capacity: one in this many. A larger one would push out many smaller ones for a single
+    /// entry, and is the kind that is read as a stream rather than all at once.
+    private static let promotionShare: Int64 = 20
+
+    /// Keeps `cachedData`, which came from the disk tier, in the memory tier, and serves it from
+    /// there.
+    ///
+    /// The whole body is read before the entry becomes visible in memory, so a reader never
+    /// meets half of it. If the key is written, revalidated or removed meanwhile, the read is
+    /// served and thrown away.
+    private func promotingToMemory(_ cachedData: CachedData, forKey key: String) async -> CachedData? {
+        let size = cachedData.buffer.readableBytes
+
+        guard Int64(size) <= storage.memoryCapacity / Self.promotionShare, storage.beginPromotion(key: key) else {
+            return cachedData
+        }
+
+        var source = cachedData.buffer
+        let bytes = size == .zero ? [] : await source.readBytes(size)
+
+        guard let bytes else {
+            storage.cancelPromotion(key: key)
+
+            // What was read is gone from `source`, and a failed read says nothing about the rest.
+            return await storage.diskStorage[key]
+        }
+
+        let dataURL = Internals.ByteURL()
+        dataURL.replace(with: bytes)
+
+        _ = storage.finishPromotion(key: key, cachedResponse: cachedData.cachedResponse, dataURL: dataURL)
+
+        return await CachedData(
+            cachedResponse: cachedData.cachedResponse,
+            buffer: Internals.DataBuffer(dataURL)
+        )
     }
 
     ///
@@ -575,6 +707,7 @@ public struct DataCache: Sendable, Equatable {
     public func remove(forKey key: String) async {
         let key = base64EncodedKey(key)
 
+        storage.invalidatePromotion(key: key)
         storage.withMemoryStorage { $0.remove(key) }
         await storage.diskStorage.remove(key)
     }
@@ -583,6 +716,7 @@ public struct DataCache: Sendable, Equatable {
     /// Removes all cached data from the cache.
     ///
     public func removeAll() async {
+        storage.invalidateAllPromotions()
         storage.withMemoryStorage { $0.removeAll() }
         await storage.diskStorage.removeAll()
     }
@@ -593,6 +727,7 @@ public struct DataCache: Sendable, Equatable {
     /// - Parameter date: The date to filter cached data removal.
     ///
     public func removeAll(since date: Date) async {
+        storage.invalidateAllPromotions()
         storage.withMemoryStorage { $0.removeAll(since: date) }
         await storage.diskStorage.removeAll(since: date)
     }
@@ -608,6 +743,8 @@ public struct DataCache: Sendable, Equatable {
         }
 
         let key = base64EncodedKey(key)
+
+        storage.invalidatePromotion(key: key)
 
         // Read before entering the critical section below: the lock is not reentrant, and
         // these getters take it.
@@ -800,7 +937,7 @@ public struct DataCache: Sendable, Equatable {
     /// The storage key for `key`: its base64url encoding, or, when that would be too long for a
     /// file name, `sha256.` followed by the hex SHA-256 of `key`. The `.` can never appear in
     /// base64url output, so the two forms cannot collide.
-    private func base64EncodedKey(_ key: String) -> String {
+    func base64EncodedKey(_ key: String) -> String {
         let base64 = Data(key.utf8).base64EncodedString()
 
         // `compactMap` rather than `replacingOccurrences(of:with:)`, which isn't in
