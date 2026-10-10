@@ -25,7 +25,11 @@ import struct Foundation.Data
 )
 struct CacheReplayTests {
 
-    private let size = 8 * 1_024 * 1_024
+    /// Small, next to the default window of 1 MiB: these tests look at where a replay stops, which
+    /// only needs the body to be longer than the window and one piece. 8 MiB through a debug
+    /// build, several tests at a time, was most of the time a loaded runner spent on them.
+    private let size = 1_024 * 1_024
+    private let highWatermark = 128 * 1_024
 
     // The waits below are for the replay to be scheduled at all, not for it to be fast. A full
     // run on a busy Linux runner has stalled every task for longer than 30 s, which failed these
@@ -40,8 +44,8 @@ struct CacheReplayTests {
 
     @Test
     func replay_whileNobodyReads_stopsAtTheWindowInsteadOfBufferingTheWholeBody() async throws {
-        // Given: an 8 MiB body, a 1 MiB window, and a reader that has not started.
-        let window = Internals.FlowControlWindow()
+        // Given: a 1 MiB body, a 128 KiB window, and a reader that has not started.
+        let window = Internals.FlowControlWindow(highWatermark: highWatermark, lowWatermark: highWatermark / 2)
         let download = await Internals.DownloadBuffer(readingMode: .length(1_024), flowControl: window)
 
         // When
@@ -74,7 +78,7 @@ struct CacheReplayTests {
     @Test
     func replay_whenTheWindowIsReleased_stopsInsteadOfReadingTheRest() async throws {
         // Given: a replay parked at the window with nobody reading.
-        let window = Internals.FlowControlWindow()
+        let window = Internals.FlowControlWindow(highWatermark: highWatermark, lowWatermark: highWatermark / 2)
         let download = await Internals.DownloadBuffer(readingMode: .length(1_024), flowControl: window)
 
         let replay = _Concurrency.Task {
