@@ -181,6 +181,57 @@ struct DiskStorage: Sendable {
         }
     }
 
+    /// Runs one piece of work for however many callers ask for it while it is going on.
+    ///
+    /// A caller that arrives while the work is running waits for that run and gets its result;
+    /// one that arrives after it finished starts a new run. The run does not belong to the
+    /// caller that started it, so that caller being cancelled does not cancel the others.
+    final class SingleFlight<Value: Sendable>: @unchecked Sendable {
+
+        // MARK: - Private properties
+
+        private let lock = Lock()
+        private var task: Task<Value, Never>?
+        private var _runCount = 0
+
+        // MARK: - Internal properties
+
+        /// Runs started so far, exposed for tests.
+        var runCount: Int {
+            lock.withLock { _runCount }
+        }
+
+        // MARK: - Internal methods
+
+        func run(_ work: @escaping @Sendable () async -> Value) async -> Value {
+            let running = lock.withLock { () -> Task<Value, Never> in
+                if let current = self.task {
+                    return current
+                }
+
+                _runCount += 1
+
+                let started = Task {
+                    let value = await work()
+                    self.lock.withLock { self.task = nil }
+                    return value
+                }
+
+                self.task = started
+                return started
+            }
+
+            return await running.value
+        }
+    }
+
+    /// What `freeSpace` needs of the directory: every whole entry with its size, and the
+    /// incomplete ones.
+    private struct Measurement: Sendable {
+        var entries: [(record: Record, size: Int64)]
+        var incomplete: [URL]
+    }
+
     /// A directory-wide, in-process index from cache key to the record directory that holds
     /// it, the fast path `record(forKey:)` uses instead of listing every entry in
     /// `directory` on every lookup.
@@ -349,6 +400,7 @@ struct DiskStorage: Sendable {
     private let directory: URL
     private let index: Index
     private let orphanAge: Double
+    private let measuring = SingleFlight<Measurement>()
 
     // MARK: - Internal properties
 
@@ -762,33 +814,31 @@ struct DiskStorage: Sendable {
             return knownUsage
         }
 
-        let scanned = await scan()
-        var entries = scanned.whole
-
-        await removeOrphans(among: scanned.incomplete)
-
         if maximumCapacity == .zero {
-            for entry in entries {
+            let scanned = await scan()
+
+            await removeOrphans(among: scanned.incomplete)
+
+            for entry in scanned.whole {
                 _ = try? await Internals.fileSystem.removeItem(at: entry.url.filePath)
             }
+
             index.removeAll()
             return .zero
         }
 
+        let measured = await measure()
+
+        await removeOrphans(among: measured.incomplete)
+
         // Least recently used first. An entry nobody read since this process started is ordered
         // by when it was created.
-        entries.sort { lastUsed(of: $0) < lastUsed(of: $1) }
+        var entries = measured.entries
+        entries.sort { lastUsed(of: $0.record) < lastUsed(of: $1.record) }
 
-        var totalSize: Int64 = 0
-        var entrySizes: [(Record, Int64)] = []
-        let sizes = await Self.mapConcurrently(entries) { await $0.size }
+        var totalSize = entries.reduce(Int64.zero) { $0 + $1.size }
 
-        for (entry, size) in zip(entries, sizes) {
-            totalSize += size
-            entrySizes.append((entry, size))
-        }
-
-        for (entry, size) in entrySizes {
+        for (entry, size) in entries {
             if totalSize <= maximumCapacity {
                 break
             }
@@ -1043,6 +1093,25 @@ struct DiskStorage: Sendable {
     /// write still in progress as a missing one, so none is given the retry budget.
     private func records() async -> [Record] {
         await scan().whole
+    }
+
+    /// Every whole entry with its size, and the incomplete ones, measured once for all the
+    /// callers that ask while it is going on.
+    ///
+    /// A launch starts many writes at once, and until the first of them finishes none has a
+    /// usage estimate, so each one used to read and stat the whole directory on its own. The
+    /// answer is the same for all of them, and a stat a moment stale only makes the estimate
+    /// off by the writes of that moment, which the next unskipped `freeSpace` corrects.
+    private func measure() async -> Measurement {
+        await measuring.run { [self] in
+            let scanned = await scan()
+            let sizes = await Self.mapConcurrently(scanned.whole) { await $0.size }
+
+            return Measurement(
+                entries: Array(zip(scanned.whole, sizes)).map { (record: $0, size: $1) },
+                incomplete: scanned.incomplete
+            )
+        }
     }
 
     /// The entries of the directory, whole ones as records and the others, the incomplete ones,
