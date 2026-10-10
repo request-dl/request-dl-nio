@@ -783,7 +783,13 @@ private func startDownload(
     flowControl: Internals.FlowControlWindow = .init(),
     beforeStarting prepare: (Internals.URLSessionClient) -> Void = { _ in }
 ) async throws -> (SessionTask, Internals.DownloadStep) {
-    let client = try client ?? Internals.URLSessionClient(configuration: .ephemeral)
+    // The reader stops for a while on purpose, and on a runner starved of CPU the server takes
+    // longer than the default 60 s to settle. A request that has received nothing for that long
+    // times out, which is not what these tests look at (the one that is has its own client).
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.timeoutIntervalForRequest = 600
+
+    let client = try client ?? Internals.URLSessionClient(configuration: configuration)
     let url = try #require(URL(string: "http://127.0.0.1:\(server.port)/"))
 
     prepare(client)
