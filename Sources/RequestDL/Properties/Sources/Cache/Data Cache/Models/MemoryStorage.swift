@@ -70,6 +70,10 @@ struct MemoryStorage: Sendable {
         }
     }
 
+    func contains(_ key: String) -> Bool {
+        records[key] != nil
+    }
+
     mutating func remove(_ key: String) {
         records[key] = nil
     }
@@ -160,6 +164,41 @@ struct MemoryStorage: Sendable {
         records[key] = record
 
         return (record.dataURL, usageAfterEviction + contentLength)
+    }
+
+    /// Installs a record whose bytes are already in `dataURL`, for an entry that was read from
+    /// another tier and is being kept here.
+    ///
+    /// Unlike ``allocateBuffer(key:cachedResponse:contentLength:maximumCapacity:knownUsage:)``,
+    /// the entry is complete from the moment it is visible, so a reader never meets it half
+    /// written.
+    ///
+    /// - Returns: Whether the entry was installed (`false` when it does not fit), and usage
+    /// immediately after this call, for the caller to keep as its next `knownUsage`.
+    mutating func install(
+        key: String,
+        cachedResponse: CachedResponse,
+        dataURL: Internals.ByteURL,
+        maximumCapacity: Int64,
+        knownUsage: Int64? = nil
+    ) -> (installed: Bool, usage: Int64?) {
+        let size = Int64(dataURL.writtenBytes)
+
+        guard size <= maximumCapacity else {
+            return (false, nil)
+        }
+
+        let usageAfterEviction = freeSpace(maximumCapacity - size, knownUsage: knownUsage)
+
+        var record = Record(
+            key: key,
+            cachedResponse: cachedResponse
+        )
+
+        record.dataURL = dataURL
+        records[key] = record
+
+        return (true, usageAfterEviction + size)
     }
 
     /// Evicts the least recently used entries, if any, until usage is at or under
