@@ -311,8 +311,13 @@ extension Internals {
                 flowControl: window
             )
 
+            let dataCache = dataCache
+            let key = requestConfiguration.url
+
             _Concurrency.Task(priority: .background) {
-                await Self.replay(body, startingWith: firstPiece, into: download, window: window)
+                await Self.replay(body, startingWith: firstPiece, into: download, window: window) {
+                    await dataCache.remove(forKey: key)
+                }
             }
 
             // Nothing crossed the wire for this response, but it is still part of what happened to
@@ -371,13 +376,19 @@ extension Internals {
         /// is gone or the task was cancelled), or when the entry cannot be read, which fails
         /// `download` instead of ending it as if the body were complete.
         ///
-        /// - Parameter firstPiece: What ``readPiece(of:)`` already took from the start of `body`,
-        /// handed over first.
+        /// - Parameters:
+        ///   - firstPiece: What ``readPiece(of:)`` already took from the start of `body`, handed
+        ///   over first.
+        ///   - onUnreadable: Runs, before `download` is failed, when a later piece cannot be read.
+        ///   The caller drops the entry there: the first piece vouches for the first chunk only,
+        ///   and an entry left behind would fail at the same place on every request while it is
+        ///   fresh.
         static func replay(
             _ body: Internals.AnyBuffer,
             startingWith firstPiece: [UInt8] = [],
             into download: Internals.DownloadBuffer,
-            window: Internals.FlowControlWindow
+            window: Internals.FlowControlWindow,
+            onUnreadable: (@Sendable () async -> Void)? = nil
         ) async {
             var body = body
 
@@ -393,6 +404,7 @@ extension Internals {
                 }
 
                 guard let piece = await readPiece(of: &body), !piece.isEmpty else {
+                    await onUnreadable?()
                     download.failed(AsyncBytesReadError())
                     break
                 }

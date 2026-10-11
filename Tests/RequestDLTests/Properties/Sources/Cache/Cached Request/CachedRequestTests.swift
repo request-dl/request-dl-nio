@@ -390,6 +390,57 @@ struct CachedRequestTests {
         #expect(try responseText(response) == testState.output)
     }
 
+    /// A chunk of an encrypted entry is authenticated whole, so the first piece vouches for the
+    /// first 4 MiB only. A body that fails later cannot be taken back once it started, but the
+    /// entry must not stay: the next request would read the same first piece, pass, and fail at
+    /// the same place for as long as the entry is fresh.
+    @Test
+    func cache_whenALaterChunkOfAnEncryptedEntryFails_theNextRequestIsServedFromTheNetwork() async throws {
+        let testState = try await TestState()
+        let encryptionKey = DataCache.EncryptionKey(Data(repeating: 0x07, count: 32))
+        testState.dataCache.encryptionKey = encryptionKey
+
+        // Given: an entry of two chunks, the last byte of the second one flipped.
+        let size = Internals.EncryptedFileStreamBuffer.chunkPlaintextSize + 100_000
+        let cacheData = await mockCachedData(
+            makeHeaders(maxAgeSeconds: 3_600),
+            policy: .disk,
+            body: Data(repeating: 0x5A, count: size)
+        )
+        let cacheKey = "https://localhost:8888" + testState.uri
+
+        await testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
+        await testState.dataCache.waitUntilIdle()
+
+        try flipLastByteOfStoredBody(in: testState.dataCache.directoryURL)
+
+        // When: the first request starts from the entry and fails part of the way.
+        var firstError: (any Error)?
+
+        do {
+            _ = try await performCacheRequest(
+                testState: testState,
+                headers: makeHeaders(eTag: UUID()),
+                cacheStrategy: .returnCachedDataElseLoad,
+                encryptionKey: encryptionKey
+            )
+        } catch {
+            firstError = error
+        }
+
+        // Then: it failed, and the entry went with it.
+        #expect(firstError != nil)
+
+        let second = try await performCacheRequest(
+            testState: testState,
+            headers: makeHeaders(eTag: UUID()),
+            cacheStrategy: .returnCachedDataElseLoad,
+            encryptionKey: encryptionKey
+        )
+
+        #expect(try responseText(second) == testState.output)
+    }
+
     @Test
     func cache_whenReturnCachedDataElseLoadWithInvalidCache() async throws {
         let testState = try await TestState()
@@ -1358,9 +1409,10 @@ extension CachedRequestTests {
         _ headers: [(String, String)] = [],
         contentLengthOverride: Int? = nil,
         includeContentLength: Bool = true,
-        policy: DataCache.Policy.Set = .all
+        policy: DataCache.Policy.Set = .all,
+        body: Data? = nil
     ) async -> CachedData {
-        let data = try? JSONEncoder().encode(["receivedBytes": "0"])
+        let data = body ?? (try? JSONEncoder().encode(["receivedBytes": "0"]))
 
         var responseHeaders = headers
         if includeContentLength {
