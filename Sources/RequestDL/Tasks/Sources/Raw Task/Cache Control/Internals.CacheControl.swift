@@ -293,6 +293,17 @@ extension Internals {
                 return nil
             }
 
+            // The first piece is read before anything is promised to the caller. An entry that
+            // cannot be read (it fails to authenticate, or its files are gone) is a miss: once
+            // the response is handed out, the only thing left to do with it is fail the stream.
+            var body = cachedData.buffer
+
+            guard let firstPiece = await Self.readPiece(of: &body) else {
+                logger?.log(level: .debug, "Cache entry could not be read - treating it as a miss")
+                await dataCache.remove(forKey: requestConfiguration.url)
+                return nil
+            }
+
             let window = Internals.FlowControlWindow()
 
             let download = await Internals.DownloadBuffer(
@@ -301,7 +312,7 @@ extension Internals {
             )
 
             _Concurrency.Task(priority: .background) {
-                await Self.replay(cachedData.buffer, into: download, window: window)
+                await Self.replay(body, startingWith: firstPiece, into: download, window: window)
             }
 
             // Nothing crossed the wire for this response, but it is still part of what happened to
@@ -359,12 +370,20 @@ extension Internals {
         /// Ends, closing `download`, when the body is done, when `window` is released (the reader
         /// is gone or the task was cancelled), or when the entry cannot be read, which fails
         /// `download` instead of ending it as if the body were complete.
+        ///
+        /// - Parameter firstPiece: What ``readPiece(of:)`` already took from the start of `body`,
+        /// handed over first.
         static func replay(
             _ body: Internals.AnyBuffer,
+            startingWith firstPiece: [UInt8] = [],
             into download: Internals.DownloadBuffer,
             window: Internals.FlowControlWindow
         ) async {
             var body = body
+
+            if !firstPiece.isEmpty, !window.isReleased {
+                download.append(await Internals.DataBuffer(firstPiece))
+            }
 
             while body.readableBytes > .zero, !window.isReleased {
                 await window.waitUntilWritable()
@@ -373,7 +392,7 @@ extension Internals {
                     break
                 }
 
-                guard let piece = await body.readBytes(min(body.readableBytes, replayPieceSize)), !piece.isEmpty else {
+                guard let piece = await readPiece(of: &body), !piece.isEmpty else {
                     download.failed(AsyncBytesReadError())
                     break
                 }
@@ -382,6 +401,22 @@ extension Internals {
             }
 
             download.close()
+        }
+
+        /// Takes the next piece off `body`, at most ``replayPieceSize`` bytes.
+        ///
+        /// - Returns: The piece, empty for a body with nothing left to read, and `nil` when what is
+        /// left cannot be read: a stored body that fails to decrypt, or whose file is gone.
+        static func readPiece(of body: inout Internals.AnyBuffer) async -> [UInt8]? {
+            guard body.readableBytes > .zero else {
+                return []
+            }
+
+            guard let piece = await body.readBytes(min(body.readableBytes, replayPieceSize)), !piece.isEmpty else {
+                return nil
+            }
+
+            return piece
         }
 
         private func validateCachedData(

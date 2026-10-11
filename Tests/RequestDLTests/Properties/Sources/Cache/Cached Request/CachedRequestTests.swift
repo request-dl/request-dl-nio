@@ -8,6 +8,8 @@ import SwiftAsyncStream
 import SwiftAsyncTesting
 import Testing
 
+import class Foundation.FileManager
+
 @testable import RequestDL
 @testable import RequestDLTestSupport
 
@@ -356,6 +358,36 @@ struct CachedRequestTests {
         // was read back and judged valid; a genuine re-fetch could not produce a matching value.
         #expect(updatedCachedData?.response == cacheData.response)
         #expect(response.head == cacheData.response)
+    }
+
+    /// An entry that cannot be read is a miss, as the documentation of the encrypted buffers
+    /// promises: the request goes out instead of failing with a stored body nobody can trust.
+    @Test
+    func cache_whenAnEncryptedEntryFailsToAuthenticate_isServedFromTheNetworkInstead() async throws {
+        let testState = try await TestState()
+        let encryptionKey = DataCache.EncryptionKey(Data(repeating: 0x07, count: 32))
+        testState.dataCache.encryptionKey = encryptionKey
+
+        // Given: a valid entry on disk, whose last byte is then flipped. The size is the same, so
+        // the lookup still judges it complete, and only reading it back can tell.
+        let cacheData = await mockCachedData(makeHeaders(maxAgeSeconds: 3_600), policy: .disk)
+        let cacheKey = "https://localhost:8888" + testState.uri
+
+        await testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
+        await testState.dataCache.waitUntilIdle()
+
+        try flipLastByteOfStoredBody(in: testState.dataCache.directoryURL)
+
+        // When
+        let response = try await performCacheRequest(
+            testState: testState,
+            headers: makeHeaders(eTag: UUID()),
+            cacheStrategy: .returnCachedDataElseLoad,
+            encryptionKey: encryptionKey
+        )
+
+        // Then: what the server answered, not the stored body and not an error.
+        #expect(try responseText(response) == testState.output)
     }
 
     @Test
@@ -1308,6 +1340,18 @@ extension CachedRequestTests {
     func waitCacheExpiration() async throws {
         let twoSecondsAndAQuarter: UInt64 = 2 * 1_000_000_000 + 250 * 1_000_000
         try await _Concurrency.Task.sleep(nanoseconds: twoSecondsAndAQuarter)
+    }
+
+    /// Flips the last byte of the body of the only disk entry in `directoryURL`, leaving its
+    /// size alone.
+    func flipLastByteOfStoredBody(in directoryURL: URL) throws {
+        let entries = try FileManager.default.contentsOfDirectory(atPath: directoryURL.path)
+        let record = try #require(entries.first { $0.hasSuffix(".cached") })
+        let bodyURL = directoryURL.appendingPathComponent(record).appendingPathComponent("data.record")
+
+        var raw = try Data(contentsOf: bodyURL)
+        raw[raw.count - 1] ^= 0xFF
+        try raw.write(to: bodyURL)
     }
 
     func mockCachedData(
