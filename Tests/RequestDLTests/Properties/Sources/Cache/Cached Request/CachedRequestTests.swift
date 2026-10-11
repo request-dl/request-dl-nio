@@ -1203,6 +1203,64 @@ struct CachedRequestTests {
         #expect(cachedData != nil)
     }
 
+    // MARK: - Two writes to one key
+
+    /// Both requests miss, both go to the network and both write their response to the same key.
+    /// Whatever the order they finish in, what the cache serves afterwards is one whole response,
+    /// not the start of one and the end of the other, and not an error.
+    @Test(arguments: [Session.Executor.nio, .urlSession])
+    func cache_whenTwoRequestsForTheSameKeyRaceToStoreIt_theEntryServedAfterwardsIsWhole(
+        _ executor: Session.Executor
+    ) async throws {
+        let testState = try await TestState()
+        defer { _ = testState }
+
+        // Given: two bodies of the same size, large enough for the two writes to overlap, that
+        // differ in every byte. The server answers each request with one of them.
+        let size = 2_000_000
+        let bodies = [String(repeating: "x", count: size), String(repeating: "y", count: size)]
+        let headers = makeHeaders(maxAgeSeconds: 3_600)
+
+        // When
+        async let first = performCacheRequest(
+            testState: testState,
+            headers: headers,
+            cacheStrategy: .returnCachedDataElseLoad,
+            output: bodies[0],
+            executor: executor
+        )
+
+        async let second = performCacheRequest(
+            testState: testState,
+            headers: headers,
+            cacheStrategy: .returnCachedDataElseLoad,
+            output: bodies[1],
+            executor: executor
+        )
+
+        let (firstResult, secondResult) = try await (first, second)
+        await testState.dataCache.waitUntilIdle()
+
+        let received = [try responseText(firstResult), try responseText(secondResult)]
+
+        // Then: both went to the network, one for each body. A request served from the cache would
+        // have been given the body of the other.
+        #expect(Set(received) == Set(bodies))
+
+        // And the entry they left is one of the two bodies, whole and not mixed: the server now
+        // says something else, so a request that is not served from the cache cannot pass for one
+        // that is.
+        let third = try await performCacheRequest(
+            testState: testState,
+            headers: headers,
+            cacheStrategy: .returnCachedDataElseLoad,
+            output: "from the network",
+            executor: executor
+        )
+
+        #expect(bodies.contains(try responseText(third)))
+    }
+
     // MARK: - Vary and credentials in the cache key
 
     /// `DataCache` is keyed by URL alone, so a response's `Vary` has to be checked or a response
