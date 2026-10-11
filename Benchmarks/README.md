@@ -2,7 +2,7 @@
 
 Measures what the metrics of the `async-http-client` fork cost, by running the same client against two versions of it: one without them (1.38.2) and one with them (1.39.1 and later).
 
-This is a package of its own and nothing builds it but you: it is not part of the library's manifest, and CI does not run it. It does not depend on RequestDL either. The fork is pinned to one exact version per build (`BENCH_AHC_VERSION`), which a dependency on RequestDL, that needs it `from: "1.39.1"`, would not allow.
+This is a package of its own and nothing builds it but you: it is not part of the library's manifest, and CI does not run it. It does not depend on RequestDL either (the one that does is `CacheProbe/`, a package of its own for the response cache). The fork is pinned to one exact version per build (`BENCH_AHC_VERSION`), which a dependency on RequestDL, that needs it `from: "1.39.1"`, would not allow.
 
 ## Running it
 
