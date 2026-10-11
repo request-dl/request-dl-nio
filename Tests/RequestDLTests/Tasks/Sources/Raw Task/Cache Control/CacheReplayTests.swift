@@ -5,6 +5,8 @@
 @_spi(Testing) import RequestDLInternals
 import Testing
 
+import class Foundation.FileManager
+
 @testable import RequestDL
 @testable import RequestDLTestSupport
 
@@ -97,6 +99,64 @@ struct CacheReplayTests {
         // Then: it did not go on to read the rest of the body into the stream.
         #expect(window.bufferedBytesForTesting <= bufferedWhenParked + Internals.CacheControl.replayPieceSize)
         #expect(window.bufferedBytesForTesting < size)
+    }
+
+    // MARK: - Reading the first piece before the response is handed out
+
+    @Test
+    func readPiece_ofAnEmptyBody_isEmptyNotUnreadable() async throws {
+        var body: Internals.AnyBuffer = await Internals.DataBuffer(Data())
+
+        let piece = await Internals.CacheControl.readPiece(of: &body)
+
+        #expect(piece == [])
+    }
+
+    @Test
+    func readPiece_ofABodyLargerThanAPiece_takesOnePieceAndLeavesTheRest() async throws {
+        var body: Internals.AnyBuffer = await Internals.DataBuffer(
+            Data(repeating: 0x5A, count: Internals.CacheControl.replayPieceSize + 7)
+        )
+
+        let piece = await Internals.CacheControl.readPiece(of: &body)
+
+        #expect(piece?.count == Internals.CacheControl.replayPieceSize)
+        #expect(body.readableBytes == 7)
+    }
+
+    /// The entry lookup found a file, and the file is gone by the time it is read.
+    @Test
+    func readPiece_whenTheFileIsGoneAfterTheLookup_isUnreadable() async throws {
+        try await withTemporaryFileURL("entry.bin") { fileURL in
+            try Data(repeating: 0x5A, count: 1_024).write(to: fileURL)
+            var body: Internals.AnyBuffer = await Internals.FileBuffer(fileURL)
+
+            try FileManager.default.removeItem(at: fileURL)
+
+            let piece = await Internals.CacheControl.readPiece(of: &body)
+
+            #expect(piece == nil)
+        }
+    }
+
+    @Test
+    func replay_startingWithAPiece_deliversItBeforeTheRest() async throws {
+        // Given: a body whose first piece was already taken off.
+        let input = Data((0..<200_000).map { UInt8($0 % 251) })
+        var body: Internals.AnyBuffer = await Internals.DataBuffer(input)
+        let first = try #require(await Internals.CacheControl.readPiece(of: &body))
+
+        let window = Internals.FlowControlWindow()
+        let download = await Internals.DownloadBuffer(readingMode: .length(1_024), flowControl: window)
+
+        // When
+        await Internals.CacheControl.replay(body, startingWith: first, into: download, window: window)
+
+        // Then: the whole body, once, in order.
+        let bytes = Internals.AsyncBytes(logger: nil, totalSize: input.count, stream: download.stream)
+        let received = try await Array(bytes).reduce(into: Data()) { $0.append($1) }
+
+        #expect(received == input)
     }
 
     /// A body that is not a multiple of the piece size, and one smaller than a single piece, end
