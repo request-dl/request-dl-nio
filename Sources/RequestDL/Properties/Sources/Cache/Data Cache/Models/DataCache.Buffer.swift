@@ -49,6 +49,12 @@ extension DataCache {
         /// Whether the disk tier was given up on because the body outgrew its capacity.
         private(set) var diskOverflowed = false
 
+        /// Whether no tier is left for the rest of the body to go to: it was never allocated one,
+        /// or every one it had was given up on. What is still to come is of no use to this write.
+        var hasNowhereToWrite: Bool {
+            memoryBuffer == nil && diskBuffer == nil
+        }
+
         // MARK: - Private properties
 
         private var memoryBuffer: Internals.AnyBuffer?

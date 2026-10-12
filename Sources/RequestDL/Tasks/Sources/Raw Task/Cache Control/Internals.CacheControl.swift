@@ -723,12 +723,7 @@ extension Internals {
                     }
 
                     do {
-                        for try await buffer in asyncBuffers {
-                            // By value, not `inout`. This is `DataCache.Buffer.writeBuffer`,
-                            // which reads through `getBytes()` and leaves the argument's cursor
-                            // alone, not the draining `Internals.Buffer.writeBuffer(_:)`.
-                            await cacheBuffer.writeBuffer(buffer)
-                        }
+                        try await Self.write(asyncBuffers, to: &cacheBuffer)
 
                         // Corrects the usage estimate `allocateBuffer` above set from
                         // `contentLength` (a pre-write hint, `0` for chunked/unknown-length
@@ -750,6 +745,38 @@ extension Internals {
                 }
 
                 return asyncBuffers
+            }
+        }
+
+        /// Writes the chunks of a response to `cacheBuffer` until the stream ends, or until the
+        /// buffer has no tier left to write to.
+        ///
+        /// The stream keeps what has not been read yet, and the download feeds it as fast as the
+        /// network gives chunks, which is faster than this loop takes them out (one task hop and
+        /// a copy per chunk, a kilobyte each by default). Once every tier has been given up on
+        /// the loop would only read the rest of the body to throw it away, while it piled up in
+        /// the stream: a body of a gigabyte held more than half a gigabyte of the process on
+        /// the NIO executors. Stopping here, and closing the stream, makes every later append a
+        /// no op.
+        static func write(
+            _ asyncBuffers: Internals.AsyncStream<Internals.DataBuffer>,
+            to cacheBuffer: inout DataCache.Buffer
+        ) async throws {
+            guard !cacheBuffer.hasNowhereToWrite else {
+                asyncBuffers.close()
+                return
+            }
+
+            for try await buffer in asyncBuffers {
+                // By value, not `inout`. This is `DataCache.Buffer.writeBuffer`, which reads
+                // through `getBytes()` and leaves the argument's cursor alone, not the draining
+                // `Internals.Buffer.writeBuffer(_:)`.
+                await cacheBuffer.writeBuffer(buffer)
+
+                if cacheBuffer.hasNowhereToWrite {
+                    asyncBuffers.close()
+                    return
+                }
             }
         }
 
