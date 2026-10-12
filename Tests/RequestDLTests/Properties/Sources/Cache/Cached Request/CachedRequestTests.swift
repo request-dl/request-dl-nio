@@ -1208,7 +1208,7 @@ struct CachedRequestTests {
     /// Both requests miss, both go to the network and both write their response to the same key.
     /// Whatever the order they finish in, what the cache serves afterwards is one whole response,
     /// not the start of one and the end of the other, and not an error.
-    @Test(arguments: [Session.Executor.nio, .urlSession])
+    @Test(arguments: executors)
     func cache_whenTwoRequestsForTheSameKeyRaceToStoreIt_theEntryServedAfterwardsIsWhole(
         _ executor: Session.Executor
     ) async throws {
