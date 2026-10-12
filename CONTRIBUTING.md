@@ -28,6 +28,14 @@ To ensure that your pull request is reviewed and accepted in a timely manner, pl
 3. Ensure that all existing tests pass before submitting your pull request.
 4. Include any new or updated tests that are required to validate your changes.
 
+### Running the tests
+
+1. The package builds in two configurations: the default one (`swift test`) and without the `NIOTransport` trait (`swift build --disable-default-traits`). Run both before submitting a change.
+2. Give the second one a build directory of its own, `swift build --disable-default-traits --scratch-path .build-notnio`. Right after a default `swift test`, building it in `.build` fails with `clang dependency scanning failure` and no further detail.
+3. A test run that was killed can leave a `swiftpm-testing-helper` process holding the ports of the test servers, and the next run fails with `Address already in use`. Look for the leftover process and end it.
+4. To run the whole suite on Linux with the Apple `container` tool, copy the tree without `.build`, `.git` and `.claude` and run `swift test` in a `swift:6.2` container (`container run --rm -c 8 -m 12g -v <copy>:/src:ro -w /work swift:6.2 bash -c 'cp -r /src/. /work && swift test'`). Copy it while no test run is going on the host, because some tests leave large files in the tree while they run and the copy would carry them. Run it with nothing else heavy on the machine: on a loaded one, tests against a local server fail with `connectTimeout`, which says nothing about the change.
+5. A test that waits for time to pass should take an injected clock instead of sleeping for a real window, and a test must not compare numbers of the whole process (threads, descriptors) while the suite runs in parallel. Prefer a probe on the object under test.
+
 ## Review Process
 
 1. Once you have submitted your pull request, the maintainers will review it as soon as possible.
