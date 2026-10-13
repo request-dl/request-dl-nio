@@ -17,13 +17,17 @@ let revision =
 // SwiftPM names a path dependency after its directory.
 let identity = URL(fileURLWithPath: revision).lastPathComponent
 
+// `CACHE_PROBE_TRAITS=none` builds RequestDL without its default traits, the configuration that
+// has no NIO and runs the file system calls on the portable pool.
+let traits: Set<Package.Dependency.Trait> = environment["CACHE_PROBE_TRAITS"] == "none" ? [] : [.defaults]
+
 let package = Package(
     name: "cache-probe",
     platforms: [
         .macOS(.v13)
     ],
     dependencies: [
-        .package(path: revision)
+        .package(path: revision, traits: traits)
     ],
     targets: [
         .executableTarget(
