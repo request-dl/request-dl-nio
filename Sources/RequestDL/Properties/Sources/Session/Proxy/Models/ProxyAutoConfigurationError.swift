@@ -5,7 +5,9 @@
 import RequestDLInternals
 
 /// An error thrown when the proxy auto-configuration (PAC) script that decides a request's proxy
-/// could not be asked, and the request declared ``SystemProxy/PACFailurePolicy/fail``.
+/// could not be asked, and the request's policy is to fail: ``SystemProxy/PACFailurePolicy/fail``,
+/// or ``SystemProxy/PACFailurePolicy/lastKnown(orElse:)`` with a script that never answered and
+/// ``SystemProxy/PACFailurePolicy/Fallback/fail`` to fall back on.
 ///
 /// Under the default policy, ``SystemProxy/PACFailurePolicy/direct``, the request is sent
 /// directly instead and the failure is only logged, which on a network that requires a proxy
@@ -70,7 +72,7 @@ extension ProxyAutoConfigurationError: CustomStringConvertible {
         return """
             RequestDL could not decide the proxy of this request: the proxy auto-configuration \
             script was not usable, because \(reasonDescription)\(detailsNote). The request was not \
-            sent, because SystemProxy(onPACFailure: .fail) was declared.
+            sent, because its SystemProxy policy is to fail when the script cannot be used.
             """
     }
 }

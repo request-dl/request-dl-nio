@@ -49,7 +49,7 @@ struct InternalsSystemProxyResolverPACTests {
         let resolved = try await Internals.SystemProxyResolver.resolve(
             target,
             among: pacList,
-            onPACFailure: policy,
+            pac: .init(onFailure: policy),
             logger: nil,
             cache: cache
         )
@@ -67,7 +67,7 @@ struct InternalsSystemProxyResolverPACTests {
         let resolved = try await Internals.SystemProxyResolver.resolve(
             target,
             among: pacList,
-            onPACFailure: .direct,
+            pac: .init(onFailure: .direct),
             logger: nil,
             cache: cache
         )
@@ -86,7 +86,7 @@ struct InternalsSystemProxyResolverPACTests {
             try await Internals.SystemProxyResolver.resolve(
                 target,
                 among: pacList,
-                onPACFailure: .fail,
+                pac: .init(onFailure: .fail),
                 logger: nil,
                 cache: cache
             )
@@ -112,7 +112,7 @@ struct InternalsSystemProxyResolverPACTests {
             _ = try? await Internals.SystemProxyResolver.resolve(
                 target,
                 among: pacList,
-                onPACFailure: .fail,
+                pac: .init(onFailure: .fail),
                 logger: nil,
                 cache: cache
             )
@@ -120,6 +120,85 @@ struct InternalsSystemProxyResolverPACTests {
 
         // Then
         #expect(asked.value == 1)
+    }
+
+    // MARK: - The last answer, and the two times
+
+    /// A script that answered, and then cannot be asked once its answer has expired, still gives the
+    /// request its proxy under `lastKnown`.
+    @Test
+    func resolve_whenTheScriptAnsweredBeforeAndCannotBeAskedNow_usesTheLastAnswer() async throws {
+        // Given: an answer, five minutes and more pass, and the script is down.
+        let proxy = Internals.Proxy(host: "proxy.example.com", port: 8_080, connection: .http, authorization: nil)
+        let steps = Steps([.proxy(proxy), .fail])
+        let clock = Clock()
+        let cache = Internals.PACProxyCache(now: clock.now) { _, _, _ in try steps.next() }
+
+        _ = try await Internals.SystemProxyResolver.resolve(
+            target,
+            among: pacList,
+            pac: .init(onFailure: .lastKnown(orElse: .fail)),
+            logger: nil,
+            cache: cache
+        )
+
+        for _ in 0..<200 where await cache.count < 1 {
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+
+        clock.advance(by: 360_000_000_000)
+
+        // When
+        let resolved = try await Internals.SystemProxyResolver.resolve(
+            target,
+            among: pacList,
+            pac: .init(onFailure: .lastKnown(orElse: .fail)),
+            logger: nil,
+            cache: cache
+        )
+
+        // Then
+        #expect(resolved == proxy)
+    }
+
+    @Test
+    func resolve_whenTheScriptNeverAnsweredAndTheFallbackIsToFail_throws() async throws {
+        // Given
+        let cache = cache { _, _, _ in throw EvaluationFailed() }
+
+        // When / Then
+        await #expect(throws: Internals.PACEvaluationFailure.self) {
+            try await Internals.SystemProxyResolver.resolve(
+                target,
+                among: pacList,
+                pac: .init(onFailure: .lastKnown(orElse: .fail)),
+                logger: nil,
+                cache: cache
+            )
+        }
+    }
+
+    @Test
+    func resolve_whenTheOptionsSetTheEvaluationTimeout_theScriptIsAskedWithIt() async throws {
+        // Given
+        let timeouts = Timeouts()
+
+        let cache = cache { _, _, timeout in
+            timeouts.record(timeout)
+            return nil
+        }
+
+        // When
+        _ = try await Internals.SystemProxyResolver.resolve(
+            target,
+            among: pacList,
+            pac: .init(evaluationTimeout: 7),
+            logger: nil,
+            cache: cache
+        )
+
+        // Then
+        #expect(timeouts.all == [7])
     }
 
     @Test
@@ -136,7 +215,7 @@ struct InternalsSystemProxyResolverPACTests {
         let direct = try await Internals.SystemProxyResolver.resolve(
             target,
             among: [[kCFProxyTypeKey as String: kCFProxyTypeNone]],
-            onPACFailure: .fail,
+            pac: .init(onFailure: .fail),
             logger: nil,
             cache: cache
         )
@@ -144,7 +223,7 @@ struct InternalsSystemProxyResolverPACTests {
         let empty = try await Internals.SystemProxyResolver.resolve(
             target,
             among: [],
-            onPACFailure: .fail,
+            pac: .init(onFailure: .fail),
             logger: nil,
             cache: cache
         )
@@ -153,6 +232,63 @@ struct InternalsSystemProxyResolverPACTests {
         #expect(direct == nil)
         #expect(empty == nil)
         #expect(asked.value == 0)
+    }
+}
+
+/// What the stand-in evaluator does, one step per evaluation.
+private final class Steps: @unchecked Sendable {
+
+    enum Step {
+        case proxy(Internals.Proxy)
+        case fail
+    }
+
+    private let lock = NSLock()
+    private var steps: [Step]
+
+    init(_ steps: [Step]) {
+        self.steps = steps
+    }
+
+    func next() throws -> Internals.Proxy? {
+        let step = lock.withLock { steps.removeFirst() }
+
+        switch step {
+        case .proxy(let proxy):
+            return proxy
+
+        case .fail:
+            throw InternalsSystemProxyResolverPACTests.EvaluationFailed()
+        }
+    }
+}
+
+/// A clock that only moves when the test says so, in the nanoseconds the cache ages entries by.
+private final class Clock: @unchecked Sendable {
+
+    private let lock = NSLock()
+    private var value: UInt64 = 1_000_000
+
+    var now: @Sendable () -> UInt64 {
+        { self.lock.withLock { self.value } }
+    }
+
+    func advance(by nanoseconds: UInt64) {
+        lock.withLock { value += nanoseconds }
+    }
+}
+
+private final class Timeouts: @unchecked Sendable {
+
+    private let lock = NSLock()
+    private var recorded: [Double] = []
+
+    var all: [Double] {
+        lock.withLock { recorded }
+    }
+
+    func record(_ timeout: Double) {
+        lock.withLock { recorded.append(timeout) }
     }
 }
 
