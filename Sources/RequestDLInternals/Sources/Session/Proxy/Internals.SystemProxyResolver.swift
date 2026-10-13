@@ -129,6 +129,28 @@ extension Internals.SystemProxyResolver {
             CFNetworkCopyProxiesForURL(url as CFURL, settings)
             .takeRetainedValue() as? [[String: Any]] ?? []
 
+        return try await resolve(
+            url,
+            among: proxies,
+            onPACFailure: policy,
+            logger: logger,
+            cache: .shared
+        )
+    }
+
+    /// What the proxy list CFNetwork gave for `url` comes to: a proxy, a direct connection, or a PAC
+    /// script that still has to be asked, in which case `cache` is.
+    ///
+    /// Separate from the call that reads the system's settings so that it can be given a list and a
+    /// cache of its own, which is what lets a test put a PAC script, working or not, where the
+    /// system's would be.
+    package static func resolve(
+        _ url: URL,
+        among proxies: [[String: Any]],
+        onPACFailure policy: PACFailurePolicy,
+        logger: Logger?,
+        cache: Internals.PACProxyCache
+    ) async throws -> Internals.Proxy? {
         switch firstResolution(in: proxies) {
         case .none, .direct:
             return nil
@@ -138,7 +160,7 @@ extension Internals.SystemProxyResolver {
 
         case .autoConfiguration(let scriptURL):
             return try apply(
-                await Internals.PACProxyCache.shared.resolution(forScriptURL: scriptURL, targetURL: url),
+                await cache.resolution(forScriptURL: scriptURL, targetURL: url),
                 policy: policy,
                 scriptURL: scriptURL,
                 logger: logger

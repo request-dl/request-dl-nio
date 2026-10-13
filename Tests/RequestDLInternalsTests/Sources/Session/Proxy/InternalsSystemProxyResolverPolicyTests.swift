@@ -79,6 +79,28 @@ struct InternalsSystemProxyResolverPolicyTests {
         #expect(!everything.contains("token"))
     }
 
+    /// A script that could not be fetched or run is not the same as one that took too long, and the
+    /// log says which.
+    @Test
+    func apply_whenTheScriptCouldNotBeRun_saysItFailedAndNotThatItTimedOut() async throws {
+        // Given
+        let records = LogRecords()
+
+        // When
+        _ = try await Logger.withTestHandler(recorded: records.append) { logger in
+            try Internals.SystemProxyResolver.apply(
+                .failed(.init(reason: .failed, details: "PAC file error")),
+                policy: .direct,
+                scriptURL: scriptURL,
+                logger: logger
+            )
+        }
+
+        // Then
+        #expect(records.all.first?.metadata["reason"] == "failed")
+        #expect(records.all.first?.metadata["details"] == "PAC file error")
+    }
+
     @Test
     func apply_whenTheScriptFailedAndThePolicyIsToFail_throwsTheFailureAndDoesNotGoDirect() async throws {
         // Given

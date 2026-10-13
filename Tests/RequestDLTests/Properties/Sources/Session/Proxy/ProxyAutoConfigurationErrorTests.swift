@@ -23,6 +23,15 @@ struct ProxyAutoConfigurationErrorTests {
     }
 
     @Test
+    func description_whenTheScriptTookTooLong_saysSo() {
+        // Given
+        let error = ProxyAutoConfigurationError(.init(reason: .timedOut))
+
+        // Then
+        #expect(error.description.contains("did not finish in time"))
+    }
+
+    @Test
     func description_saysWhatHappenedAndWhatPolicyCausedIt() {
         // Given
         let error = ProxyAutoConfigurationError(.init(reason: .failed, details: "PAC file error"))
