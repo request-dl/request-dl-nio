@@ -295,13 +295,16 @@ struct RequestMetricsReporterTests {
         }
 
         // Then
-        try await eventually(timeout: 30) { !metrics.timers.isEmpty }
-
         let dimensions = [
             ("http.request.method", "GET"),
             ("server.address", "127.0.0.1"),
             ("error.type", "timeout"),
         ]
+
+        // A metric exists before its value is recorded, so wait for the value itself.
+        try await eventually(timeout: 30) {
+            (try? metrics.expectTimer(Self.durationLabel, dimensions).values.count) == 1
+        }
 
         #expect(try metrics.expectTimer(Self.durationLabel, dimensions).values.count == 1)
     }
