@@ -147,7 +147,7 @@ struct Resolve<Root: Property>: Sendable {
         do {
             configuration.proxy = try await Internals.SystemProxyResolver.proxy(
                 forURL: make.requestConfiguration.url,
-                onPACFailure: make.systemProxyPACFailure,
+                pac: make.systemProxyPAC,
                 logger: environment.logger
             )
         } catch let failure as Internals.PACEvaluationFailure {

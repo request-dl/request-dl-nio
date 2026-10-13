@@ -30,6 +30,22 @@ extension Internals {
         }
     }
 
+    /// The last answer a PAC script gave for a URL, kept after it expired so it can stand in for
+    /// the script when the script cannot be asked.
+    package struct PACLastKnownAnswer: Sendable, Equatable {
+
+        /// The proxy the script answered, `nil` for "connect directly".
+        package let proxy: Internals.Proxy?
+
+        /// How long ago the script gave it, in nanoseconds.
+        package let ageNanoseconds: UInt64
+
+        package init(proxy: Internals.Proxy?, ageNanoseconds: UInt64) {
+            self.proxy = proxy
+            self.ageNanoseconds = ageNanoseconds
+        }
+    }
+
     /// What asking a PAC script about a URL came to.
     ///
     /// `answered(nil)` is a script that said to connect directly. It is not the same as `failed`,
@@ -37,7 +53,11 @@ extension Internals {
     /// what a failure should do.
     package enum PACResolution: Sendable, Equatable {
         case answered(Internals.Proxy?)
-        case failed(PACEvaluationFailure)
+
+        /// The script could not be asked. `lastKnown` is the last answer it gave for this URL
+        /// while it still could, if it ever did.
+        case failed(PACEvaluationFailure, lastKnown: PACLastKnownAnswer?)
+
         /// The caller was cancelled while the evaluation was still going.
         case cancelled
     }

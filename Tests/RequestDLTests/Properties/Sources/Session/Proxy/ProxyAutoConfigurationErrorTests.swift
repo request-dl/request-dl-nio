@@ -30,6 +30,6 @@ struct ProxyAutoConfigurationErrorTests {
         // Then
         #expect(error.description.contains("PAC file error"))
         #expect(error.description.contains("could not be fetched or run"))
-        #expect(error.description.contains("SystemProxy(onPACFailure: .fail)"))
+        #expect(error.description.contains("SystemProxy policy is to fail"))
     }
 }

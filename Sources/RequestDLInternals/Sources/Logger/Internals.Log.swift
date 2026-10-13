@@ -186,12 +186,58 @@ extension Internals.Log {
             The proxy auto-configuration (PAC) script could not be evaluated, so the request \
             was sent directly, around any proxy the script would have chosen.
 
-            To fail the request instead, declare SystemProxy(onPACFailure: .fail).
+            To fail the request instead, declare SystemProxy(onPACFailure: .fail); to use the \
+            last answer the script gave, SystemProxy(onPACFailure: .lastKnown(orElse: .direct)).
             """,
             metadata: [
                 "script": .string(script),
                 "reason": .string(reason),
                 "details": .string(failure.details ?? ""),
+            ]
+        )
+    }
+}
+
+extension Internals.Log {
+
+    /// A request used the last answer a PAC script gave, because the script could not be asked now.
+    ///
+    /// The answer can be out of date, which is why it is reported. Only the origin and path of the
+    /// script are, as in ``proxyAutoConfigurationFailedWentDirect(scriptURL:failure:)``.
+    package static func proxyAutoConfigurationFailedUsedLastAnswer(
+        scriptURL: URL,
+        failure: Internals.PACEvaluationFailure,
+        ageNanoseconds: UInt64
+    ) -> Internals.Log {
+        var components = URLComponents(url: scriptURL, resolvingAgainstBaseURL: false)
+        components?.user = nil
+        components?.password = nil
+        components?.query = nil
+        components?.fragment = nil
+
+        let script = components?.string ?? "?"
+        let seconds = ageNanoseconds / 1_000_000_000
+
+        let reason: String
+
+        switch failure.reason {
+        case .timedOut:
+            reason = "timed out"
+
+        case .failed:
+            reason = "failed"
+        }
+
+        return Internals.Log(
+            """
+            The proxy auto-configuration (PAC) script could not be evaluated, so the request \
+            used the last answer the script gave, which may be out of date.
+            """,
+            metadata: [
+                "script": .string(script),
+                "reason": .string(reason),
+                "details": .string(failure.details ?? ""),
+                "answerAgeSeconds": .string(String(seconds)),
             ]
         )
     }

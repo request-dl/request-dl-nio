@@ -217,7 +217,7 @@ struct InternalsPACProxyCacheKeyTests {
         )
 
         // Then
-        guard case .failed(let failure) = failed else {
+        guard case .failed(let failure, _) = failed else {
             Issue.record("expected a failure, got \(failed)")
             return
         }
@@ -240,7 +240,7 @@ struct InternalsPACProxyCacheKeyTests {
         )
 
         // Then
-        #expect(resolution == .failed(.init(reason: .timedOut)))
+        #expect(resolution == .failed(.init(reason: .timedOut), lastKnown: nil))
     }
 
     @Test
@@ -256,7 +256,7 @@ struct InternalsPACProxyCacheKeyTests {
         )
 
         // Then
-        #expect(resolution == .failed(.init(reason: .failed, details: "PAC file error")))
+        #expect(resolution == .failed(.init(reason: .failed, details: "PAC file error"), lastKnown: nil))
     }
 
     /// Everyone who asks inside the window gets the same failure at once, which is what lets a
@@ -283,7 +283,7 @@ struct InternalsPACProxyCacheKeyTests {
         let third = await cache.resolution(forScriptURL: Self.scriptURL, targetURL: target)
 
         // Then
-        #expect(first == .failed(.init(reason: .failed, details: "down")))
+        #expect(first == .failed(.init(reason: .failed, details: "down"), lastKnown: nil))
         #expect(second == first)
         #expect(await evaluator.callCount == 2)
 
@@ -319,6 +319,157 @@ struct InternalsPACProxyCacheKeyTests {
         // And it does not disturb the evaluation, which is let go and answers for whoever asks next.
         await evaluations.releaseAll()
         try await waitUntil { await evaluations.running == 0 }
+    }
+
+    // MARK: - The last answer a script gave
+
+    /// An entry that expired is replaced by a failure, and the answer it held is what stands in for
+    /// the script when it cannot be asked.
+    @Test
+    func resolution_whenAnExpiredAnswerIsFollowedByAFailure_carriesTheLastAnswerAndItsAge() async throws {
+        // Given
+        let evaluator = ScriptedEvaluator(results: [.proxy("proxy.example.com"), .executionFailed("down")])
+        let clock = TestClock()
+        let cache = Internals.PACProxyCache(now: clock.now, evaluate: evaluator.evaluate)
+        let target = try Self.url("https://example.com/")
+
+        _ = await cache.resolution(forScriptURL: Self.scriptURL, targetURL: target)
+        try await waitUntil { await cache.count == 1 }
+
+        // When: past the five minutes an answer is trusted for.
+        clock.advance(by: 360_000_000_000)
+        let resolution = await cache.resolution(forScriptURL: Self.scriptURL, targetURL: target)
+
+        // Then
+        guard case .failed(_, let lastKnown?) = resolution else {
+            Issue.record("expected a failure with a last known answer, got \(resolution)")
+            return
+        }
+
+        #expect(lastKnown.proxy?.host == "proxy.example.com")
+        #expect(lastKnown.ageNanoseconds == 360_000_000_000)
+    }
+
+    @Test
+    func resolution_whenTheScriptNeverAnswered_hasNoLastKnownAnswer() async throws {
+        // Given
+        let evaluator = ScriptedEvaluator(results: [.executionFailed("down")])
+        let cache = Internals.PACProxyCache(evaluate: evaluator.evaluate)
+
+        // When
+        let resolution = await cache.resolution(
+            forScriptURL: Self.scriptURL,
+            targetURL: try Self.url("https://example.com/")
+        )
+
+        // Then
+        #expect(resolution == .failed(.init(reason: .failed, details: "down"), lastKnown: nil))
+    }
+
+    /// "Connect directly" is an answer a script gives, and the one to fall back on if it was the
+    /// last.
+    @Test
+    func resolution_whenTheLastAnswerWasDirect_thatIsTheLastKnownAnswer() async throws {
+        // Given
+        let evaluator = ScriptedEvaluator(results: [.direct, .executionFailed("down")])
+        let clock = TestClock()
+        let cache = Internals.PACProxyCache(now: clock.now, evaluate: evaluator.evaluate)
+        let target = try Self.url("https://example.com/")
+
+        _ = await cache.resolution(forScriptURL: Self.scriptURL, targetURL: target)
+        try await waitUntil { await cache.count == 1 }
+        clock.advance(by: 360_000_000_000)
+
+        // When
+        let resolution = await cache.resolution(forScriptURL: Self.scriptURL, targetURL: target)
+
+        // Then
+        guard case .failed(_, let lastKnown?) = resolution else {
+            Issue.record("expected a failure with a last known answer, got \(resolution)")
+            return
+        }
+
+        #expect(lastKnown.proxy == nil)
+    }
+
+    /// A failure does not wipe the answer: a second failure still has the first answer to offer.
+    @Test
+    func resolution_whenTheScriptFailsAgain_stillCarriesTheLastAnswer() async throws {
+        // Given
+        let evaluator = ScriptedEvaluator(
+            results: [.proxy("proxy.example.com"), .executionFailed("down"), .executionFailed("still down")]
+        )
+        let clock = TestClock()
+        let cache = Internals.PACProxyCache(now: clock.now, evaluate: evaluator.evaluate)
+        let target = try Self.url("https://example.com/")
+
+        _ = await cache.resolution(forScriptURL: Self.scriptURL, targetURL: target)
+        try await waitUntil { await cache.count == 1 }
+        clock.advance(by: 360_000_000_000)
+        _ = await cache.resolution(forScriptURL: Self.scriptURL, targetURL: target)
+
+        // When: the failure is asked about again once its window has passed.
+        clock.advance(by: 20_000_000_000)
+        let second = await cache.resolution(forScriptURL: Self.scriptURL, targetURL: target)
+
+        // Then
+        guard case .failed(let failure, let lastKnown?) = second else {
+            Issue.record("expected a failure with a last known answer, got \(second)")
+            return
+        }
+
+        #expect(failure.details == "still down")
+        #expect(lastKnown.proxy?.host == "proxy.example.com")
+        #expect(lastKnown.ageNanoseconds == 380_000_000_000)
+    }
+
+    // MARK: - The two times a request can set
+
+    @Test
+    func resolution_whenGivenAnEvaluationTimeout_asksTheScriptWithIt() async throws {
+        // Given
+        let evaluator = ScriptedEvaluator(results: [.direct, .direct])
+        let cache = Internals.PACProxyCache(evaluate: evaluator.evaluate)
+
+        // When
+        _ = await cache.resolution(
+            forScriptURL: Self.scriptURL,
+            targetURL: try Self.url("https://example.com/"),
+            evaluationTimeout: 7
+        )
+
+        _ = await cache.resolution(
+            forScriptURL: Self.scriptURL,
+            targetURL: try Self.url("https://other.example.com/")
+        )
+
+        // Then: the one it was given, and the default for the call that gave none.
+        #expect(await evaluator.timeouts == [7, 30])
+    }
+
+    @Test
+    func resolution_whenGivenAFailureLifetime_remembersTheFailureForThatLong() async throws {
+        // Given
+        let evaluator = ScriptedEvaluator(results: [.executionFailed("down"), .proxy("proxy.example.com")])
+        let clock = TestClock()
+        let cache = Internals.PACProxyCache(now: clock.now, evaluate: evaluator.evaluate)
+        let target = try Self.url("https://example.com/")
+
+        // When: a failure remembered for 1,000 ns, far under the cache's own ten seconds.
+        _ = await cache.resolution(forScriptURL: Self.scriptURL, targetURL: target, failureLifetime: 1_000)
+        try await waitUntil { await cache.count == 1 }
+        clock.advance(by: 2_000)
+        let again = await cache.resolution(forScriptURL: Self.scriptURL, targetURL: target)
+
+        // Then
+        #expect(await evaluator.callCount == 2)
+
+        guard case .answered(let proxy) = again else {
+            Issue.record("expected the script to be asked again, got \(again)")
+            return
+        }
+
+        #expect(proxy?.host == "proxy.example.com")
     }
 
     // MARK: - Helpers
@@ -371,17 +522,19 @@ private actor ScriptedEvaluator {
 
     private var results: [Result]
     private(set) var callCount = 0
+    private(set) var timeouts: [Double] = []
 
     init(results: [Result]) {
         self.results = results
     }
 
     nonisolated var evaluate: @Sendable (URL, URL, Double) async throws -> Internals.Proxy? {
-        { _, _, _ in try await self.next() }
+        { _, _, timeout in try await self.next(timeout: timeout) }
     }
 
-    private func next() throws -> Internals.Proxy? {
+    private func next(timeout: Double) throws -> Internals.Proxy? {
         callCount += 1
+        timeouts.append(timeout)
 
         switch results.removeFirst() {
         case .failure:
