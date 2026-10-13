@@ -22,6 +22,15 @@ import Darwin
 //   chunked <port> <memory MiB> <urlSession|nio|nts> <body MiB>
 //       Reads a chunked body of that size from chunked-server.py through a cache whose memory
 //       tier is that large (0 turns the cache off) and reports the resident memory it took.
+//   replay <port> <urlSession|nio|nts> <body MiB>
+//       Reads a chunked body once to fill a disk cache, then reads it again from the cache and
+//       times that second read. The server's request count says whether it came from the cache.
+//   files <dir> <entries>
+//       Writes and reads back small entries through the disk tier and reports the threads the
+//       process has before, after and at most, which is the pool of the file system calls.
+//   compress <port> <urlSession|nio|nts> <uploads> <KiB>
+//       Sends that many uploads at once, each compressed with gzip, and reports the time and
+//       the threads the process had at most.
 
 let arguments = CommandLine.arguments
 let entrySize = 1_024
@@ -82,29 +91,68 @@ func residentBytes() -> Int {
     #endif
 }
 
-/// Keeps the highest resident size seen while it runs.
+/// The number of threads of this process right now.
+func threadCount() -> Int {
+    #if canImport(Darwin)
+    var threads: thread_act_array_t?
+    var count = mach_msg_type_number_t(0)
+
+    guard task_threads(mach_task_self_, &threads, &count) == KERN_SUCCESS, let threads else {
+        return 0
+    }
+
+    vm_deallocate(
+        mach_task_self_,
+        vm_address_t(UInt(bitPattern: threads)),
+        vm_size_t(Int(count) * MemoryLayout<thread_act_t>.size)
+    )
+
+    return Int(count)
+    #else
+    return (try? FileManager.default.contentsOfDirectory(atPath: "/proc/self/task").count) ?? 0
+    #endif
+}
+
+/// Keeps the highest resident size and the most threads seen while it runs.
 final class PeakSampler: @unchecked Sendable {
     private let lock = NSLock()
     private var peak = residentBytes()
+    private var peakThreadCount = threadCount()
     private var task: Task<Void, Never>?
+
+    var peakThreads: Int {
+        lock.withLock { max(peakThreadCount, threadCount()) }
+    }
 
     func start() {
         task = Task.detached { [self] in
             while !Task.isCancelled {
                 let current = residentBytes()
-                lock.lock()
-                peak = max(peak, current)
-                lock.unlock()
-                try? await Task.sleep(nanoseconds: 10_000_000)
+                let threads = threadCount()
+                lock.withLock {
+                    peak = max(peak, current)
+                    peakThreadCount = max(peakThreadCount, threads)
+                }
+                try? await Task.sleep(nanoseconds: 5_000_000)
             }
         }
     }
 
     func stop() -> Int {
         task?.cancel()
-        lock.lock()
-        defer { lock.unlock() }
-        return max(peak, residentBytes())
+        return lock.withLock { max(peak, residentBytes()) }
+    }
+}
+
+/// The executor a command line argument names. Without the `NIOTransport` trait there is no other
+/// than `urlSession`, and the result line says which one was used.
+func resolveExecutor(named name: String) -> Session.Executor {
+    switch name {
+    #if canImport(NIOCore)
+    case "nio": return .nio
+    case "nts": return .nioTransportServices
+    #endif
+    default: return .urlSession
     }
 }
 
@@ -215,12 +263,7 @@ case "lru":
 case "chunked":
     let port = arguments[2]
     let memoryMebibytes = Int64(arguments[3])!
-    let executor: Session.Executor =
-        switch arguments[4] {
-        case "nio": .nio
-        case "nts": .nioTransportServices
-        default: .urlSession
-        }
+    let executor = resolveExecutor(named: arguments[4])
     let bodyMebibytes = Int(arguments[5])!
 
     let directory = FileManager.default.temporaryDirectory
@@ -275,6 +318,161 @@ case "chunked":
         "RESULT received_mib=\(received / mebibyte) before_mib=\(mebibytes(before)) "
             + "peak_mib=\(mebibytes(peak)) grew_mib=\(mebibytes(peak - before)) "
             + "after_mib=\(mebibytes(after)) seconds=\(Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18)"
+    )
+
+case "replay":
+    let port = arguments[2]
+    let executor = resolveExecutor(named: arguments[3])
+    let bodyMebibytes = Int(arguments[4])!
+
+    let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("cache-probe-\(UUID().uuidString)", isDirectory: true)
+
+    func makeTask(path: String) -> DownloadTask<some Property> {
+        DownloadTask {
+            Session()
+                .requiredExecutor(executor)
+                .cachePolicy(.disk)
+                .cacheStrategy(.returnCachedDataElseLoad)
+                .cache(memoryCapacity: 0, diskCapacity: Int64(bodyMebibytes * 4 * mebibyte), url: directory)
+
+            BaseURL(.http, host: "127.0.0.1:\(port)")
+            Path(path)
+        }
+    }
+
+    func served() async throws -> Int {
+        let (data, _) = try await URLSession.shared.data(from: URL(string: "http://127.0.0.1:\(port)/count")!)
+        return Int(String(decoding: data, as: UTF8.self)) ?? -1
+    }
+
+    func read(_ path: String) async throws -> (bytes: Int, seconds: Double) {
+        var bytes = 0
+
+        let elapsed = try await ContinuousClock().measure {
+            for try await chunk in try await makeTask(path: path).result().payload {
+                bytes += chunk.count
+            }
+        }
+
+        return (bytes, Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18)
+    }
+
+    // The first read goes to the network and fills the disk tier.
+    let path = "/big/\(bodyMebibytes)"
+    let first = try await read(path)
+
+    // A write to the cache is separate from the response, so wait until the whole entry can be
+    // read. A revision that serves an entry while it is still being written (the one before the
+    // fix) hands it over at once and short, which is why the size is checked and not just that
+    // the entry exists.
+    let key = "http://127.0.0.1:\(port)\(path)"
+    let cache = DataCache(memoryCapacity: 0, diskCapacity: Int64(bodyMebibytes * 4 * mebibyte), url: directory)
+    var waited = 0
+
+    while waited < 600 {
+        if let cached = await cache.getCachedData(forKey: key, policy: .disk),
+            await cached.data.count >= bodyMebibytes * mebibyte
+        {
+            break
+        }
+
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        waited += 1
+    }
+
+    // The second one is what is measured.
+    let before = try await served()
+    let second = try await read(path)
+    let after = try await served()
+
+    print(
+        "RESULT executor=\(executor) body_mib=\(bodyMebibytes) first_s=\(first.seconds) "
+            + "second_s=\(second.seconds) second_mib_per_s=\(Double(second.bytes) / Double(mebibyte) / second.seconds) "
+            + "second_bytes=\(second.bytes) from_cache=\(after == before) waited_ds=\(waited)"
+    )
+
+case "files":
+    let directory = URL(fileURLWithPath: arguments[2], isDirectory: true)
+    let count = Int(arguments[3])!
+
+    let startThreads = threadCount()
+    let sampler = PeakSampler()
+    sampler.start()
+
+    let cache = DataCache(memoryCapacity: 0, diskCapacity: 1 << 32, url: directory)
+
+    for index in 0..<count {
+        await cache.setCachedData(await entry(policy: .disk), forKey: "https://example.com/entry/\(index)")
+    }
+
+    var waited = 0
+
+    while recordCount(in: directory) < count, waited < 600 {
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        waited += 1
+    }
+
+    var found = 0
+
+    for index in 0..<count {
+        if await cache.getCachedData(forKey: "https://example.com/entry/\(index)", policy: .disk) != nil {
+            found += 1
+        }
+    }
+
+    let afterThreads = threadCount()
+    _ = sampler.stop()
+
+    print(
+        "RESULT entries=\(count) found=\(found) threads_at_start=\(startThreads) "
+            + "threads_after=\(afterThreads) threads_peak=\(sampler.peakThreads)"
+    )
+
+case "compress":
+    let port = arguments[2]
+    let executor = resolveExecutor(named: arguments[3])
+    let uploads = Int(arguments[4])!
+    let kibibytes = Int(arguments[5])!
+    let body = Data((0..<kibibytes * 1_024).map { UInt8(truncatingIfNeeded: $0 % 251) })
+
+    func upload() async throws {
+        _ = try await UploadTask {
+            Session().requiredExecutor(executor)
+            BaseURL(.http, host: "127.0.0.1:\(port)")
+            Path("/upload")
+            RequestMethod(.put)
+            Payload(data: body).compression(.gzip)
+        }
+        .collectData()
+        .extractPayload()
+        .result()
+    }
+
+    // The first one puts the process in its steady state.
+    try await upload()
+
+    let startThreads = threadCount()
+    let sampler = PeakSampler()
+    sampler.start()
+
+    let elapsed = try await ContinuousClock().measure {
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            for _ in 0..<uploads {
+                group.addTask { try await upload() }
+            }
+
+            try await group.waitForAll()
+        }
+    }
+
+    _ = sampler.stop()
+    let seconds = Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
+
+    print(
+        "RESULT executor=\(executor) uploads=\(uploads) kib=\(kibibytes) seconds=\(seconds) "
+            + "uploads_per_s=\(Double(uploads) / seconds) threads_at_start=\(startThreads) "
+            + "threads_peak=\(sampler.peakThreads)"
     )
 
 default:
