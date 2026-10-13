@@ -50,6 +50,36 @@ struct SystemProxyTests {
         #expect(resolved.session.configuration.proxy?.port == port)
     }
 
+    @Test(arguments: [SystemProxy.PACFailurePolicy.direct, .fail])
+    func systemProxy_carriesItsPolicyToTheBuild(_ policy: SystemProxy.PACFailurePolicy) async throws {
+        // When
+        let (_, make) = try await Resolve(
+            TestProperty {
+                SystemProxy(onPACFailure: policy)
+            }
+        )
+        .partiallyBuild()
+
+        // Then
+        #expect(make.resolvesSystemProxy)
+        #expect(make.systemProxyPACFailure == policy.internalPolicy)
+    }
+
+    /// A request that never said what to do keeps going direct, as it always did.
+    @Test
+    func systemProxy_withoutAPolicy_goesDirectOnAFailure() async throws {
+        // When
+        let (_, make) = try await Resolve(
+            TestProperty {
+                SystemProxy()
+            }
+        )
+        .partiallyBuild()
+
+        // Then
+        #expect(make.systemProxyPACFailure == .direct)
+    }
+
     @Test
     func neverBody() async throws {
         // Given

@@ -19,6 +19,9 @@ struct Make: Sendable {
     /// `sessionConfiguration`, and that is what the client cache keys on.
     var resolvesSystemProxy: Bool
 
+    /// What a request does when the PAC script that decides its system proxy cannot be asked.
+    var systemProxyPACFailure: Internals.SystemProxyResolver.PACFailurePolicy
+
     /// Rules accumulated by every declared `URLOverride`, in declaration order.
     ///
     /// Matched against the final `baseURL`/`pathComponents` in `Resolve.build()`, once every
@@ -45,6 +48,7 @@ struct Make: Sendable {
         self.requestConfiguration = requestConfiguration
         self.cacheConfiguration = .init()
         self.resolvesSystemProxy = false
+        self.systemProxyPACFailure = .direct
         self.urlOverrides = []
         self.pendingURLEncodedPayloads = []
     }

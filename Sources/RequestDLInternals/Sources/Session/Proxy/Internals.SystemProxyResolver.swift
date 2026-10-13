@@ -2,10 +2,13 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Logging
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
 import struct Foundation.URL
+import struct Foundation.URLComponents
 import class Foundation.NSNumber
 #endif
 
@@ -30,13 +33,78 @@ extension Internals {
     /// executor a session resolves to.
     package enum SystemProxyResolver {
 
-        /// The proxy the system would use to reach `url`, or `nil` for a direct connection.
+        /// What a request does when the PAC script that decides its proxy cannot be asked.
+        package enum PACFailurePolicy: Sendable, Hashable {
+            /// Connect directly, and say so in the log.
+            case direct
+            /// Fail the request with ``Internals/PACEvaluationFailure``.
+            case fail
+        }
+
+        /// The proxy the system would use to reach `url`, or `nil` for a direct connection,
+        /// including when a PAC script cannot be asked.
         package static func proxy(forURL url: String) async -> Internals.Proxy? {
+            (try? await proxy(forURL: url, onPACFailure: .direct, logger: nil)) ?? nil
+        }
+
+        /// The proxy the system would use to reach `url`, or `nil` for a direct connection.
+        ///
+        /// - Parameters:
+        ///   - onPACFailure: What to do when the system's proxy is a PAC script that cannot be
+        ///   fetched or run.
+        ///   - logger: Where a failure that went direct is reported.
+        /// - Throws: ``Internals/PACEvaluationFailure`` under ``PACFailurePolicy/fail``, and
+        /// `CancellationError` when the caller was cancelled while the script was being asked.
+        package static func proxy(
+            forURL url: String,
+            onPACFailure policy: PACFailurePolicy,
+            logger: Logger?
+        ) async throws -> Internals.Proxy? {
             guard let url = URL(string: url) else {
                 return nil
             }
 
-            return await resolve(url)
+            return try await resolve(url, onPACFailure: policy, logger: logger)
+        }
+
+        /// What `policy` makes of how a PAC script came out.
+        ///
+        /// A script that answered is its answer under any policy. A failure goes direct and is
+        /// reported, or throws. A caller that was cancelled while it waited keeps going direct,
+        /// as it always did, unless the policy is to fail, where going direct would be the one
+        /// thing the policy is there to prevent.
+        package static func apply(
+            _ resolution: Internals.PACResolution,
+            policy: PACFailurePolicy,
+            scriptURL: URL,
+            logger: Logger?
+        ) throws -> Internals.Proxy? {
+            switch resolution {
+            case .answered(let proxy):
+                return proxy
+
+            case .failed(let failure):
+                switch policy {
+                case .fail:
+                    throw failure
+
+                case .direct:
+                    Internals.Log.proxyAutoConfigurationFailedWentDirect(
+                        scriptURL: scriptURL,
+                        failure: failure
+                    )
+                    .log(level: .warning, logger: logger)
+
+                    return nil
+                }
+
+            case .cancelled:
+                if policy == .fail {
+                    throw CancellationError()
+                }
+
+                return nil
+            }
         }
     }
 }
@@ -48,7 +116,11 @@ extension Internals.SystemProxyResolver {
     /// - Note: `CFNetworkCopyProxiesForURL` already applies the exception list, per interface
     /// settings and the enable flags, so the result is the answer for this URL specifically
     /// rather than the raw settings dictionary.
-    private static func resolve(_ url: URL) async -> Internals.Proxy? {
+    private static func resolve(
+        _ url: URL,
+        onPACFailure policy: PACFailurePolicy,
+        logger: Logger?
+    ) async throws -> Internals.Proxy? {
         guard let settings = CFNetworkCopySystemProxySettings()?.takeRetainedValue() else {
             return nil
         }
@@ -65,7 +137,12 @@ extension Internals.SystemProxyResolver {
             return proxy
 
         case .autoConfiguration(let scriptURL):
-            return await Internals.PACProxyCache.shared.proxy(forScriptURL: scriptURL, targetURL: url)
+            return try apply(
+                await Internals.PACProxyCache.shared.resolution(forScriptURL: scriptURL, targetURL: url),
+                policy: policy,
+                scriptURL: scriptURL,
+                logger: logger
+            )
         }
     }
 
@@ -197,7 +274,13 @@ extension Internals.SystemProxyResolver {
     ///
     /// Both are real, separate pieces of work. `Internals.PACEvaluator`/`Internals.PACProxyCache`
     /// only cover problem 2, so porting either here still leaves problem 1 completely unsolved.
-    private static func resolve(_ url: URL) async -> Internals.Proxy? {
+    ///
+    /// For the same reasons there is no PAC script to fail here, so `policy` has nothing to decide.
+    private static func resolve(
+        _ url: URL,
+        onPACFailure policy: PACFailurePolicy,
+        logger: Logger?
+    ) async throws -> Internals.Proxy? {
         let environment = ProcessInfo.processInfo.environment
 
         guard let host = url.host else {

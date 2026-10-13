@@ -142,18 +142,32 @@ extension Internals {
         /// connection, including when evaluation itself fails (a stale/misconfigured PAC file,
         /// an unreachable PAC server, a script that throws).
         ///
-        /// A failure is remembered for `failureLifetime` only, so a script that was briefly
-        /// unreachable is asked again soon, and a script that answers is kept for `lifetime`.
-        ///
         /// Failing safe to direct is the same choice
         /// `Internals.SystemProxyResolver.firstResolution(in:)` already makes for any other
-        /// proxy-list entry it can't parse.
+        /// proxy-list entry it can't parse. A caller that needs to tell a failure from a script
+        /// that answered "direct" asks ``resolution(forScriptURL:targetURL:)`` instead.
         package func proxy(forScriptURL scriptURL: URL, targetURL: URL) async -> Internals.Proxy? {
+            guard case .answered(let proxy) = await resolution(forScriptURL: scriptURL, targetURL: targetURL) else {
+                return nil
+            }
+
+            return proxy
+        }
+
+        /// What `scriptURL`'s PAC script comes to for `targetURL`: the proxy it answered (`nil`
+        /// for "direct"), the failure when it could not be asked, or that the caller was
+        /// cancelled while it waited.
+        ///
+        /// A failure is remembered for `failureLifetime` only, so a script that was briefly
+        /// unreachable is asked again soon, and a script that answers is kept for `lifetime`.
+        /// Everyone who asks within that window gets the same failure, at once, instead of each
+        /// waiting out the evaluation.
+        package func resolution(forScriptURL scriptURL: URL, targetURL: URL) async -> Internals.PACResolution {
             let targetURL = Self.evaluationTarget(for: targetURL)
             let key = Key(scriptURL: scriptURL, targetURL: targetURL)
 
             if let entry = storage[key], !isExpired(entry) {
-                return entry.proxy
+                return entry.resolution
             }
 
             let task: _Concurrency.Task<Evaluation, Never>
@@ -172,11 +186,10 @@ extension Internals {
 
                     do {
                         evaluation = Evaluation(
-                            proxy: try await evaluate(scriptURL, targetURL, Self.evaluationTimeout),
-                            failed: false
+                            resolution: .answered(try await evaluate(scriptURL, targetURL, Self.evaluationTimeout))
                         )
                     } catch {
-                        evaluation = Evaluation(proxy: nil, failed: true)
+                        evaluation = Evaluation(resolution: .failed(Self.failure(from: error)))
                     }
 
                     await self.releaseEvaluationSlot()
@@ -250,29 +263,54 @@ extension Internals {
 
         private func finishEvaluation(key: Key, evaluation: Evaluation) {
             inFlight[key] = nil
+            let failed: Bool
+
+            if case .failed = evaluation.resolution {
+                failed = true
+            } else {
+                failed = false
+            }
+
             storage[key] = Entry(
-                proxy: evaluation.proxy,
+                resolution: evaluation.resolution,
                 readAt: now(),
-                lifetime: evaluation.failed ? failureLifetime : Self.lifetime
+                lifetime: failed ? failureLifetime : Self.lifetime
             )
             evictIfNeeded()
         }
 
         private static func awaitingCancellably(
             _ task: _Concurrency.Task<Evaluation, Never>
-        ) async -> Internals.Proxy? {
+        ) async -> Internals.PACResolution {
             let box = PACCacheAwaitBox()
 
             return await withTaskCancellationHandler {
-                await withCheckedContinuation { (continuation: CheckedContinuation<Internals.Proxy?, Never>) in
+                await withCheckedContinuation { (continuation: CheckedContinuation<Internals.PACResolution, Never>) in
                     box.attach(continuation)
 
                     _Concurrency.Task {
-                        box.resolve(returning: await task.value.proxy)
+                        box.resolve(returning: await task.value.resolution)
                     }
                 }
             } onCancel: {
                 box.cancel()
+            }
+        }
+
+        /// What the evaluator's error comes to for a caller: it timed out, or it did not work.
+        private static func failure(from error: Swift.Error) -> Internals.PACEvaluationFailure {
+            switch error {
+            case let error as Internals.PACEvaluator.Error:
+                switch error {
+                case .timedOut:
+                    return .init(reason: .timedOut)
+
+                case .executionFailed(let details):
+                    return .init(reason: .failed, details: details)
+                }
+
+            default:
+                return .init(reason: .failed, details: String(describing: error))
             }
         }
 
@@ -312,15 +350,14 @@ extension Internals {
             let targetURL: URL
         }
 
-        /// What one evaluation came to. `failed` tells an error (the script could not be fetched
-        /// or run) apart from a script that answered "direct", which is `proxy == nil` alone.
+        /// What one evaluation came to. A failure (the script could not be fetched or run) stays
+        /// apart from a script that answered "direct", which is `.answered(nil)`.
         private struct Evaluation: Sendable {
-            let proxy: Internals.Proxy?
-            let failed: Bool
+            let resolution: Internals.PACResolution
         }
 
         private struct Entry {
-            let proxy: Internals.Proxy?
+            let resolution: Internals.PACResolution
             // Monotonic, not wall clock: same rationale as `Internals.Storage`/
             // `Internals.ClientManager`: a `Date`-based deadline moves if the user or NTP moves
             // the system clock, and this must not advance while the device is suspended either
@@ -340,7 +377,7 @@ private final class PACCacheAwaitBox: @unchecked Sendable {
     // MARK: - Private properties
 
     private let lock = Lock()
-    private var continuation: CheckedContinuation<Internals.Proxy?, Never>?
+    private var continuation: CheckedContinuation<Internals.PACResolution, Never>?
     private var isCancelled = false
     private var isResumed = false
 
@@ -349,7 +386,7 @@ private final class PACCacheAwaitBox: @unchecked Sendable {
     /// Registers `continuation` as the one `resolve`/`cancel` should answer, unless `cancel()`
     /// already ran, in which case this resumes it immediately instead, since there is nothing
     /// left to wait on.
-    func attach(_ continuation: CheckedContinuation<Internals.Proxy?, Never>) {
+    func attach(_ continuation: CheckedContinuation<Internals.PACResolution, Never>) {
         let resumeNow: Bool = lock.withLock {
             guard !isResumed else { return false }
 
@@ -363,12 +400,12 @@ private final class PACCacheAwaitBox: @unchecked Sendable {
         }
 
         if resumeNow {
-            continuation.resume(returning: nil)
+            continuation.resume(returning: .cancelled)
         }
     }
 
-    func resolve(returning value: Internals.Proxy?) {
-        let toResume: CheckedContinuation<Internals.Proxy?, Never>? = lock.withLock {
+    func resolve(returning value: Internals.PACResolution) {
+        let toResume: CheckedContinuation<Internals.PACResolution, Never>? = lock.withLock {
             guard !isResumed, let continuation else { return nil }
             isResumed = true
             self.continuation = nil
@@ -379,7 +416,7 @@ private final class PACCacheAwaitBox: @unchecked Sendable {
     }
 
     func cancel() {
-        let toResume: CheckedContinuation<Internals.Proxy?, Never>? = lock.withLock {
+        let toResume: CheckedContinuation<Internals.PACResolution, Never>? = lock.withLock {
             isCancelled = true
 
             guard !isResumed, let continuation else { return nil }
@@ -388,7 +425,7 @@ private final class PACCacheAwaitBox: @unchecked Sendable {
             return continuation
         }
 
-        toResume?.resume(returning: nil)
+        toResume?.resume(returning: .cancelled)
     }
 }
 

@@ -4,6 +4,13 @@
 
 import Logging
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.URL
+import struct Foundation.URLComponents
+#endif
+
 extension Internals {
 
     package struct Log: Sendable {
@@ -141,6 +148,51 @@ extension Internals.Log {
             function or modify an existing one that does not affect the \
             graph pathway.
             """
+        )
+    }
+}
+
+// MARK: - Proxy
+extension Internals.Log {
+
+    /// A request went direct because the PAC script that decides its proxy could not be asked.
+    ///
+    /// That is the choice that can send traffic around a proxy a network requires, so it is not
+    /// left silent. Only the origin and path of the script are reported: its query and any
+    /// credentials in it stay out of the log.
+    package static func proxyAutoConfigurationFailedWentDirect(
+        scriptURL: URL,
+        failure: Internals.PACEvaluationFailure
+    ) -> Internals.Log {
+        var components = URLComponents(url: scriptURL, resolvingAgainstBaseURL: false)
+        components?.user = nil
+        components?.password = nil
+        components?.query = nil
+        components?.fragment = nil
+
+        let script = components?.string ?? "?"
+        let reason: String
+
+        switch failure.reason {
+        case .timedOut:
+            reason = "timed out"
+
+        case .failed:
+            reason = "failed"
+        }
+
+        return Internals.Log(
+            """
+            The proxy auto-configuration (PAC) script could not be evaluated, so the request \
+            was sent directly, around any proxy the script would have chosen.
+
+            To fail the request instead, declare SystemProxy(onPACFailure: .fail).
+            """,
+            metadata: [
+                "script": .string(script),
+                "reason": .string(reason),
+                "details": .string(failure.details ?? ""),
+            ]
         )
     }
 }

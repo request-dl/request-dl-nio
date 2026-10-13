@@ -195,6 +195,132 @@ struct InternalsPACProxyCacheKeyTests {
         #expect(await evaluator.callCount == 1)
     }
 
+    // MARK: - What a failure is told apart from
+
+    /// A script that answers DIRECT and a script that could not be asked both used to come back as
+    /// `nil`. A caller that must not go direct on a failure needs them apart.
+    @Test
+    func resolution_whenEvaluationFails_isAFailureAndNotADirectAnswer() async throws {
+        // Given
+        let evaluator = ScriptedEvaluator(results: [.failure, .direct])
+        let cache = Internals.PACProxyCache(evaluate: evaluator.evaluate)
+
+        // When
+        let failed = await cache.resolution(
+            forScriptURL: Self.scriptURL,
+            targetURL: try Self.url("https://example.com/")
+        )
+
+        let answered = await cache.resolution(
+            forScriptURL: Self.scriptURL,
+            targetURL: try Self.url("https://other.example.com/")
+        )
+
+        // Then
+        guard case .failed(let failure) = failed else {
+            Issue.record("expected a failure, got \(failed)")
+            return
+        }
+
+        #expect(failure.reason == .failed)
+        #expect(failure.details != nil)
+        #expect(answered == .answered(nil))
+    }
+
+    @Test
+    func resolution_whenEvaluationTimesOut_saysSo() async throws {
+        // Given
+        let evaluator = ScriptedEvaluator(results: [.timedOut])
+        let cache = Internals.PACProxyCache(evaluate: evaluator.evaluate)
+
+        // When
+        let resolution = await cache.resolution(
+            forScriptURL: Self.scriptURL,
+            targetURL: try Self.url("https://example.com/")
+        )
+
+        // Then
+        #expect(resolution == .failed(.init(reason: .timedOut)))
+    }
+
+    @Test
+    func resolution_whenTheScriptCannotRun_keepsWhatTheSystemReported() async throws {
+        // Given
+        let evaluator = ScriptedEvaluator(results: [.executionFailed("PAC file error")])
+        let cache = Internals.PACProxyCache(evaluate: evaluator.evaluate)
+
+        // When
+        let resolution = await cache.resolution(
+            forScriptURL: Self.scriptURL,
+            targetURL: try Self.url("https://example.com/")
+        )
+
+        // Then
+        #expect(resolution == .failed(.init(reason: .failed, details: "PAC file error")))
+    }
+
+    /// Everyone who asks inside the window gets the same failure at once, which is what lets a
+    /// policy that fails the request fail all of them fast instead of each waiting the script out.
+    @Test
+    func resolution_whenEvaluationFails_everyoneInTheWindowGetsTheFailureWithoutAskingAgain() async throws {
+        // Given
+        let evaluator = ScriptedEvaluator(results: [.executionFailed("down"), .proxy("proxy.example.com")])
+        let clock = TestClock()
+        let cache = Internals.PACProxyCache(
+            failureLifetime: 100,
+            now: clock.now,
+            evaluate: evaluator.evaluate
+        )
+        let target = try Self.url("https://example.com/")
+
+        // When
+        let first = await cache.resolution(forScriptURL: Self.scriptURL, targetURL: target)
+
+        clock.advance(by: 50)
+        let second = await cache.resolution(forScriptURL: Self.scriptURL, targetURL: target)
+
+        clock.advance(by: 100)
+        let third = await cache.resolution(forScriptURL: Self.scriptURL, targetURL: target)
+
+        // Then
+        #expect(first == .failed(.init(reason: .failed, details: "down")))
+        #expect(second == first)
+        #expect(await evaluator.callCount == 2)
+
+        guard case .answered(let proxy) = third else {
+            Issue.record("expected the script to be asked again and answer, got \(third)")
+            return
+        }
+
+        #expect(proxy?.host == "proxy.example.com")
+    }
+
+    /// A caller that is cancelled while it waits is not an answer of the script, and a policy that
+    /// refuses to go direct must not read it as one.
+    @Test
+    func resolution_whenTheCallerIsCancelledWhileItWaits_isCancelledAndNotDirect() async throws {
+        // Given
+        let evaluations = Evaluations(holds: true)
+        let cache = Internals.PACProxyCache(evaluate: evaluations.evaluator)
+        let target = try Self.url("https://example.com/")
+
+        let caller = Task {
+            await cache.resolution(forScriptURL: Self.scriptURL, targetURL: target)
+        }
+
+        try await waitUntil { await evaluations.running == 1 }
+
+        // When
+        caller.cancel()
+
+        // Then
+        #expect(await caller.value == .cancelled)
+
+        // And it does not disturb the evaluation, which is let go and answers for whoever asks next.
+        await evaluations.releaseAll()
+        try await waitUntil { await evaluations.running == 0 }
+    }
+
     // MARK: - Helpers
 
     /// The default is far above what the condition takes on a quiet machine: a CI runner running
@@ -235,6 +361,8 @@ private actor ScriptedEvaluator {
 
     enum Result {
         case failure
+        case timedOut
+        case executionFailed(String)
         case direct
         case proxy(String)
     }
@@ -258,6 +386,10 @@ private actor ScriptedEvaluator {
         switch results.removeFirst() {
         case .failure:
             throw Failure()
+        case .timedOut:
+            throw Internals.PACEvaluator.Error.timedOut
+        case .executionFailed(let details):
+            throw Internals.PACEvaluator.Error.executionFailed(details)
         case .direct:
             return nil
         case .proxy(let host):

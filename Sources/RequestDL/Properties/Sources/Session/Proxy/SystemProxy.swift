@@ -2,6 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
+import RequestDLInternals
+
 /// `SystemProxy` follows the proxy the operating system is configured to use.
 ///
 /// The underlying HTTP client has no proxy discovery of its own, so by default a proxy set in
@@ -29,16 +31,48 @@
 /// against the request's URL, exactly like a browser would), with results cached briefly per
 /// script/URL pair so a burst of requests to the same host doesn't re-fetch and re-evaluate the
 /// same script for each one. A PAC script that's unreachable, or fails to evaluate, resolves to a
-/// direct connection rather than failing the request.
+/// direct connection and a warning in the log by default, which on a network that requires a
+/// proxy sends the request around it. Declare ``PACFailurePolicy/fail`` to fail the request
+/// instead, with a ``ProxyAutoConfigurationError``:
+///
+/// ```swift
+/// DataTask {
+///     BaseURL("example.com")
+///     SystemProxy(onPACFailure: .fail)
+/// }
+/// ```
 public struct SystemProxy: Property {
 
+    /// What a request does when the PAC script that decides its proxy cannot be fetched or run.
+    public enum PACFailurePolicy: Sendable, Hashable {
+
+        /// Send the request directly, and report it in the log. This is the default.
+        case direct
+
+        /// Fail the request with a ``ProxyAutoConfigurationError``.
+        case fail
+
+        var internalPolicy: Internals.SystemProxyResolver.PACFailurePolicy {
+            switch self {
+            case .direct:
+                return .direct
+
+            case .fail:
+                return .fail
+            }
+        }
+    }
+
     private struct Node: PropertyNode {
+
+        let onPACFailure: PACFailurePolicy
 
         func make(_ make: inout Make) async throws {
             // Only a request, not a resolution. Which proxy the system would use depends on the
             // URL, and the URL is only complete once every property has had its turn, so the
             // answer is looked up at the end of the build rather than here.
             make.resolvesSystemProxy = true
+            make.systemProxyPACFailure = onPACFailure.internalPolicy
         }
     }
 
@@ -49,10 +83,24 @@ public struct SystemProxy: Property {
         bodyException()
     }
 
+    // MARK: - Internal properties
+
+    let onPACFailure: PACFailurePolicy
+
     // MARK: - Inits
 
     /// Initializes a new instance that follows the system's proxy configuration.
-    public init() {}
+    public init() {
+        self.onPACFailure = .direct
+    }
+
+    /// Initializes a new instance that follows the system's proxy configuration.
+    ///
+    /// - Parameter onPACFailure: What to do when the system's proxy is a PAC script that cannot be
+    /// fetched or run.
+    public init(onPACFailure: PACFailurePolicy) {
+        self.onPACFailure = onPACFailure
+    }
 
     // MARK: - Public static methods
 
@@ -62,6 +110,6 @@ public struct SystemProxy: Property {
         inputs: _PropertyInputs
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
-        return .leaf(Node())
+        return .leaf(Node(onPACFailure: property.onPACFailure))
     }
 }
