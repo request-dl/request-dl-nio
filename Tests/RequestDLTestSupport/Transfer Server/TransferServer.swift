@@ -146,6 +146,19 @@ package final class TransferServer: @unchecked Sendable {
         set { lock.withLock { _stallTimeout = newValue } }
     }
 
+    /// The offset of the resource at which a download stops being written, until this is set back
+    /// to `nil`.
+    ///
+    /// A download that goes to a file (`URLSessionDownloadTask`) applies no pressure of its own, so
+    /// 64 MiB over loopback can be over before a delegate that is late has seen the first two: a
+    /// test that suspends it from a callback then suspends a task that has already completed. Held
+    /// here, it cannot complete, whatever the delegate does. It waits for two minutes at most, so a
+    /// test that forgets to let it go does not leave a thread behind for good.
+    package var holdsDownloadAt: Int? {
+        get { lock.withLock { _holdsDownloadAt } }
+        set { lock.withLock { _holdsDownloadAt = newValue } }
+    }
+
     /// Microseconds to wait after every read of an upload body: a server slower than loopback,
     /// so an upload is still mostly unsent (rather than sitting whole in socket buffers) when a
     /// test suspends it.
@@ -289,6 +302,7 @@ package final class TransferServer: @unchecked Sendable {
     private var _dropPlan: [Int?] = []
     private var _uploadDropPlan: [Int?] = []
     private var _stallTimeout: Double?
+    private var _holdsDownloadAt: Int?
     private var _uploadReadDelay: UInt32 = .zero
     private var _onUploadProgress: (@Sendable (Int) -> Void)?
     private var _redirectsFirstUpload = false
@@ -650,6 +664,8 @@ package final class TransferServer: @unchecked Sendable {
         var sent = 0
 
         while sent < limit {
+            waitWhileHeld(at: start + sent)
+
             // A chunk is framed for its full size even when a scripted drop cuts it short, so a
             // drop lands mid-chunk (where a client can tell the body is truncated) unless it falls
             // exactly on a chunk boundary.
@@ -690,6 +706,19 @@ package final class TransferServer: @unchecked Sendable {
 
         record(head, bodyLength: sent, isIntact: true, isComplete: true, status: status)
         return true
+    }
+
+    /// Returns once the download is no longer held at, or before, `offset`.
+    private func waitWhileHeld(at offset: Int) {
+        let deadline = DispatchTime.now() + .seconds(120)
+
+        while DispatchTime.now() < deadline {
+            guard let hold = lock.withLock({ _holdsDownloadAt }), offset >= hold else {
+                return
+            }
+
+            usleep(5_000)
+        }
     }
 
     private func serveUpload(_ head: TransferServerIO.Head, io: inout TransferServerIO) -> Bool {
