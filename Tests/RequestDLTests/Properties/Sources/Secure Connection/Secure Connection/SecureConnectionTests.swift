@@ -222,6 +222,8 @@ struct SecureConnectionTests {
         #expect(sut?.shutdownTimeout == timeout.nanoseconds)
     }
 
+    // Kept to prove the deprecated modifier still forwards its list; see `Session.httpVersion(_:)`.
+    @available(*, deprecated)
     @Test
     func secure_whenUpdatesApplicationProtocols_shouldBeValid() async throws {
         // Given

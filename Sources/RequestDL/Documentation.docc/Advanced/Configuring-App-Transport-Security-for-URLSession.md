@@ -55,7 +55,7 @@ Set `NSIncludesSubdomains` to match whichever domains the request actually targe
 Two `SecureConnection` modifiers have **no** ATS equivalent at all, under any Info.plist configuration. This is exactly why RequestDL flags both as incompatible with `.urlSession` instead of leaving them to fail silently:
 
 - ``SecureConnection/version(maximum:)``: ATS only offers a *minimum* TLS version per exception domain; there's no key to cap the maximum.
-- ``SecureConnection/applicationProtocols(_:)`` (ALPN): `URLSession` negotiates ALPN automatically (HTTP/2 vs. HTTP/1.1) and Info.plist has no key to override the protocol list it offers.
+- ``SecureConnection/applicationProtocols(_:)`` (ALPN, deprecated): `URLSession` negotiates ALPN automatically (HTTP/2 vs. HTTP/1.1) and Info.plist has no key to override the protocol list it offers. To keep a session off HTTP/2, use ``Session/httpVersion(_:)`` with ``Session/HTTPVersion/http1Only``, which is treated the same way: it routes the session away from `.urlSession`.
 
 If a request depends on either of these, it needs an executor that actually enforces them: ``Session/preferredExecutor(_:)`` or ``Session/requiredExecutor(_:)`` with ``Session/Executor/nioTransportServices`` (or the default non-Darwin executor) instead of `.urlSession`. Under automatic resolution (no executor pinned) this already happens for you; pinning to `.urlSession` anyway makes the conflict explicit via ``ExecutorRequirementError`` rather than silently dropping the setting.
 
