@@ -212,20 +212,21 @@ extension Internals {
                     }
 
                     await self.releaseEvaluationSlot()
+
+                    // Recorded here, by the evaluation itself, and not by a task that waits for it:
+                    // this task is already detached from any one caller's lifetime (it runs to the
+                    // end whether or not the call that started it is still being awaited), and a
+                    // caller that sees its result must find the entry already stored and
+                    // `inFlight` already cleared. Left to a second task, that was a window in which
+                    // a finished evaluation was still the one in flight, and a request that came in
+                    // after its failure window (or after the clock was moved, in a test) was given
+                    // the old result instead of asking the script again.
+                    await self.finishEvaluation(key: key, evaluation: evaluation, failureLifetime: failureLifetime)
+
                     return evaluation
                 }
                 inFlight[key] = newTask
                 task = newTask
-
-                // Detached from any one caller's lifetime on purpose: this records the result for
-                // whoever asks next (this key's cache entry, and any other concurrent caller
-                // sharing `inFlight[key]`) regardless of whether the specific call that started the
-                // evaluation is itself still being awaited below, since it may have already
-                // returned early after its own task was cancelled.
-                _Concurrency.Task { [weak self] in
-                    let evaluation = await newTask.value
-                    await self?.finishEvaluation(key: key, evaluation: evaluation, failureLifetime: failureLifetime)
-                }
             }
 
             // `await task.value` alone does not observe *this call's own* task cancellation: an
