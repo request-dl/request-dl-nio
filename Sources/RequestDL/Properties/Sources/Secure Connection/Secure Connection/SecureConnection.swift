@@ -325,7 +325,8 @@ public struct SecureConnection<Content: Property>: Property {
     @available(
         *,
         deprecated,
-        message: "Use Session.httpVersion(_:) instead. The ALPN list set here is replaced by the one the session's HTTP version dictates."
+        message:
+            "Use Session.httpVersion(_:) instead. The ALPN list set here is replaced by the one the session's HTTP version dictates."
     )
     public func applicationProtocols(_ protocols: String...) -> Self {
         edit { $0.secureConnection.applicationProtocols = protocols }
