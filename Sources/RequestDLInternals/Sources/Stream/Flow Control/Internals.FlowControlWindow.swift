@@ -89,11 +89,33 @@ extension Internals {
             lock.withLock { _isSuspended }
         }
 
+        /// Whether the producer is being held back at the moment: the window is shut, by a backlog
+        /// the reader has not drained or by ``suspend()``, or a producer that found it shut is
+        /// still waiting.
+        ///
+        /// Not the same as ``isWritable`` being `false`: a window shuts above ``highWatermark`` and
+        /// lets the producer go only at ``lowWatermark``, so between the two it is writable and
+        /// yet the producer it already stopped stays stopped.
+        package var isHeldBack: Bool {
+            lock.withLock { !_isWritable || !_waiters.isEmpty }
+        }
+
+        /// Called each time a window that had a producer waiting lets it go. What
+        /// `Internals.IdleDeadline` uses to know the client stopped holding the exchange back.
+        ///
+        /// Runs outside the window's lock, from whoever opened it.
+        package var onOpen: (@Sendable () -> Void)? {
+            get { lock.withLock { _onOpen } }
+            set { lock.withLock { _onOpen = newValue } }
+        }
+
         // MARK: - Private properties
 
         private let lock = Lock()
 
         // MARK: - Unsafe properties
+
+        private var _onOpen: (@Sendable () -> Void)?
 
         // Every credit is for bytes an earlier charge already counted (a stream charges before it
         // sends, `Internals.DownloadBuffer` charges before it enqueues), so this never goes
@@ -157,21 +179,25 @@ extension Internals {
                 return
             }
 
-            let waiters = lock.withLock { () -> [@Sendable () -> Void] in
+            let (waiters, onOpen) = lock.withLock { () -> ([@Sendable () -> Void], (@Sendable () -> Void)?) in
                 _bufferedBytes -= bytes
 
                 // A suspended window stays shut however far the reader drains it; `resume()`
                 // decides then whether the backlog is small enough to let the producer go.
                 guard !_isSuspended, _bufferedBytes <= lowWatermark else {
-                    return []
+                    return ([], nil)
                 }
 
-                return _drainWaiters()
+                return (_drainWaiters(), _onOpen)
             }
 
             // Outside the critical section: these resume a continuation or fulfil a promise.
             for waiter in waiters {
                 waiter()
+            }
+
+            if !waiters.isEmpty {
+                onOpen?()
             }
         }
 
@@ -226,18 +252,22 @@ extension Internals {
         /// passed), and otherwise once readers drain it to ``lowWatermark``, as usual.
         /// Idempotent.
         package func resume() {
-            let waiters = lock.withLock { () -> [@Sendable () -> Void] in
+            let (waiters, onOpen) = lock.withLock { () -> ([@Sendable () -> Void], (@Sendable () -> Void)?) in
                 _isSuspended = false
 
                 guard _isWritable else {
-                    return []
+                    return ([], nil)
                 }
 
-                return _drainWaiters()
+                return (_drainWaiters(), _onOpen)
             }
 
             for waiter in waiters {
                 waiter()
+            }
+
+            if !waiters.isEmpty {
+                onOpen?()
             }
         }
 

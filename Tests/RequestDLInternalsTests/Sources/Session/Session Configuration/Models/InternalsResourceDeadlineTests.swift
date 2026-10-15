@@ -5,6 +5,7 @@
 import Testing
 
 @testable import RequestDLInternals
+@testable import RequestDLTestSupport
 
 /// Margin the `race_whenOperationFinishesBeforeDeadline_*` tests give the deadline over
 /// `operation`'s own ~10ms sleep, sized against scheduler jitter rather than `operation`'s
@@ -34,6 +35,63 @@ private let raceMarginNanoseconds: Int64 = {
 }()
 
 struct InternalsResourceDeadlineTests {
+
+    /// A request ended for going idle fails with whatever cancelling it fails with, which says
+    /// nothing of why. The deadline that did it is where that is known.
+    @Test
+    func race_whenTheIdleDeadlineExpired_throwsReadTimeoutError() async throws {
+        // Given
+        let idle = Internals.IdleDeadline(nanoseconds: 1_000_000)
+        idle.start()
+        try await eventually(timeout: 120) { idle.isExpired }
+
+        let deadline = Internals.ResourceDeadline(nanoseconds: nil).watching(idle)
+
+        // Then
+        await #expect(throws: Internals.ReadTimeoutError.self) {
+            try await deadline.race {
+                throw CancellationError()
+            }
+        }
+    }
+
+    /// The resource budget is its own: spent, it says so even when the idle one has run out too.
+    @Test
+    func race_whenTheResourceDeadlineExpiredToo_stillThrowsResourceTimeoutError() async throws {
+        // Given
+        let idle = Internals.IdleDeadline(nanoseconds: 1_000_000)
+        idle.start()
+        try await eventually(timeout: 120) { idle.isExpired }
+
+        let deadline = Internals.ResourceDeadline(nanoseconds: -1).watching(idle)
+
+        // Then
+        await #expect(throws: Internals.ResourceTimeoutError.self) {
+            try await deadline.race {
+                try await Task.sleep(nanoseconds: 10_000_000)
+            }
+        }
+    }
+
+    /// An idle deadline that has not run out changes nothing: not the result, not the errors.
+    @Test
+    func race_whenTheIdleDeadlineHasNotExpired_changesNothing() async throws {
+        // Given
+        let idle = Internals.IdleDeadline(nanoseconds: raceMarginNanoseconds)
+        let deadline = Internals.ResourceDeadline(nanoseconds: nil).watching(idle)
+
+        // When
+        let result = try await deadline.race { "done" }
+
+        // Then
+        #expect(result == "done")
+
+        await #expect(throws: AnyError.self) {
+            try await deadline.race {
+                throw AnyError()
+            }
+        }
+    }
 
     @Test
     func race_whenNoDeadlineConfigured_runsOperationToCompletion() async throws {

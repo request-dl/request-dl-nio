@@ -73,6 +73,10 @@ public struct AsyncResponse: Sendable, AsyncSequence {
                 let error = ResourceTimeoutError()
                 onResponseHead?(.failure(error))
                 throw error
+            } catch is Internals.ReadTimeoutError {
+                let error = ReadTimeoutError()
+                onResponseHead?(.failure(error))
+                throw error
             } catch let error as Internals.UnsupportedContentEncodingError {
                 let error = UnsupportedContentEncodingError(value: error.value)
                 onResponseHead?(.failure(error))

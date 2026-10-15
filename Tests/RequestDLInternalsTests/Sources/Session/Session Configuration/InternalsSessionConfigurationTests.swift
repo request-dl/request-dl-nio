@@ -186,6 +186,23 @@ struct InternalsSessionConfigurationTests {
     }
 
     #if canImport(Darwin)
+    /// How long a request may stay silent is `Internals.IdleDeadline`'s to decide, the same way on
+    /// every executor, so `URLSession`'s own `timeoutIntervalForRequest` (which counts what the
+    /// application held back too, and covers an upload and a download alike) is out of the way
+    /// whatever `read` says.
+    @Test(arguments: [nil, 5_000_000_000, Int64.max] as [Int64?])
+    func configuration_whenReadIsSet_urlSessionRequestTimeoutStaysOutOfTheWay(read: Int64?) async throws {
+        // Given
+        var configuration = Internals.Session.Configuration()
+        configuration.timeout.read = read
+
+        // When
+        let urlSessionConfiguration = configuration.buildURLSessionConfiguration()
+
+        // Then: far past anything a request can last.
+        #expect(urlSessionConfiguration.timeoutIntervalForRequest > 365 * 24 * 3_600)
+    }
+
     /// `minimumTLSVersion`/`maximumTLSVersion` must not be silently dropped under `.urlSession`:
     /// both are reachable via `tlsMinimumSupportedProtocolVersion`/
     /// `tlsMaximumSupportedProtocolVersion` (public API since iOS 13/macOS 10.15, both already

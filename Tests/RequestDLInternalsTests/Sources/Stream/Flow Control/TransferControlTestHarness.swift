@@ -56,14 +56,8 @@ struct TransferHarness: Sendable {
 
     let executor: TransferExecutor
 
-    /// Seconds without progress before the *client* gives up: `timeoutIntervalForRequest` on
-    /// `.urlSession`, the read timeout on `.nio`. `nil` leaves each executor's default (60 s on
-    /// `.urlSession`, none on `.nio`).
-    var idleTimeout: Double?
-
-    init(_ executor: TransferExecutor, idleTimeout: Double? = nil) {
+    init(_ executor: TransferExecutor) {
         self.executor = executor
-        self.idleTimeout = idleTimeout
     }
 
     // MARK: - Downloads
@@ -214,10 +208,6 @@ struct TransferHarness: Sendable {
         // for a connection another suspended transfer is holding.
         configuration.connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit = 32
 
-        if let idleTimeout {
-            configuration.timeout.read = Int64(idleTimeout * 1_000_000_000)
-        }
-
         let session = Internals.Session(
             provider: .identified("com.requestdl.tests.transfer-control", numberOfThreads: 2),
             configuration: configuration
@@ -229,11 +219,10 @@ struct TransferHarness: Sendable {
 
     #if canImport(Darwin)
     private func urlSessionClient() throws -> Internals.URLSessionClient {
+        // The transport's own idle timer is out of the way, as `buildURLSessionConfiguration()` leaves
+        // it: how long an execution may stay silent is `Internals.IdleDeadline`'s to decide.
         let configuration = URLSessionConfiguration.ephemeral
-
-        if let idleTimeout {
-            configuration.timeoutIntervalForRequest = idleTimeout
-        }
+        configuration.timeoutIntervalForRequest = TimeInterval(Int64.max) / 1_000_000_000
 
         return try Internals.URLSessionClient(configuration: configuration)
     }
@@ -310,24 +299,6 @@ struct ResourceVerifier: Sendable {
 func reportMeasurement(_ label: String, _ value: CustomStringConvertible) {
     if getenv("REQUESTDL_TRANSFER_MEASUREMENTS") != nil {
         print("[transfer-measurement] \(label): \(value)")
-    }
-}
-
-extension TransferExecutor {
-
-    /// Whether `error` is this executor's own client-side idle timeout.
-    func isIdleTimeout(_ error: (any Error)?) -> Bool {
-        switch self {
-        #if canImport(NIOCore)
-        case .nio:
-            return (error as? HTTPClientError) == .readTimeout
-        #endif
-
-        #if canImport(Darwin)
-        case .urlSession:
-            return (error as? URLError)?.code == .timedOut
-        #endif
-        }
     }
 }
 

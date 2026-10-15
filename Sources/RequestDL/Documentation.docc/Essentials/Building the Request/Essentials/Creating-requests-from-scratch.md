@@ -255,6 +255,7 @@ Learn more in:
 - ``RequestDL/Timeout``
 - ``RequestDL/UnitTime``
 - ``RequestDL/ResourceTimeoutError``
+- ``RequestDL/ReadTimeoutError``
 
 ### Modifying the properties
 

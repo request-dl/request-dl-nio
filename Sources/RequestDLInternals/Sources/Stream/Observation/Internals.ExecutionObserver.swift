@@ -71,10 +71,13 @@ extension Internals {
             case metrics(TransactionMetrics)
         }
 
+        /// The deadline this execution's activity feeds, if it has one.
+        package let idle: Internals.IdleDeadline?
+
         // MARK: - Private properties
 
         private let lock = Lock()
-        private let deliver: @Sendable (Event) async -> Void
+        private let deliver: (@Sendable (Event) async -> Void)?
 
         // MARK: - Unsafe properties
 
@@ -91,8 +94,16 @@ extension Internals {
 
         // MARK: - Inits
 
+        /// - Parameter idle: Told that something moved on every byte, head and change of state, and
+        ///   that the execution is over once it ends. The one thing an execution nobody watches
+        ///   still needs from what the executors report.
         /// - Parameter deliver: Called for one event at a time, in order, from a task of its own.
-        package init(deliver: @escaping @Sendable (Event) async -> Void) {
+        ///   Without it nothing is recorded, and what is left is feeding ``idle``.
+        package init(
+            idle: Internals.IdleDeadline? = nil,
+            deliver: (@Sendable (Event) async -> Void)? = nil
+        ) {
+            self.idle = idle
             self.deliver = deliver
         }
 
@@ -100,6 +111,10 @@ extension Internals {
 
         /// What the request body is expected to add up to, when it is known up front.
         package func expectUpload(_ bytes: Int?) {
+            guard deliver != nil else {
+                return
+            }
+
             lock.withLock { _expectedUpload = bytes }
         }
 
@@ -108,6 +123,8 @@ extension Internals {
             guard bytes > .zero else {
                 return
             }
+
+            idle?.touch()
 
             schedule {
                 _uploadTotal += bytes
@@ -121,6 +138,8 @@ extension Internals {
                 return
             }
 
+            idle?.touch()
+
             schedule {
                 _downloadTotal += bytes
                 _downloadPending += bytes
@@ -133,6 +152,12 @@ extension Internals {
         /// `Content-Length`, and no content coding, which a transport may already have decoded
         /// by the time the bytes are counted.
         package func didReceiveHead(_ head: Internals.ResponseHead) {
+            idle?.touch()
+
+            guard deliver != nil else {
+                return
+            }
+
             let isEncoded =
                 head
                 .headerValues(named: "Content-Encoding")
@@ -172,6 +197,18 @@ extension Internals {
         }
 
         package func didChange(_ state: State) {
+            if state.isTerminal {
+                idle?.finish()
+            } else {
+                // A resumption or a reconnection is the client moving again: the server has the
+                // whole budget to answer it.
+                idle?.touch()
+            }
+
+            guard deliver != nil else {
+                return
+            }
+
             let isSuspension: Bool?
 
             switch state {
@@ -221,6 +258,10 @@ extension Internals {
         /// after the response body has ended, and so after the ending this observer closed on. It
         /// goes after whatever is already queued, so it never overtakes the ending it follows.
         package func didCollect(_ transaction: TransactionMetrics) {
+            guard deliver != nil else {
+                return
+            }
+
             let shouldStart = lock.withLock { () -> Bool in
                 flushProgress()
                 _entries.append(.metrics(transaction))
@@ -235,6 +276,10 @@ extension Internals {
         // MARK: - Private methods
 
         private func schedule(_ update: () -> Void) {
+            guard deliver != nil else {
+                return
+            }
+
             let shouldStart = lock.withLock { () -> Bool in
                 guard !_isClosed else {
                     return false
@@ -282,6 +327,10 @@ extension Internals {
         }
 
         private func spawn() {
+            guard let deliver else {
+                return
+            }
+
             Task.detached { [self] in
                 while let event = next() {
                     await deliver(event)

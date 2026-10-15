@@ -148,7 +148,9 @@ final class RequestMetricsReporter: @unchecked Sendable {
     }
 
     private static func errorType(of error: any Error) -> String {
-        if error is ResourceTimeoutError || error is Internals.ResourceTimeoutError {
+        if error is ResourceTimeoutError || error is Internals.ResourceTimeoutError
+            || error is ReadTimeoutError || error is Internals.ReadTimeoutError
+        {
             return "timeout"
         }
 

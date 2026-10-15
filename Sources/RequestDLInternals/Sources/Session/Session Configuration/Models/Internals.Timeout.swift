@@ -17,8 +17,13 @@ extension Internals {
 
         /// Nanoseconds, matching `UnitTime.nanoseconds` (`RequestDL`'s public unit of time).
         ///
-        /// `nil` means "not configured", not "never": `build()` falls back to
-        /// ``defaultRead``, as `URLSession`'s `timeoutIntervalForRequest` does.
+        /// `nil` means "not configured", not "never": ``idle`` falls back to ``defaultRead``,
+        /// as `URLSession`'s `timeoutIntervalForRequest` does. `Int64.max` is "never".
+        ///
+        /// Enforced by RequestDL itself on every executor (see `Internals.IdleDeadline`), not by
+        /// the transports: `build()` and `buildURLSessionConfiguration()` turn their own timers
+        /// off, because each one counts something different and none of them knows when the
+        /// application is the one holding the exchange back.
         package var read: Int64?
 
         /// Nanoseconds, matching `UnitTime.nanoseconds` (`RequestDL`'s public unit of time).
@@ -34,33 +39,38 @@ extension Internals {
         /// `.nio` request forever while `.urlSession` fails it after 60 s.
         package static let defaultRead: Int64 = 60_000_000_000
 
+        /// How long an execution may go without a byte moving, in nanoseconds.
+        package var idle: Int64 {
+            read ?? Self.defaultRead
+        }
+
         // MARK: - Internal methods
 
         #if canImport(NIOCore)
         package func build() -> HTTPClient.Configuration.Timeout {
             .init(
                 connect: connect.map { .nanoseconds($0) },
-                read: .nanoseconds(read ?? Self.defaultRead)
+                read: nil
             )
         }
         #endif
 
         // MARK: - Hashable
 
-        // Hand-written rather than synthesized, deliberately excluding `resource`: this struct
-        // feeds `Internals.Session.Configuration`'s `Hashable`/`==`, which is
-        // `Internals.ClientManager`'s pooled-client cache key, and `resource` is never read by
-        // `build()` above (`RawTask` reads it directly instead). Including it would make two
-        // sessions identical in every way `build()` actually consumes (differing only in
-        // `.timeout(.resource(_:))`) produce byte-identical `HTTPClient.Configuration`s that still
-        // compare unequal, so they could never share a pooled client/connection pool.
+        // Hand-written rather than synthesized, deliberately excluding `resource` and `read`:
+        // this struct feeds `Internals.Session.Configuration`'s `Hashable`/`==`, which is
+        // `Internals.ClientManager`'s pooled-client cache key, and neither is read by `build()`
+        // above (`RawTask` reads them directly instead). Including them would make two sessions
+        // identical in every way `build()` actually consumes (differing only in
+        // `.timeout(.resource(_:))` or `.timeout(.read(_:))`) produce byte-identical
+        // `HTTPClient.Configuration`s that still compare unequal, so they could never share a
+        // pooled client/connection pool.
         package static func == (lhs: Self, rhs: Self) -> Bool {
-            lhs.connect == rhs.connect && lhs.read == rhs.read
+            lhs.connect == rhs.connect
         }
 
         package func hash(into hasher: inout Hasher) {
             hasher.combine(connect)
-            hasher.combine(read)
         }
     }
 }

@@ -25,11 +25,27 @@
 /// before terminating the connection. The timeout parameter is the duration of time before the timeout
 /// occurs, and the source parameter specifies the type of timeout to be applied
 ///
-/// > Note: Without a `Timeout` for ``Timeout/Source/read``, a request fails once nothing arrives
-/// from the server for 60 seconds, on every executor. That is `URLSession`'s own default, and
-/// `.nio` applies it too so a server that stops sending can't hang a request forever. A body
-/// that stays silent for longer than that, such as an event stream without heartbeats, needs a
-/// larger value.
+/// ## What read means
+///
+/// ``Timeout/Source/read`` is how long a request may go without a single byte moving, in either
+/// direction: the request body going out, the response head or body coming in. Every byte starts
+/// it over, and a request that goes quiet for longer than it fails with ``ReadTimeoutError``.
+///
+/// It is RequestDL's own, the same on every executor, and it is not counting while the
+/// application is the one holding the exchange back: the time a transfer spends suspended through a
+/// ``RequestController``, or waiting for the body to be read, does not count against the server.
+///
+/// Without a `Timeout` for ``Timeout/Source/read``, a request fails once it has been silent for
+/// 60 seconds. A body that stays silent for longer than that, such as an event stream without
+/// heartbeats, needs a larger value, or none:
+///
+/// ```swift
+/// Timeout(.infinity, for: .read)
+/// ```
+///
+/// ``Timeout/Source/connect`` is not part of this. It limits how long the connection may take to
+/// be established, and only the executors built on SwiftNIO have that phase to limit:
+/// `.urlSession` ignores it.
 public struct Timeout: Property {
 
     private struct Node: PropertyNode {

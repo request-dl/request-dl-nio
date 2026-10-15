@@ -37,6 +37,20 @@ public struct UnitTime: Sendable, Hashable {
         self.nanoseconds = overflow ? ((amount < 0) != (nanoseconds < 0) ? .min : .max) : product
     }
 
+    // MARK: - Public static properties
+
+    /// A time that never runs out: the largest interval a `UnitTime` can hold.
+    ///
+    /// For a ``Timeout`` it means "no limit": `Timeout(.infinity, for: .read)` lets a response stay
+    /// silent for as long as the server likes, which is what a stream of events without
+    /// heartbeats needs.
+    ///
+    /// It is the same value an amount that overflows saturates at, so `.hours(.max)` is
+    /// `.infinity` too.
+    public static var infinity: UnitTime {
+        .init(.max)
+    }
+
     // MARK: - Public static methods
 
     ///

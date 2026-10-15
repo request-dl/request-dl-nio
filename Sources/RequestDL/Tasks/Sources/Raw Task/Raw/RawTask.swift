@@ -23,7 +23,7 @@ struct RawTask<Content: Property>: RequestTask {
         // Resolution hands back its own deadline rather than one built from the result: system
         // proxy/PAC resolution happens inside it, and a deadline created afterwards could not
         // cover it. See `Resolve.buildBoundedByResourceDeadline()`.
-        let (resolvedFromProperties, deadline) = try await surfacingResourceTimeout {
+        let (resolvedFromProperties, resourceDeadline) = try await surfacingResourceTimeout {
             try await Resolve(
                 root: content,
                 environment: environment
@@ -34,7 +34,15 @@ struct RawTask<Content: Property>: RequestTask {
         // ends, whatever stops it: a hook that throws, a pinned executor that cannot run it, a
         // budget that runs out while the client is being made. Only what happens before there is a
         // request at all (resolving the properties) is nobody's execution.
-        let observer = makeObserver(resolved: resolvedFromProperties, environment: environment)
+        //
+        // How long it may go without a byte moving is counted from the moment the request is handed
+        // to an executor, and ends it the same way on every one of them.
+        let idle = Internals.IdleDeadline.make(
+            nanoseconds: resolvedFromProperties.session.configuration.timeout.idle
+        )
+
+        let deadline = resourceDeadline.watching(idle)
+        let observer = makeObserver(resolved: resolvedFromProperties, environment: environment, idle: idle)
         let transferControl = makeTransferControl(environment: environment, observer: observer)
 
         do {
@@ -105,11 +113,20 @@ struct RawTask<Content: Property>: RequestTask {
             environment.resumableUploadSetup.map { ResumableUploadClient(base: resolvedClient, setup: $0) }
             ?? resolvedClient
 
+        warnIfConnectTimeoutIsIgnored(
+            resolved: resolved,
+            isURLSessionExecutor: isURLSessionExecutor,
+            logger: logger
+        )
+
         let cacheControl = Internals.CacheControl(
             requestConfiguration: resolved.requestConfiguration,
             dataCache: resolved.dataCache,
             logger: logger
         )
+
+        let idle = transferControl?.observer?.idle
+        idle?.start()
 
         let (sessionTask, onResponseHead) = try await runSession(
             resolved: resolved,
@@ -120,6 +137,8 @@ struct RawTask<Content: Property>: RequestTask {
             deadline: deadline,
             transferControl: transferControl
         )
+
+        idle?.attach(sessionTask.seed)
 
         // A response served from the cache never reaches an executor, which is where an
         // execution otherwise ends, so it ends here: nothing crossed the network.
@@ -134,6 +153,35 @@ struct RawTask<Content: Property>: RequestTask {
             validateHead: validateHead,
             deadline: deadline,
             metrics: sessionTask.metrics
+        )
+    }
+
+    // MARK: - Private methods, timeouts
+
+    /// `URLSession` has no phase for connecting to limit, so a `Timeout` for
+    /// ``Timeout/Source/connect`` does nothing under it, and a request that asked for one should
+    /// not find that out by it never firing.
+    ///
+    /// Not said when `connect` equals `read`: that is what `Timeout(_:for: .all)` sets, and whoever
+    /// wrote it did get the part that applies.
+    private func warnIfConnectTimeoutIsIgnored(
+        resolved: Resolved,
+        isURLSessionExecutor: Bool,
+        logger: Internals.TaskLogger?
+    ) {
+        let timeout = resolved.session.configuration.timeout
+
+        guard isURLSessionExecutor, let connect = timeout.connect, connect != timeout.read else {
+            return
+        }
+
+        logger?.log(
+            level: .warning,
+            """
+            Timeout(_:for: .connect) has no effect on the URLSession executor, which has no phase \
+            for connecting to limit. Timeout(_:for: .read) is how long a request may stay silent, \
+            on every executor.
+            """
         )
     }
 
@@ -208,6 +256,8 @@ struct RawTask<Content: Property>: RequestTask {
             return try await operation()
         } catch is Internals.ResourceTimeoutError {
             throw ResourceTimeoutError()
+        } catch is Internals.ReadTimeoutError {
+            throw ReadTimeoutError()
         }
     }
 
@@ -267,10 +317,11 @@ struct RawTask<Content: Property>: RequestTask {
     }
 
     /// Observes this one execution for every `RequestMonitor` queued on `environment`; `nil` when
-    /// there is none, which leaves the execution with nothing to count.
+    /// there is none and no idle deadline to feed, which leaves the execution with nothing to count.
     private func makeObserver(
         resolved: Resolved,
-        environment: RequestEnvironmentValues
+        environment: RequestEnvironmentValues,
+        idle: Internals.IdleDeadline?
     ) -> Internals.ExecutionObserver? {
         let monitors = environment.requestMonitors
         let configuration = resolved.requestConfiguration
@@ -282,11 +333,12 @@ struct RawTask<Content: Property>: RequestTask {
             RequestMetricsReporter(factory: $0, execution: execution)
         }
 
+        // Without anything to tell, it is still what feeds the idle deadline.
         guard !monitors.isEmpty || reporter != nil else {
-            return nil
+            return idle.map { Internals.ExecutionObserver(idle: $0) }
         }
 
-        let observer = Internals.ExecutionObserver { event in
+        let observer = Internals.ExecutionObserver(idle: idle) { event in
             reporter?.receive(event)
 
             switch event {

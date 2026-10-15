@@ -204,6 +204,31 @@ struct RequestMetricsReporterTests {
         )
     }
 
+    /// A request that went quiet for longer than `Timeout(_:for: .read)` allows is a timeout too,
+    /// not a type of error of its own.
+    @Test
+    func aReadTimeout_isNamedATimeout() throws {
+        // Given
+        let metrics = TestMetrics()
+
+        // When
+        let reporter = makeReporter(metrics)
+        reporter.receive(.state(.started))
+        reporter.receive(.state(.failed(ReadTimeoutError())))
+
+        // Then
+        #expect(
+            try metrics.expectTimer(
+                Self.durationLabel,
+                [
+                    ("http.request.method", "GET"),
+                    ("server.address", "example.com"),
+                    ("error.type", "timeout"),
+                ]
+            ).values.count == 1
+        )
+    }
+
     /// Nothing crossed the wire for it, so it is not a request, and what it took is not what a
     /// request takes.
     @Test

@@ -56,6 +56,83 @@ struct InternalsFlowControlWindowTests {
         #expect(resumed.withLockedValue { $0 } == 1)
     }
 
+    /// What `Internals.IdleDeadline` does not count as idle: a producer the window stopped is held
+    /// back until the window lets it go, which is at the low watermark and not the moment the
+    /// backlog dips under the high one. Between the two the window is writable and the producer
+    /// it stopped is still stopped.
+    @Test
+    func isHeldBack_whileAProducerWaits_staysTrueUntilTheLowWatermark() {
+        // Given
+        let window = Internals.FlowControlWindow(highWatermark: 100, lowWatermark: 50)
+
+        // Then: nothing is held back until something is stopped.
+        window.charge(100)
+        #expect(!window.isHeldBack)
+
+        window.charge(50)
+        #expect(!window.isWritable)
+        #expect(window.isHeldBack)
+
+        // When: a producer arrives at the shut window and waits.
+        window.whenWritable {}
+
+        window.credit(60)  // 90: under the high watermark, above the low one
+        #expect(window.isWritable)
+        #expect(window.isHeldBack)
+
+        window.credit(40)  // 50: the producer is let go
+        #expect(!window.isHeldBack)
+    }
+
+    @Test
+    func isHeldBack_whileSuspended_andNotOnceReleased() {
+        // Given
+        let window = Internals.FlowControlWindow(highWatermark: 100, lowWatermark: 50)
+
+        // When
+        window.suspend()
+
+        // Then
+        #expect(window.isHeldBack)
+
+        window.release()
+        #expect(!window.isHeldBack)
+    }
+
+    /// What tells a deadline that the client stopped holding the exchange back: a window that lets
+    /// a waiting producer go says so, once, and one with nobody waiting has nothing to say.
+    @Test
+    func onOpen_isCalledWhenAWaitingProducerIsLetGo() {
+        // Given
+        let window = Internals.FlowControlWindow(highWatermark: 100, lowWatermark: 50)
+        let opened = LockedValueBox(0)
+        window.onOpen = { opened.withLockedValue { $0 += 1 } }
+
+        // When: nobody waits.
+        window.charge(60)
+        window.credit(60)
+
+        // Then
+        #expect(opened.withLockedValue { $0 } == 0)
+
+        // When: a producer waits, and the reader brings the backlog down.
+        window.charge(150)
+        window.whenWritable {}
+        window.credit(100)
+
+        // Then
+        #expect(opened.withLockedValue { $0 } == 1)
+
+        // When: suspended with a producer waiting, then resumed.
+        window.suspend()
+        window.charge(10)
+        window.whenWritable {}
+        window.resume()
+
+        // Then
+        #expect(opened.withLockedValue { $0 } == 2)
+    }
+
     @Test
     func release_resumesEveryWaiterAndNeverPausesAgain() {
         // Given
