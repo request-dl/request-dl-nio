@@ -100,15 +100,6 @@ extension Internals {
             lock.withLock { !_isWritable || !_waiters.isEmpty }
         }
 
-        /// Called each time a window that had a producer waiting lets it go. What
-        /// `Internals.IdleDeadline` uses to know the client stopped holding the exchange back.
-        ///
-        /// Runs outside the window's lock, from whoever opened it.
-        package var onOpen: (@Sendable () -> Void)? {
-            get { lock.withLock { _onOpen } }
-            set { lock.withLock { _onOpen = newValue } }
-        }
-
         // MARK: - Private properties
 
         private let lock = Lock()
@@ -159,6 +150,16 @@ extension Internals {
         }
 
         // MARK: - Internal methods
+
+        /// Calls `body` each time the window lets a waiting producer go. What
+        /// `Internals.IdleDeadline` uses to know the client stopped holding the exchange back.
+        ///
+        /// It runs outside the window's lock, from whoever opened it.
+        package func onOpen(_ body: @escaping @Sendable () -> Void) {
+            lock.withLock {
+                _onOpen = body
+            }
+        }
 
         /// Counts `bytes` as buffered ahead of the reader.
         package func charge(_ bytes: Int) {

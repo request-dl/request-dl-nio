@@ -184,6 +184,30 @@ struct InternalsIdleDeadlineTests {
         #expect(!deadline.isExpired)
     }
 
+    /// One watcher per deadline, and none once it has ended.
+    @Test
+    func start_whenCalledAgainOrAfterTheEnd_startsNothingNew() async throws {
+        // Given
+        let clock = FakeIdleClock()
+        let deadline = clock.makeDeadline(nanoseconds: Self.budget)
+
+        // When
+        deadline.start()
+        let watcher = try #require(deadline.watcher)
+        deadline.start()
+
+        // Then
+        #expect(deadline.watcher == watcher)
+
+        // When
+        deadline.finish()
+        await watcher.value
+        deadline.start()
+
+        // Then
+        #expect(deadline.watcher == watcher)
+    }
+
     /// "Never" is no deadline at all, and anything under it is one.
     @Test
     func aBudgetOfNever_hasNoDeadline() {

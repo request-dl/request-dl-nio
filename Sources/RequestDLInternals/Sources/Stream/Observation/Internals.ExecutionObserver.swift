@@ -77,7 +77,8 @@ extension Internals {
         // MARK: - Private properties
 
         private let lock = Lock()
-        private let deliver: (@Sendable (Event) async -> Void)?
+        private let deliver: @Sendable (Event) async -> Void
+        private let hasDelivery: Bool
 
         // MARK: - Unsafe properties
 
@@ -104,14 +105,15 @@ extension Internals {
             deliver: (@Sendable (Event) async -> Void)? = nil
         ) {
             self.idle = idle
-            self.deliver = deliver
+            self.hasDelivery = deliver != nil
+            self.deliver = deliver ?? { _ in }
         }
 
         // MARK: - Internal methods
 
         /// What the request body is expected to add up to, when it is known up front.
         package func expectUpload(_ bytes: Int?) {
-            guard deliver != nil else {
+            guard hasDelivery else {
                 return
             }
 
@@ -154,7 +156,7 @@ extension Internals {
         package func didReceiveHead(_ head: Internals.ResponseHead) {
             idle?.touch()
 
-            guard deliver != nil else {
+            guard hasDelivery else {
                 return
             }
 
@@ -205,7 +207,7 @@ extension Internals {
                 idle?.touch()
             }
 
-            guard deliver != nil else {
+            guard hasDelivery else {
                 return
             }
 
@@ -258,7 +260,7 @@ extension Internals {
         /// after the response body has ended, and so after the ending this observer closed on. It
         /// goes after whatever is already queued, so it never overtakes the ending it follows.
         package func didCollect(_ transaction: TransactionMetrics) {
-            guard deliver != nil else {
+            guard hasDelivery else {
                 return
             }
 
@@ -276,7 +278,7 @@ extension Internals {
         // MARK: - Private methods
 
         private func schedule(_ update: () -> Void) {
-            guard deliver != nil else {
+            guard hasDelivery else {
                 return
             }
 
@@ -327,10 +329,6 @@ extension Internals {
         }
 
         private func spawn() {
-            guard let deliver else {
-                return
-            }
-
             Task.detached { [self] in
                 while let event = next() {
                     await deliver(event)

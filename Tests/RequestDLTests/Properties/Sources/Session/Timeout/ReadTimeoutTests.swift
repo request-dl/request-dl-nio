@@ -4,6 +4,7 @@
 
 import Dispatch
 import Logging
+import RequestDLInternals
 import Testing
 
 @testable import RequestDL
@@ -387,6 +388,29 @@ struct ReadTimeoutTests {
             #expect(request.bodyLength == Self.uploadSize)
             #expect(request.isBodyIntact)
             #expect(request.isBodyComplete)
+        }
+    }
+
+    // MARK: - Before there is a response
+
+    /// A request can go idle before it has a response to read: a revalidation whose server stays
+    /// silent, say. The public errors are the same ones a response would have failed with.
+    @Test
+    func aRequestThatWentIdleBeforeAnyResponse_failsWithTheSamePublicErrors() async throws {
+        // Given
+        let task = RawTask(content: EmptyProperty())
+
+        // Then
+        await #expect(throws: ReadTimeoutError.self) {
+            try await task.surfacingResourceTimeout {
+                throw Internals.ReadTimeoutError()
+            }
+        }
+
+        await #expect(throws: ResourceTimeoutError.self) {
+            try await task.surfacingResourceTimeout {
+                throw Internals.ResourceTimeoutError()
+            }
         }
     }
 

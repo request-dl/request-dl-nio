@@ -245,11 +245,15 @@ struct RawTask<Content: Property>: RequestTask {
 
     // MARK: - Private methods, setup
 
-    /// Replaces the internal resource-timeout marker with this package's public error.
+    /// Replaces the internal timeout markers with this package's public errors.
     ///
     /// Every phase raced against the `.resource` budget funnels through here, so a blown budget
-    /// reads the same to a caller regardless of which phase blew it.
-    private func surfacingResourceTimeout<T>(
+    /// reads the same to a caller regardless of which phase blew it. So does a request that went
+    /// idle before there was a response to read: a revalidation, say, whose server stays silent.
+    ///
+    /// Not private: unit-tested directly, since reaching the second case through a live request
+    /// takes a revalidation that goes quiet.
+    func surfacingResourceTimeout<T>(
         _ operation: () async throws -> T
     ) async throws -> T {
         do {

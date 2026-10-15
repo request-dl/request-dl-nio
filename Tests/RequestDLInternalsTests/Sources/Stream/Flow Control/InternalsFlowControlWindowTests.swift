@@ -106,7 +106,7 @@ struct InternalsFlowControlWindowTests {
         // Given
         let window = Internals.FlowControlWindow(highWatermark: 100, lowWatermark: 50)
         let opened = LockedValueBox(0)
-        window.onOpen = { opened.withLockedValue { $0 += 1 } }
+        window.onOpen { opened.withLockedValue { $0 += 1 } }
 
         // When: nobody waits.
         window.charge(60)

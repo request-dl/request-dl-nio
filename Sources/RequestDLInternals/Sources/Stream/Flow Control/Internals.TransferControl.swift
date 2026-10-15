@@ -128,7 +128,7 @@ extension Internals {
         /// Makes `window` follow this execution's suspension, starting with its current state.
         package func attach(_ window: Internals.FlowControlWindow) {
             if let idle = observer?.idle {
-                window.onOpen = { idle.touch() }
+                window.onOpen { idle.touch() }
             }
 
             lock.withLock {
