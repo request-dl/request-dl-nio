@@ -210,10 +210,30 @@ struct InternalsTransferControlUploadTests {
     func suspensionLongerThanTheClientIdleTimeout(_ executor: TransferExecutor) async throws {
         let size = 24 * 1_048_576
 
+        // Both are under the 3 s the upload is suspended for, which is what the test is about. But
+        // `.urlSession` needs the timeout to be passed by that suspension to fail, so it keeps the
+        // least that does, while on `.nio` the timeout is also what the server has to answer in
+        // once the body is sent, in a process whose CPUs it shares with the rest of the suite: a
+        // second was not enough on a loaded runner (`readTimeout`, on Linux), and two still leave
+        // the suspension longer than the timeout.
+        let idleTimeout: Double
+
+        switch executor {
+        #if canImport(NIOCore)
+        case .nio:
+            idleTimeout = 2
+        #endif
+
+        #if canImport(Darwin)
+        case .urlSession:
+            idleTimeout = 1
+        #endif
+        }
+
         try await withTransferServer(.init(length: 1_024)) { server in
             // Given
             let control = Internals.TransferControl()
-            let (task, owner) = try await TransferHarness(executor, idleTimeout: 1).upload(
+            let (task, owner) = try await TransferHarness(executor, idleTimeout: idleTimeout).upload(
                 to: server,
                 size: size,
                 transferControl: control

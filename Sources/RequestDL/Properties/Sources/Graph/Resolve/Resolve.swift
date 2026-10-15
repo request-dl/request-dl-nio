@@ -76,7 +76,7 @@ struct Resolve<Root: Property>: Sendable {
 
         let resolvedMake = make
         let configuration = try await deadline.race {
-            await sessionConfiguration(for: resolvedMake)
+            try await sessionConfiguration(for: resolvedMake)
         }
 
         let session = Internals.Session(
@@ -133,7 +133,10 @@ struct Resolve<Root: Property>: Sendable {
     ///
     /// The resolved proxy lands in the configuration, so the client cache partitions by it the
     /// same way it does for an explicit one.
-    private func sessionConfiguration(for make: Make) async -> Internals.Session.Configuration {
+    ///
+    /// - Throws: ``ProxyAutoConfigurationError`` when the system's proxy is a PAC script that
+    /// cannot be asked and the request declared ``SystemProxy/PACFailurePolicy/fail``.
+    private func sessionConfiguration(for make: Make) async throws -> Internals.Session.Configuration {
         guard make.resolvesSystemProxy, make.sessionConfiguration.proxy == nil else {
             // An explicit `Proxy` wins. Declaring both leaves the explicit one in effect.
             return make.sessionConfiguration
@@ -141,9 +144,15 @@ struct Resolve<Root: Property>: Sendable {
 
         var configuration = make.sessionConfiguration
 
-        configuration.proxy = await Internals.SystemProxyResolver.proxy(
-            forURL: make.requestConfiguration.url
-        )
+        do {
+            configuration.proxy = try await Internals.SystemProxyResolver.proxy(
+                forURL: make.requestConfiguration.url,
+                pac: make.systemProxyPAC,
+                logger: environment.logger
+            )
+        } catch let failure as Internals.PACEvaluationFailure {
+            throw ProxyAutoConfigurationError(failure)
+        }
 
         return configuration
     }
