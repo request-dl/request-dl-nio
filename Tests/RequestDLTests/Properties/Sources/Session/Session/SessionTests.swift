@@ -431,6 +431,76 @@ struct SessionTests {
         #expect(resolved.session.configuration.preferredExecutor == .nioTransportServices)
         #expect(resolved.session.configuration.requiredExecutor == nil)
     }
+
+    // `httpVersion(_:)` only exists under `canImport(NIOCore)`: `.http1Only` has no `URLSession`
+    // equivalent, so no executor could honor it in a build without NIO.
+    @Test
+    func session_whenHTTPVersionNotSet_shouldBeNil() async throws {
+        // When
+        let resolved = try await resolve(TestProperty { Session() })
+
+        // Then
+        #expect(resolved.session.configuration.httpVersion == nil)
+    }
+
+    @Test(arguments: [Session.HTTPVersion.http1Only, .automatic])
+    func session_whenHTTPVersion_shouldBeValid(version: Session.HTTPVersion) async throws {
+        // Given
+        let property = Session()
+            .httpVersion(version)
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        #expect(resolved.session.configuration.httpVersion == version.build())
+    }
+
+    @Test
+    func session_whenHTTPVersionSetTwice_shouldKeepLast() async throws {
+        // Given
+        let property = Session()
+            .httpVersion(.http1Only)
+            .httpVersion(.automatic)
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        #expect(resolved.session.configuration.httpVersion == .automatic)
+    }
+
+    @Test
+    func session_whenHTTP1Only_shouldBeIncompatibleWithURLSession() async throws {
+        // Given
+        let property = Session()
+            .httpVersion(.http1Only)
+            .requiredExecutor(.urlSession)
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        #expect(throws: Internals.IncompatibleExecutorConfigurationError.self) {
+            try resolved.session.configuration.requireExecutor(.urlSession)
+        }
+    }
+
+    @Test
+    func session_whenHTTPVersionAutomatic_shouldNotContainURLSessionReason() async throws {
+        // Given
+        let property = Session()
+            .httpVersion(.automatic)
+
+        // When
+        let resolved = try await resolve(TestProperty { property })
+
+        // Then
+        #expect(
+            !resolved.session.configuration.urlSessionIncompatibilityReasons()
+                .contains(.http1OnlyUnderURLSession)
+        )
+    }
     #endif
 
     @Test

@@ -20,7 +20,8 @@ import RequestDLInternals
 /// flagged, because App Transport Security offers a real equivalent, an
 /// `NSExceptionMinimumTLSVersion` entry in your app's `Info.plist`, that `version(maximum:)` and
 /// ``applicationProtocols(_:)`` don't have. See
-/// <doc:Configuring-App-Transport-Security-for-URLSession>.
+/// <doc:Configuring-App-Transport-Security-for-URLSession>. To control HTTP/2 use
+/// ``Session/httpVersion(_:)``, which replaces ``applicationProtocols(_:)``.
 public struct SecureConnection<Content: Property>: Property {
 
     private struct Node: SecureConnectionPropertyNode {
@@ -313,8 +314,20 @@ public struct SecureConnection<Content: Property>: Property {
     /// ``Session/requiredExecutor(_:)`` throws ``ExecutorRequirementError``. See
     /// <doc:Configuring-App-Transport-Security-for-URLSession>.
     ///
+    /// - Note: Deprecated in favor of ``Session/httpVersion(_:)``. AsyncHTTPClient replaces the
+    /// ALPN list of every HTTPS connection with `["h2", "http/1.1"]` or `["http/1.1"]`, depending
+    /// only on the session's HTTP version, so the list set here never reaches the handshake.
+    /// Existing callers keep compiling and keep their `.urlSession` incompatibility; use
+    /// `Session().httpVersion(.http1Only)` to keep a session off HTTP/2.
+    ///
     /// - Parameter protocols: The application protocols to use.
     /// - Returns: A modified `SecureConnection` with the application protocols set.
+    @available(
+        *,
+        deprecated,
+        message:
+            "Use Session.httpVersion(_:) instead. The ALPN list set here is replaced by the one the session's HTTP version dictates."
+    )
     public func applicationProtocols(_ protocols: String...) -> Self {
         edit { $0.secureConnection.applicationProtocols = protocols }
     }

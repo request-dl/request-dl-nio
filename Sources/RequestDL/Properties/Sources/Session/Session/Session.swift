@@ -156,6 +156,31 @@ public struct Session: Property {
         edit { $0.allowsConstrainedNetworkAccess = flag }
     }
 
+    #if canImport(NIOCore)
+    ///
+    /// Sets which HTTP versions the session may negotiate.
+    ///
+    /// ``HTTPVersion/http1Only`` keeps every HTTPS connection on HTTP/1.1, by not offering `h2`
+    /// during the TLS handshake. ``HTTPVersion/automatic`` offers both and lets the server pick.
+    /// This replaces ``SecureConnection/applicationProtocols(_:)``, which could not do this
+    /// reliably: AsyncHTTPClient rewrites the ALPN list of every HTTPS connection from this
+    /// setting alone.
+    ///
+    /// - Important: ``HTTPVersion/http1Only`` is treated as incompatible with
+    /// ``Session/Executor/urlSession``, which cannot opt out of HTTP/2: automatic executor
+    /// resolution skips it in favor of a NIO-based executor, and pinning to `.urlSession` via
+    /// ``requiredExecutor(_:)`` throws ``ExecutorRequirementError``. ``HTTPVersion/automatic``
+    /// has no such effect. Unavailable in a build without NIO, where no executor could honor
+    /// ``HTTPVersion/http1Only``.
+    ///
+    /// - Parameter version: The HTTP version policy to use.
+    /// - Returns: The modified `Session` instance with the HTTP version configured.
+    ///
+    public func httpVersion(_ version: HTTPVersion) -> Self {
+        edit { $0.httpVersion = version.build() }
+    }
+    #endif
+
     ///
     /// Configures multipath TCP for the session, mirroring `URLSessionConfiguration.multipathServiceType`.
     ///
