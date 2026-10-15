@@ -287,6 +287,11 @@ struct BackgroundDownloadResumptionTests {
     func cancellingADownload_producesWhatItTakesToContinueIt() async throws {
         try await withTransferServer(.init(length: Self.length)) { server in
             // Given: a download held still a few megabytes in.
+            // Held at 3 MiB, past the 2 MiB the delegate suspends at: a download that goes to a file
+            // applies no pressure, and on a loaded runner the delegate was late enough for 64 MiB to
+            // be over before it suspended anything (`.completed`, and no resume data to produce).
+            server.holdsDownloadAt = 3 * 1_048_576
+
             let observer = Observer(suspendAfter: 2 * 1_048_576)
             let session = URLSession(configuration: .ephemeral, delegate: observer, delegateQueue: nil)
             defer { session.invalidateAndCancel() }
@@ -302,6 +307,7 @@ struct BackgroundDownloadResumptionTests {
 
             // When
             let resumeData = try #require(await BackgroundDownloads.Session.cancelProducingResumeData(of: task))
+            server.holdsDownloadAt = nil
 
             // Then: cancelled, and continued from what it produced to the whole resource.
             try await eventually(timeout: 30) { observer.isOver }
@@ -326,6 +332,11 @@ struct BackgroundDownloadResumptionTests {
         try await withTransferServer(.init(length: Self.length)) { server in
             // Given: a download held still, cancelled for its resume data, and a server that now
             // holds another version of the resource.
+            // Held at 3 MiB, past the 2 MiB the delegate suspends at: a download that goes to a file
+            // applies no pressure, and on a loaded runner the delegate was late enough for 64 MiB to
+            // be over before it suspended anything (`.completed`, and no resume data to produce).
+            server.holdsDownloadAt = 3 * 1_048_576
+
             let observer = Observer(suspendAfter: 2 * 1_048_576)
             let session = URLSession(configuration: .ephemeral, delegate: observer, delegateQueue: nil)
             defer { session.invalidateAndCancel() }
@@ -340,6 +351,7 @@ struct BackgroundDownloadResumptionTests {
             try await eventually(timeout: 30) { task.state == .suspended }
 
             let resumeData = try #require(await BackgroundDownloads.Session.cancelProducingResumeData(of: task))
+            server.holdsDownloadAt = nil
             server.resource = .init(length: Self.length, seed: 7, validator: .entityTag("\"v2\""))
 
             // When

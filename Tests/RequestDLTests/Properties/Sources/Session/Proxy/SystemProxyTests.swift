@@ -50,6 +50,71 @@ struct SystemProxyTests {
         #expect(resolved.session.configuration.proxy?.port == port)
     }
 
+    @Test(arguments: [
+        SystemProxy.PACFailurePolicy.direct, .fail, .lastKnown(orElse: .direct), .lastKnown(orElse: .fail),
+    ])
+    func systemProxy_carriesItsPolicyToTheBuild(_ policy: SystemProxy.PACFailurePolicy) async throws {
+        // When
+        let (_, make) = try await Resolve(
+            TestProperty {
+                SystemProxy(onPACFailure: policy)
+            }
+        )
+        .partiallyBuild()
+
+        // Then
+        #expect(make.resolvesSystemProxy)
+        #expect(make.systemProxyPAC.onFailure == policy.internalPolicy)
+    }
+
+    /// A request that never said what to do keeps going direct, as it always did.
+    @Test
+    func systemProxy_withoutAPolicy_goesDirectOnAFailure() async throws {
+        // When
+        let (_, make) = try await Resolve(
+            TestProperty {
+                SystemProxy()
+            }
+        )
+        .partiallyBuild()
+
+        // Then
+        #expect(make.systemProxyPAC.onFailure == .direct)
+        #expect(make.systemProxyPAC.evaluationTimeout == 30)
+        #expect(make.systemProxyPAC.failureLifetime == 10_000_000_000)
+    }
+
+    @Test
+    func systemProxy_carriesItsTwoTimesToTheBuild() async throws {
+        // When
+        let (_, make) = try await Resolve(
+            TestProperty {
+                SystemProxy(onPACFailure: .fail, evaluationTimeout: .seconds(5), failureLifetime: .milliseconds(2_500))
+            }
+        )
+        .partiallyBuild()
+
+        // Then
+        #expect(make.systemProxyPAC.evaluationTimeout == 5)
+        #expect(make.systemProxyPAC.failureLifetime == 2_500_000_000)
+    }
+
+    /// A negative time is not a deadline in the past for a script to race: it is none.
+    @Test
+    func systemProxy_withNegativeTimes_usesZero() async throws {
+        // When
+        let (_, make) = try await Resolve(
+            TestProperty {
+                SystemProxy(onPACFailure: .direct, evaluationTimeout: .seconds(-5), failureLifetime: .seconds(-1))
+            }
+        )
+        .partiallyBuild()
+
+        // Then
+        #expect(make.systemProxyPAC.evaluationTimeout == 0)
+        #expect(make.systemProxyPAC.failureLifetime == 0)
+    }
+
     @Test
     func neverBody() async throws {
         // Given

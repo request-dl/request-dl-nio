@@ -49,14 +49,14 @@ extension Internals {
         /// for minutes would send every request in that window around the proxy the script
         /// would have chosen. It is not zero, because an unreachable PAC server otherwise makes
         /// every request wait out the whole evaluation timeout.
-        package static let failureLifetime: Int64 = 10 * 1_000_000_000
+        package static let failureLifetime: Int64 = Internals.SystemProxyResolver.PACOptions.defaultFailureLifetime
 
         /// Bounds one evaluation's fetch-and-execute time. Without this, an unreachable PAC
         /// server would hang every request routed through it, not just the first. 30s, not a
         /// tighter bound: a PAC file is commonly hosted on a slow internal server reached over a
         /// real (if sluggish) corporate network, and this only ever costs one request's worth of
         /// latency per `lifetime` window thanks to the cache above it.
-        private static let evaluationTimeout: Double = 30
+        package static let evaluationTimeout: Double = Internals.SystemProxyResolver.PACOptions.defaultEvaluationTimeout
 
         /// A ceiling, not a working limit, same rationale as `Internals.Storage.maximumCount`.
         /// `storage` is keyed by `(scriptURL, targetURL)`, and entries only expire logically
@@ -102,6 +102,12 @@ extension Internals {
 
         private var storage: [Key: Entry] = [:]
 
+        /// The last answer each key's script gave, kept apart from `storage` because an entry there
+        /// is replaced by a failure and dropped when it is old, and the answer is what stands in for
+        /// the script when it cannot be asked. Never replaced by a failure. For the life of the
+        /// process and no longer: nothing here is written to disk.
+        private var lastAnswers: [Key: LastAnswer] = [:]
+
         /// One evaluation per key in flight at a time. `proxy(forScriptURL:targetURL:)` awaits
         /// `Internals.PACEvaluator.evaluate(...)`, a genuine suspension point, so a burst of
         /// concurrent requests to the same host (a screenful of images loading at once, say)
@@ -142,18 +148,44 @@ extension Internals {
         /// connection, including when evaluation itself fails (a stale/misconfigured PAC file,
         /// an unreachable PAC server, a script that throws).
         ///
-        /// A failure is remembered for `failureLifetime` only, so a script that was briefly
-        /// unreachable is asked again soon, and a script that answers is kept for `lifetime`.
-        ///
         /// Failing safe to direct is the same choice
         /// `Internals.SystemProxyResolver.firstResolution(in:)` already makes for any other
-        /// proxy-list entry it can't parse.
+        /// proxy-list entry it can't parse. A caller that needs to tell a failure from a script
+        /// that answered "direct" asks ``resolution(forScriptURL:targetURL:)`` instead.
         package func proxy(forScriptURL scriptURL: URL, targetURL: URL) async -> Internals.Proxy? {
+            guard case .answered(let proxy) = await resolution(forScriptURL: scriptURL, targetURL: targetURL) else {
+                return nil
+            }
+
+            return proxy
+        }
+
+        /// What `scriptURL`'s PAC script comes to for `targetURL`: the proxy it answered (`nil`
+        /// for "direct"), the failure when it could not be asked, or that the caller was
+        /// cancelled while it waited.
+        ///
+        /// A failure is remembered for `failureLifetime` only, so a script that was briefly
+        /// unreachable is asked again soon, and a script that answers is kept for `lifetime`.
+        /// Everyone who asks within that window gets the same failure, at once, instead of each
+        /// waiting out the evaluation. A failure carries the last answer the script gave for this
+        /// key, if it ever did.
+        ///
+        /// - Parameters:
+        ///   - evaluationTimeout: How long an evaluation this call starts may take, in seconds.
+        ///   Callers that arrive while it runs share it, and so share this timeout.
+        ///   - failureLifetime: How long a failure of an evaluation this call starts is
+        ///   remembered, in nanoseconds. `nil` is the cache's own.
+        package func resolution(
+            forScriptURL scriptURL: URL,
+            targetURL: URL,
+            evaluationTimeout: Double = PACProxyCache.evaluationTimeout,
+            failureLifetime: Int64? = nil
+        ) async -> Internals.PACResolution {
             let targetURL = Self.evaluationTarget(for: targetURL)
             let key = Key(scriptURL: scriptURL, targetURL: targetURL)
 
             if let entry = storage[key], !isExpired(entry) {
-                return entry.proxy
+                return withLastKnown(entry.resolution, key: key)
             }
 
             let task: _Concurrency.Task<Evaluation, Never>
@@ -164,6 +196,7 @@ extension Internals {
                 evaluationCount += 1
 
                 let evaluate = evaluate
+                let failureLifetime = failureLifetime ?? self.failureLifetime
 
                 let newTask = _Concurrency.Task<Evaluation, Never> {
                     await self.acquireEvaluationSlot()
@@ -172,28 +205,28 @@ extension Internals {
 
                     do {
                         evaluation = Evaluation(
-                            proxy: try await evaluate(scriptURL, targetURL, Self.evaluationTimeout),
-                            failed: false
+                            resolution: .answered(try await evaluate(scriptURL, targetURL, evaluationTimeout))
                         )
                     } catch {
-                        evaluation = Evaluation(proxy: nil, failed: true)
+                        evaluation = Evaluation(resolution: .failed(Self.failure(from: error), lastKnown: nil))
                     }
 
                     await self.releaseEvaluationSlot()
+
+                    // Recorded here, by the evaluation itself, and not by a task that waits for it:
+                    // this task is already detached from any one caller's lifetime (it runs to the
+                    // end whether or not the call that started it is still being awaited), and a
+                    // caller that sees its result must find the entry already stored and
+                    // `inFlight` already cleared. Left to a second task, that was a window in which
+                    // a finished evaluation was still the one in flight, and a request that came in
+                    // after its failure window (or after the clock was moved, in a test) was given
+                    // the old result instead of asking the script again.
+                    await self.finishEvaluation(key: key, evaluation: evaluation, failureLifetime: failureLifetime)
+
                     return evaluation
                 }
                 inFlight[key] = newTask
                 task = newTask
-
-                // Detached from any one caller's lifetime on purpose: this records the result for
-                // whoever asks next (this key's cache entry, and any other concurrent caller
-                // sharing `inFlight[key]`) regardless of whether the specific call that started the
-                // evaluation is itself still being awaited below, since it may have already
-                // returned early after its own task was cancelled.
-                _Concurrency.Task { [weak self] in
-                    let evaluation = await newTask.value
-                    await self?.finishEvaluation(key: key, evaluation: evaluation)
-                }
             }
 
             // `await task.value` alone does not observe *this call's own* task cancellation: an
@@ -204,7 +237,21 @@ extension Internals {
             // against cancellation lets a cancelled caller fail safe to direct (`nil`) immediately
             // instead, without disturbing the shared evaluation other, still-live callers for the
             // same key are waiting on.
-            return await Self.awaitingCancellably(task)
+            return withLastKnown(await Self.awaitingCancellably(task), key: key)
+        }
+
+        /// A failure with the last answer the script gave for `key` attached, so whoever decides
+        /// what the failure does can fall back on it.
+        private func withLastKnown(_ resolution: Internals.PACResolution, key: Key) -> Internals.PACResolution {
+            guard case .failed(let failure, _) = resolution else {
+                return resolution
+            }
+
+            let lastKnown = lastAnswers[key].map {
+                Internals.PACLastKnownAnswer(proxy: $0.proxy, ageNanoseconds: now() &- $0.answeredAt)
+            }
+
+            return .failed(failure, lastKnown: lastKnown)
         }
 
         private func acquireEvaluationSlot() async {
@@ -248,31 +295,60 @@ extension Internals {
             return components.url ?? url
         }
 
-        private func finishEvaluation(key: Key, evaluation: Evaluation) {
+        private func finishEvaluation(key: Key, evaluation: Evaluation, failureLifetime: Int64) {
             inFlight[key] = nil
+            let failed: Bool
+
+            switch evaluation.resolution {
+            case .answered(let proxy):
+                failed = false
+                lastAnswers[key] = LastAnswer(proxy: proxy, answeredAt: now())
+
+            case .failed, .cancelled:
+                failed = true
+            }
+
             storage[key] = Entry(
-                proxy: evaluation.proxy,
+                resolution: evaluation.resolution,
                 readAt: now(),
-                lifetime: evaluation.failed ? failureLifetime : Self.lifetime
+                lifetime: failed ? failureLifetime : Self.lifetime
             )
             evictIfNeeded()
+            evictLastAnswersIfNeeded()
         }
 
         private static func awaitingCancellably(
             _ task: _Concurrency.Task<Evaluation, Never>
-        ) async -> Internals.Proxy? {
+        ) async -> Internals.PACResolution {
             let box = PACCacheAwaitBox()
 
             return await withTaskCancellationHandler {
-                await withCheckedContinuation { (continuation: CheckedContinuation<Internals.Proxy?, Never>) in
+                await withCheckedContinuation { (continuation: CheckedContinuation<Internals.PACResolution, Never>) in
                     box.attach(continuation)
 
                     _Concurrency.Task {
-                        box.resolve(returning: await task.value.proxy)
+                        box.resolve(returning: await task.value.resolution)
                     }
                 }
             } onCancel: {
                 box.cancel()
+            }
+        }
+
+        /// What the evaluator's error comes to for a caller: it timed out, or it did not work.
+        private static func failure(from error: Swift.Error) -> Internals.PACEvaluationFailure {
+            switch error {
+            case let error as Internals.PACEvaluator.Error:
+                switch error {
+                case .timedOut:
+                    return .init(reason: .timedOut)
+
+                case .executionFailed(let details):
+                    return .init(reason: .failed, details: details)
+                }
+
+            default:
+                return .init(reason: .failed, details: String(describing: error))
             }
         }
 
@@ -305,22 +381,47 @@ extension Internals {
             }
         }
 
+        /// Brings `lastAnswers` back under `maximumCount` the way `evictIfNeeded()` does for
+        /// `storage`: oldest first, down to three quarters.
+        private func evictLastAnswersIfNeeded() {
+            guard lastAnswers.count > maximumCount else {
+                return
+            }
+
+            let target = max(maximumCount - (maximumCount / 4), 1)
+            let excess = lastAnswers.count - target
+
+            let oldest =
+                lastAnswers
+                .sorted { $0.value.answeredAt < $1.value.answeredAt }
+                .prefix(excess)
+
+            for (key, _) in oldest {
+                lastAnswers[key] = nil
+            }
+        }
+
         // MARK: - Private nested types
+
+        private struct LastAnswer {
+            let proxy: Internals.Proxy?
+            // Monotonic, like `Entry.readAt`.
+            let answeredAt: UInt64
+        }
 
         private struct Key: Hashable {
             let scriptURL: URL
             let targetURL: URL
         }
 
-        /// What one evaluation came to. `failed` tells an error (the script could not be fetched
-        /// or run) apart from a script that answered "direct", which is `proxy == nil` alone.
+        /// What one evaluation came to. A failure (the script could not be fetched or run) stays
+        /// apart from a script that answered "direct", which is `.answered(nil)`.
         private struct Evaluation: Sendable {
-            let proxy: Internals.Proxy?
-            let failed: Bool
+            let resolution: Internals.PACResolution
         }
 
         private struct Entry {
-            let proxy: Internals.Proxy?
+            let resolution: Internals.PACResolution
             // Monotonic, not wall clock: same rationale as `Internals.Storage`/
             // `Internals.ClientManager`: a `Date`-based deadline moves if the user or NTP moves
             // the system clock, and this must not advance while the device is suspended either
@@ -340,7 +441,7 @@ private final class PACCacheAwaitBox: @unchecked Sendable {
     // MARK: - Private properties
 
     private let lock = Lock()
-    private var continuation: CheckedContinuation<Internals.Proxy?, Never>?
+    private var continuation: CheckedContinuation<Internals.PACResolution, Never>?
     private var isCancelled = false
     private var isResumed = false
 
@@ -349,7 +450,7 @@ private final class PACCacheAwaitBox: @unchecked Sendable {
     /// Registers `continuation` as the one `resolve`/`cancel` should answer, unless `cancel()`
     /// already ran, in which case this resumes it immediately instead, since there is nothing
     /// left to wait on.
-    func attach(_ continuation: CheckedContinuation<Internals.Proxy?, Never>) {
+    func attach(_ continuation: CheckedContinuation<Internals.PACResolution, Never>) {
         let resumeNow: Bool = lock.withLock {
             guard !isResumed else { return false }
 
@@ -363,12 +464,12 @@ private final class PACCacheAwaitBox: @unchecked Sendable {
         }
 
         if resumeNow {
-            continuation.resume(returning: nil)
+            continuation.resume(returning: .cancelled)
         }
     }
 
-    func resolve(returning value: Internals.Proxy?) {
-        let toResume: CheckedContinuation<Internals.Proxy?, Never>? = lock.withLock {
+    func resolve(returning value: Internals.PACResolution) {
+        let toResume: CheckedContinuation<Internals.PACResolution, Never>? = lock.withLock {
             guard !isResumed, let continuation else { return nil }
             isResumed = true
             self.continuation = nil
@@ -379,7 +480,7 @@ private final class PACCacheAwaitBox: @unchecked Sendable {
     }
 
     func cancel() {
-        let toResume: CheckedContinuation<Internals.Proxy?, Never>? = lock.withLock {
+        let toResume: CheckedContinuation<Internals.PACResolution, Never>? = lock.withLock {
             isCancelled = true
 
             guard !isResumed, let continuation else { return nil }
@@ -388,7 +489,7 @@ private final class PACCacheAwaitBox: @unchecked Sendable {
             return continuation
         }
 
-        toResume?.resume(returning: nil)
+        toResume?.resume(returning: .cancelled)
     }
 }
 

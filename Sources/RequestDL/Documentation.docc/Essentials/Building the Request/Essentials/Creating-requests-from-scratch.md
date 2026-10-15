@@ -221,6 +221,7 @@ Learn more in:
 - ``RequestDL/Proxy``
 - ``RequestDL/ProxyAuthorization``
 - ``RequestDL/SystemProxy``
+- ``RequestDL/ProxyAutoConfigurationError``
 - ``RequestDL/DNSOverride``
 - ``RequestDL/URLOverride``
 - ``RequestDL/URLOverrideError``
