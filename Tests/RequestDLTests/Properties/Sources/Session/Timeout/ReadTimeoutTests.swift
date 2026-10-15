@@ -503,9 +503,14 @@ private final class Running<Value: Sendable>: @unchecked Sendable {
         done.withLockedValue { $0 }
     }
 
-    /// The error it ended with, once it has.
+    /// The error it ended with, once it has: ``DidNotEnd`` when it has not after two minutes, so a
+    /// request that hangs fails its test and does not hold the whole run until the job is cancelled.
     var error: (any Error)? {
         get async {
+            guard await ends() else {
+                return DidNotEnd()
+            }
+
             if case .failure(let error) = await task.value {
                 return error
             }
@@ -514,14 +519,30 @@ private final class Running<Value: Sendable>: @unchecked Sendable {
         }
     }
 
-    /// What it ended with, once it has.
+    /// What it ended with, once it has; `nil` when it failed or did not end.
     var value: Value? {
         get async {
+            guard await ends() else {
+                return nil
+            }
+
             if case .success(let value) = await task.value {
                 return value
             }
 
             return nil
+        }
+    }
+
+    struct DidNotEnd: Error {}
+
+    private func ends() async -> Bool {
+        do {
+            try await eventually(timeout: 120) { isDone }
+            return true
+        } catch {
+            task.cancel()
+            return false
         }
     }
 
