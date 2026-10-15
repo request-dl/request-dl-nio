@@ -187,12 +187,11 @@ struct PropertyReaderTests {
     /// two sibling `PropertyReader`s each wrapping the same `@StoredObject`-bearing type as
     /// `source` would both independently compute seed `.zero` for `.global`, colliding on the
     /// identical `Internals.Storage` entry and silently sharing one `MemoryReference` instance
-    /// instead of each getting its own (the "intermittent `StoredObject`-identity flake" the
-    /// `#if DEBUG` diagnostic in `Internals.Storage` exists to chase). `ReferenceMemoryProperty`'s
-    /// `@StoredObject` only constructs a fresh `MemoryReference` (stamped with the next value off
-    /// a shared, monotonically increasing counter) the first time its identity is resolved, so
-    /// two independent identities show up here as two *different* counter values embedded in
-    /// each sibling's own resolved `source` URL.
+    /// instead of each getting its own (the old intermittent `StoredObject`-identity flake).
+    /// `ReferenceMemoryProperty`'s `@StoredObject` only constructs a fresh `MemoryReference`
+    /// (stamped with the next value off a shared, monotonically increasing counter) the first
+    /// time its identity is resolved, so two independent identities show up here as two
+    /// *different* counter values embedded in each sibling's own resolved `source` URL.
     @Test
     func propertyReader_whenTwoSiblingsDeclareSameStoredObjectSourceType_getIndependentInstances() async throws {
         // Given / When
