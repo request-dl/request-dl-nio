@@ -41,7 +41,10 @@ import Network
 @Suite(
     .serialized,
     .concurrent(watchdogAffectedPlatformConcurrencyLimit),
-    .nonFatalWatchdog
+    .nonFatalWatchdog,
+    .toleratingSimulatorFlake(
+        "The evaluation is bounded by 30 s, and on a simulator runner starved of CPU for minutes (tests of this suite have reported 149 s there) fetching a script from a local server can take longer than that; the other platforms are what catch a regression"
+    )
 )
 struct InternalsPACEvaluatorTests {
 
