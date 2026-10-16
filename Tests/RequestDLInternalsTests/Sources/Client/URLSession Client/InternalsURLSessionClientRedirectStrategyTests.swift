@@ -255,9 +255,9 @@ struct InternalsURLSessionClientRedirectStrategyTests {
                 delegate: AcceptAnyServerTrustDelegate()
             )
             Issue.record("Not expecting success")
-        } catch let error as Internals.URLSessionClient.InvalidRedirectURLError {
+        } catch let error as Internals.RedirectError {
             // Then
-            #expect(error.url == "")
+            #expect(error.reason == .invalidURL(""))
         }
     }
 }

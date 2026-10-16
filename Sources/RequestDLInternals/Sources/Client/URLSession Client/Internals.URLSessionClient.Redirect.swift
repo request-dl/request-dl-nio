@@ -31,14 +31,14 @@ extension URLRequest {
     /// already set on the candidate request this is called on) is left untouched, mirroring how
     /// `Internals.NIORedirectStrategyAdapter` only overwrites those same three on the NIO side.
     ///
-    /// - Throws: ``Internals/URLSessionClient/InvalidRedirectURLError`` if the decision's URL
+    /// - Throws: ``Internals/RedirectError`` (``Internals/RedirectError/Reason/invalidURL(_:)``) if the decision's URL
     ///   doesn't parse. Keeping the request's own URL instead would follow the `Location` the
     ///   server sent, a destination the strategy had just decided against.
     func applyingRedirectDecision(_ redirectRequest: Internals.RedirectRequest) throws -> URLRequest {
         var request = self
 
         guard let url = URL(string: redirectRequest.url) else {
-            throw Internals.URLSessionClient.InvalidRedirectURLError(url: redirectRequest.url)
+            throw Internals.RedirectError(.invalidURL(redirectRequest.url))
         }
 
         request.url = url

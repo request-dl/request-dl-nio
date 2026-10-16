@@ -209,7 +209,7 @@ struct RequestConfigurationURLSessionClientDownloadTests {
                 delegate: AcceptAnyServerTrustDelegate()
             )
             Issue.record("Not expecting success")
-        } catch is Internals.URLSessionClient.RedirectLimitReachedError {
+        } catch let error as Internals.RedirectError where error.reason == .limitReached {
             // Then: expected
         }
     }

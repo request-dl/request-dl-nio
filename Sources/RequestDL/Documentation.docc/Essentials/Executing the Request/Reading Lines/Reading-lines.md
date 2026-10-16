@@ -96,3 +96,4 @@ Four differences to account for: `lines()` also ends a line at `CR` and `CRLF` (
 
 - ``RequestDL/AsyncBytesItemTooLargeError``
 - ``RequestDL/ReadingModeItemTooLargeError``
+- ``RequestDL/ResponseBodyUnreadableError``

@@ -249,6 +249,7 @@ Learn more in:
 - ``RequestDL/RedirectRequest``
 - ``RequestDL/RedirectHistoryEntry``
 - ``RequestDL/RedirectDecision``
+- ``RequestDL/RedirectError``
 
 ### Adding request timeout
 

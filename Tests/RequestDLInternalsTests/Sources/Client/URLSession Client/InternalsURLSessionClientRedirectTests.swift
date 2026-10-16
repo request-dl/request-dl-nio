@@ -117,8 +117,9 @@ struct InternalsURLSessionClientRedirectTests {
                 delegate: AcceptAnyServerTrustDelegate()
             )
             Issue.record("Not expecting success")
-        } catch is Internals.URLSessionClient.RedirectLimitReachedError {
+        } catch let error as Internals.RedirectError {
             // Then: expected
+            #expect(error.reason == .limitReached)
         }
     }
 
@@ -159,8 +160,9 @@ struct InternalsURLSessionClientRedirectTests {
                 delegate: AcceptAnyServerTrustDelegate()
             )
             Issue.record("Not expecting success")
-        } catch is Internals.URLSessionClient.RedirectCycleDetectedError {
+        } catch let error as Internals.RedirectError {
             // Then: expected
+            #expect(error.reason == .cycleDetected)
         }
     }
 
@@ -215,8 +217,9 @@ struct InternalsURLSessionClientRedirectTests {
                 delegate: AcceptAnyServerTrustDelegate()
             )
             Issue.record("Not expecting success")
-        } catch is Internals.URLSessionClient.RedirectLimitReachedError {
+        } catch let error as Internals.RedirectError {
             // Then: expected, since cycles are tolerated and only the count still gates it
+            #expect(error.reason == .limitReached)
         }
     }
 
