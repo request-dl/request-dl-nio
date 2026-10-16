@@ -193,6 +193,52 @@ struct InternalsTransferControlTests {
         #expect(second.isWritable)
     }
 
+    /// The client holding the execution back is what `Internals.IdleDeadline` does not count:
+    /// suspended, or with a window that has a producer waiting on its reader, in this control or in
+    /// the control of one of its exchanges.
+    @Test
+    func isHeldBack_whenSuspendedOrAWindowHoldsAProducer() {
+        // Given
+        let control = Internals.TransferControl()
+        let window = Internals.FlowControlWindow(highWatermark: 100, lowWatermark: 50)
+        let follower = Internals.TransferControl()
+        let followerWindow = Internals.FlowControlWindow(highWatermark: 100, lowWatermark: 50)
+
+        control.attach(window)
+        follower.attach(followerWindow)
+        control.attach(follower)
+
+        // Then: nothing is holding it back.
+        #expect(!control.isHeldBack)
+
+        // When: the reader falls behind, and a producer waits.
+        window.charge(150)
+        window.whenWritable {}
+
+        // Then
+        #expect(control.isHeldBack)
+
+        window.credit(100)
+        #expect(!control.isHeldBack)
+
+        // When: the same for an exchange of it.
+        followerWindow.charge(150)
+        followerWindow.whenWritable {}
+
+        // Then
+        #expect(control.isHeldBack)
+
+        followerWindow.credit(100)
+        #expect(!control.isHeldBack)
+
+        // When: suspended.
+        control.suspend()
+        #expect(control.isHeldBack)
+
+        control.resume()
+        #expect(!control.isHeldBack)
+    }
+
     /// A suspension that comes before the executor attaches its window (the app pausing a
     /// request that hasn't reached the network yet) still holds once it does.
     @Test

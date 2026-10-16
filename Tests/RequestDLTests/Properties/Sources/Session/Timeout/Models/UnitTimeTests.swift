@@ -210,6 +210,16 @@ struct UnitTimeTests {
         #expect(UnitTime.microseconds(.max).nanoseconds == .max)
     }
 
+    /// `.infinity` is the largest time there is, so it is also where an amount that is too large
+    /// ends up: asking for "never" and asking for too much are the same thing.
+    @Test
+    func unitTime_infinity_isTheLargestTime() async throws {
+        #expect(UnitTime.infinity.nanoseconds == .max)
+        #expect(UnitTime.infinity == .hours(.max))
+        #expect(UnitTime.infinity > .hours(876_000))
+        #expect(UnitTime.infinity + .seconds(1) == .infinity)
+    }
+
     @Test
     func unitTime_whenAmountFits_isExact() async throws {
         #expect(UnitTime.seconds(9_000_000_000).nanoseconds == 9_000_000_000_000_000_000)

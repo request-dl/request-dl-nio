@@ -83,11 +83,11 @@ struct InternalsTimeoutTests {
         #expect(lhs != rhs)
     }
 
-    /// `Hashable`/`Equatable` deliberately exclude `resource`, since `build()` below never
-    /// forwards it and this type's equality is `Internals.ClientManager`'s pooled client cache
-    /// key. Including it would make two otherwise-identical sessions differing only in
-    /// `.timeout(.resource(_:))` produce byte-identical `HTTPClient.Configuration`s that are
-    /// still treated as unpoolable.
+    /// `Hashable`/`Equatable` deliberately exclude `resource` and `read`, since `build()` below
+    /// never forwards them and this type's equality is `Internals.ClientManager`'s pooled client
+    /// cache key. Including them would make two otherwise-identical sessions differing only in
+    /// `.timeout(.resource(_:))` or `.timeout(.read(_:))` produce byte-identical
+    /// `HTTPClient.Configuration`s that are still treated as unpoolable.
     @Test
     func timeout_whenOnlyResourceDiffers_stillEquals() {
         // Given
@@ -99,24 +99,67 @@ struct InternalsTimeoutTests {
         #expect(lhs.hashValue == rhs.hashValue)
     }
 
+    @Test
+    func timeout_whenOnlyReadDiffers_stillEquals() {
+        // Given
+        let lhs = Internals.Timeout(read: 1_000_000_000)
+        let rhs = Internals.Timeout(read: 2_000_000_000)
+
+        // Then
+        #expect(lhs == rhs)
+        #expect(lhs.hashValue == rhs.hashValue)
+    }
+
+    // MARK: - Idle
+
+    /// An unset `read` is not "never": it is what `URLSession`'s `timeoutIntervalForRequest` has
+    /// always defaulted to, applied to every executor by `Internals.IdleDeadline`.
+    @Test
+    func timeout_whenIdleWithoutRead_isSixtySeconds() {
+        // Given
+        let timeout = Internals.Timeout()
+
+        // Then
+        #expect(Internals.Timeout.defaultRead == 60_000_000_000)
+        #expect(timeout.idle == 60_000_000_000)
+    }
+
+    @Test
+    func timeout_whenIdleWithRead_isRead() {
+        // Given
+        let timeout = Internals.Timeout(read: 5_000_000_000)
+
+        // Then
+        #expect(timeout.idle == 5_000_000_000)
+    }
+
+    /// `Int64.max` is how a caller says never (`UnitTime.infinity`): no deadline at all.
+    @Test
+    func timeout_whenReadIsNever_hasNoIdleDeadline() {
+        // Given
+        let timeout = Internals.Timeout(read: .max)
+
+        // Then
+        #expect(Internals.IdleDeadline.make(nanoseconds: timeout.idle) == nil)
+        #expect(Internals.IdleDeadline.make(nanoseconds: Internals.Timeout().idle) != nil)
+    }
+
     #if canImport(NIOCore)
     @Test
-    func timeout_whenBuild_mapsConnectAndReadToNanoseconds() {
+    func timeout_whenBuild_mapsConnectToNanoseconds() {
         // Given
         let connect: Int64 = 60_000_000_000
-        let read: Int64 = 30_000_000_000
-        let timeout = Internals.Timeout(connect: connect, read: read)
+        let timeout = Internals.Timeout(connect: connect, read: 30_000_000_000)
 
         // When
         let sut = timeout.build()
 
         // Then
         #expect(sut.connect == .nanoseconds(connect))
-        #expect(sut.read == .nanoseconds(read))
     }
 
     @Test
-    func timeout_whenBuildWithNilFields_connectIsNilAndReadIsDefault() {
+    func timeout_whenBuildWithNilFields_hasNoTimeouts() {
         // Given
         let timeout = Internals.Timeout()
 
@@ -125,35 +168,23 @@ struct InternalsTimeoutTests {
 
         // Then
         #expect(sut.connect == nil)
-        #expect(sut.read == .nanoseconds(Internals.Timeout.defaultRead))
+        #expect(sut.read == nil)
     }
 
-    /// AsyncHTTPClient has no idle read timeout of its own, so an unset `read` would leave a
-    /// `.nio` request to a server that stops sending hanging forever, while `.urlSession` fails
-    /// the same request after its 60 s `timeoutIntervalForRequest`.
-    @Test
-    func timeout_whenBuildWithoutRead_matchesURLSessionDefaultOfSixtySeconds() {
+    /// AsyncHTTPClient's own read timeout is off whatever `read` says: it counts something
+    /// different from what `URLSession`'s does (a download only, and it goes on counting while the
+    /// application has the transfer suspended), so `Internals.IdleDeadline` enforces `read` the
+    /// same way on every executor instead.
+    @Test(arguments: [nil, 5_000_000_000, Int64.max] as [Int64?])
+    func timeout_whenBuild_neverTurnsOnTheClientsOwnReadTimeout(read: Int64?) {
         // Given
-        let timeout = Internals.Timeout()
+        let timeout = Internals.Timeout(read: read)
 
         // When
         let sut = timeout.build()
 
         // Then
-        #expect(Internals.Timeout.defaultRead == 60_000_000_000)
-        #expect(sut.read == .seconds(60))
-    }
-
-    @Test
-    func timeout_whenBuildWithExplicitRead_overridesDefault() {
-        // Given
-        let timeout = Internals.Timeout(read: 5_000_000_000)
-
-        // When
-        let sut = timeout.build()
-
-        // Then
-        #expect(sut.read == .seconds(5))
+        #expect(sut.read == nil)
     }
 
     /// `resource` has no `HTTPClient.Configuration.Timeout` counterpart (see `Internals.Timeout
@@ -171,7 +202,7 @@ struct InternalsTimeoutTests {
 
         // Then
         #expect(sut.connect == nil)
-        #expect(sut.read == .nanoseconds(Internals.Timeout.defaultRead))
+        #expect(sut.read == nil)
     }
     #endif
 }

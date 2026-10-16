@@ -208,39 +208,6 @@ struct InternalsTransferControlDownloadTests {
         }
     }
 
-    /// Pins down the limit of an in-flight suspension: a connection that moves nothing for longer
-    /// than the client's own idle timeout is given up on by the client (`timeoutIntervalForRequest`
-    /// on `.urlSession`, the read timeout on `.nio`) and, with nothing to resume it, the download
-    /// fails with that timeout once the reader looks again. (On `.nio` the read timeout is off
-    /// unless configured, and a suspension then lasts as long as the server lets it:
-    /// `suspendMidBody_holdsTheConnectionUntilResumed` holds one for several seconds.)
-    @Test(arguments: TransferExecutor.allCases)
-    func suspensionLongerThanTheClientIdleTimeout_failsWithThatTimeout(_ executor: TransferExecutor) async throws {
-        try await withTransferServer(.init(length: Self.largeBody)) { server in
-            // Given
-            let control = Internals.TransferControl()
-            let download = try await TransferHarness(executor, idleTimeout: 1).download(
-                from: server,
-                transferControl: control
-            )
-            let reader = BackgroundReader(download.step.bytes)
-
-            try await eventually(timeout: 120) { reader.position > 0 }
-            control.suspend()
-
-            // When
-            try await _Concurrency.Task.sleep(nanoseconds: 3_000_000_000)
-            control.resume()
-
-            // Then
-            #expect(try await reader.end(within: 30).isFailure)
-            #expect(executor.isIdleTimeout(reader.error), "\(String(describing: reader.error))")
-            #expect(reader.verifier.isIntact)
-
-            withExtendedLifetime(download) {}
-        }
-    }
-
     // MARK: - Reconnection
 
     /// A connection lost mid-body continues on a new one, from exactly the byte the reader got to,
@@ -386,24 +353,19 @@ struct InternalsTransferControlDownloadTests {
     /// connection, then resumed. The suspension outlives the connection, and resuming picks the
     /// download up on a new one.
     ///
-    /// Run once with the server giving up (its own idle timeout, the way nginx's `send_timeout` or a
-    /// load balancer's would), and once with the client giving up (`timeoutIntervalForRequest` on
-    /// `.urlSession`, the read timeout on `.nio`).
-    @Test(arguments: TransferExecutor.allCases, ["server", "client"])
-    func suspensionOutlivingTheConnection_reconnectsOnResume(_ executor: TransferExecutor, givesUp: String) async throws
-    {
+    /// The server gives up on its own, the way nginx's `send_timeout` or a load balancer's would.
+    /// The client never does: how long a request may stay silent does not count a suspension (see
+    /// `ReadTimeoutTests`).
+    @Test(arguments: TransferExecutor.allCases)
+    func suspensionOutlivingTheConnection_reconnectsOnResume(_ executor: TransferExecutor) async throws {
         let length = 64 * 1_048_576
 
         try await withTransferServer(.init(length: length)) { server in
             // Given
             let control = Internals.TransferControl(resumption: Self.immediately)
-            let harness = TransferHarness(executor, idleTimeout: givesUp == "client" ? 1 : nil)
+            server.stallTimeout = 1
 
-            if givesUp == "server" {
-                server.stallTimeout = 1
-            }
-
-            let download = try await harness.download(from: server, transferControl: control)
+            let download = try await TransferHarness(executor).download(from: server, transferControl: control)
             let reader = BackgroundReader(download.step.bytes)
 
             try await eventually(timeout: 120) { reader.position >= 1_048_576 }
@@ -423,10 +385,7 @@ struct InternalsTransferControlDownloadTests {
             // Nothing has been reconnected while suspended, whether or not the client noticed the
             // connection is gone yet.
             #expect(server.acceptedConnections == connectionsOnceSuspended)
-
-            if givesUp == "server" {
-                #expect(server.stalledConnections >= 1)
-            }
+            #expect(server.stalledConnections >= 1)
 
             // The server's own idle timeout mustn't catch the continuation too.
             server.stallTimeout = nil

@@ -551,8 +551,8 @@ extension Internals.Session.Configuration {
     /// `Internals.ClientManager` pools and later shuts down. Cookies are additionally disabled
     /// unconditionally in `Internals.URLSessionClient.init` itself regardless of what this builds.
     ///
-    /// `timeout.read` maps onto `timeoutIntervalForRequest`; `URLSessionConfiguration` has no
-    /// distinct connect-phase timeout to receive `timeout.connect`. `secureConnection`'s
+    /// `timeout.read` does not reach `timeoutIntervalForRequest` (see below); `URLSessionConfiguration`
+    /// has no distinct connect-phase timeout to receive `timeout.connect`. `secureConnection`'s
     /// `minimumTLSVersion`/`maximumTLSVersion` map onto `tlsMinimumSupportedProtocolVersion`/
     /// `tlsMaximumSupportedProtocolVersion`,
     /// `connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit` onto
@@ -599,9 +599,10 @@ extension Internals.Session.Configuration {
         // all.
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
 
-        if let read = timeout.read {
-            configuration.timeoutIntervalForRequest = TimeInterval(read) / 1_000_000_000
-        }
+        // Off: how long a request may stay silent is `Internals.IdleDeadline`'s to decide, the
+        // same way on every executor. `timeoutIntervalForRequest` counts time the application
+        // spent suspending the transfer, and has no value for "never" other than a very large one.
+        configuration.timeoutIntervalForRequest = TimeInterval(Int64.max) / 1_000_000_000
 
         // Also enforced up front by `Internals.NetworkPathGate`, which is what turns a refusal
         // into a `NetworkAvailabilityError` before anything is sent. This is the part the gate

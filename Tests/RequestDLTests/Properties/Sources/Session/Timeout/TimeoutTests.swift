@@ -89,6 +89,25 @@ struct TimeoutTests {
         )
     }
 
+    /// `.infinity` for `.read` is the opt-out: no deadline is built for it (see
+    /// `Internals.IdleDeadline.make`), while a session that says nothing keeps the 60 seconds.
+    @Test
+    func timeout_whenReadIsInfinity_isNever() async throws {
+        // When
+        let resolved = try await resolve(TestProperty(Timeout(.infinity, for: .read)))
+        let unset = try await resolve(TestProperty {})
+
+        // Then
+        #expect(resolved.session.configuration.timeout.read == .max)
+        #expect(Internals.IdleDeadline.make(nanoseconds: resolved.session.configuration.timeout.idle) == nil)
+        #expect(Internals.IdleDeadline.make(nanoseconds: unset.session.configuration.timeout.idle) != nil)
+    }
+
+    @Test
+    func readTimeoutError_describesItself() {
+        #expect(String(describing: ReadTimeoutError()).contains("Timeout(_:for: .read)"))
+    }
+
     @Test
     func neverBody() async throws {
         // Given

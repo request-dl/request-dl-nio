@@ -936,9 +936,9 @@ extension Internals {
         /// before a single byte of its body reaches `downloadBuffer`; anything but exactly the
         /// rest of the same representation ends the download with the mismatch.
         ///
-        /// A failure while suspended (typically the request timing out because nothing moved for
-        /// `timeoutIntervalForRequest`) only reconnects once the execution is resumed: a new
-        /// connection would otherwise just idle out the same way.
+        /// A failure while suspended (typically the server closing a connection that stayed idle
+        /// for longer than it is willing to keep one) only reconnects once the execution is
+        /// resumed: a new connection would otherwise just idle out the same way.
         ///
         /// - Returns: Once the body is complete.
         /// - Throws: Whatever should end the download: the last transport failure once the budget

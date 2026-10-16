@@ -84,7 +84,8 @@ extension InternalsSessionConfigurationTests {
 
         // Then
         #expect(builtConfiguration.timeout.connect == .nanoseconds(connect))
-        #expect(builtConfiguration.timeout.read == .nanoseconds(read))
+        // Not forwarded: `Internals.IdleDeadline` enforces it, not AsyncHTTPClient.
+        #expect(builtConfiguration.timeout.read == nil)
     }
 
     @Test
@@ -313,7 +314,7 @@ extension InternalsSessionConfigurationTests {
                 )
         )
         #expect(builtConfiguration.timeout.connect == nil)
-        #expect(builtConfiguration.timeout.read == .nanoseconds(Internals.Timeout.defaultRead))
+        #expect(builtConfiguration.timeout.read == nil)
         #expect(builtConfiguration.proxy == nil)
         // Off by default on every platform now: decompression is opt-in, and `.disabled` gets
         // real parity with `.urlSession` via `Accept-Encoding: identity`, so the two platforms no

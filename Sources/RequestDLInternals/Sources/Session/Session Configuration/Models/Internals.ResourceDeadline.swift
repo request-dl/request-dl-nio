@@ -37,12 +37,21 @@ extension Internals {
         private let instant: ContinuousClock.Instant?
         #endif
 
+        /// The execution's idle deadline, when it has one. Not raced here: it ends the request
+        /// by itself (see `Internals.IdleDeadline`), and this is where whoever waits on that
+        /// request hears it was this that ended it.
+        private var idle: Internals.IdleDeadline?
+
         // MARK: - Inits
 
         /// - Parameter nanoseconds: `Internals.Timeout.resource`, measured from *now*. `nil`
         /// disables racing entirely, so `race(seed:_:)` becomes a plain `await` with no task-group
         /// overhead: the path every request without `.resource` configured takes.
         package init(nanoseconds: Int64?) {
+            // `Int64.max` is "never" (`UnitTime.infinity`): nothing to race, and so no task group
+            // per await for a deadline that cannot pass.
+            let nanoseconds = nanoseconds.flatMap { $0 == .max ? nil : $0 }
+
             #if canImport(Darwin)
             // Clamped: a negative timeout is a deadline that has already passed, as it is
             // everywhere else, not a reason to trap.
@@ -56,8 +65,16 @@ extension Internals {
 
         // MARK: - Internal methods
 
+        /// This deadline, also reporting the end of `idle` as ``ReadTimeoutError``.
+        package func watching(_ idle: Internals.IdleDeadline?) -> ResourceDeadline {
+            var deadline = self
+            deadline.idle = idle
+            return deadline
+        }
+
         /// Runs `operation`, cancelling it (and `seed`, if given) and throwing
-        /// ``ResourceTimeoutError`` if the deadline passes first.
+        /// ``ResourceTimeoutError`` if the deadline passes first, or ``ReadTimeoutError`` if the
+        /// request was ended for going idle.
         ///
         /// - Parameter seed: Cancelled on timeout in addition to `operation`'s own task, since
         /// `operation`'s cancellation alone only stops *this* particular await. A `TaskSeed` is
@@ -66,6 +83,22 @@ extension Internals {
         /// (the initial connect/redirect phase, before `RawTask` has a `SessionTask` to cancel).
         package func race<T: Sendable>(
             seed: Internals.TaskSeed? = nil,
+            _ operation: @escaping @Sendable () async throws -> T
+        ) async throws -> T {
+            do {
+                return try await raceResource(seed: seed, operation)
+            } catch {
+                // What the cancelled request fails with says nothing of why it was cancelled.
+                if idle?.isExpired == true, !(error is ResourceTimeoutError) {
+                    throw ReadTimeoutError()
+                }
+
+                throw error
+            }
+        }
+
+        private func raceResource<T: Sendable>(
+            seed: Internals.TaskSeed?,
             _ operation: @escaping @Sendable () async throws -> T
         ) async throws -> T {
             #if canImport(Darwin)
@@ -126,6 +159,13 @@ extension Internals {
     /// `ResourceTimeoutError`. This mirrors the split `NetworkAvailabilityError`/
     /// `Internals.NetworkPathUnsatisfiedError` already uses.
     package struct ResourceTimeoutError: Swift.Error, Sendable {
+        package init() {}
+    }
+
+    /// The internal marker for a request ended because nothing moved on it for the whole of
+    /// `Timeout(_:for: .read)`, rewrapped by `RawTask` into `RequestDL`'s public
+    /// `ReadTimeoutError`.
+    package struct ReadTimeoutError: Swift.Error, Sendable {
         package init() {}
     }
 }

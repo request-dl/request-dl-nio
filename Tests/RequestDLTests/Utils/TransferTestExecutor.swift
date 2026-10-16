@@ -58,13 +58,13 @@ enum TransferTestExecutor: Sendable, CaseIterable, CustomTestStringConvertible {
         }
     }
 
-    /// The session a transfer test runs under: pinned to this executor, and with a client idle
-    /// timeout far longer than any of these tests holds a transfer still.
+    /// The session a transfer test runs under: pinned to this executor, and with an idle timeout
+    /// far longer than any of these tests lets a transfer stay silent.
     ///
-    /// The transports' own idle timeouts (60 s by default on `.urlSession`) keep counting while a
-    /// transfer is suspended, which is by design. A test only holds one suspended for a moment, but
-    /// on a CI runner starved of CPU a moment can last minutes, and the timeout fires for a reason
-    /// that has nothing to do with what the test is checking.
+    /// A suspension, or a reader that has not caught up, does not count towards it. What does is a
+    /// server (or a runner) that stops answering, and on a CI runner starved of CPU a moment can
+    /// last minutes: the timeout would then fire for a reason that has nothing to do with what the
+    /// test is checking. `ReadTimeoutTests` is where the timeout itself is checked.
     @PropertyBuilder
     var session: some Property {
         pinnedSession

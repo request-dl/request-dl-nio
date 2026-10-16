@@ -30,8 +30,8 @@ extension Internals {
     /// a body part (`.nio`) / CFNetwork's read-ahead (`.urlSession`) of the response. Bytes already
     /// buffered ahead of the response's reader keep reaching it. The connection itself stays
     /// open, which means it is exposed to whatever idle timeouts apply while nothing moves: the
-    /// client's own (`timeoutIntervalForRequest` on `.urlSession`, for either direction; the
-    /// configured read timeout on `.nio`, for a download only), the server's, and any middlebox's.
+    /// server's, and any middlebox's. Not the client's own: the time an execution spends held back
+    /// (suspended, or waiting for its reader) does not count towards `Internals.IdleDeadline`.
     /// A suspension outliving the connection therefore ends the exchange like any other dropped
     /// connection does, promptly and never by hanging, unless ``resumption`` can reconnect a
     /// download.
@@ -84,6 +84,17 @@ extension Internals {
             lock.withLock { _isSuspended }
         }
 
+        /// Whether the client is the one holding this execution back right now: suspended, or with
+        /// a window shut because whoever reads the response has not caught up. What
+        /// `Internals.IdleDeadline` does not count as idle.
+        package var isHeldBack: Bool {
+            lock.withLock {
+                _isSuspended
+                    || _windows.contains { $0.isHeldBack }
+                    || _followers.contains { $0.isHeldBack }
+            }
+        }
+
         // MARK: - Private properties
 
         private let lock = Lock()
@@ -106,12 +117,20 @@ extension Internals {
             self.allowsSuspension = allowsSuspension
             self.observer = observer
             self.resumptionStart = resumptionStart
+
+            observer?.idle?.hold { [weak self] in
+                self?.isHeldBack ?? false
+            }
         }
 
         // MARK: - Internal methods
 
         /// Makes `window` follow this execution's suspension, starting with its current state.
         package func attach(_ window: Internals.FlowControlWindow) {
+            if let idle = observer?.idle {
+                window.onOpen { idle.touch() }
+            }
+
             lock.withLock {
                 _windows.append(window)
 
