@@ -289,6 +289,12 @@ extension Internals {
                 return
             }
 
+            // From here on it is reported, so it is reported the way the other executor reports it:
+            // AsyncHTTPClient's own errors for a redirect that could not be followed are this
+            // package's. Not before, since a reconnection decides what to do with an error from
+            // what AsyncHTTPClient called it.
+            let error = Internals.RedirectError.translating(error)
+
             // First, unconditionally, and outside the state machine: whatever state this error
             // lands in, including the `.end`/`.failure` ones that otherwise do nothing, a
             // `didReceiveBodyPart` future still waiting on the window must complete. Left
@@ -372,12 +378,21 @@ extension Internals {
         /// Left alone, that failure is silent: this delegate never learns the request is over,
         /// so `head`/`upload`/`download` never close and whoever is awaiting them hangs forever.
         ///
-        /// Guarded by the same lock/state machine as every real callback, so it is a no-op once
-        /// the delegate has actually been driven, which is exactly the case a pre-flight
-        /// rejection never reaches, since it calls this delegate zero times.
+        /// The same goes for a redirect AsyncHTTPClient refuses to follow (the chain is too long, it
+        /// goes back to a URL it was at, or a strategy answered with one that can't be parsed): it
+        /// fails the task's `futureResult` and nothing else. The request has been sent by then
+        /// (`didSendRequest`), but no response has come in, so that is covered too.
+        ///
+        /// Guarded by the same lock/state machine as every real callback, so it is a no-op once a
+        /// response has started, or the delegate has been told of a failure, which is every case
+        /// AsyncHTTPClient does report to it.
         package func failIfNotStarted(_ error: Error) {
+            // Like `didReceiveError(task:_:)`: whoever reads this gets the same error whichever
+            // executor ran the request.
+            let error = Internals.RedirectError.translating(error)
+
             decide {
-                guard _state == .idle, _reference == .none else {
+                guard (_state == .idle && _reference == .none) || _state == .uploading else {
                     return []
                 }
 

@@ -162,6 +162,9 @@ extension Internals {
                 return
             }
 
+            // See `Internals.ClientResponseReceiver.didReceiveError(task:_:)`.
+            let error = Internals.RedirectError.translating(error)
+
             reconnection.observer?.didChange(.failed(error))
             reconnection.terminate { self.download.failed(error) }
         }

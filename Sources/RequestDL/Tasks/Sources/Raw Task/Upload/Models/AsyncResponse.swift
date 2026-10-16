@@ -77,6 +77,14 @@ public struct AsyncResponse: Sendable, AsyncSequence {
                 let error = ReadTimeoutError()
                 onResponseHead?(.failure(error))
                 throw error
+            } catch let error as Internals.RedirectError {
+                let error = RedirectError(error)
+                onResponseHead?(.failure(error))
+                throw error
+            } catch let error as Internals.RequestBodyPartUnreadableError {
+                let error = RequestBodyUnreadableError(error)
+                onResponseHead?(.failure(error))
+                throw error
             } catch let error as Internals.UnsupportedContentEncodingError {
                 let error = UnsupportedContentEncodingError(value: error.value)
                 onResponseHead?(.failure(error))

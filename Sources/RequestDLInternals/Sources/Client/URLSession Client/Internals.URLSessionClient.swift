@@ -137,7 +137,7 @@ extension Internals {
         /// `dataTask(with:completionHandler:)` completion handler directly, alongside the same
         /// delegate, is reachable together but not guaranteed to agree with each other:
         /// `execute_whenRedirectChainExceedsMax_throwsRedirectLimitReachedError` would fail with
-        /// `MissingURLResponseError` instead of the expected `RedirectLimitReachedError` once a
+        /// `MissingURLResponseError` instead of the expected `Internals.RedirectError` once a
         /// redirect was actually refused.
         ///
         /// `session.data(for:delegate:)` also cancelled its underlying `URLSessionTask`
@@ -1158,28 +1158,6 @@ extension Internals.URLSessionClient {
     /// `HTTPClientError.proxyAuthenticationRequired` from the NIO executor.
     package struct ProxyAuthenticationFailedError: Error, Sendable {}
 
-    /// Thrown when a redirect chain exceeds `Internals.RedirectConfiguration.follow(max:_:)`'s
-    /// `max`. Mirrors `HTTPClientError.redirectLimitReached` from the NIO executor.
-    package struct RedirectLimitReachedError: Error, Sendable {}
-
-    /// Thrown when a redirect would revisit an already-visited URL and
-    /// `Internals.RedirectConfiguration.follow(_:allowCycles:)`'s `allowCycles` is `false`.
-    /// Mirrors `HTTPClientError.redirectCycleDetected` from the NIO executor.
-    package struct RedirectCycleDetectedError: Error, Sendable {}
-
-    /// Thrown when a redirect strategy answers `.follow` with a URL that can't be parsed.
-    /// Mirrors the invalid URL failure AsyncHTTPClient raises for the same decision on the NIO
-    /// executor, rather than quietly following the `Location` the server sent instead.
-    package struct InvalidRedirectURLError: Error, Sendable {
-
-        /// The URL the strategy returned.
-        package let url: String
-
-        package init(url: String) {
-            self.url = url
-        }
-    }
-
     /// Lets a `withTaskCancellationHandler`'s `onCancel` closure reach a `URLSessionTask` that a
     /// concurrently-running `operation` closure is still in the middle of creating.
     ///
@@ -1403,11 +1381,11 @@ extension Internals.URLSessionClient {
 
                 let outcome: Result<Void, Error> = lock.withLock {
                     guard _visited.count <= max else {
-                        return .failure(Internals.URLSessionClient.RedirectLimitReachedError())
+                        return .failure(Internals.RedirectError(.limitReached))
                     }
 
                     guard allowCycles || !_visited.contains(redirectURL) else {
-                        return .failure(Internals.URLSessionClient.RedirectCycleDetectedError())
+                        return .failure(Internals.RedirectError(.cycleDetected))
                     }
 
                     _visited.append(redirectURL)

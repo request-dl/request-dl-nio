@@ -262,6 +262,10 @@ struct RawTask<Content: Property>: RequestTask {
             throw ResourceTimeoutError()
         } catch is Internals.ReadTimeoutError {
             throw ReadTimeoutError()
+        } catch let error as Internals.RedirectError {
+            throw RedirectError(error)
+        } catch let error as Internals.RequestBodyPartUnreadableError {
+            throw RequestBodyUnreadableError(error)
         }
     }
 
