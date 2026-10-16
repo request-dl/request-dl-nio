@@ -123,7 +123,7 @@ struct ContinuingDownloadFromPointRequestTaskTests {
             #expect(isIntact)
 
             // And it asked the way a continuation has to: from the offset, only if unchanged.
-            try await eventually(timeout: 30) { server.requests.contains { $0.header("Range") != nil } }
+            try await awaitRecordedRequests(server) { $0.header("Range") != nil }
 
             let request = try #require(server.requests.first { $0.header("Range") != nil })
             #expect(request.header("Range") == "bytes=\(offset)-")
@@ -223,7 +223,7 @@ struct ContinuingDownloadFromPointRequestTaskTests {
 
             // The first request asked from the point; the next one from further on, but never from
             // before it or from past what the cut connection carried.
-            try await eventually(timeout: 30) { server.requests.filter { $0.header("Range") != nil }.count >= 2 }
+            try await awaitRecordedRequests(server, atLeast: 2) { $0.header("Range") != nil }
 
             let starts = server.requests
                 .compactMap { $0.header("Range") }

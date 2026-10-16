@@ -1402,12 +1402,52 @@ private enum Glue {
     }
 }
 
-/// Waits until `server` has recorded at least `count` requests.
+/// Thrown by ``awaitRecordedRequests(_:atLeast:timeout:matching:)`` when the server did not record
+/// as many requests as were expected: with what it did record, since a CI log that only says a
+/// condition was unmet leaves nothing to tell a request that never came from one that came
+/// different.
+package struct RecordedRequestsTimeoutError: Error, CustomStringConvertible {
+
+    package let expected: Int
+    package let timeout: Double
+    package let recorded: [String]
+
+    package var description: String {
+        """
+        Expected the server to record at least \(expected) matching request(s) within \(timeout)s, \
+        and it recorded \(recorded.count): \(recorded)
+        """
+    }
+}
+
+/// Waits until `server` has recorded at least `count` requests, the ones `matching` accepts when
+/// it is given.
 ///
 /// A ``TransferServer`` records a request once it is done with it, which can be after the client
 /// already has its response (or has seen its connection end). Read straight away, the list can
 /// still be missing the last one under load, so anything asserting on it after the client's side
 /// of the exchange finished waits for it first.
-package func awaitRecordedRequests(_ server: TransferServer, atLeast count: Int = 1) async throws {
-    try await eventually(timeout: 30) { server.requests.count >= count }
+///
+/// - Throws: ``RecordedRequestsTimeoutError``, which carries every request the server did record
+///   (method, path, status, body length and `Range`), matching or not.
+package func awaitRecordedRequests(
+    _ server: TransferServer,
+    atLeast count: Int = 1,
+    timeout: Double = 30,
+    matching predicate: @escaping @Sendable (TransferServer.ReceivedRequest) -> Bool = { _ in true }
+) async throws {
+    do {
+        try await eventually(timeout: timeout) {
+            server.requests.filter(predicate).count >= count
+        }
+    } catch is EventuallyTimeoutError {
+        throw RecordedRequestsTimeoutError(
+            expected: count,
+            timeout: timeout,
+            recorded: server.requests.map {
+                "\($0.method) \($0.path) status=\($0.status) body=\($0.bodyLength) "
+                    + "range=\($0.header("Range") ?? "-")"
+            }
+        )
+    }
 }

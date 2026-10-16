@@ -180,7 +180,7 @@ struct ResumableUploadExecutionTests {
     /// A server records a request once it is done with it, which can be after the client already
     /// has its answer or has failed, so a test that counts them right after sees one fewer.
     private static func waitForRequests(_ method: String, in server: TransferServer, atLeast count: Int) async throws {
-        try await eventually(timeout: 30) { server.requests.filter { $0.method == method }.count >= count }
+        try await awaitRecordedRequests(server, atLeast: count) { $0.method == method }
     }
 
     @Test(arguments: cases)
@@ -266,7 +266,7 @@ struct ResumableUploadExecutionTests {
             // The first, and the two that follow it, which is what was allowed. The server records
             // a request once it is done with it, which can be after the client has failed, so
             // the list is waited on before it is counted.
-            try await eventually(timeout: 30) { server.requests.filter { $0.method == "PATCH" }.count >= 3 }
+            try await awaitRecordedRequests(server, atLeast: 3) { $0.method == "PATCH" }
             #expect(server.requests.filter { $0.method == "PATCH" }.count == 3)
         }
     }

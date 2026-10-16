@@ -370,22 +370,26 @@ struct InternalsTransferControlDownloadTests {
 
             try await eventually(timeout: 120) { reader.position >= 1_048_576 }
 
-            // When: suspended for three times the idle timeout.
+            // When: suspended until the server gives up.
             control.suspend()
 
+            // It gives up once its buffers are full and nothing has moved for its timeout, and how
+            // long the buffers take to fill is how fast the machine moves bytes: a fixed window
+            // for it failed 12 times out of 15 on Linux with the CPUs busy (and once in a loaded
+            // full run), because the stall had not happened yet when it was looked for.
+            try await eventually(timeout: 120) { server.stalledConnections >= 1 }
+
             // Counted once a reconnection that was already under way when the suspension began has
-            // had time to land: on a machine this loaded, the idle timeout can fire (and one
-            // reconnection start) before the test even gets to `suspend()`, which says nothing
-            // about the suspension.
+            // had time to land: on a machine this loaded, a reconnection can start before the test
+            // even gets to `suspend()`, which says nothing about the suspension.
             try await _Concurrency.Task.sleep(nanoseconds: 500_000_000)
             let connectionsOnceSuspended = server.acceptedConnections
 
-            try await _Concurrency.Task.sleep(nanoseconds: 2_500_000_000)
+            try await _Concurrency.Task.sleep(nanoseconds: 1_000_000_000)
 
             // Nothing has been reconnected while suspended, whether or not the client noticed the
             // connection is gone yet.
             #expect(server.acceptedConnections == connectionsOnceSuspended)
-            #expect(server.stalledConnections >= 1)
 
             // The server's own idle timeout mustn't catch the continuation too.
             server.stallTimeout = nil

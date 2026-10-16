@@ -107,7 +107,7 @@ struct ControlledUploadTaskTests {
             // Then
             // The server records a request once it is done with it, which can be after the client
             // has its response.
-            try await eventually(timeout: 30) { !server.requests.isEmpty }
+            try await awaitRecordedRequests(server)
 
             let request = try #require(server.requests.first)
             #expect(server.requests.count == 1)
@@ -169,7 +169,7 @@ struct ControlledUploadTaskTests {
                 // Then
                 // The server records a request once it is done with it, which can be after the client
                 // has its response.
-                try await eventually(timeout: 30) { !server.requests.isEmpty }
+                try await awaitRecordedRequests(server)
 
                 let request = try #require(server.requests.first)
                 #expect(request.bodyLength == size)
@@ -210,7 +210,7 @@ struct ControlledUploadTaskTests {
             // Then
             // The server records a request once it is done with it, which can be after the client
             // has its response.
-            try await eventually(timeout: 30) { !server.requests.isEmpty }
+            try await awaitRecordedRequests(server)
 
             let request = try #require(server.requests.first)
             #expect(request.bodyLength == size)

@@ -601,7 +601,7 @@ struct RequestMonitorTests {
             // Then
             #expect(!data.isEmpty)
 
-            try await eventually(timeout: 30) { !server.requests.isEmpty }
+            try await awaitRecordedRequests(server)
             #expect(server.requests.first?.bodyLength == 256 * 1_024)
         }
     }
