@@ -36,6 +36,12 @@ struct CacheReplayTests {
     // The waits below are for the replay to be scheduled at all, not for it to be fast. A full
     // run on a busy Linux runner has stalled every task for longer than 30 s, which failed these
     // two on two runs in a row while the replay itself takes milliseconds.
+    //
+    // And they are for the replay to be parked at the window, which is a producer waiting on it,
+    // not for the backlog to be above the high watermark: the download buffer re-chunks what the
+    // replay hands it, and one run in twenty parks with exactly the high watermark buffered, so
+    // "above" was never true and they waited their whole 120 s (three times in CI, on macOS,
+    // Mac Catalyst and Linux).
 
     private func body() async -> Internals.AnyBuffer {
         // Not built element by element: 8 million closure calls in a debug build took the better
@@ -55,7 +61,7 @@ struct CacheReplayTests {
             await Internals.CacheControl.replay(await body(), into: download, window: window)
         }
 
-        try await eventually(timeout: 120) { window.bufferedBytesForTesting > window.highWatermark }
+        try await eventually(timeout: 120) { window.waitingCountForTesting == 1 }
         await download.waitUntilIdle()
 
         // Then: it has paused, short of the whole body, by about one piece past the mark.
@@ -87,7 +93,7 @@ struct CacheReplayTests {
             await Internals.CacheControl.replay(await body(), into: download, window: window)
         }
 
-        try await eventually(timeout: 120) { window.bufferedBytesForTesting > window.highWatermark }
+        try await eventually(timeout: 120) { window.waitingCountForTesting == 1 }
         await download.waitUntilIdle()
         let bufferedWhenParked = window.bufferedBytesForTesting
 

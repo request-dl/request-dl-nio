@@ -72,7 +72,7 @@ struct ResumingDownloadsRequestTaskTests {
 
             // Long enough for a reconnection that shouldn't have happened to show up.
             try await _Concurrency.Task.sleep(nanoseconds: 500_000_000)
-            try await eventually(timeout: 30) { !server.requests.isEmpty }
+            try await awaitRecordedRequests(server)
             try await _Concurrency.Task.sleep(nanoseconds: 500_000_000)
             #expect(server.requests.count == 1)
         }
@@ -95,7 +95,7 @@ struct ResumingDownloadsRequestTaskTests {
             #expect(isIntact)
             // The server records a request once it is done with it, which can be after the client
             // has its response.
-            try await eventually(timeout: 30) { server.requests.count >= 2 }
+            try await awaitRecordedRequests(server, atLeast: 2)
             #expect(server.requests.count == 2)
             #expect(server.requests.last?.header("If-Range") == "\"v1\"")
             #expect(server.requests.last?.header("Range")?.hasPrefix("bytes=") == true)
@@ -124,7 +124,7 @@ struct ResumingDownloadsRequestTaskTests {
             #expect(data.enumerated().allSatisfy { $0.element == TransferServer.byte(at: $0.offset, seed: 0) })
             // The server records a request once it is done with it, which can be after the client
             // has its response.
-            try await eventually(timeout: 30) { server.requests.count >= 2 }
+            try await awaitRecordedRequests(server, atLeast: 2)
             #expect(server.requests.count == 2)
         }
     }
@@ -207,7 +207,7 @@ struct ResumingDownloadsRequestTaskTests {
             #expect(isIntact)
             // The server records a request once it is done with it, which can be after the client
             // has its response.
-            try await eventually(timeout: 30) { server.requests.count >= 2 }
+            try await awaitRecordedRequests(server, atLeast: 2)
             #expect(server.requests.count == 2)
         }
     }

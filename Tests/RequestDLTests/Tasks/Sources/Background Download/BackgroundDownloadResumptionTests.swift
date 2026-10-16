@@ -278,7 +278,7 @@ struct BackgroundDownloadResumptionTests {
             #expect(Self.isTheWholeResource(resumed.file))
 
             // The second request asked for the rest, with `Range`, and did not start over.
-            try await eventually(timeout: 30) { server.requests.count >= 2 }
+            try await awaitRecordedRequests(server, atLeast: 2)
             #expect(server.requests.last?.header("Range") != nil)
         }
     }

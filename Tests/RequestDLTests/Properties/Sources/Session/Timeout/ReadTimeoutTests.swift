@@ -382,7 +382,7 @@ struct ReadTimeoutTests {
 
             controller.resume()
             #expect(await running.error == nil)
-            try await eventually(timeout: 60) { !server.requests.isEmpty }
+            try await awaitRecordedRequests(server, timeout: 60)
 
             let request = try #require(server.requests.first)
             #expect(request.bodyLength == Self.uploadSize)
