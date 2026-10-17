@@ -206,3 +206,40 @@ extension UnitTime: AdditiveArithmetic {
         .init(saturating: Int64(clamping: rhs), perUnit: lhs.nanoseconds)
     }
 }
+
+// MARK: - Duration
+
+@available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+extension UnitTime {
+
+    ///
+    /// Creates a `UnitTime` from a Swift `Duration`.
+    ///
+    /// A `UnitTime` counts whole nanoseconds, and a `Duration` counts attoseconds, so the part of
+    /// the duration below a nanosecond is dropped (towards zero). One that does not fit in an
+    /// `Int64` of nanoseconds, about 292 years, saturates at ``infinity`` (or at the smallest
+    /// value), the same way an amount that overflows does.
+    ///
+    /// ```swift
+    /// Timeout(UnitTime(.seconds(5)), for: .read)
+    /// ```
+    ///
+    /// - Parameter duration: The duration to convert.
+    ///
+    public init(_ duration: Duration) {
+        let (seconds, attoseconds) = duration.components
+
+        // The two parts always have the same sign, so adding them cannot cancel out.
+        self = UnitTime.seconds(seconds) + UnitTime.nanoseconds(attoseconds / 1_000_000_000)
+    }
+
+    ///
+    /// This time as a Swift `Duration`, without losing any of it.
+    ///
+    /// ``infinity`` is the largest `Int64` of nanoseconds here, not an unbounded duration: Swift's
+    /// `Duration` has no such value.
+    ///
+    public var duration: Duration {
+        .nanoseconds(nanoseconds)
+    }
+}
