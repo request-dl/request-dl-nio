@@ -32,7 +32,9 @@ import Crypto
 ///   (e.g. `"?active=true"`) in the same field, the same trade-offs `FlexibleURL` documents on its
 ///   own. A bare host with no scheme (e.g. `"example.com"`) is **not** recognized as a host here:
 ///   it has no `://`, so `FlexibleURL` reads it as a relative path instead; write
-///   `"https://example.com"` for the base URL case.
+///   `"https://example.com"` for the base URL case. A user name or a password in the authority
+///   (`"https://user:password@example.com"`) is an error: the request would not send it, and it
+///   would end up in logs. Use `authorization` instead.
 /// - `method` (string, optional): uppercased and passed to ``RequestMethod/init(_:)``.
 /// - `timeout` (int, optional): interpreted as seconds and passed to ``Timeout/init(_:for:)``. A
 ///   negative value is an error, see ``ConfiguredError``.
@@ -102,12 +104,14 @@ import Crypto
 ///
 /// Values that carry credentials are read as secret, so a `ConfigReader` with an access
 /// reporter or logger redacts them instead of writing them out: `headers`, `queries`,
-/// `authorization.password`, `authorization.credentials`, `authorization.token`, the same three
-/// under `proxy.authorization`, `proxy.connectHeaders`, and the private key password in the
-/// certificate settings. The two lists are marked as a whole because an entry can be an
+/// `authorization.username`, `authorization.password`, `authorization.credentials`,
+/// `authorization.token`, the same four under `proxy.authorization`, `proxy.connectHeaders`, and
+/// the private key password in the certificate settings. The user name is among them because some
+/// services take an API key as the user name of a Basic credential. The two lists are marked as a whole because an entry can be an
 /// `Authorization` header or an API key in a query, and which one is not known until it is read.
-/// `baseURL` is not: it is read as a plain value even though a URL can carry a user name and
-/// password in it, so keep credentials out of it.
+/// `baseURL` is not: it is read as a plain value, so a reporter writes it out, and a user name or
+/// a password in it is an error. The error comes after the read, so the reporter has already
+/// seen that value: keep credentials out of it from the start.
 ///
 /// - Throws: ``ConfiguredError`` if `authorization.scheme` or `proxy.authorization.scheme` is
 ///   specified but invalid, if the fields the specified scheme requires are missing, if
@@ -120,7 +124,7 @@ import Crypto
 ///   none of the recognized values, if `secureConnection.spkiPinning.pins` is specified but empty
 ///   or `secureConnection.spkiPinning.policy` is specified but is neither `"strict"` nor `"audit"`,
 ///   if `redirect.mode` is specified but is neither `"follow"` nor `"disallow"`, or if `timeout` is
-///   specified but negative.
+///   specified but negative, or if `baseURL` has a user name or a password in its authority.
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 public struct Configured: Property {
 
@@ -146,7 +150,7 @@ public struct Configured: Property {
 
         return AsyncProperty {
             if let baseURL = reader.string(forKey: "baseURL") {
-                FlexibleURL(baseURL)
+                try Self.baseURL(baseURL)
             }
 
             if let method = reader.string(forKey: "method") {
@@ -250,6 +254,27 @@ public struct Configured: Property {
         }
 
         return session
+    }
+
+    private static func baseURL(_ value: String) throws -> FlexibleURL {
+        guard !hasUserInfo(value) else {
+            throw ConfiguredError(context: .invalidBaseURLConfiguration)
+        }
+
+        return FlexibleURL(value)
+    }
+
+    /// Whether a complete `scheme://authority/...` value has a user name or a password in its
+    /// authority. Only the part before any query or fragment can have an authority, and a
+    /// relative value has none, so an `@` in a path or in a query value is not userinfo.
+    private static func hasUserInfo(_ value: String) -> Bool {
+        let structural = value.prefix { $0 != "?" && $0 != "#" }
+
+        guard let separator = structural.firstRange(of: "://") else {
+            return false
+        }
+
+        return structural[separator.upperBound...].prefix { $0 != "/" }.contains("@")
     }
 
     private static func timeout(seconds: Int) throws -> Timeout {
@@ -474,7 +499,7 @@ public struct Configured: Property {
 
         switch scheme {
         case "basic":
-            if let username = reader.string(forKey: "username"),
+            if let username = reader.string(forKey: "username", isSecret: true),
                 let password = reader.string(forKey: "password", isSecret: true)
             {
                 return .basic(username: username, password: password)
@@ -500,7 +525,7 @@ public struct Configured: Property {
 
         switch scheme {
         case "basic":
-            if let username = reader.string(forKey: "username"),
+            if let username = reader.string(forKey: "username", isSecret: true),
                 let password = reader.string(forKey: "password", isSecret: true)
             {
                 return Authorization(username: username, password: password)
