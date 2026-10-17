@@ -88,6 +88,7 @@ struct ConfiguredSecretsTests {
         ])
 
         // Then
+        #expect(first.isSecret("authorization.username") == true)
         #expect(first.isSecret("authorization.password") == true)
         #expect(first.isSecret("headers") == true)
         #expect(first.isSecret("queries") == true)
@@ -95,6 +96,7 @@ struct ConfiguredSecretsTests {
         #expect(first.isSecret("proxy.connectHeaders") == true)
 
         #expect(second.isSecret("authorization.credentials") == true)
+        #expect(second.isSecret("proxy.authorization.username") == true)
         #expect(second.isSecret("proxy.authorization.password") == true)
 
         #expect(third.isSecret("authorization.token") == true)
@@ -119,7 +121,6 @@ struct ConfiguredSecretsTests {
         #expect(recorder.isSecret("method") == false)
         #expect(recorder.isSecret("timeout") == false)
         #expect(recorder.isSecret("authorization.scheme") == false)
-        #expect(recorder.isSecret("authorization.username") == false)
     }
 
     /// The flag reaching the event is not the redaction: swift-configuration's loggers do that,
@@ -178,8 +179,10 @@ struct ConfiguredSecretsTests {
             #expect(!written.contains(credential), "\(credential) reached the access log")
         }
 
+        // The user name is one too: some services take an API key as the user name.
+        #expect(!written.contains("alice"), "the user name reached the access log")
+
         // What is not a credential is readable, which is what makes the log worth having.
         #expect(written.contains("https://example.com"))
-        #expect(written.contains("alice"))
     }
 }
