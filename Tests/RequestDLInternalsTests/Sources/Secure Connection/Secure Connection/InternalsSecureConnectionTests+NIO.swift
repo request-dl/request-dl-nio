@@ -514,7 +514,7 @@ extension InternalsSecureConnectionTests {
         #if os(macOS) || !canImport(Darwin)
         try verify()
         #else
-        await withKnownIssue(
+        withKnownIssue(
             "no Keychain Sharing entitlement on this platform's SwiftPM-generated Xcode scheme; see this test's own doc comment"
         ) {
             try verify()
