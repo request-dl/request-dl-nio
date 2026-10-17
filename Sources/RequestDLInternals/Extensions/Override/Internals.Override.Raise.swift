@@ -38,7 +38,7 @@ extension Internals.Override {
             with closure: @escaping Closure,
             perform: @Sendable () async throws -> T
         ) async rethrows -> T {
-            try await $closure.withValue(closure, operation: perform)
+            try await $closure.withValue(closure) { try await perform() }
         }
 
         /// The synchronous counterpart, matching ``Internals/Override/FatalError`` and

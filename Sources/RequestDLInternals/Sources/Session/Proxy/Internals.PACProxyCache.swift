@@ -211,7 +211,7 @@ extension Internals {
                         evaluation = Evaluation(resolution: .failed(Self.failure(from: error), lastKnown: nil))
                     }
 
-                    await self.releaseEvaluationSlot()
+                    self.releaseEvaluationSlot()
 
                     // Recorded here, by the evaluation itself, and not by a task that waits for it:
                     // this task is already detached from any one caller's lifetime (it runs to the
@@ -221,7 +221,7 @@ extension Internals {
                     // a finished evaluation was still the one in flight, and a request that came in
                     // after its failure window (or after the clock was moved, in a test) was given
                     // the old result instead of asking the script again.
-                    await self.finishEvaluation(key: key, evaluation: evaluation, failureLifetime: failureLifetime)
+                    self.finishEvaluation(key: key, evaluation: evaluation, failureLifetime: failureLifetime)
 
                     return evaluation
                 }

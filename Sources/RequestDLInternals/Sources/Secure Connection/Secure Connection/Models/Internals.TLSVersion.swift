@@ -54,8 +54,8 @@ extension Internals {
         /// recommends instead.
         package var urlSessionProtocolVersion: tls_protocol_version_t {
             switch self {
-            case .tlsv1: return .TLSv10
-            case .tlsv11: return .TLSv11
+            case .tlsv1: return tls_protocol_version_t(rawValue: 0x0301)!
+            case .tlsv11: return tls_protocol_version_t(rawValue: 0x0302)!
             case .tlsv12: return .TLSv12
             case .tlsv13: return .TLSv13
             }
