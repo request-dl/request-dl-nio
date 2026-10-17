@@ -401,7 +401,7 @@ struct InternalsDownloadBufferTests {
 
             // When
             let download = await Internals.DownloadBuffer(readingMode: readingMode)
-            await download.append(reader)
+            download.append(reader)
             download.close()
 
             // Then

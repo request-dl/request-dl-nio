@@ -34,6 +34,7 @@ struct _PartialContentTests {
     }
 
     @Test
+    @available(*, deprecated)
     func tupleThreeElementsBuilder() async throws {
         // Given
         @PropertyBuilder
@@ -65,6 +66,7 @@ struct _PartialContentTests {
     }
 
     @Test
+    @available(*, deprecated)
     func tupleFourElementsBuilder() async throws {
         // Given
         @PropertyBuilder
@@ -100,6 +102,7 @@ struct _PartialContentTests {
     }
 
     @Test
+    @available(*, deprecated)
     func tupleFiveElementsBuilder() async throws {
         // Given
         @PropertyBuilder
@@ -142,6 +145,7 @@ struct _PartialContentTests {
     }
 
     @Test
+    @available(*, deprecated)
     func tupleSixElementsBuilder() async throws {
         // Given
         @PropertyBuilder
@@ -191,6 +195,7 @@ struct _PartialContentTests {
     }
 
     @Test
+    @available(*, deprecated)
     func tupleSevenElementsBuilder() async throws {
         // Given
         @PropertyBuilder
@@ -244,6 +249,7 @@ struct _PartialContentTests {
     }
 
     @Test
+    @available(*, deprecated)
     func tupleEightElementsBuilder() async throws {
         // Given
         @PropertyBuilder

@@ -30,11 +30,9 @@ struct DigestAuthenticationTests {
     func digestAuthentication_whenCredentialHasChallenge_setsComputedHeader() async throws {
         // Given
         let credential = DigestCredential()
-        credential.challenge = try #require(
-            DigestChallenge(
-                headerValue:
-                    #"Digest realm="http-auth@example.org", qop="auth", algorithm=SHA-256, nonce="7ypf/xlj9XXwfDPEoM4URrv/xwf94BcCAzFZH4GiTo0v", opaque="FQhe/qaU925kfnzjCev0ciny7QMkPqMAFRtzCUYo5tdS""#
-            )
+        credential.challenge = DigestChallenge(
+            headerValue:
+                #"Digest realm="http-auth@example.org", qop="auth", algorithm=SHA-256, nonce="7ypf/xlj9XXwfDPEoM4URrv/xwf94BcCAzFZH4GiTo0v", opaque="FQhe/qaU925kfnzjCev0ciny7QMkPqMAFRtzCUYo5tdS""#
         )
 
         let property = DigestAuthentication(
@@ -68,10 +66,8 @@ struct DigestAuthenticationTests {
     func digestAuthentication_whenCredentialReusedAcrossRequests_incrementsNonceCount() async throws {
         // Given
         let credential = DigestCredential()
-        credential.challenge = try #require(
-            DigestChallenge(
-                headerValue: #"Digest realm="test", qop="auth", nonce="abc123", algorithm=MD5"#
-            )
+        credential.challenge = DigestChallenge(
+            headerValue: #"Digest realm="test", qop="auth", nonce="abc123", algorithm=MD5"#
         )
 
         func header() async throws -> String {
@@ -99,10 +95,8 @@ struct DigestAuthenticationTests {
         // Given
         func header(password: String) async throws -> String {
             let credential = DigestCredential()
-            credential.challenge = try #require(
-                DigestChallenge(
-                    headerValue: #"Digest realm="test", qop="auth", nonce="abc123", algorithm=MD5"#
-                )
+            credential.challenge = DigestChallenge(
+                headerValue: #"Digest realm="test", qop="auth", nonce="abc123", algorithm=MD5"#
             )
 
             let resolved = try await resolve(

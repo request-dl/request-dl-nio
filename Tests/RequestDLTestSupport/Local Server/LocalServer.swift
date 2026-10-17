@@ -96,17 +96,15 @@ struct LocalServer: Sendable {
                     .serverChannelOption(ChannelOptions.backlog, value: 256)
                     .serverChannelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
                     .childChannelInitializer { channel in
-                        channel.pipeline
-                            .addHandlers([
+                        channel.eventLoop.makeCompletedFuture {
+                            let operations = channel.pipeline.syncOperations
+                            try operations.addHandlers([
                                 BackPressureHandler(),
                                 NIOSSLServerHandler(context: sslContext),
                             ])
-                            .flatMap {
-                                channel.pipeline.configureHTTPServerPipeline()
-                            }
-                            .flatMap {
-                                channel.pipeline.addHandler(HTTPHandler(responseQueue))
-                            }
+                            try operations.configureHTTPServerPipeline()
+                            try operations.addHandler(HTTPHandler(responseQueue))
+                        }
                     }
                     .childChannelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
                     .childChannelOption(ChannelOptions.maxMessagesPerRead, value: 16)

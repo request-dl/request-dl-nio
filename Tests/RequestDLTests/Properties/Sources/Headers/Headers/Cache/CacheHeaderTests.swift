@@ -54,6 +54,7 @@ struct CacheHeaderTests {
     }
 
     @Test
+    @available(*, deprecated)
     func modifiedCacheWithAllProperties() async throws {
         // Given
         let cache = CacheHeader()
@@ -104,6 +105,7 @@ struct CacheHeaderTests {
     }
 
     @Test
+    @available(*, deprecated)
     func publicCache() async throws {
         // Given
         let cache = CacheHeader()

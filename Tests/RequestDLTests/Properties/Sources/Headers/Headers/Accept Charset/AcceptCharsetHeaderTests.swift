@@ -9,6 +9,7 @@ import Testing
 struct AcceptCharsetHeaderTests {
 
     @Test
+    @available(*, deprecated)
     func charset_whenUTF8() async throws {
         // Given
         let charset = Charset.utf8
@@ -25,6 +26,7 @@ struct AcceptCharsetHeaderTests {
     }
 
     @Test
+    @available(*, deprecated)
     func charset_whenUTF16() async throws {
         // Given
         let charset = Charset.utf16
@@ -41,6 +43,7 @@ struct AcceptCharsetHeaderTests {
     }
 
     @Test
+    @available(*, deprecated)
     func charset_whenUTF32() async throws {
         // Given
         let charset = Charset.utf32
@@ -56,7 +59,9 @@ struct AcceptCharsetHeaderTests {
         #expect(resolved.requestConfiguration.headers["Accept-Charset"] == [charset.rawValue])
     }
 
-    @Test func neverBody() async throws {
+    @Test
+    @available(*, deprecated)
+    func neverBody() async throws {
         // Given
         let property = AcceptCharsetHeader(.utf8)
 

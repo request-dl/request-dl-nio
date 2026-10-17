@@ -9,6 +9,7 @@ import Testing
 struct ResolveTests {
 
     @Test
+    @available(*, deprecated)
     func debug_whenContainsOneHierarchy_shouldBeValid() async throws {
         // Given
         let property = PropertyGroup {
@@ -34,6 +35,7 @@ struct ResolveTests {
     }
 
     @Test
+    @available(*, deprecated)
     func debug_whenContainsTwoHierarchy_shouldBeValid() async throws {
         // Given
         let property = PropertyGroup {

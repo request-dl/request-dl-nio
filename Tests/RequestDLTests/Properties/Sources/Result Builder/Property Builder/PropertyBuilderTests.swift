@@ -9,6 +9,7 @@ import Testing
 struct PropertyBuilderTests {
 
     @Test
+    @available(*, deprecated)
     func singleBuildBlock() async throws {
         // Given
         @PropertyBuilder
@@ -27,6 +28,7 @@ struct PropertyBuilderTests {
 
     #if !os(Linux)
     @Test
+    @available(*, deprecated)
     func limitedNotAvailableBuildBlock() async throws {
         // Given
         @PropertyBuilder
@@ -47,6 +49,7 @@ struct PropertyBuilderTests {
     #endif
 
     @Test
+    @available(*, deprecated)
     func limitedAvailableBuildBlock() async throws {
         // Given
         @PropertyBuilder

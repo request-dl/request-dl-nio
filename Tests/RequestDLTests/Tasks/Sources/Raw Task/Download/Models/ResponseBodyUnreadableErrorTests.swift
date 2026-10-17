@@ -23,7 +23,7 @@ struct ResponseBodyUnreadableErrorTests {
         // Given: what `Internals.AsyncBytes` throws for it (see `InternalsDownloadBufferTests`).
         let stream = Internals.AsyncStream<Internals.DataBuffer>()
         await stream.append(.success(Internals.DataBuffer(Data("first".utf8))))
-        await stream.append(.failure(AsyncBytesReadError()))
+        stream.append(.failure(AsyncBytesReadError()))
 
         let bytes = AsyncBytes(
             seed: .withoutCancellation,

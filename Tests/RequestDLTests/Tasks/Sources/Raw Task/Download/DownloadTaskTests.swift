@@ -58,6 +58,7 @@ struct DownloadTaskTests {
     /// A response with no separator in it is one item, so a maximum smaller than it must end the
     /// read with the public error.
     @Test
+    @available(*, deprecated)
     func download_whenAnItemOutgrowsTheMaximum_throwsReadingModeItemTooLargeError() async throws {
         // Given
         let localServer = try await LocalServer(.standard)
@@ -96,6 +97,7 @@ struct DownloadTaskTests {
     /// The same read, pinned to `.nio`: the default executor on Darwin is `.urlSession`, so the
     /// test above only reaches the other body path there.
     @Test
+    @available(*, deprecated)
     func download_whenAnItemOutgrowsTheMaximum_onNIO_throwsReadingModeItemTooLargeError() async throws {
         // Given
         let localServer = try await LocalServer(.standard)
@@ -133,6 +135,7 @@ struct DownloadTaskTests {
     #endif
 
     @Test
+    @available(*, deprecated)
     func download_whenTheMaximumIsLargeEnough_deliversTheWholeBody() async throws {
         // Given
         let localServer = try await LocalServer(.standard)

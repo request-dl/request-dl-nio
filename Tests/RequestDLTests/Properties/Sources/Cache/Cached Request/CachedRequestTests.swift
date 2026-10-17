@@ -1029,6 +1029,7 @@ struct CachedRequestTests {
     }
 
     @Test
+    @available(*, deprecated)
     func cache_whenOnlyIfCachedRequestDirective_escalatesToUseCachedDataOnly() async throws {
         let testState = try await TestState()
         defer { _ = testState }
@@ -1056,6 +1057,7 @@ struct CachedRequestTests {
     }
 
     @Test
+    @available(*, deprecated)
     func cache_whenOnlyIfCachedRequestDirective_withCachingDisabled_doesNotForceLocalCacheOnly() async throws {
         let testState = try await TestState()
         defer { _ = testState }
