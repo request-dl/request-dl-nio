@@ -43,7 +43,7 @@ import Network
     .concurrent(watchdogAffectedPlatformConcurrencyLimit),
     .nonFatalWatchdog,
     .toleratingSimulatorFlake(
-        "CFNetwork intermittently returns kCFErrorPACFileError (Code=308) for a valid PAC script on the CI simulator runners, in a different test each run; never reproduced elsewhere"
+        "The evaluation is bounded by 30 s, and on a simulator runner starved of CPU for minutes (tests of this suite have reported 149 s there) fetching a script from a local server can take longer than that; the other platforms are what catch a regression"
     )
 )
 struct InternalsPACEvaluatorTests {
@@ -203,6 +203,139 @@ struct InternalsPACEvaluatorTests {
 
         let elapsedSeconds = Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1e9
         #expect(elapsedSeconds < 120)
+    }
+
+    // MARK: - Asking once more
+
+    /// CFNetwork fails every 39th script URL it had not fetched before in a process with
+    /// `kCFErrorPACFileError`, on a script that is fine, and answers the same URL straight after.
+    /// 300 evaluations of different URLs, one after the other, failed at the 39th, 78th, 117th,
+    /// 156th and 195th, whatever the script and the target were, and the same URL asked again
+    /// worked every time. Which test of a full run got the 39th was the luck of the order they ran
+    /// in, which is why a different one failed each time.
+    @Test
+    func evaluating_whenTheFirstAttemptIsAPACFileError_asksOnceMore() async throws {
+        // Given
+        let attempts = LockedValueBox<[Double]>([])
+
+        // When
+        let proxy = try await Internals.PACEvaluator.evaluating(timeout: 30) { remaining in
+            attempts.withLockedValue { $0.append(remaining) }
+
+            guard attempts.withLockedValue({ $0.count }) > 1 else {
+                throw Internals.PACEvaluator.Error.pacFileError("Code=308")
+            }
+
+            return Internals.Proxy(
+                host: "127.0.0.1",
+                port: 8_080,
+                connection: .http,
+                authorization: nil,
+                connectHeaders: Internals.HTTPHeaders()
+            )
+        }
+
+        // Then
+        #expect(proxy?.port == 8_080)
+        #expect(attempts.withLockedValue { $0.count } == 2)
+    }
+
+    /// A script that is broken gets the same answer twice, and the second is the one reported.
+    @Test
+    func evaluating_whenBothAttemptsAreAPACFileError_throwsTheSecond() async throws {
+        // Given
+        let attempts = LockedValueBox(0)
+
+        // Then
+        let error = await #expect(throws: Internals.PACEvaluator.Error.self) {
+            _ = try await Internals.PACEvaluator.evaluating(timeout: 30) { _ in
+                let attempt = attempts.withLockedValue { value -> Int in
+                    value += 1
+                    return value
+                }
+
+                throw Internals.PACEvaluator.Error.pacFileError("attempt \(attempt)")
+            }
+        }
+
+        #expect(attempts.withLockedValue { $0 } == 2)
+
+        guard case .pacFileError(let details) = error else {
+            Issue.record("Expected .pacFileError, got \(String(describing: error))")
+            return
+        }
+
+        #expect(details == "attempt 2")
+    }
+
+    /// Only that answer is worth asking again for: a timeout is the end of the time there was, and
+    /// any other failure of a script is not going to change.
+    @Test(arguments: [
+        Internals.PACEvaluator.Error.timedOut,
+        .executionFailed("anything else"),
+    ])
+    func evaluating_whenTheErrorIsAnyOther_doesNotAskAgain(_ failure: Internals.PACEvaluator.Error) async throws {
+        // Given
+        let attempts = LockedValueBox(0)
+
+        // Then
+        await #expect(throws: Internals.PACEvaluator.Error.self) {
+            _ = try await Internals.PACEvaluator.evaluating(timeout: 30) { _ in
+                attempts.withLockedValue { $0 += 1 }
+                throw failure
+            }
+        }
+
+        #expect(attempts.withLockedValue { $0 } == 1)
+    }
+
+    /// Asking once more does not give the script another whole timeout.
+    @Test
+    func evaluating_givesTheSecondAttemptOnlyWhatIsLeftOfTheTimeout() async throws {
+        // Given: a clock the first attempt moves by 12 of the 30 seconds.
+        let now = LockedValueBox<UInt64>(1_000_000_000)
+        let timeouts = LockedValueBox<[Double]>([])
+
+        // When
+        _ = try await Internals.PACEvaluator.evaluating(
+            timeout: 30,
+            now: { now.withLockedValue { $0 } },
+            { remaining in
+                timeouts.withLockedValue { $0.append(remaining) }
+                now.withLockedValue { $0 += 12_000_000_000 }
+
+                guard timeouts.withLockedValue({ $0.count }) > 1 else {
+                    throw Internals.PACEvaluator.Error.pacFileError("Code=308")
+                }
+
+                return nil
+            }
+        )
+
+        // Then
+        #expect(timeouts.withLockedValue { $0 } == [30, 18])
+    }
+
+    @Test
+    func evaluating_whenNothingIsLeftOfTheTimeout_doesNotAskAgain() async throws {
+        // Given: the first attempt used all of it.
+        let now = LockedValueBox<UInt64>(1_000_000_000)
+        let attempts = LockedValueBox(0)
+
+        // Then
+        await #expect(throws: Internals.PACEvaluator.Error.self) {
+            _ = try await Internals.PACEvaluator.evaluating(
+                timeout: 30,
+                now: { now.withLockedValue { $0 } },
+                { _ in
+                    attempts.withLockedValue { $0 += 1 }
+                    now.withLockedValue { $0 += 31_000_000_000 }
+                    throw Internals.PACEvaluator.Error.pacFileError("Code=308")
+                }
+            )
+        }
+
+        #expect(attempts.withLockedValue { $0 } == 1)
     }
 
     /// `.finished`/`.handledSource` must not fall through silently, which would leave

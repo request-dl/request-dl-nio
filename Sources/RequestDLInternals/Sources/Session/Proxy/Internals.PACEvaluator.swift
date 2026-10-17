@@ -10,6 +10,7 @@ import SwiftAsyncStream
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
+import struct Foundation.DispatchTime
 import class Foundation.Thread
 import struct Foundation.URL
 #endif
@@ -45,6 +46,16 @@ extension Internals {
             /// reported failure through `pacEvaluationCallback`'s `error` rather than by starting
             /// at all.
             case executionFailed(String)
+            /// CFNetwork answered `kCFErrorPACFileError` (`Code=308`): it could not make a script
+            /// of what it fetched.
+            ///
+            /// That is what a script that is broken gets, and also, every 39th time a script URL
+            /// it had not fetched before is fetched in the process, a script that is fine: it
+            /// opens a TLS handshake on the plain HTTP connection to the script, which the server
+            /// of the script never answers, and gives up with this. The same URL asked again
+            /// straight away works, which is why ``evaluate(scriptURL:targetURL:timeout:)`` asks
+            /// once more.
+            case pacFileError(String)
         }
 
         /// Fetches `scriptURL`'s contents, evaluates it as a PAC script against `targetURL`, and
@@ -61,6 +72,49 @@ extension Internals {
         /// back into `async` context: the raw `CFArray` of `[String: Any]` dictionaries isn't
         /// `Sendable`, but the parsed `Internals.Proxy?` is.
         package static func evaluate(
+            scriptURL: URL,
+            targetURL: URL,
+            timeout: Double
+        ) async throws -> Internals.Proxy? {
+            try await evaluating(timeout: timeout) { remaining in
+                try await evaluateOnce(scriptURL: scriptURL, targetURL: targetURL, timeout: remaining)
+            }
+        }
+
+        /// Runs `attempt` with `timeout`, and once more with what is left of it if CFNetwork
+        /// answered it with ``Error/pacFileError(_:)``.
+        ///
+        /// Once, and not until it works: a script that is broken gets the same answer every time,
+        /// and asking again then only costs another fetch before the failure is reported, which
+        /// `Internals.PACProxyCache` keeps for a while so that the next request does not pay for it.
+        /// Every other error is the answer, and so is the second one.
+        ///
+        /// - Parameter now: The monotonic clock, in nanoseconds. A test replaces it.
+        package static func evaluating(
+            timeout: Double,
+            now: @Sendable () -> UInt64 = { DispatchTime.now().uptimeNanoseconds },
+            _ attempt: (Double) async throws -> Internals.Proxy?
+        ) async throws -> Internals.Proxy? {
+            let start = now()
+
+            do {
+                return try await attempt(timeout)
+            } catch let error as Error {
+                guard case .pacFileError = error else {
+                    throw error
+                }
+
+                let remaining = timeout - Double(now() &- start) / 1_000_000_000
+
+                guard remaining > 0 else {
+                    throw error
+                }
+
+                return try await attempt(remaining)
+            }
+        }
+
+        private static func evaluateOnce(
             scriptURL: URL,
             targetURL: URL,
             timeout: Double
@@ -270,7 +324,15 @@ private func pacEvaluationCallback(
     let box = Unmanaged<PACContinuationBox>.fromOpaque(info).takeUnretainedValue()
 
     if let error {
-        box.resume(throwing: Internals.PACEvaluator.Error.executionFailed(String(describing: error)))
+        let isPACFileError =
+            CFErrorGetDomain(error) as String == kCFErrorDomainCFNetwork as String
+            && CFErrorGetCode(error) == Int(CFNetworkErrors.cfErrorPACFileError.rawValue)
+
+        box.resume(
+            throwing: isPACFileError
+                ? Internals.PACEvaluator.Error.pacFileError(String(describing: error))
+                : Internals.PACEvaluator.Error.executionFailed(String(describing: error))
+        )
     } else {
         let proxies = (proxyList as? [[String: Any]]) ?? []
         box.resume(returning: Internals.SystemProxyResolver.firstUsableProxy(in: proxies))

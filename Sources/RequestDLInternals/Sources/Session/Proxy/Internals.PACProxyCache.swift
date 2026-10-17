@@ -343,7 +343,7 @@ extension Internals {
                 case .timedOut:
                     return .init(reason: .timedOut)
 
-                case .executionFailed(let details):
+                case .executionFailed(let details), .pacFileError(let details):
                     return .init(reason: .failed, details: details)
                 }
 
