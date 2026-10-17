@@ -46,7 +46,7 @@ struct InternalsNetworkPathMonitorTests {
         async let first = monitor.updates().first { _ in true }
         async let second = monitor.updates().first { _ in true }
 
-        let (firstResult, secondResult) = try await (first, second)
+        let (firstResult, secondResult) = await (first, second)
 
         // Then
         #expect(firstResult != nil)

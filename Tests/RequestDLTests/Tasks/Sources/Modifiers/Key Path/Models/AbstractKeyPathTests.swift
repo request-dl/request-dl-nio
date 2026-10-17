@@ -10,6 +10,7 @@ import Testing
 struct AbstractKeyPathTests {
 
     @Test
+    @available(*, deprecated)
     func keyPath() async throws {
         // Given
         func getValue(_ keyPath: KeyPath<AbstractKeyPath, String>) -> String {

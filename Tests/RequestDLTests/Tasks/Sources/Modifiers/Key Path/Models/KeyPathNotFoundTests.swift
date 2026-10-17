@@ -10,6 +10,7 @@ import Testing
 struct KeyPathNotFoundTests {
 
     @Test
+    @available(*, deprecated)
     func error() async throws {
         // Given
         let keyPath = "any"

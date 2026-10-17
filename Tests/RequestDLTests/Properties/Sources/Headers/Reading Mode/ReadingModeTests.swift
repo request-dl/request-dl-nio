@@ -32,6 +32,7 @@ struct ReadingModeTests {
     }
 
     @Test
+    @available(*, deprecated)
     func readingBySeparator() async throws {
         // Given
         let separator = Array(Data("\n".utf8))
@@ -48,6 +49,7 @@ struct ReadingModeTests {
     }
 
     @Test
+    @available(*, deprecated)
     func readingByStringSeparator() async throws {
         // Given
         let separator = "\r\n"
@@ -64,6 +66,7 @@ struct ReadingModeTests {
     }
 
     @Test
+    @available(*, deprecated)
     func readingBySeparatorWithMaximumItemSize() async throws {
         // Given
         let separator = Array(Data("\n".utf8))
@@ -80,6 +83,7 @@ struct ReadingModeTests {
     }
 
     @Test
+    @available(*, deprecated)
     func readingByStringSeparatorWithMaximumItemSize() async throws {
         // When
         let resolved = try await resolve(

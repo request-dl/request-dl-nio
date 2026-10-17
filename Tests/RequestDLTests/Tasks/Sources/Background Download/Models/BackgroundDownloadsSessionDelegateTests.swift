@@ -335,7 +335,7 @@ struct BackgroundDownloadsSessionDelegateTests {
 /// would force an `await` onto assertions that need to run immediately, not after a hop.
 /// Serves a `404` with an HTML body for every request, so a download task finishes with a
 /// real, non-success `HTTPURLResponse` and no network access.
-private final class NotFoundURLProtocol: URLProtocol, @unchecked Sendable {
+private final class NotFoundURLProtocol: URLProtocol {
 
     override class func canInit(with request: URLRequest) -> Bool { true }
 

@@ -229,7 +229,7 @@ struct AsyncBytesItemsTests {
         let internalBytes = Internals.AsyncBytes(logger: nil, totalSize: 0, stream: stream)
         let bytes = AsyncBytes(seed: Internals.TaskSeed { cancelled.set() }, bytes: internalBytes)
 
-        await stream.append(.failure(Internals.ReadingModeItemTooLargeError(maximumItemSize: 5)))
+        stream.append(.failure(Internals.ReadingModeItemTooLargeError(maximumItemSize: 5)))
         stream.close()
 
         await #expect(throws: ReadingModeItemTooLargeError.self) {

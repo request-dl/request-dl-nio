@@ -39,6 +39,7 @@ struct ProxyAuthorizationTests {
     }
 
     @Test
+    @available(*, deprecated)
     func deprecatedProxyAuthorizationAliasStillResolves() async throws {
         // Given
         // Source compatibility: `Proxy.Authorization` is a deprecated `typealias` to

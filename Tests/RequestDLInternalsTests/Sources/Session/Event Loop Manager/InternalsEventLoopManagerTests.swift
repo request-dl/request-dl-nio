@@ -95,7 +95,7 @@ struct InternalsEventLoopManagerTests {
             wrapped.makeIterator()
         }
 
-        func shutdownGracefully(queue: DispatchQueue, _ callback: @escaping ((Error?) -> Void)) {
+        func shutdownGracefully(queue: DispatchQueue, _ callback: @escaping @Sendable (Error?) -> Void) {
             lock.withLock { _wasShutDown = true }
             wrapped.shutdownGracefully(queue: queue, callback)
         }

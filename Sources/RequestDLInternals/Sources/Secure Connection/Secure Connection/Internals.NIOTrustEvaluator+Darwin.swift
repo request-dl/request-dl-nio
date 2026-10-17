@@ -7,7 +7,7 @@
 import Dispatch
 import NIOCore
 import NIOSSL
-import Security
+@preconcurrency import Security
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
