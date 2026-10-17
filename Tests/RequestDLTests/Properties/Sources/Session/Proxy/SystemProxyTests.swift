@@ -99,13 +99,12 @@ struct SystemProxyTests {
         #expect(make.systemProxyPAC.failureLifetime == 2_500_000_000)
     }
 
-    /// A negative time is not a deadline in the past for a script to race: it is none.
     @Test
-    func systemProxy_withNegativeTimes_usesZero() async throws {
+    func systemProxy_withZeroTimes_keepsZero() async throws {
         // When
         let (_, make) = try await Resolve(
             TestProperty {
-                SystemProxy(onPACFailure: .direct, evaluationTimeout: .seconds(-5), failureLifetime: .seconds(-1))
+                SystemProxy(onPACFailure: .direct, evaluationTimeout: .zero, failureLifetime: .zero)
             }
         )
         .partiallyBuild()
@@ -114,6 +113,26 @@ struct SystemProxyTests {
         #expect(make.systemProxyPAC.evaluationTimeout == 0)
         #expect(make.systemProxyPAC.failureLifetime == 0)
     }
+
+    // Swift Testing's exit tests need to spawn a real child process, which only macOS and Linux
+    // support here: the other platforms (device or Simulator) don't allow it.
+    #if os(macOS) || os(Linux)
+    /// A negative time is a mistake in the code that wrote it, so construction traps. The
+    /// exit-test closures run in a spawned child process and cannot capture anything.
+    @Test
+    func systemProxy_withNegativeEvaluationTimeout_traps() async {
+        await #expect(processExitsWith: .failure) {
+            _ = SystemProxy(onPACFailure: .direct, evaluationTimeout: .seconds(-5))
+        }
+    }
+
+    @Test
+    func systemProxy_withNegativeFailureLifetime_traps() async {
+        await #expect(processExitsWith: .failure) {
+            _ = SystemProxy(onPACFailure: .direct, failureLifetime: .seconds(-1))
+        }
+    }
+    #endif
 
     @Test
     func neverBody() async throws {

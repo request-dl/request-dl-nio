@@ -222,10 +222,17 @@ public struct SecureConnection<Content: Property>: Property {
     /// - Important: Unavailable in a build without NIO: NIOSSL is what shuts down, so there's
     /// nothing for this to configure there.
     ///
-    /// - Parameter timeout: The timeout for shutting down the secure connection.
+    /// - Parameter timeout: The timeout for shutting down the secure connection. It must not be
+    ///   negative: that is a mistake in the code that wrote it, and traps, like a negative
+    ///   ``Timeout``.
     /// - Returns: A modified `SecureConnection` with the shutdown timeout set.
     public func shutdownTimeout(_ timeout: UnitTime) -> Self {
-        edit { $0.secureConnection.shutdownTimeout = timeout.nanoseconds }
+        precondition(
+            timeout >= .zero,
+            "shutdownTimeout cannot be negative, got \(timeout.nanoseconds) nanoseconds."
+        )
+
+        return edit { $0.secureConnection.shutdownTimeout = timeout.nanoseconds }
     }
 
     /// Sets the renegotiation support for the secure connection.
