@@ -109,6 +109,38 @@ struct TimeoutTests {
     }
 
     @Test
+    func timeout_whenZero_isAccepted() async throws {
+        // When
+        let resolved = try await resolve(TestProperty(Timeout(.zero, for: .read)))
+
+        // Then
+        #expect(resolved.session.configuration.timeout.read == .zero)
+    }
+
+    // Swift Testing's exit tests need to spawn a real child process, which only macOS and Linux
+    // support here: the other platforms (device or Simulator) don't allow it, so
+    // `#expect(processExitsWith:)` isn't even available to call there.
+    #if os(macOS) || os(Linux)
+    /// A negative duration is a mistake in the code that wrote it, and the request would start
+    /// with its time already spent, so construction traps.
+    @Test
+    func initWithNegativeTimeout_traps() async {
+        // The exit-test closure runs in a spawned child process, so it cannot capture anything
+        // from this scope. The literal has to be written directly inside it.
+        await #expect(processExitsWith: .failure) {
+            _ = Timeout(.seconds(-1))
+        }
+    }
+
+    @Test
+    func initWithMinimumTimeout_traps() async {
+        await #expect(processExitsWith: .failure) {
+            _ = Timeout(.nanoseconds(.min), for: .resource)
+        }
+    }
+    #endif
+
+    @Test
     func neverBody() async throws {
         // Given
         let property = Timeout(.seconds(1))

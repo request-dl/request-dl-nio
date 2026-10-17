@@ -39,6 +39,9 @@ public struct ConfiguredError: Error {
 
         /// `redirect.mode` was specified but is neither `"follow"` nor `"disallow"`.
         case invalidRedirectConfiguration
+
+        /// `timeout` was specified but is negative.
+        case invalidTimeoutConfiguration
     }
 
     // MARK: - Public properties

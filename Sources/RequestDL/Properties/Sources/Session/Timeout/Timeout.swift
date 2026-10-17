@@ -93,8 +93,15 @@ public struct Timeout: Property {
     ///
     /// > Note: By default, the `source` parameter is set to `.all`.
     ///
-    ///
+    /// > Important: `timeout` must not be negative. A negative duration is a mistake in the code
+    /// that wrote it, and the request would otherwise start with its time already spent, so this
+    /// traps. A value too large to count saturates at ``UnitTime/infinity`` instead.
     public init(_ timeout: UnitTime, for source: Source = .all) {
+        precondition(
+            timeout >= .zero,
+            "Timeout cannot be negative, got \(timeout.nanoseconds) nanoseconds."
+        )
+
         self.timeout = timeout
         self.source = source
     }

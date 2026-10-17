@@ -105,6 +105,52 @@ struct ConfiguredTests {
         #expect(resolved.session.configuration.timeout.read == .max)
     }
 
+    /// A negative `timeout` is a mistake in the configuration, not in the code, so it is reported
+    /// while the property resolves instead of trapping.
+    @Test(arguments: [-1, Int.min])
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func timeout_whenNegative_throws(_ timeout: Int) async {
+        // Given
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "timeout": .init(.int(timeout), isSecret: false)
+            ])
+        )
+
+        // When
+        let error = await #expect(throws: ConfiguredError.self) {
+            try await resolve(
+                TestProperty {
+                    Configured(reader)
+                }
+            )
+        }
+
+        // Then
+        #expect(error?.context == .invalidTimeoutConfiguration)
+    }
+
+    @Test
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func timeout_whenZero_isAccepted() async throws {
+        // Given
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "timeout": 0
+            ])
+        )
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                Configured(reader)
+            }
+        )
+
+        // Then
+        #expect(resolved.session.configuration.timeout.read == .zero)
+    }
+
     @Test
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func headers() async throws {

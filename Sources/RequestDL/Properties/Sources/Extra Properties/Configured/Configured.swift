@@ -34,7 +34,8 @@ import Crypto
 ///   it has no `://`, so `FlexibleURL` reads it as a relative path instead; write
 ///   `"https://example.com"` for the base URL case.
 /// - `method` (string, optional): uppercased and passed to ``RequestMethod/init(_:)``.
-/// - `timeout` (int, optional): interpreted as seconds and passed to ``Timeout/init(_:for:)``.
+/// - `timeout` (int, optional): interpreted as seconds and passed to ``Timeout/init(_:for:)``. A
+///   negative value is an error, see ``ConfiguredError``.
 /// - `headers` (string array, optional): each entry is a colon-separated `"Name: Value"` pair,
 ///   collected into a ``HeaderGroup``. Entries sharing the same name (case-sensitively) collapse
 ///   to one, the later entry winning, so a repeated header name (e.g. two `Accept` values) isn't
@@ -118,7 +119,8 @@ import Crypto
 ///   `secureConnection.tlsMinimumVersion`/`secureConnection.tlsMaximumVersion` is specified but is
 ///   none of the recognized values, if `secureConnection.spkiPinning.pins` is specified but empty
 ///   or `secureConnection.spkiPinning.policy` is specified but is neither `"strict"` nor `"audit"`,
-///   or if `redirect.mode` is specified but is neither `"follow"` nor `"disallow"`.
+///   if `redirect.mode` is specified but is neither `"follow"` nor `"disallow"`, or if `timeout` is
+///   specified but negative.
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 public struct Configured: Property {
 
@@ -152,7 +154,7 @@ public struct Configured: Property {
             }
 
             if let timeout = reader.int(forKey: "timeout") {
-                Timeout(.seconds(Int64(timeout)))
+                try Self.timeout(seconds: timeout)
             }
 
             if let headerPairs = reader.stringArray(forKey: "headers", isSecret: true) {
@@ -248,6 +250,14 @@ public struct Configured: Property {
         }
 
         return session
+    }
+
+    private static func timeout(seconds: Int) throws -> Timeout {
+        guard seconds >= 0 else {
+            throw ConfiguredError(context: .invalidTimeoutConfiguration)
+        }
+
+        return Timeout(.seconds(Int64(seconds)))
     }
 
     private static func redirect(_ reader: ConfigReader) throws -> Session? {
