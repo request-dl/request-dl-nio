@@ -5,9 +5,12 @@
 import Configuration
 import RequestDLInternals
 import SwiftAsyncStream
+import SystemPackage
 import Testing
 
 @testable import RequestDL
+
+import Foundation
 
 /// `Configured` reads bearer tokens, Basic passwords and credentials, proxy credentials and the
 /// header lists as secrets, because swift-configuration's access loggers redact only what is
@@ -117,5 +120,66 @@ struct ConfiguredSecretsTests {
         #expect(recorder.isSecret("timeout") == false)
         #expect(recorder.isSecret("authorization.scheme") == false)
         #expect(recorder.isSecret("authorization.username") == false)
+    }
+
+    /// The flag reaching the event is not the redaction: swift-configuration's loggers do that,
+    /// from the flag. This reads through the access logger that writes to a file, and looks at
+    /// what it wrote.
+    @Test
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func accessLogger_neverWritesACredential_andStillWritesTheKeys() async throws {
+        // Given
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let file = directory.appendingPathComponent("access.log")
+
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let logger = try FileAccessLogger(filePath: FilePath(file.path))
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "baseURL": "https://example.com",
+                "method": "post",
+                "authorization.scheme": "basic",
+                "authorization.username": "alice",
+                "authorization.password": "hunter2-password",
+                "headers": .init(.stringArray(["X-API-Key: key-in-a-header"]), isSecret: false),
+                "queries": .init(.stringArray(["api_key=key-in-a-query"]), isSecret: false),
+                "proxy.enabled": true,
+                "proxy.host": "proxy.example.com",
+                "proxy.port": 8_080,
+                "proxy.authorization.scheme": "bearer",
+                "proxy.authorization.token": "proxy-bearer-token",
+                "proxy.connectHeaders": .init(
+                    .stringArray(["Proxy-Authorization: Bearer connect-secret"]),
+                    isSecret: false
+                ),
+            ]),
+            accessReporter: logger
+        )
+
+        // When
+        _ = try await resolve(TestProperty { Configured(reader) })
+
+        // Then
+        let written = try String(contentsOf: file, encoding: .utf8)
+
+        #expect(written.contains("authorization.password"))
+        #expect(written.contains("headers"))
+        #expect(written.contains("proxy.authorization.token"))
+
+        for credential in [
+            "hunter2-password",
+            "key-in-a-header",
+            "key-in-a-query",
+            "proxy-bearer-token",
+            "connect-secret",
+        ] {
+            #expect(!written.contains(credential), "\(credential) reached the access log")
+        }
+
+        // What is not a credential is readable, which is what makes the log worth having.
+        #expect(written.contains("https://example.com"))
+        #expect(written.contains("alice"))
     }
 }
