@@ -1703,8 +1703,21 @@ extension Internals.URLSessionClient {
         /// reason to refuse, in which case that reason. Every way an exchange can fail runs its
         /// error through this: `didCompleteWithError:` for the `dataTask`/`uploadTask` overloads,
         /// and `executeSessionTask`'s `runExchange` for the `bytes(for:delegate:)` one.
+        ///
+        /// A refused redirect is recorded too. `URLSession` normally hands back the 3xx and
+        /// `responseHead(for:)` reports it, but under load `bytes(for:delegate:)` sometimes ends
+        /// with a bare `NSURLErrorUnknown` instead, and that is not what the caller must see. A
+        /// cancellation stays one: the caller stopped the request, whatever was refused before.
         func substitutingRecordedError(for error: Error) -> Error {
-            lock.withLock { _proxyAuthenticationError } ?? error
+            if let proxyAuthenticationError = lock.withLock({ _proxyAuthenticationError }) {
+                return proxyAuthenticationError
+            }
+
+            if error is CancellationError || (error as? URLError)?.code == .cancelled {
+                return error
+            }
+
+            return lock.withLock { _redirectError } ?? error
         }
 
         /// The redirect `willPerformHTTPRedirection` deferred to `runExchange` (see
@@ -1967,6 +1980,44 @@ extension Internals.URLSessionClient {
     /// back pressure in `executeSessionTask` has to survive.
     public var delegateQueueForTesting: OperationQueue {
         session.delegateQueue
+    }
+
+    /// What an exchange fails with when `URLSession` ends it with `error` after its delegate was
+    /// offered one redirect, under `configuration`. The delegate is private to this file, and
+    /// `URLSession` ending a refused redirect with a bare `NSURLErrorUnknown` can't be provoked
+    /// on demand, so a test reaches `substitutingRecordedError(for:)` through here.
+    public static func failure(
+        _ error: Error,
+        afterRedirectUnder configuration: Internals.RedirectConfiguration
+    ) -> Error {
+        let url = URL(string: "https://localhost/redirect")!
+        let session = URLSession(configuration: .ephemeral)
+        defer { session.invalidateAndCancel() }
+
+        let delegate = TaskDelegate(
+            redirectConfiguration: configuration,
+            initialRequest: URLRequest(url: url),
+            proxyAuthorization: nil,
+            tls: nil,
+            forwarding: nil
+        )
+
+        let response = HTTPURLResponse(
+            url: url,
+            statusCode: 302,
+            httpVersion: nil,
+            headerFields: ["Location": url.absoluteString]
+        )!
+
+        delegate.urlSession(
+            session,
+            task: session.dataTask(with: url),
+            willPerformHTTPRedirection: response,
+            newRequest: URLRequest(url: url),
+            completionHandler: { _ in }
+        )
+
+        return delegate.substitutingRecordedError(for: error)
     }
 }
 
