@@ -134,21 +134,34 @@ public struct SystemProxy: Property {
     ///   - evaluationTimeout: How long fetching and running a PAC script may take. 30 seconds by
     ///   default, because a script is often hosted on a slow internal server. A request that
     ///   arrives while another one is already evaluating the same script waits for that
-    ///   evaluation, and so for its timeout. A timeout of zero or less makes every evaluation fail
-    ///   at once.
+    ///   evaluation, and so for its timeout. A timeout of zero makes every evaluation fail at
+    ///   once. It must not be negative.
     ///   - failureLifetime: How long a failure is remembered. Until it passes, requests do not ask
     ///   the script again: they get the failure, at once, instead of each waiting out the
-    ///   evaluation. 10 seconds by default. Zero or less remembers nothing, and every request
-    ///   asks the script itself.
+    ///   evaluation. 10 seconds by default. Zero remembers nothing, and every request asks the
+    ///   script itself. It must not be negative.
+    ///
+    /// A negative `evaluationTimeout` or `failureLifetime` is a mistake in the code that wrote it
+    /// and traps, like a negative ``Timeout``.
     public init(
         onPACFailure: PACFailurePolicy,
         evaluationTimeout: UnitTime = .seconds(30),
         failureLifetime: UnitTime = .seconds(10)
     ) {
+        precondition(
+            evaluationTimeout >= .zero,
+            "evaluationTimeout cannot be negative, got \(evaluationTimeout.nanoseconds) ns."
+        )
+
+        precondition(
+            failureLifetime >= .zero,
+            "failureLifetime cannot be negative, got \(failureLifetime.nanoseconds) ns."
+        )
+
         self.pac = .init(
             onFailure: onPACFailure.internalPolicy,
-            evaluationTimeout: Double(max(evaluationTimeout.nanoseconds, 0)) / 1_000_000_000,
-            failureLifetime: max(failureLifetime.nanoseconds, 0)
+            evaluationTimeout: Double(evaluationTimeout.nanoseconds) / 1_000_000_000,
+            failureLifetime: failureLifetime.nanoseconds
         )
     }
 

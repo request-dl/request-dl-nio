@@ -222,6 +222,34 @@ struct SecureConnectionTests {
         #expect(sut?.shutdownTimeout == timeout.nanoseconds)
     }
 
+    @Test
+    func secure_whenShutdownTimeoutIsZero_isAccepted() async throws {
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                RequestDL.SecureConnection {}
+                    .shutdownTimeout(.zero)
+            }
+        )
+
+        // Then
+        #expect(resolved.session.configuration.secureConnection?.shutdownTimeout == 0)
+    }
+
+    // Swift Testing's exit tests need to spawn a real child process, which only macOS and Linux
+    // support here: the other platforms (device or Simulator) don't allow it.
+    #if os(macOS) || os(Linux)
+    /// A negative time is a mistake in the code that wrote it, so the modifier traps. The
+    /// exit-test closure runs in a spawned child process and cannot capture anything.
+    @Test
+    func secure_whenShutdownTimeoutIsNegative_traps() async {
+        await #expect(processExitsWith: .failure) {
+            _ = RequestDL.SecureConnection {}
+                .shutdownTimeout(.seconds(-1))
+        }
+    }
+    #endif
+
     // Kept to prove the deprecated modifier still forwards its list; see `Session.httpVersion(_:)`.
     @available(*, deprecated)
     @Test
