@@ -342,6 +342,8 @@ struct ResumableUploadExecutionTests {
 
             // Then: what the server has to say about the request that was written, as usual.
             #expect(result.head.status.code == 401)
+
+            try await awaitRecordedRequests(server)
             #expect(server.requests.count == 1)
         }
     }
@@ -645,6 +647,9 @@ struct ResumableUploadExecutionTests {
             // Then
             #expect(result.head.status.code == 200)
             #expect(result.payload.count == 4_096)
+
+            // The server records a request once it has written all of its answer.
+            try await awaitRecordedRequests(server)
             #expect(server.requests.map(\.method) == ["GET"])
         }
     }
