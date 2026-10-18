@@ -174,7 +174,7 @@ extension Internals {
             try Task.checkCancellation()
 
             let tlsDelegate = identityPolicy.flatMap { policy in
-                request.url?.host.map { TLSDelegate(host: $0, policy: policy) }
+                request.url.flatMap(Internals.IdentityOrigin.init(url:)).map { TLSDelegate(origin: $0, policy: policy) }
             }
 
             let taskDelegate = TaskDelegate(
@@ -257,7 +257,7 @@ extension Internals {
             }
 
             let tlsDelegate = identityPolicy.flatMap { policy in
-                request.url?.host.map { TLSDelegate(host: $0, policy: policy) }
+                request.url.flatMap(Internals.IdentityOrigin.init(url:)).map { TLSDelegate(origin: $0, policy: policy) }
             }
 
             let taskDelegate = TaskDelegate(
@@ -346,7 +346,7 @@ extension Internals {
             }
 
             let tlsDelegate = identityPolicy.flatMap { policy in
-                request.url?.host.map { TLSDelegate(host: $0, policy: policy) }
+                request.url.flatMap(Internals.IdentityOrigin.init(url:)).map { TLSDelegate(origin: $0, policy: policy) }
             }
 
             // Built here, in an `async` context that can freely `await`, rather than inside a
@@ -632,7 +632,7 @@ extension Internals {
             }
 
             let tlsDelegate = identityPolicy.flatMap { policy in
-                request.url?.host.map { TLSDelegate(host: $0, policy: policy) }
+                request.url.flatMap(Internals.IdentityOrigin.init(url:)).map { TLSDelegate(origin: $0, policy: policy) }
             }
 
             let upload = Internals.AsyncStream<Int>()
