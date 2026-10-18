@@ -192,6 +192,68 @@ struct InternalsURLSessionClientTests {
             try await eventually(timeout: 15) { !client.isRunning }
         }
     }
+
+    /// A client built with a secure connection answers TLS challenges through a `TLSDelegate`
+    /// that every `execute` overload builds for the origin of its request. These two overloads
+    /// were only ever run without one, so what they hand to the delegate was never reached: the
+    /// streamed upload and the streamed download, each cancelled in flight like their siblings.
+    @Test
+    func execute_whenStreamingUploadRunsWithASecureConnection_buildsTheDelegateAndStillCancels() async throws {
+        try await withHangingURLSessionTestServer { port in
+            let client = try Internals.URLSessionClient(
+                configuration: .ephemeral,
+                secureConnection: Internals.SecureConnection()
+            )
+            var request = URLRequest(url: try #require(URL(string: "http://127.0.0.1:\(port)/")))
+            request.httpMethod = "POST"
+
+            let (stream, continuation) = AsyncStream<Internals.Bytes>.makeStream()
+            continuation.yield(Internals.Bytes(Data("payload".utf8)))
+            continuation.finish()
+
+            let responseTask = _Concurrency.Task {
+                try await client.execute(request: request, streaming: stream)
+            }
+
+            try await _Concurrency.Task.sleep(nanoseconds: 200_000_000)
+            #expect(client.isRunning)
+
+            responseTask.cancel()
+
+            await #expect(throws: (any Error).self) {
+                _ = try await responseTask.value
+            }
+
+            try await eventually(timeout: 15) { !client.isRunning }
+        }
+    }
+
+    @Test
+    func execute_whenStreamedDownloadRunsWithASecureConnection_buildsTheDelegateAndStillCancels() async throws {
+        try await withHangingURLSessionTestServer { port in
+            let client = try Internals.URLSessionClient(
+                configuration: .ephemeral,
+                secureConnection: Internals.SecureConnection()
+            )
+            let url = try #require(URL(string: "http://127.0.0.1:\(port)/"))
+
+            let responseTask = _Concurrency.Task {
+                try await client.execute(request: URLRequest(url: url), readingMode: .length(1_024))
+            }
+
+            try await _Concurrency.Task.sleep(nanoseconds: 200_000_000)
+            #expect(client.isRunning)
+
+            responseTask.cancel()
+
+            await #expect(throws: (any Error).self) {
+                _ = try await responseTask.value
+            }
+
+            try await eventually(timeout: 15) { !client.isRunning }
+        }
+    }
+
 }
 
 /// Test-only stand-in for the real client's own TLS challenge handling; see the identical
