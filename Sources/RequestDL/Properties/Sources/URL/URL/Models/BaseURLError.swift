@@ -21,6 +21,10 @@ public struct BaseURLError: Error {
 
         /// The host string has an unexpected format and the host could not be extracted.
         case unexpectedHost
+
+        /// The host string carries a user name or a password (`user:password@host`). They would not
+        /// be sent, and a URL ends up in logs, so credentials go in ``Authorization``.
+        case userInfoNotAllowed
     }
 
     // MARK: - Public properties
@@ -28,7 +32,8 @@ public struct BaseURLError: Error {
     /// The context of the error.
     public let context: Context
 
-    /// The base URL associated with the error.
+    /// The base URL associated with the error, with the user name and the password, if it had
+    /// any, replaced by `REDACTED`: an error ends up in logs.
     public let baseURL: String
 
     // MARK: - Initializer

@@ -59,6 +59,87 @@ struct ConfiguredTests {
         #expect(resolved.requestConfiguration.method == "POST")
     }
 
+    /// `FlexibleURL` keeps the scheme, the host and the port of a complete URL and drops the rest
+    /// of its authority, so a user name and a password in `baseURL` were never sent. They would
+    /// also have been written to the logs, so they are an error.
+    @Test(arguments: [
+        "https://user:password@example.com",
+        "https://user@example.com",
+        "https://:password@example.com/path",
+        "https://user:password@example.com:8443/path?q=1",
+        "  https://user:password@example.com  ",
+    ])
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func baseURL_whenItHasUserInfo_throws(_ baseURL: String) async {
+        // Given
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "baseURL": .init(.string(baseURL), isSecret: false)
+            ])
+        )
+
+        // When
+        let error = await #expect(throws: ConfiguredError.self) {
+            try await resolve(
+                TestProperty {
+                    Configured(reader)
+                }
+            )
+        }
+
+        // Then
+        #expect(error?.context == .invalidBaseURLConfiguration)
+    }
+
+    /// An `@` that is not in the authority is part of a path or of a query, and a relative value
+    /// has no authority at all.
+    @Test(arguments: [
+        ("https://example.com/users/a@b.c", "https://example.com/users/a@b.c"),
+        ("https://example.com?email=a@b.c", "https://example.com?email=a@b.c"),
+        ("https://example.com#a@b", "https://example.com"),
+        ("https://example.com:8443/a", "https://example.com:8443/a"),
+    ])
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func baseURL_whenAnAtSignIsNotInTheAuthority_isAccepted(
+        _ baseURL: String,
+        _ expected: String
+    ) async throws {
+        // Given
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "baseURL": .init(.string(baseURL), isSecret: false)
+            ])
+        )
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                Configured(reader)
+            }
+        )
+
+        // Then
+        #expect(resolved.requestConfiguration.url == expected)
+    }
+
+    @Test
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func baseURL_whenRelative_hasNoAuthorityToCheck() async throws {
+        // Given
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "baseURL": "/users/a@b.c"
+            ])
+        )
+
+        // Then
+        _ = try await resolve(
+            TestProperty {
+                Configured(reader)
+            }
+        )
+    }
+
     @Test
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func timeout() async throws {

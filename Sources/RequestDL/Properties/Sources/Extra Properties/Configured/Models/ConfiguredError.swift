@@ -42,6 +42,11 @@ public struct ConfiguredError: Error {
 
         /// `timeout` was specified but is negative.
         case invalidTimeoutConfiguration
+
+        /// `baseURL` carries a user name or a password in its authority (`user:password@host`).
+        /// Credentials do not belong in a URL: they would end up in logs, and the request does
+        /// not send them. Use ``Authorization`` instead.
+        case invalidBaseURLConfiguration
     }
 
     // MARK: - Public properties

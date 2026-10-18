@@ -242,4 +242,37 @@ struct BaseURLTests {
         // Then
         try await assertNever(property.body)
     }
+
+    // MARK: - User info
+
+    /// Same as `FlexibleURL`: a user name or a password in the host would not be sent and would
+    /// end up in logs, and the error does not repeat them.
+    @Test(arguments: [
+        ("user:password@example.com", "REDACTED@example.com"),
+        ("user@example.com:8443", "REDACTED@example.com:8443"),
+        ("https://user:password@example.com", "https://REDACTED@example.com"),
+        ("user:password@example.com/path", "REDACTED@example.com/path"),
+    ])
+    func host_whenItHasUserInfo_throwsUserInfoNotAllowed(
+        _ host: String,
+        _ expected: String
+    ) async {
+        // When
+        let error = await #expect(throws: BaseURLError.self) {
+            try await resolve(TestProperty { BaseURL(host) })
+        }
+
+        // Then
+        #expect(error?.context == .userInfoNotAllowed)
+        #expect(error?.baseURL == expected)
+    }
+
+    @Test(arguments: ["example.com", "example.com:8443", "[::1]:8080"])
+    func host_whenItHasNoUserInfo_isAccepted(_ host: String) async throws {
+        // When
+        let resolved = try await resolve(TestProperty { BaseURL(host) })
+
+        // Then
+        #expect(resolved.requestConfiguration.url == "https://\(host)")
+    }
 }

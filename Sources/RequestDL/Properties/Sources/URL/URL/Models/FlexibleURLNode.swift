@@ -29,13 +29,17 @@ struct FlexibleURLNode: PropertyNode {
         let structuralEnd = normalized.firstIndex(where: { $0 == "?" || $0 == "#" }) ?? normalized.endIndex
         let isFullURL = normalized[..<structuralEnd].contains("://")
 
+        if isFullURL, URLUserInfo.isPresent(in: normalized) {
+            throw FlexibleURLError(context: .userInfoNotAllowed, url: redactedURL)
+        }
+
         if isFullURL {
             guard let url = URL(string: normalized) else {
-                throw FlexibleURLError(context: .invalidURL, url: url)
+                throw FlexibleURLError(context: .invalidURL, url: redactedURL)
             }
 
             guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
-                throw FlexibleURLError(context: .invalidURL, url: self.url)
+                throw FlexibleURLError(context: .invalidURL, url: redactedURL)
             }
 
             try processFullURL(components: components, into: &make.requestConfiguration)
@@ -44,7 +48,7 @@ struct FlexibleURLNode: PropertyNode {
             let placeholderURLString = "https://placeholder.com\(needsSeparator ? "/": "")\(normalized)"
 
             guard let components = URLComponents(string: placeholderURLString) else {
-                throw FlexibleURLError(context: .invalidURL, url: url)
+                throw FlexibleURLError(context: .invalidURL, url: redactedURL)
             }
 
             try appendPathAndQueries(components: components, into: &make.requestConfiguration, fromStart: false)
@@ -52,6 +56,11 @@ struct FlexibleURLNode: PropertyNode {
     }
 
     // MARK: - Private Methods
+
+    /// `url` for an error: its user name and password are not for a log.
+    private var redactedURL: String {
+        URLUserInfo.redacting(url: url)
+    }
 
     private func processFullURL(components: URLComponents, into request: inout RequestConfiguration) throws {
         if let host = components.host {
@@ -88,7 +97,7 @@ extension FlexibleURLNode {
 
     fileprivate func constructBaseURLString(from components: URLComponents, host: String) throws -> String {
         guard !host.isEmpty else {
-            throw FlexibleURLError(context: .invalidHost, url: url)
+            throw FlexibleURLError(context: .invalidHost, url: redactedURL)
         }
 
         var fullHost = host

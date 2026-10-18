@@ -372,4 +372,69 @@ struct FlexibleURLTests {
         // Then
         #expect(resolved.requestConfiguration.url == expectedUrl)
     }
+
+    // MARK: - User info
+
+    /// The request would not send a user name or a password in the URL (only the scheme, the host
+    /// and the port are kept), and a URL ends up in logs: they are an error, and the error does
+    /// not repeat them.
+    @Test(arguments: [
+        "https://user:password@example.com",
+        "https://user@example.com/path?q=1",
+        "https://:password@example.com:8443",
+        "  https://user:password@example.com  ",
+    ])
+    func completeURLWithUserInfoThrowsUserInfoNotAllowed(_ url: String) async {
+        // When
+        let error = await #expect(throws: FlexibleURLError.self) {
+            try await resolve(FlexibleURL(url))
+        }
+
+        // Then
+        #expect(error?.context == .userInfoNotAllowed)
+        #expect(error?.url.contains("password") == false)
+        #expect(error?.url.contains("user") == false)
+        #expect(error?.url.contains("example.com") == true)
+    }
+
+    /// Whatever the error, a URL in it is redacted, the unparseable one included.
+    @Test func unparseableCompleteURLWithUserInfo_isRedactedInTheError() async {
+        // When
+        let error = await #expect(throws: FlexibleURLError.self) {
+            try await resolve(FlexibleURL("http://user:secret@a b.com/x"))
+        }
+
+        // Then
+        #expect(error?.context == .userInfoNotAllowed)
+        #expect(error?.url == "http://REDACTED@a b.com/x")
+    }
+
+    @Test(arguments: [
+        ("https://example.com/users/a@b.c", "https://example.com/users/a@b.c"),
+        ("https://example.com?email=a@b.c", "https://example.com?email=a@b.c"),
+        ("https://example.com:8443/a", "https://example.com:8443/a"),
+    ])
+    func completeURLWithAnAtSignOutsideTheAuthority_isAccepted(
+        _ url: String,
+        _ expected: String
+    ) async throws {
+        // When
+        let resolved = try await resolve(FlexibleURL(url))
+
+        // Then
+        #expect(resolved.requestConfiguration.url == expected)
+    }
+
+    @Test func relativePathWithAnAtSign_hasNoAuthorityToCheck() async throws {
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL("example.com")
+                FlexibleURL("/users/a@b.c")
+            }
+        )
+
+        // Then
+        #expect(resolved.requestConfiguration.url == "https://example.com/users/a@b.c")
+    }
 }

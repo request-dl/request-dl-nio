@@ -26,6 +26,11 @@
 ///
 /// > Note: If no scheme is provided in a complete URL, `https` is assumed by default.
 ///
+/// > Important: A complete URL must not carry a user name or a password
+/// (`https://user:password@host`): only the scheme, the host and the port are kept, so they would
+/// never be sent, and a URL ends up in logs. It throws ``FlexibleURLError`` with the context
+/// ``FlexibleURLError/Context-swift.enum/userInfoNotAllowed``. Use ``Authorization``.
+///
 /// ### Supported Formats
 ///
 /// The `FlexibleURL` accepts:
