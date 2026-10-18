@@ -143,6 +143,20 @@ struct CURLTaskCapabilitiesTests {
         #expect(configuration.body != nil)
     }
 
+    /// A `-F` field with no `=` is not a file, so it needs no capability to be refused: it is
+    /// malformed whatever the task may do.
+    @Test
+    func aFormFieldWithoutAnEquals_isMalformed_notRefusedForItsCapabilities() async {
+        // When
+        let error = await #expect(throws: CURLParsingError.self) {
+            try await CURLCommandParser.parseCommand("curl -F nofield https://example.com", allowing: [])
+        }
+
+        // Then
+        #expect(error?.context == .malformedArgument)
+        #expect(error?.token == "nofield")
+    }
+
     // MARK: - Refused before anything is opened
 
     /// A path that does not exist: with the capability the parse fails opening it, which is not a
