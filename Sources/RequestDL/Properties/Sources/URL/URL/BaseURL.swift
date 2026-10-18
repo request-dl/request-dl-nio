@@ -21,6 +21,10 @@
 ///
 /// > Note: Successively specifying the `BaseURL` within a declarative block will override the previously specified value.
 ///
+/// > Important: The host must not carry a user name or a password (`user:password@host`): they
+/// would not be sent, and a URL ends up in logs. It throws ``BaseURLError`` with the context
+/// ``BaseURLError/Context-swift.enum/userInfoNotAllowed``. Use ``Authorization``.
+///
 /// > Warning: It is extremely important to specify the BaseURL in each request. Otherwise, RequestDL may throw an error.
 ///
 /// ### Learn the fundamentals
@@ -37,10 +41,17 @@ public struct BaseURL: Property {
         let host: String
 
         func make(_ make: inout Make) async throws {
+            if URLUserInfo.isPresent(in: host) || URLUserInfo.isPresent(inHost: host) {
+                throw BaseURLError(
+                    context: .userInfoNotAllowed,
+                    baseURL: URLUserInfo.redacting(host: host)
+                )
+            }
+
             if host.contains("://") {
                 throw BaseURLError(
                     context: .invalidHost,
-                    baseURL: host
+                    baseURL: URLUserInfo.redacting(host: host)
                 )
             }
 
@@ -51,7 +62,7 @@ public struct BaseURL: Property {
             guard !host.isEmpty, !host.contains("/") else {
                 throw BaseURLError(
                     context: .unexpectedHost,
-                    baseURL: host
+                    baseURL: URLUserInfo.redacting(host: host)
                 )
             }
 

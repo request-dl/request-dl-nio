@@ -257,24 +257,11 @@ public struct Configured: Property {
     }
 
     private static func baseURL(_ value: String) throws -> FlexibleURL {
-        guard !hasUserInfo(value) else {
+        guard !URLUserInfo.isPresent(in: value) else {
             throw ConfiguredError(context: .invalidBaseURLConfiguration)
         }
 
         return FlexibleURL(value)
-    }
-
-    /// Whether a complete `scheme://authority/...` value has a user name or a password in its
-    /// authority. Only the part before any query or fragment can have an authority, and a
-    /// relative value has none, so an `@` in a path or in a query value is not userinfo.
-    private static func hasUserInfo(_ value: String) -> Bool {
-        let structural = value.prefix { $0 != "?" && $0 != "#" }
-
-        guard let separator = structural.firstRange(of: "://") else {
-            return false
-        }
-
-        return structural[separator.upperBound...].prefix { $0 != "/" }.contains("@")
     }
 
     private static func timeout(seconds: Int) throws -> Timeout {
