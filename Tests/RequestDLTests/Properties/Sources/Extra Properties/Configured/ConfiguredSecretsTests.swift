@@ -3,14 +3,13 @@
 //
 
 import Configuration
+import Foundation
 import RequestDLInternals
 import SwiftAsyncStream
 import SystemPackage
 import Testing
 
 @testable import RequestDL
-
-import Foundation
 
 /// `Configured` reads bearer tokens, Basic passwords and credentials, proxy credentials and the
 /// header lists as secrets, because swift-configuration's access loggers redact only what is
