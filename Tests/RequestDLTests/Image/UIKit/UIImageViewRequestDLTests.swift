@@ -7,6 +7,7 @@ import SwiftAsyncStream
 import Testing
 
 @_spi(Private) @testable import RequestDL
+@testable import RequestDLTestSupport
 
 #if canImport(UIKit) && !os(watchOS)
 import UIKit
@@ -106,6 +107,75 @@ struct UIImageViewRequestDLTests {
 
         // Then
         #expect(await !completed.value)
+    }
+
+    /// The completion not firing is not the same as the request being stopped: a cell that is
+    /// reused has to free the connection of the image it no longer shows.
+    @Test
+    func reusingTheImageViewInterruptsTheRequestOfThePreviousLoad() async throws {
+        // Given
+        let imageView = UIImageView()
+        let started = Flag()
+        let interrupted = Flag()
+
+        imageView.rdl.setImage(
+            id: "interrupted-by-reuse-\(UUID())",
+            task: StubImageTask {
+                await started.set()
+
+                do {
+                    try await Task.sleep(nanoseconds: 60_000_000_000)
+                } catch {
+                    await interrupted.set()
+                    throw error
+                }
+
+                return .init(head: .stub, payload: .onePixelPNG)
+            }
+        )
+
+        try await eventually { await started.value }
+
+        // When
+        imageView.rdl.setImage(
+            id: "replacement-\(UUID())",
+            task: StubImageTask { .init(head: .stub, payload: .onePixelPNG) }
+        )
+
+        // Then
+        try await eventually { await interrupted.value }
+    }
+
+    @Test
+    func cancelInterruptsTheRequestOfThePendingLoad() async throws {
+        // Given
+        let imageView = UIImageView()
+        let started = Flag()
+        let interrupted = Flag()
+
+        imageView.rdl.setImage(
+            id: "interrupted-by-cancel-\(UUID())",
+            task: StubImageTask {
+                await started.set()
+
+                do {
+                    try await Task.sleep(nanoseconds: 60_000_000_000)
+                } catch {
+                    await interrupted.set()
+                    throw error
+                }
+
+                return .init(head: .stub, payload: .onePixelPNG)
+            }
+        )
+
+        try await eventually { await started.value }
+
+        // When
+        imageView.rdl.cancel()
+
+        // Then
+        try await eventually { await interrupted.value }
     }
 }
 

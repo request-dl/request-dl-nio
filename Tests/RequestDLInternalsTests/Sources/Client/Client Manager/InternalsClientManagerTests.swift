@@ -287,12 +287,15 @@ struct InternalsClientManagerTests {
                 sessionConfiguration: overflowing
             )
 
-            // Then: served straight away, the ceiling overshot rather than enforced, and nothing
-            // in flight was torn down to get there.
+            // Then: served without waiting for a busy client, the ceiling overshot rather than
+            // enforced, and nothing in flight was torn down to get there. The bound is not a
+            // speed claim: a caller that waited for a client to free up would wait for the 60 s
+            // request that holds it, or for ever, and a loaded runner takes a second or more
+            // over a call that does nothing but bookkeeping.
             #if canImport(Darwin)
-            #expect(DispatchTime.now().uptimeNanoseconds - start < 1_000_000_000)
+            #expect(DispatchTime.now().uptimeNanoseconds - start < 30_000_000_000)
             #else
-            #expect(ContinuousClock.now - start < .seconds(1))
+            #expect(ContinuousClock.now - start < .seconds(30))
             #endif
             #expect(manager.count == maximumCount + 1)
             #expect(busy.allSatisfy { $0.isRunning })
