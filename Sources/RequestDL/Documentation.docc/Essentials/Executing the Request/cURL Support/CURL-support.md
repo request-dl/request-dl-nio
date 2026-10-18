@@ -22,7 +22,30 @@ let result = try await CURLTask("""
 
 `CURLTask` parses the command straight into a ``RequestDL/RequestConfiguration`` — there's no `@PropertyBuilder` tree to declare from a string only known at runtime — but resolution and execution still go through the same pipeline ``RequestDL/DataTask`` uses, so caching, tracing, and executor requirements all apply exactly the same way.
 
-> Important: Run only curl commands you wrote or trust. A command is a program for the request engine, not just data: `-F name=@path` uploads the local file it names, `--cert`, `--key` and `--cacert` read files from disk, `-k` / `--insecure` turns certificate verification off, and `-x` / `--proxy` and `--resolve` change where the request goes. A command assembled from user input, a pasted snippet or a network response can leak local files to a host of its choosing or remove TLS protection. Reject or inspect such a command first, or declare the request with ``RequestDL/DataTask`` instead.
+> Important: Run only curl commands you wrote or trust. A command is a program for the request engine, not just data: `-F name=@path` uploads the local file it names, `--cert`, `--key` and `--cacert` read files from disk, `-k` / `--insecure` turns certificate verification off, and `-x` / `--proxy` and `--resolve` change where the request goes. A command assembled from user input, a pasted snippet or a network response can leak local files to a host of its choosing or remove TLS protection. Say what the command may do, as below, reject or inspect it first, or declare the request with ``RequestDL/DataTask`` instead.
+
+### A command you do not control
+
+``RequestDL/CURLTask/init(_:allowing:)`` takes the capabilities a command may use. A flag that needs one it was not given throws ``RequestDL/CURLParsingError`` with `unsupportedFlag` while the command is parsed, before any file is opened and before anything is sent:
+
+```swift
+// Nothing it could read, redirect or weaken.
+try await CURLTask(pasted, allowing: [])
+    .result()
+
+// The same, but it may name a proxy.
+try await CURLTask(pasted, allowing: .proxy)
+    .result()
+```
+
+| Capability | Flags it covers |
+|---|---|
+| `.localFiles` | `-F name=@path` (relative paths too, which resolve against the working directory), `--cacert`, `--cert` / `-E`, `--key` |
+| `.disabledTLSVerification` | `-k` / `--insecure` |
+| `.proxy` | `-x` / `--proxy` |
+| `.dnsOverrides` | `--resolve` |
+
+Everything else in the subset (the method, headers, a body, a form of plain fields, `-u`, redirects, `--compressed`, and the flags that only shape curl's own output) needs none. `CURLTask(_:)` allows all of them, as it always did.
 
 ### From a request to curl
 

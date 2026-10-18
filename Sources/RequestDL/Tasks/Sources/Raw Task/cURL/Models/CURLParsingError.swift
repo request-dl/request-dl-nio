@@ -12,7 +12,8 @@ public struct CURLParsingError: Error, Sendable, Hashable {
     public enum Context: Sendable, Hashable {
 
         /// A flag outside the documented subset (`-X`/`-H`/`-d`/`-F`/`-u`/`--url`/`-G`, plus
-        /// their long forms).
+        /// their long forms), or one that ``CURLTask/Capabilities`` the task was given do not
+        /// cover (`-F name=@path`, `-k`, `-x`, `--resolve`, `--cacert`, `--cert`, `--key`).
         case unsupportedFlag
 
         /// A flag that takes a value was the last token, or its value didn't parse (a `-F`

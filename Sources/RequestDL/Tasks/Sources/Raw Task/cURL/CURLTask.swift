@@ -43,13 +43,21 @@ import struct Foundation.Data
 /// .Configuration.dnsOverride`) is incompatible with the `.urlSession` executor, so a command
 /// using it will only run under `.nio`/`.nioTransportServices`.
 ///
-/// - Important: Pass only commands you wrote or trust. A command is a program for the request
-/// engine, not just data. `-F name=@path` reads that local file and uploads it. `--cert`/`-E`/
-/// `--key` and `--cacert` read the files they name. `-k`/`--insecure` turns certificate
-/// verification off, and `-x`/`--proxy` and `--resolve` redirect where the request goes. A
-/// command built from user input, a pasted snippet or a network response can therefore leak
-/// local files to a host of its choosing or strip TLS protection. Reject or inspect such a
-/// command before handing it to `CURLTask`, or build the request with ``DataTask`` instead.
+/// - Important: Pass only commands you wrote or trust, or say what the command may do. A
+/// command is a program for the request engine, not just data. `-F name=@path` reads that local
+/// file and uploads it. `--cert`/`-E`/`--key` and `--cacert` read the files they name.
+/// `-k`/`--insecure` turns certificate verification off, and `-x`/`--proxy` and `--resolve`
+/// redirect where the request goes. A command built from user input, a pasted snippet or a
+/// network response can therefore leak local files to a host of its choosing or strip TLS
+/// protection. ``init(_:allowing:)`` refuses those flags unless the capability that covers them
+/// is given, so a command from a source you do not control can run with none of them:
+///
+/// ```swift
+/// try await CURLTask(pasted, allowing: [])
+///     .result()
+/// ```
+///
+/// `CURLTask(_:)` allows all of them, as it always did.
 ///
 /// The command is parsed straight into a ``RequestConfiguration`` rather than through
 /// `@PropertyBuilder`, since there is nothing to declare a `Property` tree from until the
@@ -57,20 +65,86 @@ import struct Foundation.Data
 /// ``DataTask`` uses, so caching, tracing, and executor requirements all apply the same way.
 public struct CURLTask: RequestTask {
 
+    // MARK: - Public types
+
+    /// What a curl command may do beyond describing a request: the flags that touch the machine
+    /// or change where, and how safely, the request goes. ``CURLTask/init(_:)`` allows all of
+    /// them; ``CURLTask/init(_:allowing:)`` refuses the flag of any that is not given, with
+    /// ``CURLParsingError/Context/unsupportedFlag``, before a file is opened or a request is
+    /// built.
+    public struct Capabilities: OptionSet, Sendable, Hashable {
+
+        /// Reading a file from this machine: `-F name=@path` (any path, relative ones included,
+        /// which resolve against the working directory), `--cacert`, `--cert`/`-E` and `--key`.
+        public static let localFiles = Capabilities(rawValue: 1 << 0)
+
+        /// Turning certificate verification off: `-k`/`--insecure`.
+        public static let disabledTLSVerification = Capabilities(rawValue: 1 << 1)
+
+        /// Sending the request through a proxy: `-x`/`--proxy`.
+        public static let proxy = Capabilities(rawValue: 1 << 2)
+
+        /// Sending the request to an address other than the one DNS gives for the host:
+        /// `--resolve`.
+        public static let dnsOverrides = Capabilities(rawValue: 1 << 3)
+
+        /// Every capability, which is what ``CURLTask/init(_:)`` allows.
+        public static let all: Capabilities = [
+            .localFiles, .disabledTLSVerification, .proxy, .dnsOverrides,
+        ]
+
+        public let rawValue: Int
+
+        public init(rawValue: Int) {
+            self.rawValue = rawValue
+        }
+    }
+
     // MARK: - Private properties
 
     private let command: String
+    private let capabilities: Capabilities
 
     // MARK: - Inits
 
     ///
     /// Initializes with a curl command line.
     ///
+    /// The command may use every flag the subset covers, local files, a proxy and
+    /// `-k`/`--insecure` included. Pass only commands you wrote or trust, or use
+    /// ``init(_:allowing:)``.
+    ///
     /// - Parameter command: The curl command line to parse. A leading literal `curl` token, if
     /// present, is ignored.
     ///
     public init(_ command: String) {
+        self.init(command, allowing: .all)
+    }
+
+    ///
+    /// Initializes with a curl command line that may only use the given capabilities.
+    ///
+    /// A flag that needs a capability that is not in `capabilities` throws
+    /// ``CURLParsingError`` with ``CURLParsingError/Context/unsupportedFlag`` and the flag as
+    /// the token, while the command is parsed: before any file is opened and before anything is
+    /// sent.
+    ///
+    /// ```swift
+    /// // A command from a source you do not control, with nothing it could leak or redirect.
+    /// CURLTask(pasted, allowing: [])
+    ///
+    /// // The same, but it may name a proxy.
+    /// CURLTask(pasted, allowing: .proxy)
+    /// ```
+    ///
+    /// - Parameters:
+    ///   - command: The curl command line to parse. A leading literal `curl` token, if present,
+    ///   is ignored.
+    ///   - capabilities: What the command may do. An empty set refuses all of it.
+    ///
+    public init(_ command: String, allowing capabilities: Capabilities) {
         self.command = command
+        self.capabilities = capabilities
     }
 
     // MARK: - Public methods
@@ -83,11 +157,11 @@ public struct CURLTask: RequestTask {
     /// `.description(_:onDescribe:)`, `.digestAuthentication()`, `.environment(...)`) was then a
     /// silent no-op.
     ///
-    /// - Throws: ``CURLParsingError`` if the command doesn't parse, or an error from the request
-    /// itself.
+    /// - Throws: ``CURLParsingError`` if the command doesn't parse or uses a flag its capabilities
+    /// do not cover, or an error from the request itself.
     @_spi(Private)
     public func _result(environment: RequestEnvironmentValues) async throws -> TaskResult<Data> {
-        let parsed = try await CURLCommandParser.parseCommand(command)
+        let parsed = try await CURLCommandParser.parseCommand(command, allowing: capabilities)
 
         return try await RawTask(
             content: RawRequestConfigurationProperty(
