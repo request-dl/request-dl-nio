@@ -217,6 +217,7 @@ struct InternalsURLSessionClientTests {
 
             try await _Concurrency.Task.sleep(nanoseconds: 200_000_000)
             #expect(client.isRunning)
+            #expect(client.identityOriginsForTesting.contains(host: "127.0.0.1", port: port))
 
             responseTask.cancel()
 
@@ -243,6 +244,7 @@ struct InternalsURLSessionClientTests {
 
             try await _Concurrency.Task.sleep(nanoseconds: 200_000_000)
             #expect(client.isRunning)
+            #expect(client.identityOriginsForTesting.contains(host: "127.0.0.1", port: port))
 
             responseTask.cancel()
 

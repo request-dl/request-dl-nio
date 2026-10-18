@@ -107,6 +107,12 @@ PrivateKey(privateFile1)
 ```
 > Important: Password-protected private keys use the `password:` parameter during initialization.
 
+#### Which servers receive the certificate
+
+The client certificate is presented to the host and the port a request was made to, and to no other, whichever executor runs it. A redirect to another host, or to another port of the same host, does not get it: the server you were sent to is not the one the certificate was configured for, and presenting it there would tell it who you are.
+
+The origins a request was made to stay known to the session for as long as it is in use. A redirect that comes back to one of them is given the certificate, because you addressed that origin yourself with this session. Checking the server (trust roots, pinning) is a separate matter and applies to every host and port, redirect targets included.
+
 ### PSK
 
 Pre-Shared Key (PSK) authentication uses symmetric keys shared between client and server. Configure using `SSLPSKIdentityResolver`, secured via ``StoredObject`` for efficiency:
