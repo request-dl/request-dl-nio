@@ -56,14 +56,12 @@ extension FilePath {
             return nil
         }
 
-        guard let status = status(of: path) else {
-            return nil
-        }
-
-        let isDirectory = status.mode & 0o170000 == 0o040000
-        let isOwnerOnly = status.mode & 0o077 == 0
-
-        guard isDirectory, isOwnerOnly, status.owner == owner else {
+        guard
+            let status = status(of: path),
+            status.mode & 0o170000 == 0o040000,
+            status.mode & 0o077 == 0,
+            status.owner == owner
+        else {
             return nil
         }
 
@@ -74,12 +72,16 @@ extension FilePath {
     /// What the cache uses when `ownedDirectory(named:under:owner:)` found nothing it can trust:
     /// it does not survive the process, since every process makes its own, but nobody else
     /// could have made it first.
+    ///
+    /// - Parameter nextSuffix: Where the unguessable part of the name comes from. Random, except
+    ///   in a test that needs two names to collide.
     package static func exclusiveDirectory(
         prefix: String,
-        under parent: FilePath
+        under parent: FilePath,
+        nextSuffix: () -> UInt64 = { UInt64.random(in: .min ... .max) }
     ) -> FilePath? {
         for _ in 0..<8 {
-            let path = parent.appending("\(prefix)-\(UInt64.random(in: .min ... .max))")
+            let path = parent.appending("\(prefix)-\(nextSuffix())")
 
             switch makeDirectory(atPath: path.string) {
             case .created:
@@ -94,14 +96,24 @@ extension FilePath {
         return nil
     }
 
+    /// Where the cache goes when there is no per-user directory for it: `<parent>/request-dl-nio-<owner>`
+    /// if ``ownedDirectory(named:under:owner:)`` trusts it, else a directory with a name nobody
+    /// could have guessed (``exclusiveDirectory(prefix:under:nextSuffix:)``), else `parent`
+    /// itself, as it always was.
+    package static func sharedCachesDirectory(
+        under parent: FilePath,
+        owner: UInt32 = UInt32(geteuid()),
+        nextSuffix: () -> UInt64 = { UInt64.random(in: .min ... .max) }
+    ) -> FilePath {
+        ownedDirectory(named: "request-dl-nio-\(owner)", under: parent, owner: owner)
+            ?? exclusiveDirectory(prefix: "request-dl-nio", under: parent, nextSuffix: nextSuffix)
+            ?? parent
+    }
+
     // MARK: - Private static methods
 
     private static func isUntamperable(parent: FilePath, owner: UInt32) -> Bool {
-        guard let status = status(of: parent) else {
-            return false
-        }
-
-        guard status.mode & 0o170000 == 0o040000 else {
+        guard let status = status(of: parent), status.mode & 0o170000 == 0o040000 else {
             return false
         }
 

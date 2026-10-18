@@ -232,6 +232,110 @@ struct InternalsCacheDirectoryTests {
         #expect(FilePath.exclusiveDirectory(prefix: "cache", under: parent) == nil)
     }
 
+    @Test
+    func ownedDirectory_whenTheParentIsNotADirectory_isNotUsed() throws {
+        // Given
+        let parent = try makeParent(mode: 0o700)
+        defer { remove(parent) }
+
+        let file = parent.appending("file")
+        #expect(FileManager.default.createFile(atPath: file.string, contents: Data()))
+
+        // When / Then
+        #expect(FilePath.ownedDirectory(named: "cache", under: file) == nil)
+    }
+
+    /// A parent this user can look into but not write to: the directory cannot be made.
+    @Test(.disabled(if: geteuid() == 0, "root can write wherever it likes"))
+    func ownedDirectory_whenItCannotBeCreated_isNotUsed() throws {
+        // Given
+        let parent = try makeParent(mode: 0o500)
+        defer { remove(parent) }
+
+        // When / Then
+        #expect(FilePath.ownedDirectory(named: "cache", under: parent) == nil)
+    }
+
+    @Test
+    func exclusiveDirectory_whenTheNameIsTaken_triesAnotherOne() throws {
+        // Given: "cache-1" is there already.
+        let parent = try makeParent(mode: 0o700)
+        defer { remove(parent) }
+
+        try FileManager.default.createDirectory(
+            atPath: parent.appending("cache-1").string,
+            withIntermediateDirectories: false
+        )
+
+        var suffixes: [UInt64] = [1, 2]
+
+        // When
+        let directory = FilePath.exclusiveDirectory(prefix: "cache", under: parent) {
+            suffixes.removeFirst()
+        }
+
+        // Then
+        #expect(directory == parent.appending("cache-2"))
+    }
+
+    @Test
+    func exclusiveDirectory_whenEveryNameIsTaken_givesUp() throws {
+        // Given
+        let parent = try makeParent(mode: 0o700)
+        defer { remove(parent) }
+
+        try FileManager.default.createDirectory(
+            atPath: parent.appending("cache-1").string,
+            withIntermediateDirectories: false
+        )
+
+        // When / Then
+        #expect(FilePath.exclusiveDirectory(prefix: "cache", under: parent) { 1 } == nil)
+    }
+
+    // MARK: - The fallback chain
+
+    @Test
+    func sharedCachesDirectoryUnder_whenTheOwnedDirectoryIsTrusted_isIt() throws {
+        // Given
+        let parent = try makeParent(mode: 0o700)
+        defer { remove(parent) }
+
+        // When
+        let directory = FilePath.sharedCachesDirectory(under: parent, owner: UInt32(geteuid()))
+
+        // Then
+        #expect(directory == parent.appending("request-dl-nio-\(geteuid())"))
+    }
+
+    /// Someone else got there first: a directory with the name this user's would have, that is
+    /// open to others. It is left alone, and the cache goes to one nobody could have guessed.
+    @Test
+    func sharedCachesDirectoryUnder_whenTheOwnedDirectoryIsNotTrusted_isAnExclusiveOne() throws {
+        // Given
+        let parent = try makeParent(mode: 0o700)
+        defer { remove(parent) }
+
+        let taken = parent.appending("request-dl-nio-\(geteuid())")
+        try FileManager.default.createDirectory(atPath: taken.string, withIntermediateDirectories: false)
+        #expect(chmod(taken.string, 0o755) == 0)
+
+        // When
+        let directory = FilePath.sharedCachesDirectory(under: parent, nextSuffix: { 7 })
+
+        // Then
+        #expect(directory == parent.appending("request-dl-nio-7"))
+        #expect(try mode(of: taken) == 0o755)
+    }
+
+    /// Nothing to be made in a place that is not there: the parent itself, as it always was.
+    @Test
+    func sharedCachesDirectoryUnder_whenNothingCanBeMade_isTheParent() {
+        let parent = FilePath.temporaryDirectory.appending("requestdl-missing-\(UUID().uuidString)")
+
+        #expect(FilePath.sharedCachesDirectory(under: parent) == parent)
+    }
+
     /// The directory the cache falls back to is the process's, not the temporary directory: owner
     /// only, and the same every time it is asked.
     @Test

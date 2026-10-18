@@ -106,11 +106,7 @@ extension FilePath {
 
     private static let sharedCachesDirectoryOnce: FilePath = {
         #if canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android)
-        let temporary = temporaryDirectory
-
-        return ownedDirectory(named: "request-dl-nio-\(geteuid())", under: temporary)
-            ?? exclusiveDirectory(prefix: "request-dl-nio", under: temporary)
-            ?? temporary
+        return sharedCachesDirectory(under: temporaryDirectory)
         #else
         return temporaryDirectory
         #endif
