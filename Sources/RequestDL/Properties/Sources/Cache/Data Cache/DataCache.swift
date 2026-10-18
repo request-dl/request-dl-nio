@@ -540,8 +540,11 @@ public struct DataCache: Sendable, Equatable {
     /// `FilePath.temporaryDirectory``. Cache entries are meant to survive between requests, and
     /// the temporary directory offers no such guarantee: the system can purge it at any moment,
     /// even while the app is running. `cachesDirectory` lands in `Library/Caches` on Darwin,
-    /// which is only cleared between launches, and falls back to the temporary directory on
-    /// platforms with no equivalent standard location.
+    /// which is only cleared between launches. On Linux it is the user's XDG cache directory.
+    /// Where there is none of those (no `HOME` or `XDG_CACHE_HOME`), it is a directory of the
+    /// process's user inside the temporary directory, one nobody else created or can rename away,
+    /// or, if the temporary directory cannot be trusted, a new one that lasts as long as the
+    /// process. Other platforms use the temporary directory.
     ///
     ///   `FileSystem.shared.temporaryDirectory` is the NIO one and would otherwise be the obvious
     ///   choice, but it is `async throws` and this call chain cannot suspend: it is reached from

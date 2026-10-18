@@ -14,6 +14,16 @@ import class Foundation.ProcessInfo
 import class Foundation.FileManager
 #endif
 
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#elseif canImport(Android)
+import Android
+#endif
+
 extension FilePath {
 
     /// The system temporary directory.
@@ -80,8 +90,27 @@ extension FilePath {
         }
         #endif
 
-        return temporaryDirectory
+        return sharedCachesDirectory
     }
+
+    /// Where the cache goes when there is no per-user directory for it, which is the temporary
+    /// directory every user of the machine can write to. Not the temporary directory itself: a
+    /// directory of this process's user in it, that nobody else made or can rename away
+    /// (``ownedDirectory(named:under:owner:)``), and, when the place cannot be trusted, one
+    /// with a name nobody could have guessed, that lasts as long as the process does
+    /// (``exclusiveDirectory(prefix:under:)``). Where there is no such thing to check (Windows),
+    /// the temporary directory, as it always was.
+    ///
+    /// Resolved once: the fallback must be the same every time it is asked.
+    package static var sharedCachesDirectory: FilePath { sharedCachesDirectoryOnce }
+
+    private static let sharedCachesDirectoryOnce: FilePath = {
+        #if canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android)
+        return sharedCachesDirectory(under: temporaryDirectory)
+        #else
+        return temporaryDirectory
+        #endif
+    }()
 
     /// The per-user cache directory of the XDG Base Directory specification: `$XDG_CACHE_HOME`,
     /// or `$HOME/.cache` when it is not set. `nil` when neither names a usable absolute path,
