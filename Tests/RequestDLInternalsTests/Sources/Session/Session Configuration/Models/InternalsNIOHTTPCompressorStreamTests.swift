@@ -25,7 +25,7 @@ struct InternalsNIOHTTPCompressorStreamTests {
         _ algorithm: Internals.Compression.Algorithm,
         chunks: [Data] = chunks
     ) throws -> Data {
-        var stream = try Internals.NIOHTTPCompressorStream(algorithm: algorithm)
+        let stream = try Internals.NIOHTTPCompressorStream(algorithm: algorithm)
         var output = Data()
 
         for chunk in chunks {
@@ -111,19 +111,19 @@ struct InternalsNIOHTTPCompressorStreamTests {
     @Test
     func dropping_aStreamWithoutFinishing_onAnEventLoopThread_doesNotTrap() async throws {
         try await NIOSingletons.posixEventLoopGroup.next().submit {
-            var stream = try Internals.NIOHTTPCompressorStream(algorithm: .gzip)
+            let stream = try Internals.NIOHTTPCompressorStream(algorithm: .gzip)
             _ = try stream(compressing: Internals.Bytes(Self.chunks[0]))
         }.get()
     }
 
     @Test
     func usingAStream_afterFinish_throwsInsteadOfWaiting() async throws {
-        var stream = try Internals.NIOHTTPCompressorStream(algorithm: .gzip)
+        let stream = try Internals.NIOHTTPCompressorStream(algorithm: .gzip)
         _ = try stream(compressing: Internals.Bytes(Self.chunks[0]))
         _ = try stream.finish()
 
         let result = try await completing(within: 10) { [stream] in
-            var stream = stream
+            let stream = stream
 
             do {
                 _ = try stream(compressing: Internals.Bytes(Self.chunks[0]))
@@ -142,7 +142,7 @@ struct InternalsNIOHTTPCompressorStreamTests {
 
     @Test
     func aFinishedStream_givesItsThreadBack() async throws {
-        var stream = try Internals.NIOHTTPCompressorStream(algorithm: .gzip)
+        let stream = try Internals.NIOHTTPCompressorStream(algorithm: .gzip)
         let isRunning = stream.workerProbe
         _ = try stream(compressing: Internals.Bytes(Self.chunks[0]))
         #expect(isRunning())
@@ -157,7 +157,7 @@ struct InternalsNIOHTTPCompressorStreamTests {
         let isRunning: @Sendable () -> Bool
 
         do {
-            var stream = try Internals.NIOHTTPCompressorStream(algorithm: .gzip)
+            let stream = try Internals.NIOHTTPCompressorStream(algorithm: .gzip)
             isRunning = stream.workerProbe
             _ = try stream(compressing: Internals.Bytes(Self.chunks[0]))
             #expect(isRunning())

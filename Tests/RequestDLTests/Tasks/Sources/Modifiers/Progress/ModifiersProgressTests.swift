@@ -101,6 +101,7 @@ struct ModifiersProgressTests {
     }
 
     @Test
+    @available(*, deprecated)
     func progress_whenUploadStep_shouldBeValid() async throws {
         let testState = try await TestState()
         // Given
@@ -139,6 +140,7 @@ struct ModifiersProgressTests {
     }
 
     @Test
+    @available(*, deprecated)
     func progress_whenDownloadStep_shouldBeValid() async throws {
         let testState = try await TestState()
         // Given
@@ -192,6 +194,7 @@ struct ModifiersProgressTests {
     }
 
     @Test
+    @available(*, deprecated)
     func progress_whenDownloadStepAfterExtractingPayload_shouldBeValid() async throws {
         let testState = try await TestState()
         // Given
@@ -253,6 +256,7 @@ struct ModifiersProgressTests {
     // Pinned to `.requiredExecutor(.nio)` below, which only exists under `canImport(NIOCore)`.
     #if canImport(NIOCore)
     @Test
+    @available(*, deprecated)
     func progress_whenCompleteProgress_shouldBeValid() async throws {
         let testState = try await TestState()
         // Given

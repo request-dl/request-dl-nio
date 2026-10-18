@@ -10,6 +10,7 @@ import Testing
 struct KeyPathInvalidDataErrorTests {
 
     @Test
+    @available(*, deprecated)
     func error() async throws {
         // Given
         let error = KeyPathInvalidDataError()

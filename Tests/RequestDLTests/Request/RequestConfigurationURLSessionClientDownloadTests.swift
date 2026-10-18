@@ -99,6 +99,7 @@ struct RequestConfigurationURLSessionClientDownloadTests {
     }
 
     @Test
+    @available(*, deprecated)
     func urlSessionClient_whenStreamingDownload_splitsOnSeparatorAcrossChunkBoundaries() async throws {
         // Given: a payload sized so the separator (`,`) straddles wherever URLSession happens
         // to slice `didReceive data:` calls, exercising `Internals.DownloadBuffer`'s rolling

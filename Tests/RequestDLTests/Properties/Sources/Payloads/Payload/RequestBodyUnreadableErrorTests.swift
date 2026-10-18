@@ -20,7 +20,7 @@ struct RequestBodyUnreadableErrorTests {
     func aPartThatCannotBeReadWhileSending_failsTheResponseWithRequestBodyUnreadableError() async throws {
         // Given: the executor ends the exchange with it before a response comes in.
         let head = Internals.AsyncStream<Internals.ResponseHead>()
-        await head.append(.failure(Internals.RequestBodyPartUnreadableError(expectedBytes: 4_096)))
+        head.append(.failure(Internals.RequestBodyPartUnreadableError(expectedBytes: 4_096)))
 
         let response = AsyncResponse(
             seed: .withoutCancellation,

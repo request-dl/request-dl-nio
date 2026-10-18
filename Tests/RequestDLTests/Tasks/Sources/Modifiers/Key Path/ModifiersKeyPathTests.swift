@@ -12,6 +12,7 @@ import Foundation
 struct ModifiersKeyPathTests {
 
     @Test
+    @available(*, deprecated)
     func keyPath() async throws {
         // Given
         let jsonObject = ["key": true]
@@ -30,6 +31,7 @@ struct ModifiersKeyPathTests {
     }
 
     @Test
+    @available(*, deprecated)
     func wrongKeyPath() async throws {
         // Given
         let jsonObject = ["key": true]
@@ -53,6 +55,7 @@ struct ModifiersKeyPathTests {
     }
 
     @Test
+    @available(*, deprecated)
     func keyPathInData() async throws {
         // Given
         let jsonObject = ["key": true]
@@ -72,6 +75,7 @@ struct ModifiersKeyPathTests {
     }
 
     @Test
+    @available(*, deprecated)
     func wrongKeyPathInData() async throws {
         // Given
         let jsonObject = ["key": true]

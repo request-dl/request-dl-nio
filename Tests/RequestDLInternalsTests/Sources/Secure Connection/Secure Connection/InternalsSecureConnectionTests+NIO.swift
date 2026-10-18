@@ -254,8 +254,8 @@ extension InternalsSecureConnectionTests {
         #expect(sut.tlsConfiguration.pskHint == configuration.pskHint)
         #expect(sut.tlsConfiguration.applicationProtocols == configuration.applicationProtocols)
         #expect(sut.tlsConfiguration.keyLogCallback == nil)
-        #expect(sut.tlsConfiguration.pskClientCallback == nil)
-        #expect(sut.tlsConfiguration.pskServerCallback == nil)
+        #expect(sut.tlsConfiguration.pskClientProvider == nil)
+        #expect(sut.tlsConfiguration.pskServerProvider == nil)
         #expect(sut.tlsConfiguration.minimumTLSVersion == configuration.minimumTLSVersion)
         #expect(sut.tlsConfiguration.maximumTLSVersion == configuration.maximumTLSVersion)
         #expect(sut.tlsConfiguration.cipherSuites == configuration.cipherSuites)
@@ -514,7 +514,7 @@ extension InternalsSecureConnectionTests {
         #if os(macOS) || !canImport(Darwin)
         try verify()
         #else
-        await withKnownIssue(
+        withKnownIssue(
             "no Keychain Sharing entitlement on this platform's SwiftPM-generated Xcode scheme; see this test's own doc comment"
         ) {
             try verify()

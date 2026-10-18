@@ -9,6 +9,7 @@ import Testing
 struct HeadersTests {
 
     @Test
+    @available(*, deprecated)
     func headers_whenMultipleHeadersWithoutGroup() async throws {
         let property = TestProperty {
             CacheHeader()
@@ -27,6 +28,7 @@ struct HeadersTests {
     }
 
     @Test
+    @available(*, deprecated)
     func headers_whenSameHeaderSpecifyWithSettingStrategy() async throws {
         let property = TestProperty {
             CacheHeader()
@@ -49,6 +51,7 @@ struct HeadersTests {
     }
 
     @Test
+    @available(*, deprecated)
     func headers_whenSameHeaderWithGroupWithSettingStrategy() async throws {
         let property = TestProperty {
             CacheHeader()
@@ -74,6 +77,7 @@ struct HeadersTests {
     }
 
     @Test
+    @available(*, deprecated)
     func headers_whenSameHeaderSpecifyWithAddingStrategy() async throws {
         // Given
         let property = TestProperty {
@@ -105,6 +109,7 @@ struct HeadersTests {
     }
 
     @Test
+    @available(*, deprecated)
     func headers_whenSameHeaderWithGroupWithAddingStrategy() async throws {
         // Given
         let property = TestProperty {
@@ -174,6 +179,7 @@ struct HeadersTests {
     }
 
     @Test
+    @available(*, deprecated)
     func headers_whenCombinedHeadersWithGroup() async throws {
         let property = TestProperty {
             HostHeader("127.0.0.1", port: "8080")

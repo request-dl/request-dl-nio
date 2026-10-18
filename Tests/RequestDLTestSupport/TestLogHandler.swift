@@ -60,6 +60,18 @@ final class TestLogHandler: LogHandler, @unchecked Sendable {
         onLogRecord(record)
     }
 
+    func log(event: LogEvent) {
+        log(
+            level: event.level,
+            message: event.message,
+            metadata: event.metadata,
+            source: event.source,
+            file: event.file,
+            function: event.function,
+            line: event.line
+        )
+    }
+
     subscript(metadataKey key: String) -> Logger.Metadata.Value? {
         get { lock.withLock { _metadata[key] } }
         set { lock.withLock { _metadata[key] = newValue } }

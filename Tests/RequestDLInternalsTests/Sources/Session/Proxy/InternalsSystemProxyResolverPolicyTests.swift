@@ -107,7 +107,7 @@ struct InternalsSystemProxyResolverPolicyTests {
         let records = LogRecords()
 
         // When / Then
-        try await Logger.withTestHandler(recorded: records.append) { logger in
+        await Logger.withTestHandler(recorded: records.append) { logger in
             #expect(throws: Internals.PACEvaluationFailure.self) {
                 try Internals.SystemProxyResolver.apply(
                     .failed(failure, lastKnown: nil),

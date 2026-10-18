@@ -10,23 +10,23 @@ import SwiftAsyncStream
 /// A publisher for any ``RequestTask``.
 public struct PublishedTask<Output: Sendable>: Publisher {
 
-    final class Subscription<S: Subscriber>: @unchecked Sendable, Combine.Subscription where S.Failure == Error {
+    final class Subscription<Input: Sendable>: @unchecked Sendable, Combine.Subscription {
 
         // MARK: - Private properties
 
         private let lock = Lock()
-        private let wrapper: () async throws -> S.Input
+        private let wrapper: () async throws -> Input
 
         // MARK: - Unsafe properties
 
         private var _task: _Concurrency.Task<Void, Never>?
-        private var _subscriber: S?
+        private var _subscriber: AnySubscriber<Input, Error>?
 
         // MARK: - Inits
 
         init(
-            wrapper: @escaping () async throws -> S.Input,
-            subscriber: S
+            wrapper: @escaping () async throws -> Input,
+            subscriber: AnySubscriber<Input, Error>
         ) {
             self.wrapper = wrapper
             self._subscriber = subscriber
@@ -99,7 +99,7 @@ public struct PublishedTask<Output: Sendable>: Publisher {
     public func receive<S>(
         subscriber: S
     ) where S: Subscriber, Failure == S.Failure, Output == S.Input {
-        let subscription = Subscription(wrapper: wrapper, subscriber: subscriber)
+        let subscription = Subscription(wrapper: wrapper, subscriber: AnySubscriber(subscriber))
         subscriber.receive(subscription: subscription)
     }
 }

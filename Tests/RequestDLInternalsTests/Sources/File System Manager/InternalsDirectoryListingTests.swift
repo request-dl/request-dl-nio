@@ -40,7 +40,7 @@ struct InternalsDirectoryListingTests {
 
     @Test
     func names_ofAMissingDirectory_throws() async throws {
-        try await withTemporaryFileURL(createPath: false) { directoryURL in
+        _ = try await withTemporaryFileURL(createPath: false) { directoryURL in
             await #expect(throws: Internals.DirectoryListingError.self) {
                 _ = try await Internals.directoryEntryNames(atPath: directoryURL.path)
             }
@@ -49,7 +49,7 @@ struct InternalsDirectoryListingTests {
 
     @Test
     func names_ofAFile_throws() async throws {
-        try await withTemporaryFileURL("file.txt") { fileURL in
+        _ = try await withTemporaryFileURL("file.txt") { fileURL in
             await #expect(throws: Internals.DirectoryListingError.self) {
                 _ = try await Internals.directoryEntryNames(atPath: fileURL.path)
             }

@@ -71,10 +71,8 @@ struct HeaderGroupTests {
     @Test
     func headerGroupWithDigestAuthentication() async throws {
         let credential = DigestCredential()
-        credential.challenge = try #require(
-            DigestChallenge(
-                headerValue: #"Digest realm="test", qop="auth", nonce="abc123", algorithm=MD5"#
-            )
+        credential.challenge = DigestChallenge(
+            headerValue: #"Digest realm="test", qop="auth", nonce="abc123", algorithm=MD5"#
         )
 
         let property = TestProperty {
@@ -107,6 +105,7 @@ struct HeaderGroupTests {
     }
 
     @Test
+    @available(*, deprecated)
     func headerGroupWithMultipleHeaders() async throws {
         let property = TestProperty(
             HeaderGroup {
