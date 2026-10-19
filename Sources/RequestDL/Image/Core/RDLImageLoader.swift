@@ -20,9 +20,10 @@ import struct Foundation.Data
 /// starting a second request. This is separate from, and on top of, RequestDL's own response
 /// cache, which is what makes a *later*, non-concurrent request for the same image cheap.
 ///
-/// The shared download is cancelled once every call waiting for it has been cancelled. While at
-/// least one is still waiting it keeps running, so cancelling one call never takes the image
-/// away from another.
+/// A call that is cancelled stops waiting at once, with a `CancellationError`, whether it was
+/// alone or one of several. The shared download is cancelled once every call waiting for it has
+/// been cancelled. While at least one is still waiting it keeps running, so cancelling one call
+/// never takes the image away from another.
 public actor RDLImageLoader {
 
     /// The shared loader instance, used by RequestDL's SwiftUI, UIKit, AppKit and WatchKit
@@ -48,14 +49,20 @@ public actor RDLImageLoader {
 
     private var nextGeneration = 0
 
-    /// A download in flight and how many calls are waiting for it.
+    private var nextWaiter = 0
+
+    /// A download in flight and the calls waiting for it, each with its own continuation.
+    ///
+    /// A call has its own continuation, rather than awaiting the download's task, so that it can
+    /// stop waiting on its own: awaiting a `Task` is not interrupted by the cancellation of the
+    /// caller, and the download has to go on for the others.
     ///
     /// `generation` tells one download for an `id` from the next one, so a late cancellation of
     /// a call that waited for an earlier download never touches a newer one.
     private struct InFlight {
-        let task: Task<SendableImage, Error>
+        let task: Task<Void, Never>
         let generation: Int
-        var waiters: Int
+        var waiters: [Int: CheckedContinuation<SendableImage, Error>]
     }
 
     // MARK: - Inits
@@ -107,33 +114,38 @@ public actor RDLImageLoader {
         id: String,
         task: Content
     ) async throws -> PlatformImage {
-        if var existing = tasks[id] {
-            existing.waiters += 1
-            tasks[id] = existing
-
-            return try await waitFor(existing.task, id: id, generation: existing.generation)
+        if let existing = tasks[id] {
+            return try await waitFor(id: id, generation: existing.generation).image
         }
+
+        let generation = nextGeneration
+        nextGeneration += 1
 
         // `.detached` rather than a plain `Task { ... }`: a plain `Task` would inherit this actor's
         // executor and run the CPU-bound `PlatformImage(data:)` decode on it. The decode touches no
         // actor state, and running it there would serialize every decode behind one another and
         // block unrelated `load()` calls from reaching their `tasks[id]` lookup.
         let newTask = Task.detached {
-            let result = try await task.result()
+            let result: Result<SendableImage, Error>
 
-            guard let image = PlatformImage(data: result.payload) else {
-                throw RDLImageDecodingError()
+            do {
+                let response = try await task.result()
+
+                guard let image = PlatformImage(data: response.payload) else {
+                    throw RDLImageDecodingError()
+                }
+
+                result = .success(SendableImage(image))
+            } catch {
+                result = .failure(error)
             }
 
-            return SendableImage(image)
+            await self.complete(id: id, generation: generation, with: result)
         }
 
-        let generation = nextGeneration
-        nextGeneration += 1
+        tasks[id] = InFlight(task: newTask, generation: generation, waiters: [:])
 
-        tasks[id] = InFlight(task: newTask, generation: generation, waiters: 1)
-
-        return try await waitFor(newTask, id: id, generation: generation)
+        return try await waitFor(id: id, generation: generation).image
     }
 
     ///
@@ -181,34 +193,46 @@ public actor RDLImageLoader {
 
     // MARK: - Private methods
 
-    /// Waits for `task`, which the caller already counted as one of its waiters.
+    /// Waits for the download of `id`, as one of the calls it is shared by.
     ///
-    /// A plain `await task.value` would ignore this caller's cancellation, since the download
-    /// runs in a detached task of its own. The cancellation handler gives the caller's place
-    /// back instead, and the last one to leave cancels the download.
-    private func waitFor(
-        _ task: Task<SendableImage, Error>,
-        id: String,
-        generation: Int
-    ) async throws -> PlatformImage {
-        defer { finish(id: id, generation: generation) }
+    /// The call's place is taken in the same turn of the actor that found or made the download,
+    /// so the download cannot finish before there is a continuation to hand its result to. When
+    /// the call is cancelled it leaves at once: its continuation is resumed with a
+    /// `CancellationError` and the download goes on for the others, or is cancelled if it was
+    /// the last.
+    private func waitFor(id: String, generation: Int) async throws -> SendableImage {
+        let waiter = nextWaiter
+        nextWaiter += 1
 
         return try await withTaskCancellationHandler {
-            try await task.value.image
+            try await withCheckedThrowingContinuation { continuation in
+                guard var inFlight = tasks[id], inFlight.generation == generation else {
+                    continuation.resume(throwing: CancellationError())
+                    return
+                }
+
+                inFlight.waiters[waiter] = continuation
+                tasks[id] = inFlight
+            }
         } onCancel: {
-            Task { await self.leave(id: id, generation: generation) }
+            Task { await self.leave(id: id, generation: generation, waiter: waiter) }
         }
     }
 
-    /// Gives up one waiter's place, cancelling the download when it was the last.
-    private func leave(id: String, generation: Int) {
-        guard var inFlight = tasks[id], inFlight.generation == generation else {
+    /// Gives up one call's place, resuming it with a `CancellationError`, and cancels the
+    /// download when it was the last.
+    private func leave(id: String, generation: Int, waiter: Int) {
+        guard
+            var inFlight = tasks[id],
+            inFlight.generation == generation,
+            let continuation = inFlight.waiters.removeValue(forKey: waiter)
+        else {
             return
         }
 
-        inFlight.waiters -= 1
+        continuation.resume(throwing: CancellationError())
 
-        guard inFlight.waiters <= 0 else {
+        guard inFlight.waiters.isEmpty else {
             tasks[id] = inFlight
             return
         }
@@ -217,11 +241,23 @@ public actor RDLImageLoader {
         tasks[id] = nil
     }
 
-    /// Forgets the download once a call has its outcome, unless a newer one took its place.
-    private func finish(id: String, generation: Int) {
-        if tasks[id]?.generation == generation {
-            tasks[id] = nil
+    /// Hands the outcome of the download to every call still waiting for it, and forgets it.
+    /// Nothing is left to do when the download was cancelled with its last call.
+    private func complete(id: String, generation: Int, with result: Result<SendableImage, Error>) {
+        guard let inFlight = tasks[id], inFlight.generation == generation else {
+            return
         }
+
+        tasks[id] = nil
+
+        for continuation in inFlight.waiters.values {
+            continuation.resume(with: result)
+        }
+    }
+
+    /// How many calls are waiting for the download of `id`.
+    func waiterCountForTesting(id: String) -> Int {
+        tasks[id]?.waiters.count ?? 0
     }
 }
 
