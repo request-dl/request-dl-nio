@@ -203,6 +203,130 @@ struct RDLImageLoaderTests {
         #expect(await probe.startCount == 1)
     }
 
+    /// The cancelled caller does not wait for the shared request: it stops at once, with a
+    /// `CancellationError`, while the request goes on for the caller that is still waiting.
+    @Test
+    func cancellingOneOfTwoWaiters_returnsTheCancelledOneAtOnce_whileTheRequestStillRuns() async throws {
+        // Given: two callers sharing one request that stays in flight until the gate is opened.
+        let probe = RequestProbe()
+        let gate = Gate()
+        let task = StubImageTask {
+            await probe.started()
+            await gate.wait()
+
+            return .init(head: .stub, payload: .onePixelPNG)
+        }
+
+        let loader = RDLImageLoader()
+        let first = Task { try await loader.load(id: "shared", task: task) }
+        try await eventually { await probe.didStart }
+        let second = Task { try await loader.load(id: "shared", task: task) }
+        try await eventually { await loader.waiterCountForTesting(id: "shared") == 2 }
+
+        // When
+        first.cancel()
+
+        // Then: the first stops without the request having finished.
+        let outcome = try await completing(within: 30) { () -> String in
+            do {
+                _ = try await first.value
+                return "returned an image"
+            } catch is CancellationError {
+                return "cancelled"
+            } catch {
+                return "failed with \(error)"
+            }
+        }
+
+        #expect(outcome == "cancelled")
+        #expect(await gate.isOpen == false)
+        #expect(await loader.waiterCountForTesting(id: "shared") == 1)
+
+        // And the other still gets its image from the same request, which was never cancelled.
+        await gate.open()
+
+        let image = try await second.value
+        #expect(image.size.width > 0)
+        #expect(await probe.wasCancelled == false)
+        #expect(await probe.startCount == 1)
+    }
+
+    @Test
+    func cancellingEveryWaiterOfASharedRequest_cancelsIt() async throws {
+        // Given: two callers sharing one request that would run for a long time.
+        let probe = RequestProbe()
+        let task = StubImageTask {
+            await probe.started()
+
+            do {
+                try await Task.sleep(nanoseconds: 30_000_000_000)
+            } catch {
+                await probe.cancelled()
+                throw error
+            }
+
+            return .init(head: .stub, payload: .onePixelPNG)
+        }
+
+        let loader = RDLImageLoader()
+        let first = Task { try await loader.load(id: "shared", task: task) }
+        try await eventually { await probe.didStart }
+        let second = Task { try await loader.load(id: "shared", task: task) }
+        try await eventually { await loader.waiterCountForTesting(id: "shared") == 2 }
+
+        // When: the first leaves, and then the second does.
+        first.cancel()
+        try await eventually { await loader.waiterCountForTesting(id: "shared") == 1 }
+        #expect(await probe.wasCancelled == false)
+
+        second.cancel()
+
+        // Then: the request is cancelled once nobody is left, and both callers stopped.
+        try await eventually { await probe.wasCancelled }
+        try await eventually { await loader.waiterCountForTesting(id: "shared") == 0 }
+
+        for load in [first, second] {
+            do {
+                _ = try await load.value
+                Issue.record("Expected the cancelled load to throw")
+            } catch is CancellationError {
+                // expected
+            }
+        }
+    }
+
+    /// A caller that arrives after the others left, but while the request still runs, joins it.
+    @Test
+    func aCallerThatJoinsAfterAnotherLeft_getsTheSameRequest() async throws {
+        // Given
+        let probe = RequestProbe()
+        let gate = Gate()
+        let task = StubImageTask {
+            await probe.started()
+            await gate.wait()
+
+            return .init(head: .stub, payload: .onePixelPNG)
+        }
+
+        let loader = RDLImageLoader()
+        let staying = Task { try await loader.load(id: "shared", task: task) }
+        try await eventually { await probe.didStart }
+        let leaving = Task { try await loader.load(id: "shared", task: task) }
+        try await eventually { await loader.waiterCountForTesting(id: "shared") == 2 }
+        leaving.cancel()
+        try await eventually { await loader.waiterCountForTesting(id: "shared") == 1 }
+
+        // When
+        let joining = Task { try await loader.load(id: "shared", task: task) }
+        try await eventually { await loader.waiterCountForTesting(id: "shared") == 2 }
+        await gate.open()
+
+        // Then: both get the image, from one request.
+        #expect(try await staying.value.size.width > 0)
+        #expect(try await joining.value.size.width > 0)
+        #expect(await probe.startCount == 1)
+    }
+
     @Test
     func loadingAgain_afterTheOnlyWaiterWasCancelled_startsANewRequest() async throws {
         // Given: a request that was cancelled together with its only waiter.
@@ -261,6 +385,31 @@ private actor RequestProbe {
 
     func cancelled() {
         wasCancelled = true
+    }
+}
+
+/// Holds a request until the test lets it finish.
+private actor Gate {
+
+    private(set) var isOpen = false
+    private var waiting: [CheckedContinuation<Void, Never>] = []
+
+    func wait() async {
+        guard !isOpen else {
+            return
+        }
+
+        await withCheckedContinuation { waiting.append($0) }
+    }
+
+    func open() {
+        isOpen = true
+
+        for continuation in waiting {
+            continuation.resume()
+        }
+
+        waiting = []
     }
 }
 
