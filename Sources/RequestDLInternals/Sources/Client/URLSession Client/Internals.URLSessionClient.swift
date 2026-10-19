@@ -49,6 +49,10 @@ extension Internals {
         private let redirectConfiguration: Internals.RedirectConfiguration
         private let proxyAuthorization: Internals.Proxy.Authorization?
         private let identityPolicy: Internals.URLSessionIdentityPolicy?
+
+        /// The origins requests were made to with this client, which are the only ones its client
+        /// identity is presented to. See `Internals.IdentityOrigins`.
+        private let identityOrigins = Internals.IdentityOrigins()
         private let lock = Lock()
 
         // MARK: - Unsafe properties
@@ -110,6 +114,19 @@ extension Internals {
         }
 
         // MARK: - Internal methods
+
+        /// The delegate that answers the TLS challenges of a request to `url`, or `nil` when this
+        /// client has no identity policy. The origin of the request is recorded first: it is
+        /// what makes the client identity eligible to be presented there.
+        private func makeTLSDelegate(for url: URL?) -> TLSDelegate? {
+            guard let identityPolicy, let origin = url.flatMap(Internals.IdentityOrigin.init(url:)) else {
+                return nil
+            }
+
+            identityOrigins.register(origin)
+
+            return TLSDelegate(origins: identityOrigins, policy: identityPolicy)
+        }
 
         /// Executes `request`, buffering the whole response body into memory.
         ///
@@ -173,9 +190,7 @@ extension Internals {
             // moment `acquire()` returned.
             try Task.checkCancellation()
 
-            let tlsDelegate = identityPolicy.flatMap { policy in
-                request.url?.host.map { TLSDelegate(host: $0, policy: policy) }
-            }
+            let tlsDelegate = makeTLSDelegate(for: request.url)
 
             let taskDelegate = TaskDelegate(
                 redirectConfiguration: redirectConfiguration,
@@ -256,9 +271,7 @@ extension Internals {
                 materialized = try await Internals.URLSessionUploadFile.write(body: body)
             }
 
-            let tlsDelegate = identityPolicy.flatMap { policy in
-                request.url?.host.map { TLSDelegate(host: $0, policy: policy) }
-            }
+            let tlsDelegate = makeTLSDelegate(for: request.url)
 
             let taskDelegate = TaskDelegate(
                 redirectConfiguration: redirectConfiguration,
@@ -345,9 +358,7 @@ extension Internals {
                 throw CancellationError()
             }
 
-            let tlsDelegate = identityPolicy.flatMap { policy in
-                request.url?.host.map { TLSDelegate(host: $0, policy: policy) }
-            }
+            let tlsDelegate = makeTLSDelegate(for: request.url)
 
             // Built here, in an `async` context that can freely `await`, rather than inside a
             // synchronous delegate callback: `Internals.DownloadBuffer.init(readingMode:)` is
@@ -631,9 +642,7 @@ extension Internals {
                 throw error
             }
 
-            let tlsDelegate = identityPolicy.flatMap { policy in
-                request.url?.host.map { TLSDelegate(host: $0, policy: policy) }
-            }
+            let tlsDelegate = makeTLSDelegate(for: request.url)
 
             let upload = Internals.AsyncStream<Int>()
             let head = Internals.AsyncStream<Internals.ResponseHead>()
@@ -2018,6 +2027,15 @@ extension Internals.URLSessionClient {
         )
 
         return delegate.substitutingRecordedError(for: error)
+    }
+}
+
+extension Internals.URLSessionClient {
+
+    /// The origins requests were made to with this client, which its client identity may be
+    /// presented to. Lets a test see that an `execute` overload recorded its request's origin.
+    package var identityOriginsForTesting: Internals.IdentityOrigins {
+        identityOrigins
     }
 }
 
