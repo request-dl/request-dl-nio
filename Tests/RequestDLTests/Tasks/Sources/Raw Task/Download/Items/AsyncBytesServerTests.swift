@@ -106,7 +106,14 @@ private final class EndlessLineServer: @unchecked Sendable {
     }
 
     init() throws {
-        let descriptor = socket(AF_INET, Int32(SOCK_STREAM), 0)
+        // An enum on Glibc, a plain `Int32` everywhere else (Darwin, Musl, Bionic).
+        #if canImport(Glibc)
+        let socketType = Int32(SOCK_STREAM.rawValue)
+        #else
+        let socketType = SOCK_STREAM
+        #endif
+
+        let descriptor = socket(AF_INET, socketType, 0)
 
         guard descriptor >= 0 else {
             throw POSIXError()
@@ -157,7 +164,7 @@ private final class EndlessLineServer: @unchecked Sendable {
     }
 
     func stop() {
-        shutdown(listener, Int32(SHUT_RDWR))
+        shutdown(listener, CInt(SHUT_RDWR))
         close(listener)
     }
 
