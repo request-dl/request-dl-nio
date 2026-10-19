@@ -42,7 +42,13 @@ enum CURLCommandParser {
         try await parseCommand(command).requestConfiguration
     }
 
-    static func parseCommand(_ command: String) async throws -> Command {
+    /// - Parameter capabilities: What the command may do. A flag that needs one it does not have
+    /// throws ``CURLParsingError/Context/unsupportedFlag`` as soon as it is read: this is the
+    /// loop over the tokens, so nothing was opened or built by then.
+    static func parseCommand(
+        _ command: String,
+        allowing capabilities: CURLTask.Capabilities = .all
+    ) async throws -> Command {
         var tokens = try CURLTokenizer.tokenize(command)
 
         if tokens.first == "curl" {
@@ -68,6 +74,12 @@ enum CURLCommandParser {
         var keyPath: String?
 
         var index = tokens.startIndex
+
+        func require(_ capability: CURLTask.Capabilities, for flag: String) throws {
+            guard capabilities.contains(capability) else {
+                throw CURLParsingError(.unsupportedFlag, token: flag)
+            }
+        }
 
         func value(for flag: String) throws -> String {
             index += 1
@@ -100,7 +112,13 @@ enum CURLCommandParser {
                 dataFragments.append(try value(for: token))
 
             case "-F", "--form":
-                formItems.append(try makeFormItem(try value(for: token)))
+                let field = try value(for: token)
+
+                if isFile(field) {
+                    try require(.localFiles, for: token)
+                }
+
+                formItems.append(try makeFormItem(field))
 
             case "-u", "--user":
                 let (username, password) = try splitOnce(try value(for: token), separator: ":")
@@ -134,12 +152,15 @@ enum CURLCommandParser {
                 maxRedirects = count
 
             case "-k", "--insecure":
+                try require(.disabledTLSVerification, for: token)
                 isInsecure = true
 
             case "-x", "--proxy":
+                try require(.proxy, for: token)
                 proxy = try makeProxy(try value(for: token))
 
             case "--resolve":
+                try require(.dnsOverrides, for: token)
                 let (host, address) = try makeDNSOverride(try value(for: token))
                 dnsOverrides[host] = address
 
@@ -147,12 +168,15 @@ enum CURLCommandParser {
                 isCompressed = true
 
             case "--cacert":
+                try require(.localFiles, for: token)
                 caCertPath = try value(for: token)
 
             case "--cert", "-E":
+                try require(.localFiles, for: token)
                 certPath = try value(for: token)
 
             case "--key":
+                try require(.localFiles, for: token)
                 keyPath = try value(for: token)
 
             // Ignored outright, not routed through `value(for:)`/`RequestConfiguration` at all:
@@ -449,6 +473,15 @@ enum CURLCommandParser {
 
         configuration.headers.set(name: "Content-Length", value: String(body.totalSize))
         configuration.body = body
+    }
+
+    /// Whether a `-F`/`--form` field is a file (`name=@path`), which is read from this machine.
+    private static func isFile(_ field: String) -> Bool {
+        guard let separator = field.firstIndex(of: "=") else {
+            return false
+        }
+
+        return field[field.index(after: separator)...].trimming(where: \.isWhitespace).hasPrefix("@")
     }
 
     /// Parses one `-F`/`--form` field: `name=value`, or `name=@path;type=mime` for a file.
