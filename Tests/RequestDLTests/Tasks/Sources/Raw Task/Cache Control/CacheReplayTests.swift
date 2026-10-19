@@ -16,6 +16,16 @@ import FoundationEssentials
 import struct Foundation.Data
 #endif
 
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#elseif canImport(Android)
+import Android
+#endif
+
 /// A cached body is fed to the download buffer in pieces with a flow-control window between
 /// them, so it is not read into the response's stream whole however slowly it is being read, and
 /// it is read in large blocks, not in chunks of the reading mode (1 KiB by default), one trip to
@@ -138,6 +148,39 @@ struct CacheReplayTests {
             var body: Internals.AnyBuffer = await Internals.FileBuffer(fileURL)
 
             try FileManager.default.removeItem(at: fileURL)
+
+            let piece = await Internals.CacheControl.readPiece(of: &body)
+
+            #expect(piece == nil)
+        }
+    }
+
+    /// An I/O error that is not a missing file: the file is there, and the process may not read
+    /// it. It is as unreadable as a removed one, a miss and not a failure.
+    @Test(.disabled(if: geteuid() == 0, "root reads whatever it likes"))
+    func readPiece_whenTheFileCannotBeRead_isUnreadable() async throws {
+        try await withTemporaryFileURL("entry.bin") { fileURL in
+            try Data(repeating: 0x5A, count: 1_024).write(to: fileURL)
+            var body: Internals.AnyBuffer = await Internals.FileBuffer(fileURL)
+
+            try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: fileURL.path)
+            defer { try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: fileURL.path) }
+
+            let piece = await Internals.CacheControl.readPiece(of: &body)
+
+            #expect(piece == nil)
+        }
+    }
+
+    /// Another I/O error: a directory is where the file was.
+    @Test
+    func readPiece_whenADirectoryTookTheFilesPlace_isUnreadable() async throws {
+        try await withTemporaryFileURL("entry.bin") { fileURL in
+            try Data(repeating: 0x5A, count: 1_024).write(to: fileURL)
+            var body: Internals.AnyBuffer = await Internals.FileBuffer(fileURL)
+
+            try FileManager.default.removeItem(at: fileURL)
+            try FileManager.default.createDirectory(at: fileURL, withIntermediateDirectories: false)
 
             let piece = await Internals.CacheControl.readPiece(of: &body)
 
