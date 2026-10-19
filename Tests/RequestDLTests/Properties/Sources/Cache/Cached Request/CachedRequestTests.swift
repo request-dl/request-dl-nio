@@ -1141,38 +1141,155 @@ struct CachedRequestTests {
         #expect(cachedData == nil)
     }
 
-    /// Regression coverage for RFC 7234 §3.2: a response to a request carrying `Authorization`
-    /// must not be stored unless its own `Cache-Control` explicitly permits it
-    /// (`must-revalidate`, `public`, or `s-maxage`). `DataCache` keys entries by URL alone with
-    /// no request-credential awareness, so without this check, one account's cached response to
-    /// an authenticated endpoint could later be served to a different account sharing the same
-    /// process-wide `DataCache`.
+    // MARK: - A response to a request with credentials
+
+    /// A private cache may store a response to a request that carried `Authorization` (RFC 9111
+    /// §3.5 restricts only shared caches), which is what callers expect of a client. It is
+    /// stored for that credential, not for the URL alone: see the tests below.
     @Test
-    func cache_whenRequestHasAuthorizationAndResponseDoesNotPermitSharedCaching_skipsCaching() async throws {
+    func cache_whenRequestHasAuthorization_storesTheResponseWhateverItsCacheControl() async throws {
         let testState = try await TestState()
         defer { _ = testState }
 
         // Given
         let cacheKey = "https://localhost:8888" + testState.uri
 
-        // When: `max-age` alone (no `public`/`must-revalidate`/`s-maxage`) would be cached for
-        // an unauthenticated request, but must not be stored here.
+        // When: `max-age` alone, without `public`, `must-revalidate` or `s-maxage`.
         _ = try await performCacheRequest(
             testState: testState,
             headers: [("Cache-Control", "max-age=1000")],
             cacheStrategy: .returnCachedDataElseLoad,
-            includesAuthorizationHeader: true
+            requestHeaders: [("Authorization", "Bearer alice-token")]
         )
 
         await testState.dataCache.waitUntilIdle()
 
-        let cachedData = await testState.dataCache.getCachedData(
-            forKey: cacheKey,
-            policy: .all
+        let cachedData = try #require(
+            await testState.dataCache.getCachedData(forKey: cacheKey, policy: .all)
+        )
+
+        // Then: stored, for the three credential headers, as digests and never as values.
+        let recorded = try #require(cachedData.cachedResponse.varyRequestHeaders)
+
+        #expect(Set(recorded.keys) == ["authorization", "cookie", "proxy-authorization"])
+        #expect(recorded["authorization"]?.hasPrefix("sha256:") == true)
+        #expect(recorded["cookie"] == "")
+        #expect(recorded["proxy-authorization"] == "")
+        #expect(recorded.values.allSatisfy { !$0.contains("alice-token") })
+    }
+
+    @Test
+    func cache_whenRequestHasAuthorization_servesItToTheSameCredential() async throws {
+        let testState = try await TestState()
+        defer { _ = testState }
+
+        // Given
+        _ = try await performCacheRequest(
+            testState: testState,
+            headers: makeHeaders(maxAgeSeconds: 3_600),
+            cacheStrategy: .returnCachedDataElseLoad,
+            requestHeaders: [("Authorization", "Bearer alice-token")],
+            output: "first"
+        )
+        await testState.dataCache.waitUntilIdle()
+
+        // When
+        let again = try await performCacheRequest(
+            testState: testState,
+            headers: makeHeaders(maxAgeSeconds: 3_600),
+            cacheStrategy: .returnCachedDataElseLoad,
+            requestHeaders: [("Authorization", "Bearer alice-token")],
+            output: "second"
+        )
+
+        // Then: from the cache.
+        #expect(try responseText(again) == "first")
+    }
+
+    /// The reason the credential is part of what has to match: `DataCache` is one store for the
+    /// process, and another account signing in must not be given the first one's response.
+    @Test
+    func cache_whenRequestHasAuthorization_doesNotServeItToAnotherCredential() async throws {
+        let testState = try await TestState()
+        defer { _ = testState }
+
+        // Given
+        _ = try await performCacheRequest(
+            testState: testState,
+            headers: makeHeaders(maxAgeSeconds: 3_600),
+            cacheStrategy: .returnCachedDataElseLoad,
+            requestHeaders: [("Authorization", "Bearer alice-token")],
+            output: "alice"
+        )
+        await testState.dataCache.waitUntilIdle()
+
+        // When
+        let other = try await performCacheRequest(
+            testState: testState,
+            headers: makeHeaders(maxAgeSeconds: 3_600),
+            cacheStrategy: .returnCachedDataElseLoad,
+            requestHeaders: [("Authorization", "Bearer bob-token")],
+            output: "bob"
         )
 
         // Then
-        #expect(cachedData == nil)
+        #expect(try responseText(other) == "bob")
+    }
+
+    @Test
+    func cache_whenRequestHasAuthorization_doesNotServeItToARequestWithNone() async throws {
+        let testState = try await TestState()
+        defer { _ = testState }
+
+        // Given
+        _ = try await performCacheRequest(
+            testState: testState,
+            headers: makeHeaders(maxAgeSeconds: 3_600),
+            cacheStrategy: .returnCachedDataElseLoad,
+            requestHeaders: [("Authorization", "Bearer alice-token")],
+            output: "alice"
+        )
+        await testState.dataCache.waitUntilIdle()
+
+        // When
+        let anonymous = try await performCacheRequest(
+            testState: testState,
+            headers: makeHeaders(maxAgeSeconds: 3_600),
+            cacheStrategy: .returnCachedDataElseLoad,
+            output: "anonymous"
+        )
+
+        // Then
+        #expect(try responseText(anonymous) == "anonymous")
+    }
+
+    /// The other direction is as it always was: what an anonymous request got is not about any
+    /// account, and is given to a request that sends credentials too.
+    @Test
+    func cache_whenStoredWithoutCredentials_isServedToARequestWithCredentials() async throws {
+        let testState = try await TestState()
+        defer { _ = testState }
+
+        // Given
+        _ = try await performCacheRequest(
+            testState: testState,
+            headers: makeHeaders(maxAgeSeconds: 3_600),
+            cacheStrategy: .returnCachedDataElseLoad,
+            output: "first"
+        )
+        await testState.dataCache.waitUntilIdle()
+
+        // When
+        let withCredentials = try await performCacheRequest(
+            testState: testState,
+            headers: makeHeaders(maxAgeSeconds: 3_600),
+            cacheStrategy: .returnCachedDataElseLoad,
+            requestHeaders: [("Authorization", "Bearer alice-token")],
+            output: "second"
+        )
+
+        // Then
+        #expect(try responseText(withCredentials) == "first")
     }
 
     /// Companion to the test above: `public` is one of the three directives RFC 7234 §3.2
@@ -1416,11 +1533,69 @@ struct CachedRequestTests {
         #expect(try responseText(response) == "network")
     }
 
-    /// `Authorization` was already treated as a credential: a response to it is only stored
-    /// when it says a cache may. `Cookie` carries the same kind of identity, and the package
-    /// turns the cookie jar off, so it is always set by hand.
+    /// A `Cookie` the caller set by hand (the package turns the cookie jar off) is a credential
+    /// like `Authorization`: the response is stored for that cookie, whatever its `Cache-Control`
+    /// says besides `max-age`.
     @Test
-    func cache_whenRequestHasCookieAndResponseDoesNotPermitSharedCaching_skipsCaching() async throws {
+    func cache_whenRequestHasCookie_servesItToTheSameCookie() async throws {
+        let testState = try await TestState()
+        defer { _ = testState }
+
+        // Given
+        _ = try await performCacheRequest(
+            testState: testState,
+            headers: [("Cache-Control", "max-age=1000")],
+            cacheStrategy: .returnCachedDataElseLoad,
+            requestHeaders: [("Cookie", "session=alice")],
+            output: "first"
+        )
+        await testState.dataCache.waitUntilIdle()
+
+        // When
+        let same = try await performCacheRequest(
+            testState: testState,
+            headers: [("Cache-Control", "max-age=1000")],
+            cacheStrategy: .returnCachedDataElseLoad,
+            requestHeaders: [("Cookie", "session=alice")],
+            output: "second"
+        )
+
+        // Then
+        #expect(try responseText(same) == "first")
+    }
+
+    @Test
+    func cache_whenRequestHasCookie_doesNotServeItToAnotherCookie() async throws {
+        let testState = try await TestState()
+        defer { _ = testState }
+
+        // Given
+        _ = try await performCacheRequest(
+            testState: testState,
+            headers: [("Cache-Control", "max-age=1000")],
+            cacheStrategy: .returnCachedDataElseLoad,
+            requestHeaders: [("Cookie", "session=alice")],
+            output: "alice"
+        )
+        await testState.dataCache.waitUntilIdle()
+
+        // When
+        let other = try await performCacheRequest(
+            testState: testState,
+            headers: [("Cache-Control", "max-age=1000")],
+            cacheStrategy: .returnCachedDataElseLoad,
+            requestHeaders: [("Cookie", "session=bob")],
+            output: "bob"
+        )
+
+        // Then
+        #expect(try responseText(other) == "bob")
+    }
+
+    /// A response that varies on `Cookie` records what the request sent for it, and that is a
+    /// credential: it goes to the disk as a digest, not as the cookie.
+    @Test
+    func cache_whenResponseVariesOnACookie_recordsADigestAndNotTheCookie() async throws {
         let testState = try await TestState()
         defer { _ = testState }
 
@@ -1430,14 +1605,21 @@ struct CachedRequestTests {
         // When
         _ = try await performCacheRequest(
             testState: testState,
-            headers: [("Cache-Control", "max-age=1000")],
+            headers: makeHeaders(maxAgeSeconds: 3_600) + [("Vary", "Cookie, Accept-Language")],
             cacheStrategy: .returnCachedDataElseLoad,
-            requestHeaders: [("Cookie", "session=alice")]
+            requestHeaders: [("Cookie", "session=alice-secret"), ("Accept-Language", "pt-BR")]
         )
         await testState.dataCache.waitUntilIdle()
 
-        // Then
-        #expect(await testState.dataCache.getCachedData(forKey: cacheKey, policy: .all) == nil)
+        let recorded = try #require(
+            await testState.dataCache.getCachedData(forKey: cacheKey, policy: .all)?
+                .cachedResponse.varyRequestHeaders
+        )
+
+        // Then: the cookie is a digest, the language is what it was.
+        #expect(recorded["cookie"]?.hasPrefix("sha256:") == true)
+        #expect(recorded.values.allSatisfy { !$0.contains("alice-secret") })
+        #expect(recorded["accept-language"] == "pt-BR")
     }
 }
 

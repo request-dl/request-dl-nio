@@ -2,11 +2,13 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Crypto
 import RequestDLInternals
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
+import struct Foundation.Data
 import struct Foundation.Date
 import struct Foundation.URL
 #endif
@@ -121,6 +123,10 @@ extension Internals {
         /// A stored response is kept per URL, so a request that disagrees is a miss, and its own
         /// response replaces the stored one.
         private func matchesVary(of cachedResponse: CachedResponse) -> Bool {
+            guard matchesCredentials(of: cachedResponse) else {
+                return false
+            }
+
             let responseHeaders = RequestDL.HTTPHeaders(
                 cachedResponse.response.headers.map { ($0.name, $0.value) }
             )
@@ -139,6 +145,32 @@ extension Internals {
 
                 return fields.allSatisfy { recorded[$0] == requestValue(forVaryField: $0) }
             }
+        }
+
+        /// The request headers that identify an account: `Authorization`, `Cookie` and
+        /// `Proxy-Authorization`, by lowercased name. The package turns the cookie jar off on both
+        /// executors, so a `Cookie` is always one the caller put on the request by hand.
+        private static let credentialFields = ["authorization", "cookie", "proxy-authorization"]
+
+        /// Whether the stored response was stored for the credentials this request sends.
+        ///
+        /// `DataCache` keys entries by URL alone and is commonly one store for the whole process
+        /// (`DataCache.shared`), so an app where more than one account is signed in over its
+        /// lifetime could be given one account's response by another. A response stored for a
+        /// request that carried credentials therefore records which ones (as digests, see
+        /// ``requestValue(forVaryField:)``), and is given only to a request that sends the same:
+        /// not to another account, and not to a request with no credentials at all. A response
+        /// stored for a request with none carries no such record and is given to any request, as
+        /// it always was.
+        private func matchesCredentials(of cachedResponse: CachedResponse) -> Bool {
+            guard
+                let recorded = cachedResponse.varyRequestHeaders,
+                Self.credentialFields.allSatisfy({ recorded[$0] != nil })
+            else {
+                return true
+            }
+
+            return Self.credentialFields.allSatisfy { recorded[$0] == requestValue(forVaryField: $0) }
         }
 
         private enum Vary {
@@ -160,10 +192,37 @@ extension Internals {
         }
 
         /// What this request sends for `field`, normalized the way it is recorded.
+        ///
+        /// For a credential header (`credentialFields`) it is a digest, never the value: the
+        /// record is written to disk as it is, and unless the cache has an `encryptionKey` that
+        /// is in the clear. A header the request does not send is `""`, so that "no credential"
+        /// is told apart from any credential.
         private func requestValue(forVaryField field: String) -> String {
-            (requestConfiguration.headers[field] ?? [])
+            let value = (requestConfiguration.headers[field] ?? [])
                 .map { $0.trimming(where: \.isWhitespace) }
                 .joined(separator: ", ")
+
+            guard Self.credentialFields.contains(field), !value.isEmpty else {
+                return value
+            }
+
+            return Self.digest(ofCredential: value, field: field)
+        }
+
+        /// A SHA-256 of the credential, with the field name and a fixed prefix in front so the
+        /// same bytes under another header, or in another place, do not give the same digest.
+        ///
+        /// A bearer token or a random session identifier cannot be recovered from it. A
+        /// credential with little entropy (a Basic password) can be guessed from a record someone
+        /// can read, which is what `DataCache.EncryptionKey` is for.
+        static func digest(ofCredential value: String, field: String) -> String {
+            let hash = SHA256.hash(data: Data("request-dl.cache.credential.v1\n\(field)\n\(value)".utf8))
+            let hex = hash.map { byte in
+                let digits = String(byte, radix: 16)
+                return digits.count == 1 ? "0" + digits : digits
+            }
+
+            return "sha256:" + hex.joined()
         }
 
         /// The strategy actually applied, folding request-side ``CacheHeader`` directives on top
@@ -214,41 +273,14 @@ extension Internals {
                 .contains { $0.lowercased() == "no-store" }
         }
 
-        /// Whether the outgoing request carries an `Authorization` header.
+        /// Whether the outgoing request carries an `Authorization`, `Cookie` or
+        /// `Proxy-Authorization` header.
         ///
-        /// `DataCache` keys entries by URL alone, and is commonly a single, process-wide store
-        /// (`DataCache.shared`). Without this check, an app where more than one account can be
-        /// signed in over the app's lifetime (sign out, a different user signs in) could serve
-        /// one account's cached, authenticated response to another: nothing here folds the
-        /// request's own credentials into the cache key, or a `Vary` response header, the way a
-        /// browser's shared cache would.
-        ///
-        /// `Cookie` and `Proxy-Authorization` count as well: they identify the account in the
-        /// same way, and the package turns the cookie jar off on both executors, so a session
-        /// cookie is always one the caller put on the request by hand. A response that is
-        /// explicitly shareable, or that says what it varies on, can still be stored.
+        /// A response to such a request is stored, as a private cache may store it (RFC 9111
+        /// §3.5 restricts only shared caches), but for those credentials and no others: see
+        /// ``matchesCredentials(of:)``.
         private var requestCarriesCredentials: Bool {
-            ["Authorization", "Cookie", "Proxy-Authorization"].contains {
-                !(requestConfiguration.headers[$0] ?? []).isEmpty
-            }
-        }
-
-        /// Whether the response's own `Cache-Control` explicitly permits a cache to store a
-        /// response to a credentialed (`Authorization`-bearing) request, per RFC 7234 §3.2:
-        /// `must-revalidate`, `public`, or `s-maxage` are the only directives the RFC recognizes as
-        /// having that effect. Absent one of these, storing at all is what the RFC forbids. Unlike
-        /// `no-store`/`no-cache`, no directive must be *present* to trigger this: the request
-        /// having `Authorization` is what does.
-        private func permitsCachingCredentialedResponse(headers: [String]) -> Bool {
-            for directive in directives(headers) {
-                let directive = directive.lowercased()
-
-                if directive == "public" || directive == "must-revalidate" || directive.hasPrefix("s-maxage=") {
-                    return true
-                }
-            }
-
-            return false
+            Self.credentialFields.contains { !(requestConfiguration.headers[$0] ?? []).isEmpty }
         }
 
         private func checkIfCachedDataStillValid(
@@ -667,23 +699,29 @@ extension Internals {
                     Self.isCacheableByDefault(statusCode: head.status.code),
                     !containsNoCache(headers: headHeaders["Cache-Control"] ?? []),
                     !requestForbidsStoring,
-                    !requestCarriesCredentials
-                        || permitsCachingCredentialedResponse(headers: headHeaders["Cache-Control"] ?? []),
                     // `Vary: *` is a response that no later request can be said to match.
                     !isAny(vary)
                 else {
                     return nil
                 }
 
-                let varyRequestHeaders: [String: String]?
+                // What the response varies on, and, when the request carried credentials, which
+                // ones: all three headers, `""` for those it did not send, so that the entry is
+                // not given to a request with none.
+                var fields: [String] = []
 
-                if case .fields(let fields) = vary {
-                    varyRequestHeaders = Dictionary(
-                        uniqueKeysWithValues: fields.map { ($0, requestValue(forVaryField: $0)) }
-                    )
-                } else {
-                    varyRequestHeaders = nil
+                if case .fields(let varyFields) = vary {
+                    fields = varyFields
                 }
+
+                if requestCarriesCredentials {
+                    fields = Array(Set(fields).union(Self.credentialFields)).sorted()
+                }
+
+                let varyRequestHeaders: [String: String]? =
+                    fields.isEmpty
+                    ? nil
+                    : Dictionary(uniqueKeysWithValues: fields.map { ($0, requestValue(forVaryField: $0)) })
 
                 // A capacity hint for the allocation below, not a correctness check, so `0` is a
                 // fine stand-in when the header is absent.
