@@ -32,6 +32,9 @@ public struct ExecutorRequirementError: Error, Sendable {
         case maximumTLSVersionUnderURLSession
         case applicationProtocolsUnderURLSession
         case multipleClientCertificatesUnderNetworkFramework
+
+        /// Not thrown any more: a client certificate with a proxy runs on `.nioTransportServices`.
+        /// The case stays so that code that names it keeps compiling.
         case clientIdentityWithProxyUnderNetworkFramework
 
         // MARK: - Inits

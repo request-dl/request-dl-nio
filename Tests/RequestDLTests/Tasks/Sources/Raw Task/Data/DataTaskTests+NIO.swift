@@ -358,41 +358,25 @@ extension DataTaskTests {
         }
     }
 
-    /// `Internals.Session.Configuration.networkFrameworkIncompatibilityReasons()`'s
-    /// `.clientIdentityWithProxyUnderNetworkFramework` case catches this:
-    /// `Internals.SecureConnection
-    /// .makeTLSConfigurationByContext(isCompatibleWithNetworkFramework:)` deliberately leaves
-    /// `certificateChain`/`privateKey` off the NIOSSL `TLSConfiguration` it builds whenever the
-    /// configuration is Network.framework-compatible, since mTLS instead travels only through
-    /// `tlsLocalIdentityNetworkFramework` (`makeLocalIdentityForNetworkFramework()`), the
-    /// Network.framework-native channel.
+    /// A client certificate behind a proxy runs on `.nioTransportServices`, and the handshake
+    /// through the tunnel completes.
     ///
-    /// That's correct for a *direct* NIOTransportServices connection, which really does perform
-    /// its TLS through Network.framework and therefore only ever consults
-    /// `tlsLocalIdentityNetworkFramework`. It is wrong once a proxy is in the picture:
-    /// AsyncHTTPClient performs TLS for a *proxied* HTTPS connection through NIOSSL even on a
-    /// NIOTransportServices event loop (`setupTLSInProxyConnectionIfNeeded` in
-    /// `HTTPConnectionPool+Factory.swift`, which reads `self.tlsConfiguration`, the same NIOSSL
-    /// `TLSConfiguration` `certificateChain`/`privateKey` were left off of), so with a client
-    /// identity configured behind a proxy under `.nioTransportServices`, no client certificate
-    /// would reach the tunnel, and the server's mTLS verification, which
-    /// `LocalServer.TLSOption.client(_:)` performs, would fail with a connection reset.
+    /// It used to be refused (`.clientIdentityWithProxyUnderNetworkFramework`, and a fallback to
+    /// `.nio` when the executor was only preferred). AsyncHTTPClient performs the TLS of a
+    /// *proxied* HTTPS connection through NIOSSL even on a NIOTransportServices event loop
+    /// (`setupTLSInProxyConnectionIfNeeded` in `HTTPConnectionPool+Factory.swift`), and with a proxy
+    /// every connection of the client is proxied, so the identity that is used is the NIOSSL one
+    /// and the Network.framework one is not needed. `Internals.SecureConnection.build(
+    /// isCompatibleWithNetworkFramework:isProxied:)` builds the NIOSSL one in that case, a read of
+    /// the PEM files and no Keychain round trip, which is why this needs no `withKnownIssue`
+    /// caveat for the Keychain entitlement either.
     ///
-    /// `.preferredExecutor`, not `.requiredExecutor`: this configuration must transparently fall
-    /// back to `.nio` (where the identity *is* on the NIOSSL `TLSConfiguration`) rather than fail
-    /// outright. The hard-pin case (`.requiredExecutor` correctly refusing this combination
-    /// instead) is
-    /// `dataTask_whenCAEnabledBehindProxyAndNIOTransportServicesRequired_throwsExecutorRequirementError`,
-    /// right below.
-    ///
-    /// Unlike `dataTask_whenCAEnabledUnderNIOTransportServices` right above, this one needs no
-    /// `withKnownIssue`/Keychain-entitlement caveat on iOS/tvOS/watchOS Simulator: the
-    /// configuration falls back to `.nio`, which reads the identity straight off NIOSSL's own
-    /// `TLSConfiguration.certificateChain`/`privateKey`, with no `SecIdentity`/Keychain round
-    /// trip involved, so there's no entitlement gap to hit. Wrapping its body in `withKnownIssue`
-    /// would fail with "Known issue was not recorded", since the body unconditionally succeeds.
+    /// The server verifies the client certificate (`LocalServer.TLSOption.client(_:)`), so the
+    /// handshake only completes if the certificate reached the tunnel. Both ways of asking for the
+    /// executor are run: `.preferredExecutor`, which must now resolve to
+    /// `.nioTransportServices` and not to `.nio`, and `.requiredExecutor`, which used to throw.
     @Test
-    func dataTask_whenCAEnabledBehindProxyAndNIOTransportServicesPreferred_fallsBackToNIOAndCompletesHandshake()
+    func dataTask_whenCAEnabledBehindProxyOnNIOTransportServices_completesHandshake()
         async throws
     {
         // Given
@@ -417,6 +401,7 @@ extension DataTaskTests {
 
         localServer.cleanup(at: uri)
         localServer.insert(response, at: uri)
+        localServer.insert(response, at: uri)
         defer { localServer.cleanup(at: uri) }
 
         let proxy = try await LocalHTTPConnectProxy.start()
@@ -425,99 +410,55 @@ extension DataTaskTests {
             Task { try? await proxy.shutdown() }
         }
 
-        let content = TestProperty {
-            BaseURL(localServer.baseURL)
-            Path(uri)
+        func content(_ session: Session) -> some Property {
+            TestProperty {
+                BaseURL(localServer.baseURL)
+                Path(uri)
 
-            Session.localServer
-                .preferredExecutor(.nioTransportServices)
+                session
 
-            // Custom CONNECT headers, not just a plain `connection: .http` proxy: this rules
-            // `.urlSession` out too (`.proxyConnectHeadersUnderURLSession`), which stays
-            // genuinely compatible with a client identity + proxy and would otherwise win
-            // `resolveExecutor()`'s default priority regardless of what this test is actually
-            // trying to isolate. With `.urlSession` ruled out, resolution is a real contest
-            // between `.nioTransportServices` (incompatible) and `.nio` (the fallback), the "proxy
-            // connect headers rule out .urlSession" scenario.
-            Proxy(host: proxy.host, port: proxy.port) {
-                CustomHeader(name: "X-Test-Marker", value: "1")
+                // Custom CONNECT headers, not just a plain `connection: .http` proxy: this rules
+                // `.urlSession` out (`.proxyConnectHeadersUnderURLSession`), which stays
+                // genuinely compatible with a client identity + proxy and would otherwise win
+                // `resolveExecutor()`'s default priority regardless of what this test is trying
+                // to isolate.
+                Proxy(host: proxy.host, port: proxy.port) {
+                    CustomHeader(name: "X-Test-Marker", value: "1")
+                }
+
+                SecureConnection {
+                    TrustRoots(server.certificateURL.absolutePath(percentEncoded: false))
+                    RequestDL.Certificates(client.certificateURL.absolutePath(percentEncoded: false))
+                    PrivateKey(client.privateKeyURL.absolutePath(percentEncoded: false))
+                }
+                .verification(.fullVerification)
             }
-
-            SecureConnection {
-                TrustRoots(server.certificateURL.absolutePath(percentEncoded: false))
-                RequestDL.Certificates(client.certificateURL.absolutePath(percentEncoded: false))
-                PrivateKey(client.privateKeyURL.absolutePath(percentEncoded: false))
-            }
-            .verification(.fullVerification)
         }
 
         // When / Then
-        func verify() async throws {
-            let data = try await DataTask { content }
+        for session in [
+            Session.localServer.preferredExecutor(.nioTransportServices),
+            Session.localServer.requiredExecutor(.nioTransportServices),
+        ] {
+            let attempts = proxy.connectAttempts.count
+
+            let data = try await DataTask { content(session) }
                 .extractPayload()
                 .result()
 
             // Proves the request genuinely went through the tunnel, not straight to
             // `localServer` (which would trivially "succeed" for the wrong reason).
-            #expect(proxy.connectAttempts.count >= 1)
+            #expect(proxy.connectAttempts.count > attempts)
 
             let result = try HTTPResult<String>(data)
             #expect(result.response == output)
 
-            // Proves the fallback actually happened, not just that the handshake somehow
-            // succeeded: this configuration must resolve to `.nio`, not `.nioTransportServices`
-            // (`Internals.ClientManager.Client.nio` backs both, so that enum alone can't tell
-            // them apart; `resolveExecutor()`, the same call `RawTask`/`ClientManager` make,
-            // can).
-            let resolved = try await resolve(content)
-            #expect(resolved.session.configuration.resolveExecutor() == .nio)
-        }
-
-        try await verify()
-    }
-
-    /// The hard-pin counterpart to the fallback test above:
-    /// `.requiredExecutor(.nioTransportServices)` must refuse this same
-    /// client-identity-behind-a-proxy combination outright, the same way
-    /// `dataTask_whenRequiredExecutorIsIncompatible_throwsActionableErrorBeforeAnyNetworkIO`
-    /// already proves for an unrelated field, rather than silently attempting the handshake and
-    /// failing with an opaque connection reset.
-    ///
-    /// No `LocalServer`/`LocalHTTPConnectProxy` needed: `requireExecutor(_:)` throws before any
-    /// client is built or network I/O starts.
-    @Test
-    func dataTask_whenCAEnabledBehindProxyAndNIOTransportServicesRequired_throwsExecutorRequirementError()
-        async throws
-    {
-        // Given
-        let client = Certificates().client()
-
-        let task = DataTask {
-            BaseURL("localhost")
-
-            Session()
-                .requiredExecutor(.nioTransportServices)
-
-            Proxy(host: "127.0.0.1", port: 9999, connection: .http)
-
-            SecureConnection {
-                RequestDL.Certificates(client.certificateURL.absolutePath(percentEncoded: false))
-                PrivateKey(client.privateKeyURL.absolutePath(percentEncoded: false))
-            }
-        }
-        .extractPayload()
-
-        // When / Then
-        await #expect(throws: ExecutorRequirementError.self) {
-            try await task.result()
-        }
-
-        do {
-            _ = try await task.result()
-            Issue.record("Not expecting success")
-        } catch let error as ExecutorRequirementError {
-            #expect(error.requiredExecutor == .nioTransportServices)
-            #expect(error.reasons == [.clientIdentityWithProxyUnderNetworkFramework])
+            // Proves it ran on Network.framework, not on a fallback: `.nio` and
+            // `.nioTransportServices` are both backed by `Internals.ClientManager.Client.nio`, so
+            // that alone can't tell them apart; `resolveExecutor()`, the same call
+            // `RawTask`/`ClientManager` make, can.
+            let resolved = try await resolve(content(session))
+            #expect(resolved.session.configuration.resolveExecutor() == .nioTransportServices)
         }
     }
 
