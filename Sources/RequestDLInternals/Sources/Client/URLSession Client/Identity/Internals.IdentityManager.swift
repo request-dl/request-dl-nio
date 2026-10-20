@@ -24,6 +24,7 @@ extension Internals {
     package final class IdentityHandle: @unchecked Sendable {
         package let identity: SecIdentity
         fileprivate let label: String
+        fileprivate let keyLabel: String
 
         /// Which Keychain the items behind `identity` were stored in, so that releasing the
         /// handle deletes from that same one. On macOS the build can land in either, depending
@@ -35,17 +36,23 @@ extension Internals {
         fileprivate init(
             identity: SecIdentity,
             label: String,
+            keyLabel: String,
             useDataProtectionKeychain: Bool,
             manager: IdentityManager
         ) {
             self.identity = identity
             self.label = label
+            self.keyLabel = keyLabel
             self.useDataProtectionKeychain = useDataProtectionKeychain
             self.manager = manager
         }
 
         deinit {
-            manager.release(label: label, useDataProtectionKeychain: useDataProtectionKeychain)
+            manager.release(
+                label: label,
+                keyLabel: keyLabel,
+                useDataProtectionKeychain: useDataProtectionKeychain
+            )
         }
     }
 
@@ -73,6 +80,11 @@ extension Internals {
 
         private let lock = Lock()
         private var live: [String: Weak<IdentityHandle>] = [:]
+
+        /// How many handles are alive per key label. The Keychain keeps one item per key however
+        /// many certificates it is paired with, so identities for one key share one item, which
+        /// goes away with the last of them and not with the one that happened to add it.
+        private var keyUsers: [String: Int] = [:]
         private let deleteItems: @Sendable (_ label: String, _ useDataProtectionKeychain: Bool) -> Void
 
         /// - Parameter deleteItems: Removes the key and certificate items stored under `label`
@@ -87,8 +99,12 @@ extension Internals {
         /// (the actual Keychain round trip) and registers its result.
         ///
         /// `build` also reports which Keychain it stored the items in.
+        ///
+        /// - Parameter keyLabel: The label of the key item, when it is shared with the identities
+        ///   of other certificates. It is `label` when `nil`.
         package func handle(
             for label: String,
+            keyLabel: String? = nil,
             build: () throws -> (identity: SecIdentity, useDataProtectionKeychain: Bool)
         ) throws -> IdentityHandle {
             try lock.withLock {
@@ -96,14 +112,17 @@ extension Internals {
                     return existing
                 }
 
+                let keyLabel = keyLabel ?? label
                 let built = try build()
                 let handle = IdentityHandle(
                     identity: built.identity,
                     label: label,
+                    keyLabel: keyLabel,
                     useDataProtectionKeychain: built.useDataProtectionKeychain,
                     manager: self
                 )
                 live[label] = Weak(handle)
+                keyUsers[keyLabel, default: 0] += 1
                 return handle
             }
         }
@@ -121,14 +140,21 @@ extension Internals {
         /// The deletion targets the Keychain the releasing handle was built in, not a fixed one:
         /// a signed macOS app stores in the data-protection Keychain, and deleting from the
         /// legacy one would leave the imported private key behind for good.
-        fileprivate func release(label: String, useDataProtectionKeychain: Bool) {
+        fileprivate func release(label: String, keyLabel: String, useDataProtectionKeychain: Bool) {
             lock.withLock {
+                let remainingKeyUsers = (keyUsers[keyLabel] ?? 1) - 1
+                keyUsers[keyLabel] = remainingKeyUsers > 0 ? remainingKeyUsers : nil
+
                 guard live[label]?.value == nil else {
                     return
                 }
 
                 live[label] = nil
                 deleteItems(label, useDataProtectionKeychain)
+
+                if remainingKeyUsers <= 0, keyLabel != label {
+                    deleteItems(keyLabel, useDataProtectionKeychain)
+                }
             }
         }
 

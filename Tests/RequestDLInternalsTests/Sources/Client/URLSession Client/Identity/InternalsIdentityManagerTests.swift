@@ -153,6 +153,61 @@ extension InternalsIdentityManagerTests {
         }
         #endif
     }
+
+    /// The Keychain keeps one item per key however many certificates it is paired with. The key
+    /// goes with the last identity built from it, not with the one that added it, or the others
+    /// would be left without it.
+    @Test
+    func release_whenIdentitiesShareAKey_deletesTheKeyWithTheLastOne() async throws {
+        func run() throws {
+            // Given
+            let client = Certificates().client()
+            let secureConnection = Internals.SecureConnection.testMTLSConnection(client: client)
+
+            let certificateChain = try #require(secureConnection.certificateChain)
+            let certificateDER = try #require(
+                try Internals.RawBytesIdentityBuilder.certificateDERs(from: certificateChain).first
+            )
+            let privateKeySource = try #require(secureConnection.privateKey)
+            let privateKeyDER = try Internals.RawBytesIdentityBuilder.privateKeyDER(from: privateKeySource)
+
+            let source = try Internals.RawBytesIdentityBuilder.makeIdentity(
+                certificateDER: certificateDER,
+                privateKeyDER: privateKeyDER
+            )
+
+            let deletions = LockedValueBox<[String]>([])
+            let manager = Internals.IdentityManager { label, _ in
+                deletions.withLockedValue { $0.append(label) }
+            }
+
+            var first: Internals.IdentityHandle? = try manager.handle(for: "cert.first", keyLabel: "key") {
+                (source.identity, false)
+            }
+            var second: Internals.IdentityHandle? = try manager.handle(for: "cert.second", keyLabel: "key") {
+                (source.identity, false)
+            }
+
+            // When / Then
+            first = nil
+            #expect(deletions.withLockedValue { $0 } == ["cert.first"])
+
+            second = nil
+            #expect(deletions.withLockedValue { $0 } == ["cert.first", "cert.second", "key"])
+
+            _ = (first, second)
+        }
+
+        #if os(macOS)
+        try run()
+        #else
+        await withKnownIssue(
+            "no Keychain Sharing entitlement on this platform's SwiftPM-generated Xcode scheme; see RequestConfigurationURLSessionClientMTLSTests's own doc comment"
+        ) {
+            try run()
+        }
+        #endif
+    }
 }
 
 extension Internals.SecureConnection {
