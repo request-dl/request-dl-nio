@@ -31,6 +31,11 @@ import Darwin
 //   compress <port> <urlSession|nio|nts> <uploads> <KiB>
 //       Sends that many uploads at once, each compressed with gzip, and reports the time and
 //       the threads the process had at most.
+//   images <port> <urlSession|nio|nts> <loads> <MiB> <cancel after ms> <interval ms> <settle ms>
+//       A list scrolled fast: starts `loads` image loads one every `interval` ms, each of an image
+//       of that many MiB that chunked-server.py sends at about 8 MiB a second, and cancels each
+//       one `cancel after` ms after it started. After `settle` ms it reports how many bytes the
+//       server handed to the connections.
 
 let arguments = CommandLine.arguments
 let entrySize = 1_024
@@ -474,6 +479,62 @@ case "compress":
             + "uploads_per_s=\(Double(uploads) / seconds) threads_at_start=\(startThreads) "
             + "threads_peak=\(sampler.peakThreads)"
     )
+
+case "images":
+    #if canImport(AppKit)
+    let port = arguments[2]
+    let executor = resolveExecutor(named: arguments[3])
+    let loads = Int(arguments[4])!
+    let imageMebibytes = Int(arguments[5])!
+    let cancelAfter = UInt64(arguments[6])!
+    let interval = UInt64(arguments[7])!
+    let settle = UInt64(arguments[8])!
+
+    func serverCount(_ path: String) async throws -> Int {
+        let (data, _) = try await URLSession.shared.data(from: URL(string: "http://127.0.0.1:\(port)\(path)")!)
+        return Int(String(decoding: data, as: UTF8.self))!
+    }
+
+    let loader = RDLImageLoader()
+    _ = try await serverCount("/reset")
+
+    var tasks: [Task<Void, Never>] = []
+
+    for index in 0..<loads {
+        let load = Task {
+            _ = try? await loader.load(id: "image-\(index)") {
+                Session().requiredExecutor(executor)
+                BaseURL(.http, host: "127.0.0.1:\(port)")
+                Path("/slow/\(imageMebibytes)/\(index)")
+            }
+        }
+
+        tasks.append(load)
+        tasks.append(
+            Task {
+                try? await Task.sleep(nanoseconds: cancelAfter * 1_000_000)
+                load.cancel()
+            }
+        )
+
+        try await Task.sleep(nanoseconds: interval * 1_000_000)
+    }
+
+    for task in tasks {
+        await task.value
+    }
+
+    try await Task.sleep(nanoseconds: settle * 1_000_000)
+    let sent = try await serverCount("/sent")
+
+    print(
+        "RESULT executor=\(arguments[3]) loads=\(loads) image_mib=\(imageMebibytes) "
+            + "full_mib=\(loads * imageMebibytes) sent_mib=\(String(format: "%.1f", Double(sent) / Double(mebibyte))) "
+            + "sent_share=\(String(format: "%.3f", Double(sent) / Double(loads * imageMebibytes * mebibyte)))"
+    )
+    #else
+    print("images needs AppKit")
+    #endif
 
 default:
     print("unknown mode \(arguments[1])")

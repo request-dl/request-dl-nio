@@ -9,7 +9,14 @@ GET /count answers with how many /big requests reached the server, so a caller c
 response that came from the cache from one that did not.
 
 PUT /upload reads the body, with a Content-Length or chunked, and answers with a few bytes.
+
+GET /slow/<mebibytes>/<id> answers with a body of that size sent at about 8 MiB a second, and
+counts the bytes it managed to hand to the connection. A client that cancels stops the count at the
+point where the connection closed. GET /sent answers with that count and GET /reset clears it. The
+count runs ahead of what the client has read by what the connection buffers, a few hundred KiB.
 """
+
+import time
 
 import sys
 import threading
@@ -18,6 +25,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 PIECE = bytes(64 * 1024)
 COUNT_LOCK = threading.Lock()
 COUNT = 0
+SENT = 0
+SLOW_PIECE = bytes(16 * 1024)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -47,8 +56,43 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
-        global COUNT
+        global COUNT, SENT
         parts = self.path.strip("/").split("/")
+
+        if parts in (["sent"], ["reset"]):
+            with COUNT_LOCK:
+                body = str(SENT).encode()
+
+                if parts == ["reset"]:
+                    SENT = 0
+
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        if len(parts) == 3 and parts[0] == "slow" and parts[1].isdigit():
+            total = int(parts[1]) * 1024 * 1024
+            self.send_response(200)
+            self.send_header("Content-Type", "application/octet-stream")
+            self.send_header("Content-Length", str(total))
+            self.end_headers()
+
+            try:
+                for _ in range(total // len(SLOW_PIECE)):
+                    self.wfile.write(SLOW_PIECE)
+                    self.wfile.flush()
+
+                    with COUNT_LOCK:
+                        SENT += len(SLOW_PIECE)
+
+                    time.sleep(0.002)
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+
+            self.close_connection = True
+            return
 
         if parts == ["count"]:
             body = str(COUNT).encode()
