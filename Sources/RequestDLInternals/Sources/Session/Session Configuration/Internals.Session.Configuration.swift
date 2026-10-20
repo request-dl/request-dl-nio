@@ -121,7 +121,8 @@ extension Internals.Session {
         /// answer.
         package func build(isCompatibleWithNetworkFramework: Bool = true) throws -> Output {
             let secureConnectionOutput = try secureConnection?.build(
-                isCompatibleWithNetworkFramework: isCompatibleWithNetworkFramework
+                isCompatibleWithNetworkFramework: isCompatibleWithNetworkFramework,
+                isProxied: proxy != nil
             )
 
             var configuration = HTTPClient.Configuration.init(
@@ -275,20 +276,14 @@ extension Internals.Session.Configuration {
     /// The mirror image of `urlSessionIncompatibilityReasons()`: fields that keep a configuration
     /// off `.nioTransportServices` (Network.framework) instead of off `.urlSession`.
     ///
-    /// Starts from `secureConnection?.networkFrameworkIncompatibilityReasons()` (the fields
-    /// `SecureConnection` alone already knows are Network.framework-incompatible), then adds
-    /// `.clientIdentityWithProxyUnderNetworkFramework` when both a `proxy` and a client identity
-    /// (`certificateChain`/`privateKey`) are configured together, something `SecureConnection`
-    /// can't see on its own, since `proxy` lives here, one level up. See that reason's own doc
-    /// comment for why the combination doesn't work.
+    /// What `secureConnection?.networkFrameworkIncompatibilityReasons()` says, and nothing more. A
+    /// client identity together with a `proxy` used to be a reason of its own
+    /// (`.clientIdentityWithProxyUnderNetworkFramework`), and is not any more: with a proxy
+    /// configured every connection goes through it, its TLS is done by NIOSSL and not by
+    /// Network.framework, and `build(isCompatibleWithNetworkFramework:)` hands NIOSSL the identity
+    /// in that case. See `SecureConnection.build(isCompatibleWithNetworkFramework:isProxied:)`.
     package func networkFrameworkIncompatibilityReasons() -> [Internals.ExecutorIncompatibilityReason] {
-        var reasons = secureConnection?.networkFrameworkIncompatibilityReasons() ?? []
-
-        if proxy != nil, secureConnection?.certificateChain != nil || secureConnection?.privateKey != nil {
-            reasons.append(.clientIdentityWithProxyUnderNetworkFramework)
-        }
-
-        return reasons
+        secureConnection?.networkFrameworkIncompatibilityReasons() ?? []
     }
 
     /// The bucket-D fields that keep a configuration off `.urlSession` regardless of what

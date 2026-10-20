@@ -56,17 +56,13 @@ extension Internals {
         case multipleClientCertificatesUnderNetworkFramework
         /// A client identity (`certificateChain`/`privateKey`) configured alongside a `proxy`.
         ///
-        /// Network.framework's own TLS only ever reads the client identity from
-        /// `tlsLocalIdentityNetworkFramework` (see `Internals.SecureConnection
-        /// .makeTLSConfigurationByContext(isCompatibleWithNetworkFramework:)`'s own doc comment
-        /// on why `certificateChain`/`privateKey` are deliberately left off the NIOSSL
-        /// `TLSConfiguration` whenever Network.framework is in play), which is correct for a
-        /// *direct* NIOTransportServices connection. It's wrong once a proxy is configured
-        /// alongside it: AsyncHTTPClient performs TLS for a *proxied* HTTPS connection through
-        /// NIOSSL even on a NIOTransportServices event loop
-        /// (`HTTPConnectionPool+Factory.swift`'s `setupTLSInProxyConnectionIfNeeded`, which reads
-        /// the same NIOSSL `TLSConfiguration` the identity was left off of), so no client
-        /// certificate would ever reach the proxy tunnel's TLS handshake.
+        /// No longer produced: a configuration with both runs on Network.framework now. With a
+        /// proxy configured every connection goes through it, AsyncHTTPClient does the TLS of a
+        /// proxied HTTPS connection with NIOSSL even on a NIOTransportServices event loop
+        /// (`HTTPConnectionPool+Factory.swift`'s `setupTLSInProxyConnectionIfNeeded`), and
+        /// `Internals.SecureConnection.build(isCompatibleWithNetworkFramework:isProxied:)` gives
+        /// NIOSSL the identity in that case. The case stays because it is part of the public
+        /// `ExecutorRequirementError.Reason`.
         case clientIdentityWithProxyUnderNetworkFramework
     }
 }

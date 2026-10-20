@@ -229,7 +229,18 @@ extension Internals {
         /// Defaults to `true`, matching this method's original unconditional behavior for the
         /// identity-building half, for callers that don't know or don't care which executor will
         /// consume this.
-        package func build(isCompatibleWithNetworkFramework: Bool = true) throws -> Output {
+        /// - Parameter isProxied: Whether the client this builds for has a proxy. Every connection of
+        /// such a client goes through the proxy, and AsyncHTTPClient does the TLS of a *proxied*
+        /// HTTPS connection with NIOSSL even on a Network.framework event loop, so the identity
+        /// that matters is the NIOSSL one: it is built (a read of the PEM files) and the
+        /// Network.framework one, which would cost a Keychain round trip for a connection that
+        /// never uses it, is not.
+        package func build(
+            isCompatibleWithNetworkFramework: Bool = true,
+            isProxied: Bool = false
+        ) throws -> Output {
+            let usesNetworkFrameworkIdentity = isCompatibleWithNetworkFramework && !isProxied
+
             var tlsConfiguration = try makeTLSConfigurationByContext(
                 isCompatibleWithNetworkFramework: isCompatibleWithNetworkFramework
             )
@@ -307,7 +318,7 @@ extension Internals {
             }
 
             let nioSSLIdentity = try makeNIOSSLIdentity(
-                isCompatibleWithNetworkFramework: isCompatibleWithNetworkFramework
+                isCompatibleWithNetworkFramework: usesNetworkFrameworkIdentity
             )
             let trustEvaluator = try Internals.NIOTrustEvaluator.resolve(from: self)
 
@@ -325,7 +336,7 @@ extension Internals {
                 tlsConfiguration: tlsConfiguration,
                 tlsCustomVerification: needsNIOSSLCustomVerification ? trustEvaluator?.tlsCustomVerification : nil,
                 tlsCustomVerificationNetworkFramework: trustEvaluator?.tlsCustomVerificationNetworkFramework,
-                localIdentityHandle: isCompatibleWithNetworkFramework
+                localIdentityHandle: usesNetworkFrameworkIdentity
                     ? try makeLocalIdentityForNetworkFramework() : nil,
                 nioSSLCertificateChain: nioSSLIdentity?.certificateChain,
                 nioSSLPrivateKey: nioSSLIdentity?.privateKey

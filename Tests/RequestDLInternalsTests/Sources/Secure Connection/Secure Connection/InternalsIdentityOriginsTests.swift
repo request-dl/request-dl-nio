@@ -89,6 +89,46 @@ struct InternalsIdentityOriginsTests {
         #expect(provider("redirect-target.example", 8_443) == nil)
     }
 
+    /// On Network.framework with a proxy, every connection is proxied and its TLS is done by
+    /// NIOSSL, so the NIOSSL provider is what must answer, and the Network.framework identity,
+    /// which costs a Keychain round trip, is not built: this passes in a process without the
+    /// Keychain entitlement.
+    @Test
+    func build_whenProxiedOnNetworkFramework_offersTheNIOSSLIdentityAndBuildsNoKeychainOne() throws {
+        // Given
+        let client = Certificates().client()
+
+        var configuration = Internals.Session.Configuration()
+        configuration.proxy = Internals.Proxy(
+            host: "proxy.example.com",
+            port: 8_080,
+            connection: .http,
+            authorization: nil
+        )
+
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.certificateChain = .file(client.certificateURL.absolutePath(percentEncoded: false))
+        secureConnection.privateKey = .privateKey(
+            .init(client.privateKeyURL.absolutePath(percentEncoded: false), format: .pem)
+        )
+        configuration.secureConnection = secureConnection
+
+        // When
+        let output = try configuration.build(isCompatibleWithNetworkFramework: true)
+        let httpClientConfiguration = output.httpClientConfiguration
+        let provider = try #require(httpClientConfiguration.tlsLocalIdentityProviderNIOSSL)
+
+        // Then
+        output.identityOrigins.register(host: "localhost", port: 8_443)
+        #expect(provider("localhost", 8_443) != nil)
+        #expect(provider("redirect-target.example", 8_443) == nil)
+
+        #if canImport(Darwin)
+        #expect(output.localIdentityHandle == nil)
+        #expect(httpClientConfiguration.tlsLocalIdentityProviderNetworkFramework == nil)
+        #endif
+    }
+
     @Test
     func build_whenNoMTLSConfigured_installsNoProvider() throws {
         // When

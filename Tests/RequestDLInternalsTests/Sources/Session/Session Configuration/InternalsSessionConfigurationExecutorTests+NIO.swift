@@ -167,10 +167,10 @@ extension InternalsSessionConfigurationExecutorTests {
         }
     }
 
-    // MARK: - networkFrameworkIncompatibilityReasons() / clientIdentityWithProxyUnderNetworkFramework
+    // MARK: - A client identity behind a proxy runs on Network.framework
 
     /// A minimal proxy, reused across this section's tests: only `host`/`port`/`connection`
-    /// matter to `networkFrameworkIncompatibilityReasons()`, which only checks `proxy != nil`.
+    /// matter to `networkFrameworkIncompatibilityReasons()`.
     private static func makeProxy() -> Internals.Proxy {
         Internals.Proxy(host: "proxy.example.com", port: 8080, connection: .http, authorization: nil)
     }
@@ -185,52 +185,26 @@ extension InternalsSessionConfigurationExecutorTests {
         return secureConnection
     }
 
-    /// The gap `.clientIdentityWithProxyUnderNetworkFramework` closes:
-    /// `SecureConnection.networkFrameworkIncompatibilityReasons()` alone can't see this, since
-    /// `proxy` lives one level up, on `Internals.Session.Configuration` itself. Confirmed
-    /// end-to-end (real mTLS handshake through a real `CONNECT` tunnel) by `DataTaskTests`'s
-    /// `dataTask_whenCAEnabledBehindProxyAndNIOTransportServicesPreferred_fallsBackToNIOAndCompletesHandshake`/
-    /// `..._Required_throwsExecutorRequirementError`.
+    /// With a proxy every connection is proxied and its TLS is done by NIOSSL, so a client
+    /// identity next to a proxy is no longer a reason to keep a configuration off Network.framework
+    /// (`build` gives NIOSSL the identity in that case). The end-to-end check, a real mTLS
+    /// handshake through a real `CONNECT` tunnel, is `DataTaskTests`'s
+    /// `dataTask_whenCAEnabledBehindProxyOnNIOTransportServices_completesHandshake`.
     @Test
-    func networkFrameworkIncompatibilityReasons_whenProxyAndClientIdentityBothSet_containsReason() async throws {
+    func networkFrameworkIncompatibilityReasons_whenProxyAndClientIdentityBothSet_isEmpty() async throws {
         // Given
         var configuration = Internals.Session.Configuration()
         configuration.proxy = Self.makeProxy()
         configuration.secureConnection = Self.makeClientIdentitySecureConnection()
 
         // Then
-        let reason = Internals.ExecutorIncompatibilityReason.clientIdentityWithProxyUnderNetworkFramework
-        #expect(configuration.networkFrameworkIncompatibilityReasons().contains(reason))
-    }
-
-    /// Neither half alone is the trigger: only the combination is a problem (a direct
-    /// NIOTransportServices connection presents mTLS fine, and a proxy with no client identity
-    /// has no identity to fail to present in the first place).
-    @Test
-    func networkFrameworkIncompatibilityReasons_whenOnlyProxyOrOnlyClientIdentitySet_doesNotContainReason()
-        async throws
-    {
-        // Given: proxy alone
-        var proxyOnly = Internals.Session.Configuration()
-        proxyOnly.proxy = Self.makeProxy()
-
-        // Given: client identity alone
-        var identityOnly = Internals.Session.Configuration()
-        identityOnly.secureConnection = Self.makeClientIdentitySecureConnection()
-
-        // Then
-        let reason = Internals.ExecutorIncompatibilityReason.clientIdentityWithProxyUnderNetworkFramework
-        #expect(!proxyOnly.networkFrameworkIncompatibilityReasons().contains(reason))
-        #expect(!identityOnly.networkFrameworkIncompatibilityReasons().contains(reason))
+        #expect(configuration.networkFrameworkIncompatibilityReasons().isEmpty)
     }
 
     @Test
-    func resolveExecutor_whenProxyAndClientIdentitySetAndNIOTransportServicesPreferred_fallsBackToNIO() async throws {
-        // Given: compatible with `.urlSession` (mTLS behind a proxy works fine there, via a
-        // Keychain round trip), so an unrelated URLSession-incompatible field also has to be set
-        // to isolate this test to the NIOTransportServices-side fallback specifically, the same
-        // reason `DataTaskTests`'s end-to-end version of this rules `.urlSession` out via proxy
-        // `connectHeaders` rather than a bare `connection: .http` proxy.
+    func resolveExecutor_whenProxyAndClientIdentitySetAndNIOTransportServicesPreferred_resolvesToIt() async throws {
+        // Given: `.http1Only` rules `.urlSession` out, so this is a contest between
+        // `.nioTransportServices` and `.nio`.
         var configuration = Internals.Session.Configuration()
         configuration.httpVersion = .http1Only
         configuration.preferredExecutor = .nioTransportServices
@@ -241,26 +215,23 @@ extension InternalsSessionConfigurationExecutorTests {
         let sut = configuration.resolveExecutor()
 
         // Then
+        #if canImport(Darwin)
+        #expect(sut == .nioTransportServices)
+        #else
         #expect(sut == .nio)
+        #endif
     }
 
     @Test
-    func requireExecutor_whenNIOTransportServicesPinnedWithProxyAndClientIdentity_throwsWithExactReason()
-        async throws
-    {
+    func requireExecutor_whenNIOTransportServicesPinnedWithProxyAndClientIdentity_doesNotThrow() async throws {
         // Given
         var configuration = Internals.Session.Configuration()
         configuration.proxy = Self.makeProxy()
         configuration.secureConnection = Self.makeClientIdentitySecureConnection()
 
-        // When
-        do {
+        // Then
+        #expect(throws: Never.self) {
             try configuration.requireExecutor(.nioTransportServices)
-            Issue.record("Not expecting success")
-        } catch let error as Internals.IncompatibleExecutorConfigurationError {
-            // Then
-            #expect(error.requiredExecutor == .nioTransportServices)
-            #expect(error.reasons == [.clientIdentityWithProxyUnderNetworkFramework])
         }
     }
 
