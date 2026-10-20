@@ -288,13 +288,79 @@ struct InternalsRawBytesIdentityBuilderTests {
         let certificate = try Self.certificate(fromPEMFile: client.certificateURL)
         let secKey = try Self.secKey(fromPrivateKeyPEMFile: client.privateKeyURL)
 
+        let label = "InternalsRawBytesIdentityBuilderTests.rsaLegacyKeychain." + UUID().uuidString
+        defer { Self.deleteKeychainItems(labelled: label) }
+
         // When / Then
         _ = try Internals.RawBytesIdentityBuilder.store(
             certificate: certificate,
             secKey: secKey,
-            label: "InternalsRawBytesIdentityBuilderTests.rsaLegacyKeychain." + UUID().uuidString,
+            label: label,
             useDataProtectionKeychain: false
         )
+    }
+
+    /// The file keychain answers a second `SecItemAdd` of a key it already holds with
+    /// `errSecDuplicateItem` and stores an extra copy of it that has no label, which nothing can
+    /// find or delete afterwards. Every `swift test` run used to leave thousands of them in the
+    /// login keychain.
+    @Test
+    func store_whenTheKeyIsAlreadyStored_addsNoCopyOfIt() throws {
+        // Given: a pair of its own, so that deleting its key at the end takes nothing from the
+        // tests that handshake with `Certificates().client()` at the same time.
+        let client = CertificateResource("client_chain_leaf", format: .pem)
+        let certificate = try Self.certificate(fromPEMFile: client.certificateURL)
+        let secKey = try Self.secKey(fromPrivateKeyPEMFile: client.privateKeyURL)
+
+        let labels = (0..<3).map { _ in "InternalsRawBytesIdentityBuilderTests.noCopy." + UUID().uuidString }
+        defer { labels.forEach(Self.deleteKeychainItems(labelled:)) }
+
+        let before = Self.unlabelledPrivateKeyCount()
+
+        // When
+        for label in labels {
+            _ = try Internals.RawBytesIdentityBuilder.store(
+                certificate: certificate,
+                secKey: secKey,
+                label: label,
+                useDataProtectionKeychain: false
+            )
+        }
+
+        // Then
+        #expect(Self.unlabelledPrivateKeyCount() == before)
+    }
+
+    fileprivate static func unlabelledPrivateKeyCount() -> Int {
+        var result: CFTypeRef?
+        let status = SecItemCopyMatching(
+            [
+                kSecClass: kSecClassKey,
+                kSecAttrKeyClass: kSecAttrKeyClassPrivate,
+                kSecMatchLimit: kSecMatchLimitAll,
+                kSecReturnAttributes: true,
+                kSecUseDataProtectionKeychain: false,
+            ] as CFDictionary,
+            &result
+        )
+
+        guard status == errSecSuccess, let items = result as? [[String: Any]] else {
+            return 0
+        }
+
+        return items.filter { (($0[kSecAttrLabel as String] as? String) ?? "").isEmpty }.count
+    }
+
+    fileprivate static func deleteKeychainItems(labelled label: String) {
+        for itemClass in [kSecClassKey, kSecClassCertificate] {
+            SecItemDelete(
+                [
+                    kSecClass: itemClass,
+                    kSecAttrLabel: label,
+                    kSecUseDataProtectionKeychain: false,
+                ] as CFDictionary
+            )
+        }
     }
     #endif
 

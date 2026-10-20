@@ -327,7 +327,12 @@ extension Internals {
             // reliably match an existing item across process runs; label-based matching does.
             let label = "RequestDL.mtls." + Self.hexDigest(certificateDER) + "." + Self.hexDigest(privateKeyDER)
 
-            return try Internals.IdentityManager.shared.handle(for: label) {
+            // The Keychain stores one item per key, whatever certificate it is paired with, so
+            // the key gets a label of its own and outlives every identity built from it (see
+            // `store(...)`).
+            let keyLabel = "RequestDL.mtls.key." + Self.hexDigest(privateKeyDER)
+
+            return try Internals.IdentityManager.shared.handle(for: label, keyLabel: keyLabel) {
                 #if os(macOS)
                 // Try the modern, data-protection keychain first: unlike the legacy (CDSA-backed)
                 // keychain below, it's confirmed to accept an *imported* EC `SecKey` (built here
@@ -345,6 +350,7 @@ extension Internals {
                         certificate: certificate,
                         secKey: secKey,
                         label: label,
+                        keyLabel: keyLabel,
                         useDataProtectionKeychain: true
                     )
                     return (identity, true)
@@ -354,6 +360,7 @@ extension Internals {
                         certificate: certificate,
                         secKey: secKey,
                         label: label,
+                        keyLabel: keyLabel,
                         useDataProtectionKeychain: false
                     )
                     return (identity, false)
@@ -366,6 +373,7 @@ extension Internals {
                     certificate: certificate,
                     secKey: secKey,
                     label: label,
+                    keyLabel: keyLabel,
                     useDataProtectionKeychain: true
                 )
                 return (identity, true)
@@ -388,13 +396,22 @@ extension Internals {
         /// (`swift test` included) still lands here with `useDataProtectionKeychain: false` and
         /// hits this gap for an EC client certificate, since there is no known way to store an
         /// imported EC key on that Keychain.
+        ///
+        /// - Parameters:
+        ///   - label: The label of the certificate, and of the key when `keyLabel` is `nil`.
+        ///   - keyLabel: The label of the key, when it is not the certificate's.
         package static func store(
             certificate: SecCertificate,
             secKey: SecKey,
             label: String,
+            keyLabel: String? = nil,
             useDataProtectionKeychain: Bool
         ) throws -> SecIdentity {
-            Self.removeExistingKeychainItems(label: label, useDataProtectionKeychain: useDataProtectionKeychain)
+            Self.removeExistingKeychainItems(
+                label: label,
+                itemClasses: [kSecClassCertificate],
+                useDataProtectionKeychain: useDataProtectionKeychain
+            )
 
             // `kSecAttrApplicationLabel` is the public-key hash Security.framework's own
             // identity-synthesis engine uses to pair a `kSecClassKey` item with a
@@ -426,19 +443,30 @@ extension Internals {
             }
             let applicationLabel = Data(Insecure.SHA1.hash(data: publicKeyRepresentation))
 
-            try addToKeychain(
-                query: [
-                    kSecClass: kSecClassKey,
-                    kSecValueRef: secKey,
-                    kSecAttrLabel: label,
-                    kSecAttrApplicationLabel: applicationLabel,
-                    // This device only, not iCloud Keychain: the key only needs to survive
-                    // this process's lifetime, not sync anywhere.
-                    kSecAttrAccessible: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
-                    kSecUseDataProtectionKeychain: useDataProtectionKeychain,
-                ],
-                operation: "SecItemAdd(key)"
-            )
+            // The file keychain answers a second `SecItemAdd` of the same key with
+            // `errSecDuplicateItem` but still stores an extra copy of it, with no label, no tag
+            // and an application label nothing can query for, so nothing can ever delete it
+            // again. Only a key that is not stored yet is added: one that is already there, left
+            // by another identity or by a process that never got to delete it, pairs with this
+            // certificate by its application label all the same.
+            if !isPrivateKeyStored(
+                applicationLabel: applicationLabel,
+                useDataProtectionKeychain: useDataProtectionKeychain
+            ) {
+                try addToKeychain(
+                    query: [
+                        kSecClass: kSecClassKey,
+                        kSecValueRef: secKey,
+                        kSecAttrLabel: keyLabel ?? label,
+                        kSecAttrApplicationLabel: applicationLabel,
+                        // This device only, not iCloud Keychain: the key only needs to survive
+                        // this process's lifetime, not sync anywhere.
+                        kSecAttrAccessible: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+                        kSecUseDataProtectionKeychain: useDataProtectionKeychain,
+                    ],
+                    operation: "SecItemAdd(key)"
+                )
+            }
 
             try addToKeychain(
                 query: [
@@ -498,24 +526,38 @@ extension Internals {
             return matchingIdentity
         }
 
-        private static func removeExistingKeychainItems(label: String, useDataProtectionKeychain: Bool) {
-            SecItemDelete(
-                [
-                    kSecClass: kSecClassKey,
-                    kSecAttrLabel: label,
-                    kSecUseDataProtectionKeychain: useDataProtectionKeychain,
-                ] as CFDictionary
-            )
-            SecItemDelete(
-                [
-                    kSecClass: kSecClassCertificate,
-                    kSecAttrLabel: label,
-                    kSecUseDataProtectionKeychain: useDataProtectionKeychain,
-                ] as CFDictionary
-            )
+        private static func removeExistingKeychainItems(
+            label: String,
+            itemClasses: [CFString] = [kSecClassKey, kSecClassCertificate],
+            useDataProtectionKeychain: Bool
+        ) {
+            for itemClass in itemClasses {
+                SecItemDelete(
+                    [
+                        kSecClass: itemClass,
+                        kSecAttrLabel: label,
+                        kSecUseDataProtectionKeychain: useDataProtectionKeychain,
+                    ] as CFDictionary
+                )
+            }
         }
 
         // MARK: - Private methods
+
+        private static func isPrivateKeyStored(
+            applicationLabel: Data,
+            useDataProtectionKeychain: Bool
+        ) -> Bool {
+            SecItemCopyMatching(
+                [
+                    kSecClass: kSecClassKey,
+                    kSecAttrKeyClass: kSecAttrKeyClassPrivate,
+                    kSecAttrApplicationLabel: applicationLabel,
+                    kSecUseDataProtectionKeychain: useDataProtectionKeychain,
+                ] as CFDictionary,
+                nil
+            ) == errSecSuccess
+        }
 
         private static func addToKeychain(query: [CFString: Any], operation: String) throws {
             var result: CFTypeRef?
