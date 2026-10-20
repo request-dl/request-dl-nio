@@ -457,8 +457,10 @@ extension DataTaskTests {
             // `.nioTransportServices` are both backed by `Internals.ClientManager.Client.nio`, so
             // that alone can't tell them apart; `resolveExecutor()`, the same call
             // `RawTask`/`ClientManager` make, can.
+            #if canImport(Darwin)
             let resolved = try await resolve(content(session))
             #expect(resolved.session.configuration.resolveExecutor() == .nioTransportServices)
+            #endif
         }
     }
 

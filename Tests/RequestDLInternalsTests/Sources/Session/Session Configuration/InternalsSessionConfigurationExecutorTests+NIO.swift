@@ -215,7 +215,11 @@ extension InternalsSessionConfigurationExecutorTests {
         let sut = configuration.resolveExecutor()
 
         // Then
+        #if canImport(Darwin)
         #expect(sut == .nioTransportServices)
+        #else
+        #expect(sut == .nio)
+        #endif
     }
 
     @Test
