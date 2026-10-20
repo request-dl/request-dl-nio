@@ -34,6 +34,7 @@ Each script takes `label=path/to/cache-probe` arguments, one per build, and prin
 | `run-n6.sh` | How long a cache hit read from the disk tier takes, for a body of 32 and 128 MiB. | `python3`. |
 | `run-p3.sh` | How many threads a process has after it touched the disk cache, without NIO. | A build with `CACHE_PROBE_TRAITS=none`. |
 | `run-n8.sh` | How long uploads compressed with gzip take, and how many threads the process had at most. | `python3`. |
+| `run-n10.sh` | How many bytes a server sends to a fast-scrolled list that cancels each image load shortly after starting it. | `python3`, and a platform with `RDLImageLoader` (AppKit or UIKit). |
 
 `run-n5.sh` runs each build with the cache off and with an 8 MiB memory tier. A revision that holds the whole body in the tier (the one before the fix) is the positive control: it shows the cache is engaged in the setup. The resident size is read from the process, so it is the high water mark of what was live, not what the allocator gives back.
 
