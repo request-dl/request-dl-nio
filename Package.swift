@@ -41,15 +41,15 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/apple/swift-nio",
-            from: "2.103.0"
+            from: "2.104.0"
         ),
         .package(
             url: "https://github.com/apple/swift-nio-extras",
-            from: "1.35.1"
+            from: "1.35.2"
         ),
         .package(
             url: "https://github.com/apple/swift-nio-http2",
-            from: "1.36.0"
+            from: "1.46.0"
         ),
         .package(
             url: "https://github.com/apple/swift-nio-ssl",
@@ -61,11 +61,11 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/apple/swift-log",
-            from: "1.15.1"
+            from: "1.16.2"
         ),
         .package(
             url: "https://github.com/apple/swift-collections",
-            from: "1.7.1"
+            from: "1.7.5"
         ),
         .package(
             url: "https://github.com/o-nnerb/swift-async-stream",
@@ -73,7 +73,7 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/apple/swift-async-algorithms",
-            from: "1.1.6"
+            from: "1.1.7"
         ),
         .package(
             url: "https://github.com/apple/swift-system",
@@ -81,24 +81,24 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/apple/swift-distributed-tracing",
-            from: "1.5.0"
+            from: "1.7.3"
         ),
         .package(
             url: "https://github.com/apple/swift-metrics",
-            from: "2.11.0"
+            from: "2.13.0"
         ),
         .package(
             url: "https://github.com/apple/swift-configuration",
-            from: "1.2.1",
+            from: "1.4.0",
             traits: []
         ),
         .package(
             url: "https://github.com/apple/swift-crypto.git",
-            from: "5.0.0"
+            from: "5.0.3"
         ),
         .package(
             url: "https://github.com/apple/swift-certificates.git",
-            from: "1.21.0"
+            from: "1.21.1"
         ),
     ],
     targets: [
