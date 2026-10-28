@@ -56,7 +56,8 @@ jobs:
       format-swift-version: '6.4'
 
       # Step 3
-      enable-breaking-changes: true
+      # Off until swift package diagnose-api-breaking-changes works on the xcode-27 image.
+      enable-breaking-changes: false
       skip-on-major-update: true
       force-skip-breaking-changes: ${{ contains(github.event.pull_request.labels.*.name, 'force-skip-ci') }}
 
