@@ -46,6 +46,11 @@ struct DownloadResumptionPolicyTests {
     }
 
     @Test
+    func enabled_treatsANaNDelayAsNoDelay() {
+        #expect(DownloadResumptionPolicy.enabled(delay: .nan).resumption?.delay == .zero)
+    }
+
+    @Test
     func policies_areEquatableByTheirSettings() {
         #expect(DownloadResumptionPolicy.enabled(delay: 2) == .enabled(delay: 2))
         #expect(DownloadResumptionPolicy.enabled(delay: 2) != .enabled(delay: 3))

@@ -91,6 +91,15 @@ struct ResumingUploadsModifierTests {
     }
 
     @Test
+    func aNaNDelay_isNoDelay() async throws {
+        // When
+        let setup = try #require(try await Probe().resumingUploads(delay: .nan).result())
+
+        // Then
+        #expect(setup.delay == 0)
+    }
+
+    @Test
     func aDelayTooLongToCount_isAsLongAsThereIs() async throws {
         // When
         let setup = try #require(try await Probe().resumingUploads(delay: .greatestFiniteMagnitude).result())
