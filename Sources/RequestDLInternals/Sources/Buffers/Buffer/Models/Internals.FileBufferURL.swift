@@ -126,12 +126,18 @@ extension Internals {
             } catch {}
         }
 
+        /// Removes the file when this package created it.
+        ///
+        /// Runs through `Internals.uncancellable`: a request that is cancelled cleans up from a
+        /// cancelled Task, where `NIOFileSystem` refuses the work with a `CancellationError` and
+        /// the file would stay behind.
         package func removeIfTemporary() async {
             guard isTemporary else {
                 return
             }
 
-            try? await url.removeIfNeeded()
+            let url = url
+            try? await Internals.uncancellable { try await url.removeIfNeeded() }
         }
 
         package func absoluteURL() -> URL {
