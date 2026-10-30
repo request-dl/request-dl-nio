@@ -66,6 +66,19 @@ extension Internals {
             return era * 146_097 + dayOfEra - 719_468
         }
 
+        /// The number of days in `month` of `year`, leap years included.
+        package static func daysInMonth(year: Int64, month: Int64) -> Int64 {
+            switch month {
+            case 2:
+                let isLeapYear = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
+                return isLeapYear ? 29 : 28
+            case 4, 6, 9, 11:
+                return 30
+            default:
+                return 31
+            }
+        }
+
         /// Integer division that rounds toward negative infinity.
         ///
         /// Swift's `/` rounds toward zero, which splits `-1 / 86400` into day zero with a
@@ -156,25 +169,35 @@ extension Date {
         switch fields.count {
         case 5:
             offset = 0
-        case 6...:
+        case 6:
             offset = 1
         default:
             return nil
         }
 
+        // ASCII digits only, in the lengths the grammar gives. `Int64(_:)` alone takes a sign and
+        // any number of digits, and an unbounded year overflows the arithmetic below.
+        func number(_ field: some StringProtocol, digits: ClosedRange<Int>) -> Int64? {
+            guard digits.contains(field.utf8.count), field.utf8.allSatisfy({ $0 >= 0x30 && $0 <= 0x39 }) else {
+                return nil
+            }
+
+            return Int64(field)
+        }
+
         guard
-            let day = Int64(fields[offset]),
+            let day = number(fields[offset], digits: 1...2),
             let month = Self.httpMonths[fields[offset + 1]],
-            let year = Int64(fields[offset + 2])
+            let year = number(fields[offset + 2], digits: 4...4)
         else { return nil }
 
-        let time = fields[offset + 3].split(separator: ":")
+        let time = fields[offset + 3].split(separator: ":", omittingEmptySubsequences: false)
 
         guard
             time.count == 3,
-            let hour = Int64(time[0]),
-            let minute = Int64(time[1]),
-            let second = Int64(time[2])
+            let hour = number(time[0], digits: 2...2),
+            let minute = number(time[1], digits: 2...2),
+            let second = number(time[2], digits: 2...2)
         else { return nil }
 
         // Range checked before the arithmetic. The algorithm below happily accepts month 47 and
@@ -182,7 +205,7 @@ extension Date {
         // plausible looking date rather than into a rejection.
         guard
             (1...12).contains(month),
-            (1...31).contains(day),
+            (1...Internals.GregorianCalendar.daysInMonth(year: year, month: month)).contains(day),
             (0...23).contains(hour),
             (0...59).contains(minute),
             // 60 for a leap second, which RFC 9110 permits.

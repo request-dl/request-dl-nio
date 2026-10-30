@@ -133,7 +133,8 @@ extension RequestTask {
         delay: Double = 1,
         onCancellation: UploadCancellation = .terminate
     ) -> AnyTask<Element> {
-        let nanoseconds = (max(delay, .zero) * 1_000_000_000).rounded()
+        // `NaN` waits as little as a negative delay does: converting it would trap.
+        let nanoseconds = (max(delay.isNaN ? .zero : delay, .zero) * 1_000_000_000).rounded()
 
         let setup = ResumableUploadSetup(
             dialect: `protocol`.dialect,

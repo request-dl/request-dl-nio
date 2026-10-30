@@ -426,7 +426,9 @@ extension Internals {
             let onDiskSize = min(remainingInFile, UInt64(Self.chunkOnDiskSize))
             let isLast = chunkStart + onDiskSize == rawSize
 
-            guard onDiskSize > UInt64(Self.tagSize) else {
+            // A body that is a whole number of chunks ends with a final chunk that holds only its
+            // tag, so a chunk of exactly `tagSize` bytes is valid and decrypts to nothing.
+            guard onDiskSize >= UInt64(Self.tagSize) else {
                 throw StreamError.truncatedChunk
             }
 

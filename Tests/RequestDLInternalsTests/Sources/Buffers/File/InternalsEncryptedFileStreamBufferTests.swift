@@ -163,6 +163,41 @@ struct InternalsEncryptedFileStreamBufferTests {
         }
     }
 
+    /// A body that is a whole number of chunks ends with a final chunk that holds only its tag.
+    /// Reading up to, or past, the end must not treat that chunk as truncated.
+    @Test(arguments: [1, 2])
+    func read_whenBodyIsWholeChunks_shouldReachTheEndWithoutError(_ chunkCount: Int) async throws {
+        try await withTemporaryFileURL("encrypted.bin") { fileURL in
+            let expected = Data((0..<(chunkPlaintextSize * chunkCount)).map { UInt8($0 % 251) })
+            let url = makeURL(fileURL)
+
+            let writer = try await Internals.EncryptedFileStreamBuffer(writingTo: url)
+            try await writer.writeData(expected)
+            try await writer.close()
+
+            let reader = try await Internals.EncryptedFileStreamBuffer(readingFrom: url)
+
+            do {
+                // Exactly the size.
+                #expect(try await reader.readData(length: UInt64(expected.count)) == expected)
+
+                // More than there is: the bytes that exist come back.
+                try await reader.seek(to: 0)
+                #expect(try await reader.readData(length: UInt64(expected.count) + 10) == expected)
+
+                // Nothing left.
+                try await reader.seek(to: UInt64(expected.count))
+                #expect(try await reader.readData(length: 10) == nil)
+            } catch {
+                // A handle must be closed before it is released, even when the read fails.
+                try? await reader.close()
+                throw error
+            }
+
+            try await reader.close()
+        }
+    }
+
     @Test
     func read_whenTrailingChunkIsTruncated_shouldFailAsDecryptionMiss() async throws {
         try await withTemporaryFileURL("encrypted.bin") { fileURL in

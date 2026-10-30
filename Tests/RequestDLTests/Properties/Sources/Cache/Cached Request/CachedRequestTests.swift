@@ -222,6 +222,30 @@ struct CachedRequestTests {
         #expect(thrownError is EmptyCachedDataError)
     }
 
+    /// An `Expires` the date parser cannot hold has to read as no `Expires` at all. A year far
+    /// beyond what `Int64` seconds can represent used to end the process on the lookup.
+    @Test
+    func cache_whenExpiresHasAnAbsurdYear_ignoresTheHeaderInsteadOfTrapping() async throws {
+        let testState = try await TestState()
+        let cacheData = await mockCachedData([
+            ("Cache-Control", "public"),
+            ("Expires", "Sun, 06 Nov 400000000000 08:49:37 GMT"),
+        ])
+        let cacheKey = "https://localhost:8888" + testState.uri
+
+        // When
+        await testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
+
+        let response = try await performCacheRequest(
+            testState: testState,
+            headers: makeHeaders(eTag: UUID()),
+            cacheStrategy: .useCachedDataOnly
+        )
+
+        // Then
+        #expect(response.head == cacheData.response)
+    }
+
     @Test
     func cache_whenUseCachedDataOnlyStrategyWithValidCacheExpires() async throws {
         let testState = try await TestState()

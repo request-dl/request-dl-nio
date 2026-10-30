@@ -146,6 +146,50 @@ struct DateMethodsTests {
         #expect(Date(httpDate: "Sun, 06 Nov 1994 08:49:61 GMT") == nil)
     }
 
+    @Test(
+        arguments: [
+            "Sun, 06 Nov 400000000000 08:49:37 GMT",
+            "Sun, 06 Nov 9223372036854775807 08:49:37 GMT",
+            "Sun, 06 Nov -9223372036854775808 08:49:37 GMT",
+            "Sun, 06 Nov 10000 08:49:37 GMT",
+            "Sun, 06 Nov 94 08:49:37 GMT",
+            "Sun, 06 Nov +1994 08:49:37 GMT",
+        ]
+    )
+    func httpDateReturnsNilWhenTheYearIsNotFourDigits(_ value: String) {
+        #expect(Date(httpDate: value) == nil)
+    }
+
+    @Test
+    func httpDateReturnsNilWhenATimeComponentIsNotTwoDigits() {
+        #expect(Date(httpDate: "Sun, 06 Nov 1994 8:49:37 GMT") == nil)
+        #expect(Date(httpDate: "Sun, 06 Nov 1994 08:4:37 GMT") == nil)
+        #expect(Date(httpDate: "Sun, 06 Nov 1994 08:49:+7 GMT") == nil)
+        #expect(Date(httpDate: "Sun, 06 Nov 1994 08::37 GMT") == nil)
+    }
+
+    @Test
+    func httpDateReturnsNilWhenThereAreMoreFieldsThanTheGrammarHas() {
+        #expect(Date(httpDate: "Sun, 06 Nov 1994 08:49:37 GMT extra") == nil)
+    }
+
+    @Test
+    func httpDateReturnsNilWhenTheDayDoesNotExistInTheMonth() {
+        #expect(Date(httpDate: "Sun, 31 Feb 2026 00:00:00 GMT") == nil)
+        #expect(Date(httpDate: "Sun, 30 Feb 2024 00:00:00 GMT") == nil)
+        #expect(Date(httpDate: "Sun, 29 Feb 2025 00:00:00 GMT") == nil)
+        #expect(Date(httpDate: "Sun, 31 Apr 2026 00:00:00 GMT") == nil)
+    }
+
+    @Test
+    func httpDateAcceptsTheLastDayOfEveryMonthLength() {
+        #expect(Date(httpDate: "Thu, 29 Feb 2024 00:00:00 GMT") != nil)
+        #expect(Date(httpDate: "Sat, 29 Feb 2000 00:00:00 GMT") != nil)
+        #expect(Date(httpDate: "Fri, 29 Feb 2100 00:00:00 GMT") == nil)
+        #expect(Date(httpDate: "Thu, 30 Apr 2026 00:00:00 GMT") != nil)
+        #expect(Date(httpDate: "Sun, 31 May 2026 00:00:00 GMT") != nil)
+    }
+
     // MARK: - HTTP date formatting
 
     @Test

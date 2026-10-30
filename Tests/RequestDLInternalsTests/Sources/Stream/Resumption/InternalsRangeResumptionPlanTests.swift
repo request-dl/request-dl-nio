@@ -105,6 +105,14 @@ struct InternalsRangeResumptionPlanTests {
         #expect(makePlan([("Last-Modified", Self.lastModified)]) == nil)
     }
 
+    /// A year the arithmetic cannot hold must read as an invalid date, not end the process.
+    @Test
+    func lastModifiedWithAnAbsurdYear_isNotResumable() {
+        #expect(
+            makePlan([("Last-Modified", "Sun, 06 Nov 400000000000 08:49:37 GMT"), ("Date", Self.date)]) == nil
+        )
+    }
+
     @Test
     func noValidator_isNotResumable() {
         #expect(makePlan([("Content-Length", "1000")]) == nil)
