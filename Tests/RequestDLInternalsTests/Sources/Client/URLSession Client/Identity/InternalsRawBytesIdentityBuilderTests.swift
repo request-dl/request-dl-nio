@@ -201,6 +201,99 @@ struct InternalsRawBytesIdentityBuilderTests {
         #expect(der == sec1)
     }
 
+    // MARK: - PEM files that hold more than the bare key
+
+    enum KeyFile: CaseIterable, CustomTestStringConvertible {
+        case rsa
+        case ec
+
+        var testDescription: String {
+            switch self {
+            case .rsa: "RSA"
+            case .ec: "EC"
+            }
+        }
+
+        func der() throws -> Data {
+            switch self {
+            case .rsa:
+                return try InternalsRawBytesIdentityBuilderTests.makeRSAPKCS1DER()
+            case .ec:
+                let curve = InternalsRawBytesIdentityBuilderTests.Curve.p256
+                let scalar = curve.randomScalar()
+
+                return InternalsRawBytesIdentityBuilderTests.sec1ECPrivateKeyDER(
+                    scalar: scalar,
+                    curveOID: curve.oid,
+                    publicKeyPoint: curve.x963PublicKey(fromScalar: scalar)
+                )
+            }
+        }
+
+        var header: String {
+            switch self {
+            case .rsa: "RSA PRIVATE KEY"
+            case .ec: "EC PRIVATE KEY"
+            }
+        }
+    }
+
+    private static let certificateBlock = "-----BEGIN CERTIFICATE-----\nAAAAAAAA\n-----END CERTIFICATE-----\n"
+
+    @Test(arguments: KeyFile.allCases)
+    func privateKeyDER_whenLineEndingsAreCRLF_givesTheSameKey(_ file: KeyFile) throws {
+        let der = try file.der()
+        let pem = String(decoding: Self.pem(der: der, header: file.header), as: UTF8.self)
+            .replacingOccurrences(of: "\n", with: "\r\n")
+
+        #expect(try Internals.RawBytesIdentityBuilder.privateKeyDER(fromPEM: Data(pem.utf8)) == der)
+    }
+
+    @Test(arguments: KeyFile.allCases)
+    func privateKeyDER_whenTheCertificateIsInTheSameFile_givesOnlyTheKey(_ file: KeyFile) throws {
+        let der = try file.der()
+        let key = String(decoding: Self.pem(der: der, header: file.header), as: UTF8.self)
+
+        let certificateFirst = Self.certificateBlock + key + "\n"
+        let keyFirst = key + "\n" + Self.certificateBlock
+
+        #expect(try Internals.RawBytesIdentityBuilder.privateKeyDER(fromPEM: Data(certificateFirst.utf8)) == der)
+        #expect(try Internals.RawBytesIdentityBuilder.privateKeyDER(fromPEM: Data(keyFirst.utf8)) == der)
+    }
+
+    @Test
+    func privateKeyDER_whenECParametersComeBeforeTheKey_givesOnlyTheKey() throws {
+        let der = try KeyFile.ec.der()
+        let parameters = "-----BEGIN EC PARAMETERS-----\nBggqhkjOPQMBBw==\n-----END EC PARAMETERS-----\n"
+        let key = String(decoding: Self.pem(der: der, header: "EC PRIVATE KEY"), as: UTF8.self)
+
+        #expect(try Internals.RawBytesIdentityBuilder.privateKeyDER(fromPEM: Data((parameters + key).utf8)) == der)
+    }
+
+    @Test(arguments: KeyFile.allCases)
+    func privateKeyDER_whenTextFollowsTheKey_givesTheKey(_ file: KeyFile) throws {
+        let der = try file.der()
+        let key = String(decoding: Self.pem(der: der, header: file.header), as: UTF8.self)
+
+        #expect(
+            try Internals.RawBytesIdentityBuilder.privateKeyDER(fromPEM: Data((key + "\n# a comment\n").utf8)) == der
+        )
+    }
+
+    @Test
+    func privateKeyDER_whenTheFileHasNoPrivateKey_namesTheFirstBlock() {
+        let pem = Data(Self.certificateBlock.utf8)
+
+        do {
+            _ = try Internals.RawBytesIdentityBuilder.privateKeyDER(fromPEM: pem)
+            Issue.record("Not expecting success")
+        } catch Internals.RawBytesIdentityBuilder.Error.unsupportedKeyFormat(let header) {
+            #expect(header == "-----BEGIN CERTIFICATE-----")
+        } catch {
+            Issue.record("Unexpected error \(error)")
+        }
+    }
+
     // MARK: - Keychain round trip (store(...))
 
     /// `makeIdentity(_:_:)` on macOS tries the modern, data-protection Keychain first

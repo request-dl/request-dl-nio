@@ -10,6 +10,7 @@
 
 import CryptoKit
 import Security
+import SwiftASN1
 import _CryptoExtras
 
 #if canImport(FoundationEssentials)
@@ -166,38 +167,36 @@ extension Internals {
 
         // MARK: - Private key (PEM -> DER)
 
-        /// Strips PEM armor down to the base64-decoded DER payload, for any of the three headers
-        /// this executor recognizes for a private key: PKCS#1 RSA (`RSA PRIVATE KEY`), SEC1 EC
-        /// (`EC PRIVATE KEY`), and PKCS#8 (`PRIVATE KEY`, itself wrapping either RSA or EC). Which
-        /// header matched doesn't change what happens next: ``secKey(fromDER:)`` classifies the
-        /// DER content itself, not the PEM label around it.
+        /// Strips PEM armor down to the DER payload of the first block that holds a private key,
+        /// for any of the three labels this executor recognizes: PKCS#1 RSA (`RSA PRIVATE KEY`),
+        /// SEC1 EC (`EC PRIVATE KEY`), and PKCS#8 (`PRIVATE KEY`, itself wrapping either RSA or
+        /// EC). Which label matched doesn't change what happens next: ``secKey(fromDER:)``
+        /// classifies the DER content itself, not the PEM label around it.
+        ///
+        /// Read with the same parser as the certificates, so a file with CRLF line endings, or one
+        /// that also holds the certificate or other blocks, gives the same key as a file with only
+        /// the key in it.
         package static func privateKeyDER(fromPEM pemData: Data) throws -> Data {
             guard let pemString = String(data: pemData, encoding: .utf8) else {
                 throw Error.unsupportedKeyFormat("non-UTF8 input")
             }
 
-            let recognizedHeaders = [
-                "-----BEGIN RSA PRIVATE KEY-----",
-                "-----BEGIN EC PRIVATE KEY-----",
-                "-----BEGIN PRIVATE KEY-----",
-            ]
+            let documents: [PEMDocument]
 
-            guard recognizedHeaders.contains(where: pemString.contains) else {
-                let header = pemString.split(separator: "\n").first.map(String.init) ?? "empty input"
+            do {
+                documents = try PEMDocument.parseMultiple(pemString: pemString)
+            } catch {
+                throw Error.unsupportedKeyFormat("malformed PEM")
+            }
+
+            let recognizedLabels: Set = ["RSA PRIVATE KEY", "EC PRIVATE KEY", "PRIVATE KEY"]
+
+            guard let key = documents.first(where: { recognizedLabels.contains($0.discriminator) }) else {
+                let header = documents.first.map { "-----BEGIN \($0.discriminator)-----" } ?? "empty input"
                 throw Error.unsupportedKeyFormat(header)
             }
 
-            let base64 =
-                pemString
-                .split(separator: "\n")
-                .filter { !$0.hasPrefix("-----") }
-                .joined()
-
-            guard let der = Data(base64Encoded: base64) else {
-                throw Error.unsupportedKeyFormat("malformed base64 body")
-            }
-
-            return der
+            return Data(key.derBytes)
         }
 
         // MARK: - Private key (DER -> SecKey)
