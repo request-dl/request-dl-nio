@@ -4,6 +4,7 @@
 
 #if canImport(Darwin)
 
+import Dispatch
 import RequestDLInternals
 import SwiftAsyncStream
 
@@ -157,22 +158,20 @@ extension BackgroundDownloads {
         /// asked fresh: cheap enough for something that only runs when a caller explicitly asks
         /// to cancel something, not on any hot path.
         ///
+        /// Asked of the session even when nothing was scheduled in this process: after a manual
+        /// relaunch the system may still be running downloads from the previous one, and only
+        /// creating the session with the stable identifier reattaches them.
+        ///
         /// Cancelling a `URLSessionTask` this way makes it fail with `NSURLErrorCancelled`
         /// shortly after, through the ordinary `didCompleteWithError` callback below, so a
         /// cancellation is reported through ``BackgroundDownloads/onEvent`` as an ordinary
         /// `.failed` event, not a distinct case of its own.
         ///
         /// - Returns: `true` if a matching, still-running download was found and cancelled;
-        /// `false` if none was (already finished, never existed, or no download has ever been
-        /// scheduled in this process at all, checked without creating a session just to find
-        /// out, since there would be nothing in it to cancel either way).
+        /// `false` if none was (already finished or never existed).
         @discardableResult
         func cancel(id: String) async -> Bool {
-            guard let urlSession = lock.withLock({ _urlSession }) else {
-                return false
-            }
-
-            guard let match = Self.firstTask(matching: id, in: await urlSession.allTasks) else {
+            guard let match = Self.firstTask(matching: id, in: await urlSession().allTasks) else {
                 return false
             }
 
@@ -191,11 +190,7 @@ extension BackgroundDownloads {
         ///
         /// - Returns: `true` if a matching download was found, `false` if none was.
         func control(id: String, _ action: Control) async -> Bool {
-            guard let urlSession = lock.withLock({ _urlSession }) else {
-                return false
-            }
-
-            guard let match = Self.firstTask(matching: id, in: await urlSession.allTasks) else {
+            guard let match = Self.firstTask(matching: id, in: await urlSession().allTasks) else {
                 return false
             }
 
@@ -206,12 +201,8 @@ extension BackgroundDownloads {
         /// Cancels the download with this `id` and hands back what `URLSession` kept to continue
         /// it. `nil` when there was no such download, or nothing to continue from.
         func cancelProducingResumeData(id: String) async -> BackgroundDownloadResumeData? {
-            guard let urlSession = lock.withLock({ _urlSession }) else {
-                return nil
-            }
-
             guard
-                let match = Self.firstTask(matching: id, in: await urlSession.allTasks),
+                let match = Self.firstTask(matching: id, in: await urlSession().allTasks),
                 let download = match as? URLSessionDownloadTask
             else {
                 return nil
@@ -423,6 +414,16 @@ extension BackgroundDownloads {
                 // losing whatever was already downloaded there before this attempt even though
                 // the failure was transient. `replaceItemAt` swaps the two atomically, leaving
                 // the original file untouched if the replacement can't complete.
+                //
+                // The directory is created first: `URLSession` deletes `location` as soon as this
+                // returns, so a destination folder that is gone by now (a subfolder of `Caches`
+                // the system cleared while the app was not running, say) would otherwise lose a
+                // download that may have taken hours.
+                try FileManager.default.createDirectory(
+                    at: destination.deletingLastPathComponent(),
+                    withIntermediateDirectories: true
+                )
+
                 if FileManager.default.fileExists(atPath: destination.path) {
                     _ = try FileManager.default.replaceItemAt(destination, withItemAt: location)
                 } else {
@@ -476,7 +477,12 @@ extension BackgroundDownloads {
                 return _pendingCompletionHandler
             }
 
-            handler?()
+            // On the main queue, as the system's own sample code does with the handler it passes to
+            // `application(_:handleEventsForBackgroundURLSession:completionHandler:)`. This is
+            // called on the delegate queue, a background one.
+            if let handler {
+                DispatchQueue.main.async { handler() }
+            }
         }
 
         // MARK: - taskDescription encoding

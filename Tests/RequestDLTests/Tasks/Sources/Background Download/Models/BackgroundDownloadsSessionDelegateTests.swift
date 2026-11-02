@@ -64,6 +64,40 @@ struct BackgroundDownloadsSessionDelegateTests {
         }
     }
 
+    /// `URLSession` deletes the downloaded file once the delegate returns, so a destination folder
+    /// that is gone by then (a cleared `Caches` subfolder) would lose the whole download.
+    @Test
+    func didFinishDownloadingTo_whenTheDestinationDirectoryIsMissing_createsItAndCompletes() async throws {
+        try await withTemporaryFileURL("source.tmp") { location in
+            try await withTemporaryFileURL("missing", "nested", "destination.bin", createPath: false) { destination in
+                // Given
+                try Data("downloaded content".utf8).write(to: location)
+
+                let session = BackgroundDownloads.Session()
+                let events = EventBox()
+                session.onEvent = { events.append($0) }
+
+                let task = URLSession.shared.downloadTask(with: try #require(URL(string: "https://example.com")))
+                task.taskDescription = BackgroundDownloads.Session.encode(id: "episode-42", destination: destination)
+
+                #expect(!FileManager.default.fileExists(atPath: destination.deletingLastPathComponent().path))
+
+                // When
+                session.urlSession(.shared, downloadTask: task, didFinishDownloadingTo: location)
+
+                // Then
+                #expect(try Data(contentsOf: destination) == Data("downloaded content".utf8))
+
+                guard case .completed(let id, let recordedDestination) = try #require(events.all.first) else {
+                    Issue.record("Expected .completed, got \(String(describing: events.all.first))")
+                    return
+                }
+                #expect(id == "episode-42")
+                #expect(recordedDestination == destination)
+            }
+        }
+    }
+
     @Test
     func didFinishDownloadingTo_whenDestinationAlreadyExists_overwritesIt() async throws {
         try await withTemporaryFileURL("source.tmp") { location in
@@ -241,23 +275,50 @@ struct BackgroundDownloadsSessionDelegateTests {
     func handleEvents_whenIdentifierMatches_storesHandlerAndFinishEventsCallsAndClearsIt() async throws {
         // Given
         let session = BackgroundDownloads.Session()
-        let firstCalled = CallBox()
+        let firstCalled = AsyncSignalBox()
+        let firstCallCount = CallCounter()
 
         session.handleEvents(forIdentifier: BackgroundDownloads.Session.identifier) {
-            firstCalled.markCalled()
+            firstCallCount.increment()
+            firstCalled.fire()
         }
 
         // When
         session.urlSessionDidFinishEvents(forBackgroundURLSession: .shared)
 
         // Then
-        #expect(firstCalled.wasCalled)
+        await firstCalled.wait()
+        #expect(firstCallCount.value == 1)
 
         // And: a second finish-events call with no new `handleEvents` in between must not
         // re-invoke a stale handler.
-        let secondCalled = CallBox()
         session.urlSessionDidFinishEvents(forBackgroundURLSession: .shared)
-        #expect(!secondCalled.wasCalled)
+        await MainActor.run {}
+        #expect(firstCallCount.value == 1)
+    }
+
+    /// The system's own sample code calls the handler on the main queue, and the delegate callback
+    /// arrives on a background one.
+    @Test
+    func urlSessionDidFinishEvents_callsTheHandlerOnTheMainThread() async throws {
+        // Given
+        let session = BackgroundDownloads.Session()
+        let signal = AsyncSignalBox()
+        let thread = ThreadRecorder()
+
+        session.handleEvents(forIdentifier: BackgroundDownloads.Session.identifier) {
+            thread.record(Thread.isMainThread)
+            signal.fire()
+        }
+
+        // When
+        await Task.detached {
+            session.urlSessionDidFinishEvents(forBackgroundURLSession: .shared)
+        }.value
+
+        // Then
+        await signal.wait()
+        #expect(thread.wasMain == true)
     }
 
     /// URLSession hands a download task's body to `didFinishDownloadingTo` whatever the HTTP
@@ -412,6 +473,34 @@ private final class CallBox: @unchecked Sendable {
 
     func markCalled() {
         lock.withLock { _wasCalled = true }
+    }
+}
+
+private final class CallCounter: @unchecked Sendable {
+
+    private let lock = Lock()
+    private var _value = 0
+
+    var value: Int {
+        lock.withLock { _value }
+    }
+
+    func increment() {
+        lock.withLock { _value += 1 }
+    }
+}
+
+private final class ThreadRecorder: @unchecked Sendable {
+
+    private let lock = Lock()
+    private var _wasMain: Bool?
+
+    var wasMain: Bool? {
+        lock.withLock { _wasMain }
+    }
+
+    func record(_ isMain: Bool) {
+        lock.withLock { _wasMain = isMain }
     }
 }
 
