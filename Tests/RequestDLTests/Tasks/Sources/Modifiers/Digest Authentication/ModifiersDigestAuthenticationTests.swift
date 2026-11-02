@@ -19,13 +19,50 @@ struct ModifiersDigestAuthenticationTests {
         #"Digest realm="test", qop="auth", nonce="abc123", opaque="xyz", algorithm=MD5"#
 
     private func head(status: UInt, wwwAuthenticate: String? = nil) -> ResponseHead {
+        head(status: status, wwwAuthenticate: wwwAuthenticate.map { [$0] } ?? [])
+    }
+
+    private func head(status: UInt, wwwAuthenticate: [String]) -> ResponseHead {
         ResponseHead(
             url: nil,
             status: .init(code: status, reason: ""),
             version: .init(minor: 1, major: 1),
-            headers: wwwAuthenticate.map { ["WWW-Authenticate": $0] } ?? [:],
+            headers: HTTPHeaders(wwwAuthenticate.map { ("WWW-Authenticate", $0) }),
             isKeepAlive: true
         )
+    }
+
+    @Test
+    func digestAuthentication_whenBasicIsOfferedBeforeDigest_stillRetries() async throws {
+        // Given
+        let credential = DigestCredential()
+        let attempts = InlineProperty(wrappedValue: 0)
+
+        // When
+        let result = try await MockedTask {
+            BaseURL("localhost")
+            DigestAuthentication(username: "user", password: "pass")
+        }
+        .collectData()
+        .flatMap { _ -> TaskResult<Data> in
+            attempts.wrappedValue += 1
+
+            guard attempts.wrappedValue > 1 else {
+                return TaskResult(
+                    head: head(status: 401, wwwAuthenticate: [#"Basic realm="files""#, Self.challengeHeader]),
+                    payload: Data()
+                )
+            }
+
+            return TaskResult(head: head(status: 200), payload: Data("ok".utf8))
+        }
+        .digestAuthentication(credential)
+        .result()
+
+        // Then
+        #expect(attempts.wrappedValue == 2)
+        #expect(result.head.status.code == 200)
+        #expect(credential.challenge?.realm == "test")
     }
 
     @Test

@@ -29,6 +29,7 @@ struct ServerSentEventParser {
     private var pendingEventType: String?
     private var pendingDataLines: [String] = []
     private var pendingRetry: Int?
+    private var isAtStartOfStream = true
 
     // MARK: - Inits
 
@@ -68,8 +69,17 @@ struct ServerSentEventParser {
     private mutating func events(from lines: [Data]) -> [ServerSentEvent] {
         var events: [ServerSentEvent] = []
 
-        for line in lines {
-            if let event = process(line: String(decoding: line, as: UTF8.self)) {
+        for var line in lines {
+            if isAtStartOfStream {
+                isAtStartOfStream = false
+
+                // A byte order mark opens the stream and is not part of the first line.
+                if line.starts(with: Self.byteOrderMark) {
+                    line = line.dropFirst(Self.byteOrderMark.count)
+                }
+            }
+
+            if let event = process(line: line) {
                 events.append(event)
             }
         }
@@ -77,43 +87,44 @@ struct ServerSentEventParser {
         return events
     }
 
-    private mutating func process(line: String) -> ServerSentEvent? {
-        if line.isEmpty {
+    /// Works on bytes, not characters: a `:` followed by a combining mark is one character, and
+    /// would hide the colon and the space after it.
+    private mutating func process(line: Data) -> ServerSentEvent? {
+        guard let first = line.first else {
             return dispatch()
         }
 
-        if line.hasPrefix(":") {
+        if first == Self.colon {
             return nil
         }
 
-        let field: Substring
-        let value: Substring
+        let field: Data
+        var value: Data
 
-        if let colonIndex = line.firstIndex(of: ":") {
+        if let colonIndex = line.firstIndex(of: Self.colon) {
             field = line[line.startIndex..<colonIndex]
+            value = line[line.index(after: colonIndex)...]
 
-            var rawValue = line[line.index(after: colonIndex)...]
-            if rawValue.first == " " {
-                rawValue = rawValue.dropFirst()
+            if value.first == Self.space {
+                value = value.dropFirst()
             }
-            value = rawValue
         } else {
-            field = line[...]
-            value = ""
+            field = line
+            value = Data()
         }
 
-        switch field {
+        switch String(decoding: field, as: UTF8.self) {
         case "event":
-            pendingEventType = String(value)
+            pendingEventType = String(decoding: value, as: UTF8.self)
         case "data":
-            pendingDataLines.append(String(value))
+            pendingDataLines.append(String(decoding: value, as: UTF8.self))
         case "id":
-            if !value.contains("\u{0000}") {
-                lastEventId = String(value)
+            if !value.contains(0) {
+                lastEventId = String(decoding: value, as: UTF8.self)
             }
         case "retry":
-            if !value.isEmpty, value.allSatisfy(\.isASCII), value.allSatisfy(\.isNumber) {
-                pendingRetry = Int(value)
+            if !value.isEmpty, value.allSatisfy({ (Self.zero...Self.nine).contains($0) }) {
+                pendingRetry = Int(String(decoding: value, as: UTF8.self))
             }
         default:
             break
@@ -121,6 +132,12 @@ struct ServerSentEventParser {
 
         return nil
     }
+
+    private static let byteOrderMark: [UInt8] = [0xEF, 0xBB, 0xBF]
+    private static let colon = UInt8(ascii: ":")
+    private static let space = UInt8(ascii: " ")
+    private static let zero = UInt8(ascii: "0")
+    private static let nine = UInt8(ascii: "9")
 
     private mutating func dispatch() -> ServerSentEvent? {
         defer {

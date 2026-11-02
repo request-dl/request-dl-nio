@@ -278,4 +278,57 @@ struct ServerSentEventParserTests {
         // Then
         #expect(finished == nil)
     }
+
+    // MARK: - The WHATWG rules
+
+    @Test
+    func feed_whenTheStreamOpensWithAByteOrderMark_shouldNotLoseTheFirstEvent() {
+        // Given
+        var parser = ServerSentEventParser()
+
+        // When
+        let events = parser.feed(Data([0xEF, 0xBB, 0xBF]) + Data("data: hi\n\n".utf8))
+
+        // Then
+        #expect(events == [ServerSentEvent(id: nil, event: "message", data: "hi", retry: nil)])
+    }
+
+    @Test
+    func feed_whenTheByteOrderMarkIsNotAtTheStartOfTheStream_shouldNotRemoveIt() {
+        // Given
+        var parser = ServerSentEventParser()
+        _ = parser.feed(Data("data: a\n\n".utf8))
+
+        // When: a field called "\u{FEFF}data" is not "data".
+        let events = parser.feed(Data([0xEF, 0xBB, 0xBF]) + Data("data: b\n\n".utf8))
+
+        // Then
+        #expect(events.isEmpty)
+    }
+
+    @Test(arguments: ["data:\u{0301}x\n\n", "data: \u{0301}x\n\n"])
+    func feed_whenAValueStartsWithACombiningMark_shouldKeepItAndDropOnlyTheSpace(_ text: String) {
+        // Given
+        var parser = ServerSentEventParser()
+
+        // When
+        let events = parser.feed(Data(text.utf8))
+
+        // Then: the mark belongs to the value, not to the colon before it.
+        #expect(events.map(\.data) == ["\u{0301}x"])
+    }
+
+    @Test
+    func feed_whenAnEmptyChunkArrivesBetweenCRAndLF_shouldKeepThemAsOneLineBreak() {
+        // Given
+        var parser = ServerSentEventParser()
+
+        // When
+        var events = parser.feed(Data("data: a\r".utf8))
+        events += parser.feed(Data())
+        events += parser.feed(Data("\ndata: b\r\n\r\n".utf8))
+
+        // Then: one event with two lines, not two events.
+        #expect(events == [ServerSentEvent(id: nil, event: "message", data: "a\nb", retry: nil)])
+    }
 }

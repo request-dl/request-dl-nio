@@ -260,7 +260,13 @@ private final class PACContinuationBox: @unchecked Sendable {
         )
 
         CFRunLoopAddSource(runLoop, source, .defaultMode)
-        defer { CFRunLoopRemoveSource(runLoop, source, .defaultMode) }
+        defer {
+            // Invalidated, not only removed: that is what tells CFNetwork to stop an evaluation
+            // still under way after a timeout or a cancellation, so its callback cannot arrive
+            // once this box is gone.
+            CFRunLoopSourceInvalidate(source)
+            CFRunLoopRemoveSource(runLoop, source, .defaultMode)
+        }
 
         // `false`: only `CFRunLoopStop(_:)` (fired by `pacEvaluationCallback` below, the instant
         // the result is in) or `timeout` elapsing ends this, not merely the first source this

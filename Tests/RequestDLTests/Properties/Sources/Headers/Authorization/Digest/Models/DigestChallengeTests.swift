@@ -95,6 +95,65 @@ struct DigestChallengeTests {
     }
 
     @Test
+    func init_whenDigestFollowsAnotherChallengeInTheSameValue_findsIt() throws {
+        // Given
+        let header = #"Basic realm="files", Digest realm="test", qop="auth", nonce="abc123", opaque="xyz""#
+
+        // When
+        let challenge = try #require(DigestChallenge(headerValue: header))
+
+        // Then: the parameters of the Digest challenge, none of the Basic one.
+        #expect(challenge.realm == "test")
+        #expect(challenge.nonce == "abc123")
+        #expect(challenge.opaque == "xyz")
+        #expect(challenge.hasAuthQop)
+    }
+
+    @Test
+    func init_whenAnotherChallengeFollowsDigest_doesNotTakeItsParameters() throws {
+        // Given
+        let header = #"Digest realm="test", nonce="abc123", Basic realm="other""#
+
+        // When
+        let challenge = try #require(DigestChallenge(headerValue: header))
+
+        // Then
+        #expect(challenge.realm == "test")
+    }
+
+    @Test
+    func init_whenSchemeIsOnlyNamedLikeDigest_isNil() {
+        #expect(DigestChallenge(headerValue: #"Digestive realm="test", nonce="abc123""#) == nil)
+    }
+
+    @Test
+    func first_whenSeveralHeaderLinesAreOffered_takesTheDigestOne() throws {
+        // Given
+        let lines = [#"Basic realm="files""#, #"Negotiate"#, #"Digest realm="test", nonce="abc123""#]
+
+        // When
+        let challenge = try #require(DigestChallenge.first(in: lines))
+
+        // Then
+        #expect(challenge.realm == "test")
+    }
+
+    @Test
+    func first_whenNoLineIsDigest_isNil() {
+        #expect(DigestChallenge.first(in: [#"Basic realm="files""#, "Negotiate"]) == nil)
+        #expect(DigestChallenge.first(in: []) == nil)
+    }
+
+    @Test
+    func init_whenAQuotedValueHasAnEscapedQuote_isRejectedAsUnsafeInsteadOfBeingSplit() {
+        // Given: `nonce` holds `a\"b, realm="x`, one value with a quote-pair and a comma.
+        let header = #"Digest realm="test", nonce="a\"b, realm=\"x""#
+
+        // Then: not read as a second `realm`, and a quote cannot be echoed back.
+        #expect(DigestChallenge(headerValue: header) == nil)
+    }
+
+    @Test
     func init_toleratesACommaInsideAQuotedValue() throws {
         // Given: a comma inside `opaque`, which RFC 7616 does not forbid.
         let header = #"Digest realm="test", nonce="abc123", opaque="left,right""#

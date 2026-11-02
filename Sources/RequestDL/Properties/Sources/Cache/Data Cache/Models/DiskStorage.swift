@@ -627,9 +627,7 @@ struct DiskStorage: Sendable {
 
     func remove(_ key: String) async {
         guard let record = await record(key) else { return }
-        _ = try? await Internals.fileSystem.removeItem(
-            at: record.url.filePath
-        )
+        await Self.removeItem(at: record.url.filePath)
         index.remove(key, ifLocation: record.url)
     }
 
@@ -640,9 +638,7 @@ struct DiskStorage: Sendable {
     func removeAll(since date: Date) async {
         let recordsToCheck = await records()
         for record in recordsToCheck where record.date <= date {
-            _ = try? await Internals.fileSystem.removeItem(
-                at: record.url.filePath
-            )
+            await Self.removeItem(at: record.url.filePath)
             index.remove(record.key, ifLocation: record.url)
         }
     }
@@ -686,15 +682,11 @@ struct DiskStorage: Sendable {
 
             index.set(key, location: newRecord.url)
         } catch {
-            _ = try? await Internals.fileSystem.removeItem(
-                at: newRecord.url.filePath
-            )
+            await Self.removeItem(at: newRecord.url.filePath)
             index.remove(key, ifLocation: newRecord.url)
         }
 
-        _ = try? await Internals.fileSystem.removeItem(
-            at: record.url.filePath
-        )
+        await Self.removeItem(at: record.url.filePath)
         // A no-op when the `do` branch above already repointed `key` at `newRecord.url`; clears
         // it when the move failed and there is nothing left on disk for this key at all. See
         // the comment on `Record.init(directory:key:at:)` for why a failed revalidation loses
@@ -774,7 +766,7 @@ struct DiskStorage: Sendable {
     /// cleaning up a cancelled or errored cache write never has to go searching for what it
     /// already knows.
     func removeRecord(at url: URL) async {
-        _ = try? await Internals.fileSystem.removeItem(at: url.filePath)
+        await Self.removeItem(at: url.filePath)
 
         // `allocateBuffer` pointed the index at this directory. Left there, the next read of the
         // key would go to a directory that is gone and spend its whole retry budget (up to 15s)
@@ -820,7 +812,7 @@ struct DiskStorage: Sendable {
             await removeOrphans(among: scanned.incomplete)
 
             for entry in scanned.whole {
-                _ = try? await Internals.fileSystem.removeItem(at: entry.url.filePath)
+                await Self.removeItem(at: entry.url.filePath)
             }
 
             index.removeAll()
@@ -842,9 +834,7 @@ struct DiskStorage: Sendable {
             if totalSize <= maximumCapacity {
                 break
             }
-            _ = try? await Internals.fileSystem.removeItem(
-                at: entry.url.filePath
-            )
+            await Self.removeItem(at: entry.url.filePath)
             index.remove(entry.key, ifLocation: entry.url)
             totalSize -= size
         }
@@ -853,6 +843,13 @@ struct DiskStorage: Sendable {
     }
 
     // MARK: - Private methods
+
+    /// Removes `path` from a cancelled Task too. `NIOFileSystem` refuses work there, and a cache
+    /// write that is cancelled cleans up from exactly that Task: the entry would stay on disk
+    /// while the index and the size already counted it as gone.
+    private static func removeItem(at path: FilePath) async {
+        _ = try? await Internals.uncancellable { try await Internals.fileSystem.removeItem(at: path) }
+    }
 
     private func lastUsed(of record: Record) -> Date {
         max(index.lastUsed(record.key) ?? record.date, record.date)

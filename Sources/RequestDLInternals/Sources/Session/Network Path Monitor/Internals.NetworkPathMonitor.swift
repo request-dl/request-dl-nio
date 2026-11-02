@@ -91,16 +91,18 @@ extension Internals {
             let id = ObjectIdentifier(token)
 
             return _Concurrency.AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
-                let initialPath = lock.withLock { () -> NetworkPath? in
-                    _subscribers[id] = continuation
-                    return _currentPath
-                }
-
                 // A path that already satisfies by the time a caller subscribes must not wait
                 // for the *next* change to be observed. Before the first update there is nothing
                 // real to replay yet; that update reaches this subscriber through `updatePath`.
-                if let initialPath {
-                    continuation.yield(initialPath)
+                //
+                // Replayed under the lock that registers the subscription: `updatePath` yields
+                // under it too, so a newer path can never be followed by this older one.
+                lock.withLock {
+                    _subscribers[id] = continuation
+
+                    if let initialPath = _currentPath {
+                        continuation.yield(initialPath)
+                    }
                 }
 
                 // Fires when this stream's consuming task is cancelled. This is the
@@ -117,13 +119,12 @@ extension Internals {
         // MARK: - Private methods
 
         private func updatePath(_ path: NetworkPath) {
-            let subscribers = lock.withLock { () -> [_Concurrency.AsyncStream<NetworkPath>.Continuation] in
+            lock.withLock {
                 _currentPath = path
-                return Array(_subscribers.values)
-            }
 
-            for continuation in subscribers {
-                continuation.yield(path)
+                for continuation in _subscribers.values {
+                    continuation.yield(path)
+                }
             }
         }
 

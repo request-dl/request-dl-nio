@@ -70,7 +70,8 @@ struct ItemSplitter {
 
         var chunk = chunk
 
-        if sawTrailingCR {
+        // An empty chunk says nothing about the byte after the `CR`, so it keeps waiting.
+        if sawTrailingCR, !chunk.isEmpty {
             sawTrailingCR = false
 
             if chunk.first == UInt8(ascii: "\n") {
