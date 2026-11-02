@@ -24,8 +24,8 @@ struct InternalsPACProxyCacheKeyTests {
 
     // MARK: - The target a script is asked about
 
-    /// The cache is keyed by origin for secure targets, so requests that differ only in their
-    /// query (pagination, signed URLs) share one thread and one script run.
+    /// The cache is keyed by origin, so requests that differ only in their path or query
+    /// (pagination, signed URLs) share one thread and one script run.
     @Test
     func proxy_whenSecureTargetsDifferOnlyInPathOrQuery_evaluatesOnceForTheOrigin() async throws {
         // Given
@@ -77,24 +77,78 @@ struct InternalsPACProxyCacheKeyTests {
         #expect(await evaluations.targets.contains(try Self.url("https://example.com:8443/")))
     }
 
-    /// A script may route plain `http` on its path (browsers hand it the whole URL), so those
-    /// keep their full address.
+    /// Plain `http` is keyed by origin too. Browsers hand a script the whole URL, but each
+    /// evaluation here fetches the script again on a thread of its own, so a key per path made
+    /// every distinct URL of one host pay for that.
     @Test
-    func proxy_whenInsecureTargetsDifferInPathOrQuery_evaluatesEachWithTheFullAddress() async throws {
+    func proxy_whenInsecureTargetsDifferOnlyInPathOrQuery_evaluatesOnceForTheOrigin() async throws {
         // Given
         let evaluations = Evaluations()
         let cache = Internals.PACProxyCache(evaluate: evaluations.evaluator)
 
-        let first = try Self.url("http://example.com/api/items?page=1")
-        let second = try Self.url("http://example.com/static/logo.png")
+        // When
+        for index in 0..<40 {
+            _ = await cache.proxy(
+                forScriptURL: Self.scriptURL,
+                targetURL: try Self.url("http://example.com/item?id=\(index)")
+            )
+        }
+
+        _ = await cache.proxy(
+            forScriptURL: Self.scriptURL,
+            targetURL: try Self.url("http://user:secret@EXAMPLE.com/static/logo.png#top")
+        )
+
+        // Then
+        #expect(await cache.evaluationCount == 1)
+        #expect(await evaluations.targets == [try Self.url("http://example.com/")])
+    }
+
+    @Test
+    func proxy_whenInsecureTargetsDifferInPortOrHost_evaluatesEach() async throws {
+        // Given
+        let evaluations = Evaluations()
+        let cache = Internals.PACProxyCache(evaluate: evaluations.evaluator)
 
         // When
-        _ = await cache.proxy(forScriptURL: Self.scriptURL, targetURL: first)
-        _ = await cache.proxy(forScriptURL: Self.scriptURL, targetURL: second)
+        for target in ["http://example.com/", "http://example.com:8080/", "http://other.example.com/"] {
+            _ = await cache.proxy(forScriptURL: Self.scriptURL, targetURL: try Self.url(target))
+        }
+
+        // Then
+        #expect(await cache.evaluationCount == 3)
+        #expect(await evaluations.targets.contains(try Self.url("http://example.com:8080/")))
+    }
+
+    @Test(arguments: ["ws", "wss"])
+    func proxy_whenWebSocketTargetsDifferOnlyInPath_evaluatesOnceForTheOrigin(_ scheme: String) async throws {
+        // Given
+        let evaluations = Evaluations()
+        let cache = Internals.PACProxyCache(evaluate: evaluations.evaluator)
+
+        // When
+        _ = await cache.proxy(forScriptURL: Self.scriptURL, targetURL: try Self.url("\(scheme)://example.com/a?x=1"))
+        _ = await cache.proxy(forScriptURL: Self.scriptURL, targetURL: try Self.url("\(scheme)://example.com/b"))
+
+        // Then
+        #expect(await cache.evaluationCount == 1)
+        #expect(await evaluations.targets == [try Self.url("\(scheme)://example.com/")])
+    }
+
+    /// The same scheme and host on `http` and `https` are two origins a script may answer
+    /// differently.
+    @Test
+    func proxy_whenTheSchemeDiffers_evaluatesEach() async throws {
+        // Given
+        let evaluations = Evaluations()
+        let cache = Internals.PACProxyCache(evaluate: evaluations.evaluator)
+
+        // When
+        _ = await cache.proxy(forScriptURL: Self.scriptURL, targetURL: try Self.url("http://example.com/"))
+        _ = await cache.proxy(forScriptURL: Self.scriptURL, targetURL: try Self.url("https://example.com/"))
 
         // Then
         #expect(await cache.evaluationCount == 2)
-        #expect(await evaluations.targets == [first, second])
     }
 
     // MARK: - How many evaluations run at once
@@ -116,7 +170,7 @@ struct InternalsPACProxyCacheKeyTests {
                     group.addTask {
                         _ = await cache.proxy(
                             forScriptURL: Self.scriptURL,
-                            targetURL: URL(string: "http://example.com/\(index)")!
+                            targetURL: URL(string: "http://host\(index).example.com/")!
                         )
                     }
                 }
@@ -170,6 +224,116 @@ struct InternalsPACProxyCacheKeyTests {
         #expect(beforeWindowEnds == nil)
         #expect(await evaluator.callCount == 2)
         #expect(afterWindowEnds?.host == "proxy.example.com")
+    }
+
+    /// A timeout is the script's fetch that did not finish, so asking about another host would
+    /// only wait out the same timeout again. With a key per host this is what stops a burst of
+    /// distinct hosts from waiting `ceil(n / maximumConcurrentEvaluations)` timeouts.
+    @Test
+    func resolution_whenAScriptTimedOut_otherTargetsOfThatScriptGetTheFailureWithoutAskingAgain() async throws {
+        // Given
+        let evaluator = ScriptedEvaluator(results: [.timedOut, .proxy("proxy.example.com")])
+        let clock = TestClock()
+        let cache = Internals.PACProxyCache(
+            failureLifetime: 100,
+            now: clock.now,
+            evaluate: evaluator.evaluate
+        )
+
+        // When
+        let first = await cache.resolution(
+            forScriptURL: Self.scriptURL,
+            targetURL: try Self.url("https://one.example.com/")
+        )
+
+        clock.advance(by: 50)
+        let other = await cache.resolution(
+            forScriptURL: Self.scriptURL,
+            targetURL: try Self.url("http://two.example.com/")
+        )
+
+        // Then
+        #expect(first == .failed(.init(reason: .timedOut), lastKnown: nil))
+        #expect(other == first)
+        #expect(await evaluator.callCount == 1)
+    }
+
+    @Test
+    func resolution_whenAScriptTimedOut_isAskedAgainForAnyTargetOnceTheWindowPasses() async throws {
+        // Given
+        let evaluator = ScriptedEvaluator(results: [.timedOut, .proxy("proxy.example.com")])
+        let clock = TestClock()
+        let cache = Internals.PACProxyCache(
+            failureLifetime: 100,
+            now: clock.now,
+            evaluate: evaluator.evaluate
+        )
+
+        _ = await cache.resolution(forScriptURL: Self.scriptURL, targetURL: try Self.url("https://one.example.com/"))
+
+        // When
+        clock.advance(by: 101)
+        let other = await cache.resolution(
+            forScriptURL: Self.scriptURL,
+            targetURL: try Self.url("https://two.example.com/")
+        )
+
+        // Then
+        guard case .answered(let proxy) = other else {
+            Issue.record("expected the script to be asked again and answer, got \(other)")
+            return
+        }
+
+        #expect(proxy?.host == "proxy.example.com")
+        #expect(await evaluator.callCount == 2)
+    }
+
+    @Test
+    func resolution_whenAScriptTimedOut_anotherScriptIsNotAffected() async throws {
+        // Given
+        let evaluator = ScriptedEvaluator(results: [.timedOut, .proxy("proxy.example.com")])
+        let cache = Internals.PACProxyCache(evaluate: evaluator.evaluate)
+        let otherScript = try Self.url("http://127.0.0.1:2/proxy.pac")
+
+        _ = await cache.resolution(forScriptURL: Self.scriptURL, targetURL: try Self.url("https://one.example.com/"))
+
+        // When
+        let other = await cache.resolution(
+            forScriptURL: otherScript,
+            targetURL: try Self.url("https://two.example.com/")
+        )
+
+        // Then
+        guard case .answered = other else {
+            Issue.record("expected an answer, got \(other)")
+            return
+        }
+
+        #expect(await evaluator.callCount == 2)
+    }
+
+    /// Only a timeout says anything about the script as a whole. A failure to run it can be one
+    /// target's, so the others are still asked.
+    @Test
+    func resolution_whenAScriptFailedToRunForOneTarget_otherTargetsAreStillAsked() async throws {
+        // Given
+        let evaluator = ScriptedEvaluator(results: [.executionFailed("threw"), .proxy("proxy.example.com")])
+        let cache = Internals.PACProxyCache(evaluate: evaluator.evaluate)
+
+        // When
+        _ = await cache.resolution(forScriptURL: Self.scriptURL, targetURL: try Self.url("https://one.example.com/"))
+        let other = await cache.resolution(
+            forScriptURL: Self.scriptURL,
+            targetURL: try Self.url("https://two.example.com/")
+        )
+
+        // Then
+        guard case .answered = other else {
+            Issue.record("expected an answer, got \(other)")
+            return
+        }
+
+        #expect(await evaluator.callCount == 2)
     }
 
     /// A script that answers DIRECT is an answer, not a failure: it is kept for the full lifetime.

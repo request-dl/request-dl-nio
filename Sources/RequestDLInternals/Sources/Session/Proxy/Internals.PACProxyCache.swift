@@ -21,12 +21,20 @@ extension Internals {
     /// JavaScript evaluation of the same PAC script: the cost the original "PAC is skipped
     /// entirely" version of this resolver was written specifically to avoid paying per request.
     ///
-    /// The target of a secure URL (`https`, `wss`) is reduced to its origin before it is cached
-    /// or evaluated, which is what browsers hand a PAC script for those schemes: the path and
-    /// query of a secure URL are not available to a proxy, and often carry tokens a PAC script
-    /// has no business seeing. Requests that differ only in path or query (pagination, signed
-    /// URLs) then share one evaluation instead of each paying for a thread and a script run.
-    /// Plain `http` URLs keep their full address, since a script may legitimately route on it.
+    /// The target of a URL (`http`, `https`, `ws`, `wss`) is reduced to its origin before it is
+    /// cached or evaluated: the path and query often carry tokens a PAC script has no business
+    /// seeing, and requests that differ only in them (pagination, signed URLs, a feed of images)
+    /// then share one evaluation instead of each paying for a thread and a script run.
+    ///
+    /// - Important: A script that routes plain `http` on the path or query of a URL
+    /// (`shExpMatch(url, "http://host/api/*")`) never sees them. Browsers hand it the whole URL,
+    /// but they evaluate a script they keep compiled, which costs microseconds. Here each
+    /// evaluation fetches the script again through CFNetwork, on a thread of its own, so a key
+    /// per path would make every distinct `http` URL pay for that. Routing on the host and the
+    /// port, which is what scripts nearly always do, is unaffected.
+    ///
+    /// A script that timed out is also remembered by its URL, for `failureLifetime`: its fetch is
+    /// what timed out, so asking again for another host would only wait out the same timeout.
     ///
     /// At most `maximumConcurrentEvaluations` evaluations run at once, because each one holds a
     /// dedicated thread (see `Internals.PACEvaluator`); the rest wait for a slot.
@@ -101,6 +109,11 @@ extension Internals {
         private var waitingForSlot: [CheckedContinuation<Void, Never>] = []
 
         private var storage: [Key: Entry] = [:]
+
+        /// The scripts whose last evaluation timed out, with the failure to hand to every target
+        /// asked about them until it expires. Small by nature: one entry per PAC script, and
+        /// dropped when it expires.
+        private var timedOutScripts: [URL: Entry] = [:]
 
         /// The last answer each key's script gave, kept apart from `storage` because an entry there
         /// is replaced by a failure and dropped when it is old, and the answer is what stands in for
@@ -185,6 +198,10 @@ extension Internals {
             let key = Key(scriptURL: scriptURL, targetURL: targetURL)
 
             if let entry = storage[key], !isExpired(entry) {
+                return withLastKnown(entry.resolution, key: key)
+            }
+
+            if let entry = timedOutScripts[scriptURL], !isExpired(entry) {
                 return withLastKnown(entry.resolution, key: key)
             }
 
@@ -274,11 +291,11 @@ extension Internals {
             }
         }
 
-        /// What a PAC script is asked about for `url`: the origin only, for a secure scheme.
+        /// What a PAC script is asked about for `url`: the origin only, for the web schemes.
         private static func evaluationTarget(for url: URL) -> URL {
             guard
                 let scheme = url.scheme?.lowercased(),
-                scheme == "https" || scheme == "wss",
+                ["http", "https", "ws", "wss"].contains(scheme),
                 var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
             else {
                 return url
@@ -308,11 +325,20 @@ extension Internals {
                 failed = true
             }
 
-            storage[key] = Entry(
+            let entry = Entry(
                 resolution: evaluation.resolution,
                 readAt: now(),
                 lifetime: failed ? failureLifetime : Self.lifetime
             )
+
+            storage[key] = entry
+
+            timedOutScripts = timedOutScripts.filter { !isExpired($0.value) }
+
+            if case .failed(let failure, _) = evaluation.resolution, failure.reason == .timedOut {
+                timedOutScripts[key.scriptURL] = entry
+            }
+
             evictIfNeeded()
             evictLastAnswersIfNeeded()
         }
