@@ -19,7 +19,13 @@ struct ContentTypeTests {
     }
 
     @Test
-    func formDataTypeRawValue() async throws {
+    func multipartFormDataTypeRawValue() async throws {
+        #expect(ContentType.multipartFormData == "multipart/form-data")
+    }
+
+    @Test
+    @available(*, deprecated)
+    func formDataTypeRawValue_keepsTheValueItAlwaysHad() async throws {
         #expect(ContentType.formData == "form-data")
     }
 

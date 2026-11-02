@@ -29,7 +29,18 @@ struct AcceptHeaderTests {
     }
 
     @Test
-    func headersFormDataAccept() async throws {
+    func headersMultipartFormDataAccept() async throws {
+        let property = TestProperty(AcceptHeader(.multipartFormData))
+        let resolved = try await resolve(property)
+
+        #expect(
+            resolved.requestConfiguration.headers["Accept"] == ["multipart/form-data"]
+        )
+    }
+
+    @Test
+    @available(*, deprecated)
+    func headersFormDataAccept_keepsSendingTheValueItAlwaysHad() async throws {
         let property = TestProperty(AcceptHeader(.formData))
         let resolved = try await resolve(property)
 
