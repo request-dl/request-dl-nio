@@ -123,6 +123,18 @@ struct ResumableUploadDialectContractTests {
     }
 
     @Test(arguments: ResumableUploadDialectKind.allCases)
+    func resource_whenLocationCannotBeRead_throws(_ kind: ResumableUploadDialectKind) async throws {
+        // Given
+        let request = await Fixtures.request()
+        let head = Fixtures.head(201, [("Location", "http://[not-a-host/u/1")])
+
+        // Then
+        #expect(throws: ResumableUploadDialectError(reason: .missingLocation)) {
+            try kind.dialect.resource(from: head, createdFor: request)
+        }
+    }
+
+    @Test(arguments: ResumableUploadDialectKind.allCases)
     func resource_whenLocationDowngradesHTTPSToHTTP_throws(_ kind: ResumableUploadDialectKind) async throws {
         // Given
         let request = await Fixtures.request()
@@ -303,6 +315,22 @@ struct ResumableUploadDialectContractTests {
             #expect(query.headers.first(name: "Proxy-Authorization") == nil)
             #expect(query.headers.first(name: "Origin") == nil)
             #expect(query.headers.first(name: "Accept") == "application/json")
+        }
+    }
+
+    @Test(arguments: ResumableUploadDialectKind.allCases)
+    func requestsToAURLThatCannotBeRead_doNotCarryTheCallersCredentials(_ kind: ResumableUploadDialectKind) async throws
+    {
+        // Given
+        let request = await Fixtures.request()
+
+        // When
+        let derived = try requests(kind, to: UploadResource(url: "not a url"), like: request)
+
+        // Then
+        for query in derived {
+            #expect(query.headers.first(name: "Authorization") == nil)
+            #expect(query.headers.first(name: "Cookie") == nil)
         }
     }
 
