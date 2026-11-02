@@ -15,8 +15,8 @@ struct URLImageProperty: Property {
     var body: some Property {
         BaseURL(URLScheme(url.scheme ?? "https"), host: hostWithPort)
 
-        if !url.path.isEmpty {
-            Path(url.path)
+        if !percentEncodedPath.isEmpty {
+            Path(percentEncodedPath)
         }
 
         QueryItemsProperty(items: percentEncodedQueryItems)
@@ -32,6 +32,12 @@ struct URLImageProperty: Property {
         }
 
         return "\(host):\(port)"
+    }
+
+    /// - Important: Read as `percentEncodedPath`, not `url.path`: the decoded path turned
+    /// `%2F` into a separator and `%25` into a bare `%`, and `Path` takes the escapes as they are.
+    private var percentEncodedPath: String {
+        URLComponents(url: url, resolvingAgainstBaseURL: false)?.percentEncodedPath ?? url.path
     }
 
     /// - Important: Read as `percentEncodedQueryItems`, not `queryItems`. Everything RequestDL

@@ -80,7 +80,8 @@ extension NamespaceTests {
         )
 
         // Then
-        #expect(resolved.requestConfiguration.url == "https://www.apple.com/SingleNamespace<NamespaceSpy>.v1")
+        // `<` and `>` are not valid in a path, so the URL carries them encoded.
+        #expect(resolved.requestConfiguration.url == "https://www.apple.com/SingleNamespace%3CNamespaceSpy%3E.v1")
         #expect(
             namespaceID.wrappedValue
                 == PropertyNamespace.ID(
@@ -139,8 +140,17 @@ extension NamespaceTests {
 
         #expect(namespaceID.wrappedValue == expected)
 
-        // Derived rather than spelled out, so the repetition reads as the assertion it is.
-        #expect(resolved.requestConfiguration.url == "https://www.apple.com/\(expected)/\(expected)")
+        // Derived rather than spelled out, so the repetition reads as the assertion it is. `<` and `>`
+        // are not valid in a path, so they come out encoded.
+        let segment = "\(expected)".map { character -> String in
+            switch character {
+            case "<": "%3C"
+            case ">": "%3E"
+            default: String(character)
+            }
+        }.joined()
+
+        #expect(resolved.requestConfiguration.url == "https://www.apple.com/\(segment)/\(segment)")
     }
 }
 

@@ -19,6 +19,11 @@ public struct RequestConfiguration: Sendable {
 
     /// The full URL string constructed from `baseURL`, `pathComponents`, and `queries`.
     ///
+    /// The path is in the form that goes on the wire: what a component already carries as a percent
+    /// escape (`%2F`, `%25`) is kept, and anything a path may not contain (a space, a non-ASCII
+    /// character, a `%` that starts no escape) is encoded. A `%2F` stays inside its segment instead
+    /// of becoming another one.
+    ///
     /// - Important: The query items are used as they are. Anything reaching ``queries`` is
     /// expected to be percent encoded already, which is what ``URLEncoder`` produces. Encoding
     /// again here would turn every `%20` into `%2520`.
@@ -39,6 +44,8 @@ public struct RequestConfiguration: Sendable {
     public internal(set) var baseURL: String
 
     /// An array of path components to be appended to the `baseURL`. Defaults to an empty array.
+    ///
+    /// Each one is the text of the path, which may already carry percent escapes. See ``url``.
     public internal(set) var pathComponents: [String]
 
     /// An array of query items to be added to the request URL. Defaults to an empty array.

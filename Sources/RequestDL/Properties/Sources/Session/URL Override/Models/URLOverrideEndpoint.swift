@@ -2,6 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
+import RequestDLInternals
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
@@ -93,12 +95,14 @@ extension URLOverrideEndpoint {
         self.scheme = scheme
         self.host = host
         self.port = components.port
+        // `percentEncodedPath`, in the canonical form `RequestConfiguration.url` gives the request's
+        // own path, so a rule written with `%2F` or a space matches the request it was written for.
         self.pathComponents = Array(
-            components.path
+            components.percentEncodedPath
                 .split(separator: "/")
                 .lazy
                 .filter { !$0.isEmpty }
-                .map(String.init)
+                .map { $0.addingPercentEncodingForURLPath() }
         )
     }
 

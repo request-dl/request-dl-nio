@@ -193,4 +193,44 @@ struct PathTests {
         // Then
         try await assertNever(property.body)
     }
+
+    // MARK: - Encoding
+
+    @Test(arguments: [
+        ("a b", "a%20b"),
+        ("caf\u{E9}", "caf%C3%A9"),
+        ("a%2Fb", "a%2Fb"),
+        ("100%25", "100%25"),
+        ("100%", "100%25"),
+        ("50%OFF", "50%25OFF"),
+        ("%C3%A9", "%C3%A9"),
+        ("a#b", "a%23b"),
+    ])
+    func path_givesTheFormThatGoesOnTheWire(_ path: String, _ expected: String) async throws {
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL("example.com")
+                Path(path)
+            }
+        )
+
+        // Then
+        #expect(resolved.requestConfiguration.url == "https://example.com/\(expected)")
+    }
+
+    @Test
+    func path_withAnEscapedSlash_staysOneSegment() async throws {
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL("example.com")
+                Path("files")
+                Path("a%2Fb")
+            }
+        )
+
+        // Then
+        #expect(resolved.requestConfiguration.url == "https://example.com/files/a%2Fb")
+    }
 }

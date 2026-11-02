@@ -109,19 +109,25 @@ extension FlexibleURLNode {
         return "\(scheme)://\(fullHost)"
     }
 
+    /// - Important: `percentEncodedPath`, not `path`. The decoded path turned `%2F` into a
+    /// separator (another resource), `%25` into a bare `%` that was then trimmed away and `%2e%2e`
+    /// into `..`. `RequestConfiguration.url` takes a component as the text of the path, with the
+    /// escapes it already carries.
     fileprivate func pathComponents(from components: URLComponents) -> [String] {
+        let path = components.percentEncodedPath
+
         var splitComponents = Array(
-            components.path
+            path
                 .split(separator: "/")
                 .lazy
                 .filter { !$0.isEmpty }
                 .map(String.init)
         )
 
-        if components.path.hasSuffix("/") {
+        if path.hasSuffix("/") {
             if !splitComponents.isEmpty {
                 splitComponents[splitComponents.count - 1] += "/"
-            } else if components.path == "/" {
+            } else if path == "/" {
                 splitComponents.append("/")
             }
         }
