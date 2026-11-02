@@ -38,8 +38,7 @@ extension Modifiers {
 
             while attempt < maxAttempts,
                 result.head.status.code == 401,
-                let challengeHeader = result.head.headers.first(name: "WWW-Authenticate"),
-                let challenge = DigestChallenge(headerValue: challengeHeader)
+                let challenge = DigestChallenge.first(in: result.head.headers["WWW-Authenticate"] ?? [])
             {
                 credential.challenge = challenge
                 attempt += 1
