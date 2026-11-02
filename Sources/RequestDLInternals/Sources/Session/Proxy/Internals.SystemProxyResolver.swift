@@ -385,65 +385,7 @@ extension Internals.SystemProxyResolver {
         pac: PACOptions,
         logger: Logger?
     ) async throws -> Internals.Proxy? {
-        let environment = ProcessInfo.processInfo.environment
-
-        guard let host = url.host else {
-            return nil
-        }
-
-        guard !isExcluded(host, by: environment["no_proxy"] ?? environment["NO_PROXY"]) else {
-            return nil
-        }
-
-        let names =
-            url.scheme?.lowercased() == "https"
-            ? ["https_proxy", "HTTPS_PROXY", "http_proxy", "HTTP_PROXY"]
-            : ["http_proxy", "HTTP_PROXY"]
-
-        guard
-            let value = names.lazy.compactMap({ environment[$0] }).first,
-            let proxy = URL(string: value),
-            let proxyHost = proxy.host
-        else { return nil }
-
-        let connection: Internals.Proxy.ConnectionProtocol =
-            proxy.scheme?.lowercased().hasPrefix("socks") == true ? .socks : .http
-
-        let authorization: Internals.Proxy.Authorization?
-
-        if let username = proxy.user, let password = proxy.password {
-            authorization = .basic(username: username, password: password)
-        } else {
-            authorization = nil
-        }
-
-        return .init(
-            host: proxyHost,
-            port: proxy.port ?? (connection == .socks ? 1080 : 8080),
-            connection: connection,
-            authorization: authorization
-        )
-    }
-
-    private static func isExcluded(_ host: String, by list: String?) -> Bool {
-        guard let list, !list.isEmpty else {
-            return false
-        }
-
-        let host = host.lowercased()
-
-        return
-            list
-            .split(separator: ",")
-            .map { $0.trimming(where: \.isWhitespace).lowercased() }
-            .contains { entry in
-                guard entry != "*" else {
-                    return true
-                }
-
-                let bare = entry.hasPrefix(".") ? String(entry.dropFirst()) : entry
-                return host == bare || host.hasSuffix(".\(bare)")
-            }
+        proxy(forURL: url, environment: ProcessInfo.processInfo.environment)
     }
 }
 
