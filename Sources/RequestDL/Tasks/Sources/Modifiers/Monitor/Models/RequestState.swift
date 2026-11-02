@@ -22,7 +22,7 @@ public enum RequestState: Sendable {
 
     /// The connection of a download or an upload was lost and it is being continued from where it
     /// stopped (see ``RequestTask/resumingDownloads(_:)`` and
-    /// ``RequestTask/resumingUploads(_:maximumAttemptsWithoutProgress:delay:onCancellation:)``).
+    /// ``RequestTask/resumingUploads(_:maximumAttemptsWithoutProgress:delay:onCancellation:forwardsCredentialsToOtherOrigins:)``).
     /// `attempt` counts the reconnections of this transfer, from 1.
     case reconnecting(attempt: Int)
 

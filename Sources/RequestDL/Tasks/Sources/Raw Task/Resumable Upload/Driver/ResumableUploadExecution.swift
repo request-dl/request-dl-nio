@@ -118,6 +118,9 @@ final class ResumableUploadExecution: @unchecked Sendable {
     ) async {
         self.client = client
         self.setup = setup
+        var request = request
+        request.forwardsCredentialsToOtherOrigins = setup.forwardsCredentialsToOtherOrigins
+
         self.request = request
         self.source = source
         self.decompression = decompression

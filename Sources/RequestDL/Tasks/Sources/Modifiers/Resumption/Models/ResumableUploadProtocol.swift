@@ -3,7 +3,7 @@
 //
 
 /// A protocol for uploading a body in a way that can be continued, for
-/// ``RequestTask/resumingUploads(_:maximumAttemptsWithoutProgress:delay:onCancellation:)``:
+/// ``RequestTask/resumingUploads(_:maximumAttemptsWithoutProgress:delay:onCancellation:forwardsCredentialsToOtherOrigins:)``:
 /// ``IETFResumableUpload`` and ``TUSResumableUpload``.
 ///
 /// They differ in what the request that was written means to the server and in what the server

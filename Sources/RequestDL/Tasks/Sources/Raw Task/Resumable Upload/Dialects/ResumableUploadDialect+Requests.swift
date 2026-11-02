@@ -33,8 +33,21 @@ extension RequestConfiguration {
         "upload-defer-length",
     ]
 
+    /// What identifies the caller to the server it wrote the request for, which another server has
+    /// no business receiving.
+    private static let headersIdentifyingTheCaller: Set<String> = [
+        "authorization",
+        "cookie",
+        "proxy-authorization",
+        "origin",
+    ]
+
     /// A request to `url` that keeps what the caller set up for the request it is built from, but
     /// not what described its body: the base, the headers about the body, the body itself.
+    ///
+    /// When `url` is not on the origin of this request, which only happens when the server chose
+    /// it, the headers that identify the caller stay behind too, unless the caller asked for them
+    /// to be forwarded.
     func derived(method: String, url: String) -> RequestConfiguration {
         var configuration = self
 
@@ -48,8 +61,16 @@ extension RequestConfiguration {
         configuration.compression = nil
         configuration.shouldCompressBodyData = nil
 
-        for name in headers.names where Self.headersDescribingTheBody.contains(name.lowercased()) {
-            configuration.headers.remove(name: name)
+        let keepsCredentials = forwardsCredentialsToOtherOrigins || Self.isSameOrigin(self.url, url)
+
+        for name in headers.names {
+            let lowercased = name.lowercased()
+
+            if Self.headersDescribingTheBody.contains(lowercased)
+                || (!keepsCredentials && Self.headersIdentifyingTheCaller.contains(lowercased))
+            {
+                configuration.headers.remove(name: name)
+            }
         }
 
         return configuration
@@ -57,6 +78,9 @@ extension RequestConfiguration {
 
     /// `location` as an absolute URL, `location` being what a server answered with, which may be
     /// relative to the URL the request went to.
+    ///
+    /// `nil` when it is not an `http` or `https` URL, or when it would take a request that went
+    /// over `https` to `http`: the rest of the upload would then travel in the clear.
     func resolving(location: String) -> String? {
         let trimmed = location.trimming(where: \.isWhitespace)
 
@@ -64,15 +88,50 @@ extension RequestConfiguration {
             return nil
         }
 
-        if let absolute = URLComponents(string: trimmed), absolute.scheme != nil, absolute.host != nil {
-            return trimmed
-        }
+        let resolved: String
 
-        guard let base = URL(string: url), let resolved = URL(string: trimmed, relativeTo: base) else {
+        if let absolute = URLComponents(string: trimmed), absolute.scheme != nil, absolute.host != nil {
+            resolved = trimmed
+        } else if let base = URL(string: url), let relative = URL(string: trimmed, relativeTo: base) {
+            resolved = relative.absoluteString
+        } else {
             return nil
         }
 
-        return resolved.absoluteString
+        guard let scheme = URL(string: resolved)?.scheme?.lowercased(), Self.defaultPorts[scheme] != nil else {
+            return nil
+        }
+
+        if URL(string: url)?.scheme?.lowercased() == "https", scheme != "https" {
+            return nil
+        }
+
+        return resolved
+    }
+
+    private static let defaultPorts = ["http": 80, "https": 443]
+
+    /// Whether both URLs have the same scheme, host and port (RFC 6454). A URL that cannot be read
+    /// is on no origin.
+    private static func isSameOrigin(_ first: String, _ second: String) -> Bool {
+        guard let first = origin(of: first), let second = origin(of: second) else {
+            return false
+        }
+
+        return first == second
+    }
+
+    private static func origin(of string: String) -> [String]? {
+        guard
+            let url = URL(string: string),
+            let scheme = url.scheme?.lowercased(),
+            let host = url.host?.lowercased(),
+            let port = url.port ?? defaultPorts[scheme]
+        else {
+            return nil
+        }
+
+        return [scheme, host, String(port)]
     }
 }
 

@@ -148,6 +148,49 @@ struct ResumableUploadExecutionStubTests {
         #expect(cancelled.withLockedValue { $0 })
     }
 
+    // MARK: - Where the server puts the upload
+
+    @Test(arguments: [false, true])
+    func anUploadTheServerPutsOnAnotherOrigin_getsTheCredentialsOnlyWhenAskedTo(_ forwards: Bool) async throws {
+        // Given: a creation answered with another origin, and a body that is being sent there.
+        let sent = LockedValueBox<[String: String?]>([:])
+        let gate = Gate()
+
+        let execution = try await Self.execution(
+            forwardsCredentialsToOtherOrigins: forwards,
+            client: ScriptedClient { configuration in
+                sent.withLockedValue {
+                    $0[configuration.method ?? ""] = configuration.headers.first(name: "Authorization")
+                }
+
+                if configuration.method == "PATCH" {
+                    await gate.wait()
+                }
+
+                return Self.sessionTask(
+                    head: Self.head(status: 201, headers: [("Location", "https://uploads.example.net/u/1")])
+                )
+            }
+        )
+
+        execution.start()
+        try await eventually { sent.withLockedValue { $0 }.keys.contains("PATCH") }
+
+        // When
+        execution.makeSeed()()
+        gate.open()
+
+        // Then: the creation went to the server the caller named, so it always carries them.
+        try await eventually { sent.withLockedValue { $0 }.keys.contains("DELETE") }
+
+        let headers = sent.withLockedValue { $0 }
+        let expected: String? = forwards ? "Bearer token" : nil
+
+        #expect(headers["PUT"] == "Bearer token")
+        #expect(headers["PATCH"] == expected)
+        #expect(headers["DELETE"] == expected)
+    }
+
     // MARK: - What the server is told when the upload is cancelled
 
     @Test
@@ -494,12 +537,14 @@ struct ResumableUploadExecutionStubTests {
     private static func execution(
         dialect: any ResumableUploadDialect = IETFResumableUploadDialect(),
         cancellation: UploadCancellation = .terminate,
+        forwardsCredentialsToOtherOrigins: Bool = false,
         client: ScriptedClient
     ) async throws -> ResumableUploadExecution {
         var request = RequestConfiguration()
         request.baseURL = "https://example.com"
         request.pathComponents = ["files"]
         request.method = "PUT"
+        request.headers.set(name: "Authorization", value: "Bearer token")
 
         let source = try await ResumableUploadSource(
             RequestBody(buffers: [Internals.DataBuffer(Data(repeating: 1, count: 1_000))])
@@ -510,7 +555,8 @@ struct ResumableUploadExecutionStubTests {
             setup: ResumableUploadSetup(
                 dialect: dialect,
                 delay: 1_000_000,
-                cancellation: cancellation
+                cancellation: cancellation,
+                forwardsCredentialsToOtherOrigins: forwardsCredentialsToOtherOrigins
             ),
             request: request,
             source: source,

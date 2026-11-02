@@ -106,6 +106,11 @@ public struct RequestConfiguration: Sendable {
     var compressionDuplicateHeaderBehavior: Internals.Compression.DuplicateHeaderBehavior = .error
     var shouldCompressBodyData: (@Sendable (Int) -> Bool)?
 
+    /// Whether the requests of a resumable upload that go to another origin than this one, where
+    /// the server sent them, keep the headers that identify the caller. Set by the upload itself
+    /// from `forwardsCredentialsToOtherOrigins`, never by a node.
+    var forwardsCredentialsToOtherOrigins = false
+
     // MARK: - Inits
 
     init() {

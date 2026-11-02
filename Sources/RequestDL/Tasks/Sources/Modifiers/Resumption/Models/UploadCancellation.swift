@@ -3,7 +3,7 @@
 //
 
 /// What happens to an upload on the server when the request that is sending it is cancelled.
-/// See ``RequestTask/resumingUploads(_:maximumAttemptsWithoutProgress:delay:onCancellation:)``.
+/// See ``RequestTask/resumingUploads(_:maximumAttemptsWithoutProgress:delay:onCancellation:forwardsCredentialsToOtherOrigins:)``.
 public enum UploadCancellation: Sendable, Hashable {
 
     /// Tells the server the upload is abandoned, so it can free what it holds: an HTTP `DELETE` of
