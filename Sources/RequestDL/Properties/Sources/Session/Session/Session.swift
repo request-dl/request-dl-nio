@@ -439,6 +439,10 @@ public struct Session: Property {
     ///   - limit: Bounds `.nio`/`.nioTransportServices`' own native gzip/deflate decoding against
     ///   a decompression bomb. Has no effect on `.urlSession`, which exposes no such control, and
     ///   no effect on manually-dispatched algorithms, which are responsible for their own limits.
+    ///   The default is ``DecompressionLimit/none``, like most HTTP clients, because a ratio that
+    ///   suits one API refuses another's highly compressible responses. Set
+    ///   ``DecompressionLimit/size(_:)`` or ``DecompressionLimit/ratio(_:)`` when the responses
+    ///   come from a server you do not control.
     /// - Returns: The modified `Session` instance with these decompression algorithms configured.
     ///
     public func decompressionAlgorithms(
