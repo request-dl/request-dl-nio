@@ -128,6 +128,9 @@ public struct SecureConnection<Content: Property>: Property {
 
     /// Sets the minimum TLS version for the secure connection.
     ///
+    /// Without it, the ``Session/Executor/nio`` executors refuse anything below TLS 1.2. Pass
+    /// `.v1` or `.v1_1` to connect to a server that still speaks one of those.
+    ///
     /// > Important: Has no effect under ``Session/Executor/urlSession``. Configure an
     /// `NSExceptionMinimumTLSVersion` ATS exception in `Info.plist` instead. See
     /// <doc:Configuring-App-Transport-Security-for-URLSession>.
