@@ -9,6 +9,7 @@ import RequestDLInternals
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
+import struct Foundation.CocoaError
 import struct Foundation.URL
 #endif
 
@@ -121,12 +122,20 @@ public struct BackgroundDownloadTask<Content: Property> {
     /// ``init(id:destination:resumingFrom:content:)``). Returns as soon as it's scheduled;
     /// use ``BackgroundDownloads/onEvent`` to observe how it turns out.
     ///
-    /// - Throws: ``BackgroundDownloadUnsupportedConfigurationError`` if `content` configures a
+    /// - Throws: `CocoaError.fileWriteUnsupportedScheme` if `destination` is not a file URL.
+    ///   ``BackgroundDownloadUnsupportedConfigurationError`` if `content` configures a
     ///   client certificate or SPKI pin this executor can't rebuild after a relaunch (see its own
     ///   documentation for the specific cases), or any error `content` itself throws while being
     ///   resolved into a request (an invalid URL, a certificate file that can't be read, etc.),
     ///   the same errors any other task can throw at this stage.
     public func result() async throws {
+        // The downloaded file is moved here from the delegate, possibly in a later launch, and
+        // only a file URL says where. Refused now, since by then the download would be done and
+        // the file already deleted by the system.
+        guard destination.isFileURL else {
+            throw CocoaError(.fileWriteUnsupportedScheme)
+        }
+
         let resolved = try await Resolve(
             root: content,
             environment: RequestEnvironmentValues()

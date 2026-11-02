@@ -13,6 +13,7 @@ import Testing
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
+import struct Foundation.CocoaError
 import struct Foundation.Data
 import struct Foundation.URL
 #endif
@@ -28,6 +29,25 @@ import struct Foundation.URL
 /// see `InternalsClientIdentityDescriptorTests` for that half, since proving it doesn't throw
 /// here would mean letting `result()` run all the way to `schedule(...)`.
 struct BackgroundDownloadTaskTests {
+
+    /// The file is moved from the delegate, possibly in a later launch, and only a file URL says
+    /// where; by the time that failed, the system would already have deleted the download.
+    @Test
+    func result_whenTheDestinationIsNotAFileURL_throwsBeforeScheduling() async throws {
+        let task = BackgroundDownloadTask(
+            id: "episode-42",
+            destination: try #require(URL(string: "https://example.com/episode-42.mp3"))
+        ) {
+            BaseURL("localhost")
+        }
+
+        do {
+            try await task.result()
+            Issue.record("Expected CocoaError.fileWriteUnsupportedScheme")
+        } catch let error as CocoaError {
+            #expect(error.code == .fileWriteUnsupportedScheme)
+        }
+    }
 
     @Test
     func result_whenClientCertificateIsBytesBacked_throwsUnsupportedConfigurationError() async throws {
