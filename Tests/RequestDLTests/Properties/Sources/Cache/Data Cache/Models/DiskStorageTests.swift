@@ -154,6 +154,43 @@ struct DiskStorageTests {
         }
     }
 
+    /// A cache write that is cancelled cleans up from a cancelled Task, where `NIOFileSystem`
+    /// refuses work: the directory of the incomplete entry has to go all the same.
+    @Test
+    func removeRecord_fromACancelledTask_removesTheDirectory() async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            let storage = DiskStorage(directory: directoryURL)
+
+            // Given
+            var (buffer, _, recordURL) = await storage.allocateBuffer(
+                key: "k1",
+                cachedResponse: makeCachedResponse(key: "k1"),
+                contentLength: 0,
+                maximumCapacity: .max
+            )
+            await buffer?.writeData(Data([0x1, 0x2, 0x3, 0x4]))
+            try? await buffer?.close()
+
+            let url = try #require(recordURL)
+            #expect(await url.isReachable)
+
+            // When
+            let cleanup = Task {
+                while !Task.isCancelled {
+                    await Task.yield()
+                }
+
+                await storage.removeRecord(at: url)
+            }
+
+            cleanup.cancel()
+            await cleanup.value
+
+            // Then
+            #expect(await !url.isReachable)
+        }
+    }
+
     /// Writes `keys` through `storage` and returns once each one can be read back.
     private func write(_ keys: [String], through storage: DiskStorage) async throws {
         for key in keys {
