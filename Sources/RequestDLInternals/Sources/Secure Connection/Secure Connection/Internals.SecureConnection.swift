@@ -245,9 +245,7 @@ extension Internals {
                 isCompatibleWithNetworkFramework: isCompatibleWithNetworkFramework
             )
 
-            if let minimumTLSVersion {
-                tlsConfiguration.minimumTLSVersion = minimumTLSVersion.build()
-            }
+            tlsConfiguration.minimumTLSVersion = (minimumTLSVersion ?? defaultMinimumTLSVersion).build()
 
             if let maximumTLSVersion {
                 tlsConfiguration.maximumTLSVersion = maximumTLSVersion.build()
@@ -352,6 +350,17 @@ extension Internals {
         }
 
         // MARK: - Private methods
+
+        /// TLS 1.2, which NIOSSL's own default (TLS 1.0) is below. A caller that caps the maximum under
+        /// 1.2 asked for a legacy protocol, so the cap is the floor instead of a configuration that
+        /// no handshake can satisfy.
+        private var defaultMinimumTLSVersion: Internals.TLSVersion {
+            if let maximumTLSVersion, maximumTLSVersion == .tlsv1 || maximumTLSVersion == .tlsv11 {
+                return maximumTLSVersion
+            }
+
+            return .tlsv12
+        }
 
         /// - Parameter isCompatibleWithNetworkFramework: See `build(isCompatibleWithNetworkFramework:)`'s
         /// own doc comment. When `true`, `certificateChain`/`privateKey` are deliberately left off

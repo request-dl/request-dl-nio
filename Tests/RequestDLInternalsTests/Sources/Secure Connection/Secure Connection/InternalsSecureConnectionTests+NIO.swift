@@ -206,6 +206,62 @@ extension InternalsSecureConnectionTests {
     }
 
     @Test
+    func secureConnection_withoutAMinimumTLSVersion_refusesTLS10And11() async throws {
+        // Given
+        let secureConnection = Internals.SecureConnection()
+
+        // When
+        let sut = try secureConnection.build()
+
+        // Then
+        #expect(sut.tlsConfiguration.minimumTLSVersion == .tlsv12)
+    }
+
+    @Test(arguments: [Internals.TLSVersion.tlsv1, .tlsv11, .tlsv12, .tlsv13])
+    func secureConnection_withAMinimumTLSVersion_keepsIt(_ version: Internals.TLSVersion) async throws {
+        // Given
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.minimumTLSVersion = version
+
+        // When
+        let sut = try secureConnection.build()
+
+        // Then
+        #expect(sut.tlsConfiguration.minimumTLSVersion == version.build())
+    }
+
+    @Test(arguments: [Internals.TLSVersion.tlsv1, .tlsv11])
+    func secureConnection_withALegacyMaximumAndNoMinimum_usesTheMaximumAsTheFloor(
+        _ version: Internals.TLSVersion
+    ) async throws {
+        // Given
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.maximumTLSVersion = version
+
+        // When
+        let sut = try secureConnection.build()
+
+        // Then
+        #expect(sut.tlsConfiguration.minimumTLSVersion == version.build())
+        #expect(sut.tlsConfiguration.maximumTLSVersion == version.build())
+    }
+
+    @Test(arguments: [Internals.TLSVersion.tlsv12, .tlsv13])
+    func secureConnection_withAModernMaximumAndNoMinimum_keepsTLS12AsTheFloor(
+        _ version: Internals.TLSVersion
+    ) async throws {
+        // Given
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.maximumTLSVersion = version
+
+        // When
+        let sut = try secureConnection.build()
+
+        // Then
+        #expect(sut.tlsConfiguration.minimumTLSVersion == .tlsv12)
+    }
+
+    @Test
     func secureConnection_whenCipherSuites_shouldBeValid() async throws {
         // Given
         var secureConnection = Internals.SecureConnection()
@@ -256,7 +312,7 @@ extension InternalsSecureConnectionTests {
         #expect(sut.tlsConfiguration.keyLogCallback == nil)
         #expect(sut.tlsConfiguration.pskClientProvider == nil)
         #expect(sut.tlsConfiguration.pskServerProvider == nil)
-        #expect(sut.tlsConfiguration.minimumTLSVersion == configuration.minimumTLSVersion)
+        #expect(sut.tlsConfiguration.minimumTLSVersion == .tlsv12)
         #expect(sut.tlsConfiguration.maximumTLSVersion == configuration.maximumTLSVersion)
         #expect(sut.tlsConfiguration.cipherSuites == configuration.cipherSuites)
         #expect(sut.tlsConfiguration.cipherSuiteValues == configuration.cipherSuiteValues)
