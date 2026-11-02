@@ -2,7 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
-/// Why an upload that was made resumable (see ``RequestTask/resumingUploads(_:maximumAttemptsWithoutProgress:delay:onCancellation:)``)
+/// Why an upload that was made resumable (see ``RequestTask/resumingUploads(_:maximumAttemptsWithoutProgress:delay:onCancellation:forwardsCredentialsToOtherOrigins:)``)
 /// couldn't be carried through.
 ///
 /// A failure of the connection that ends the last attempt is thrown as it is: these are the ones

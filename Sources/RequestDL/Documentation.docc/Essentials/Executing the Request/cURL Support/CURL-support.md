@@ -83,16 +83,16 @@ let command = try await DataTask {
 Request-level — these shape the `RequestDL/RequestConfiguration` itself:
 
 - `-X` / `--request`
-- `-H` / `--header` (repeatable)
-- `-d` / `--data` / `--data-raw` / `--data-binary`
-- `-F` / `--form` (repeatable) — `name=value`, or `name=@path;type=mime` for a file
+- `-H` / `--header` (repeatable) — `-H 'Name:'` with no value removes the header, as in curl
+- `-d` / `--data` / `--data-raw` / `--data-binary` — a value that starts with `@` (a file, or `@-` for stdin) is rejected, except for `--data-raw`, which sends it as text
+- `-F` / `--form` (repeatable) — `name=value`, or `name=@path;type=mime` for a file; `name=<path` is rejected
 - `-u` / `--user` (basic auth)
 - `--url`, or a bare trailing URL
 - `-G` / `--get` — moves accumulated `-d` data onto the URL as a query string instead of a body
 
 Session-level — these configure the same `Session`-level settings a declared `@PropertyBuilder` tree would reach through ``RequestDL/Session``/``RequestDL/SecureConnection``/``RequestDL/Proxy``:
 
-- `-L` / `--location` (with `--max-redirs`) — follows redirects, up to 50 by default
+- `-L` / `--location` (with `--max-redirs`) — follows redirects, up to 50 by default; `--max-redirs -1` means no limit
 - `-k` / `--insecure` — disables certificate verification
 - `-x` / `--proxy` — `[scheme://][user[:password]@]host[:port]`; a `socks*` scheme maps to a SOCKS proxy, anything else to HTTP; defaults to port 1080
 - `--resolve HOST:PORT:ADDRESS` — overrides DNS resolution for `HOST` (the port is validated but not carried through — the override applies to every port on that host)

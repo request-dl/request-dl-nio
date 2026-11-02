@@ -107,6 +107,66 @@ struct ResumableUploadDialectContractTests {
         }
     }
 
+    @Test(
+        arguments: ResumableUploadDialectKind.allCases,
+        ["ftp://uploads.example.com/u/9", "file:///etc/hosts", "mailto:a@example.com"]
+    )
+    func resource_whenLocationIsNotHTTP_throws(_ kind: ResumableUploadDialectKind, _ location: String) async throws {
+        // Given
+        let request = await Fixtures.request()
+        let head = Fixtures.head(201, [("Location", location)])
+
+        // Then
+        #expect(throws: ResumableUploadDialectError(reason: .missingLocation)) {
+            try kind.dialect.resource(from: head, createdFor: request)
+        }
+    }
+
+    @Test(arguments: ResumableUploadDialectKind.allCases)
+    func resource_whenLocationCannotBeRead_throws(_ kind: ResumableUploadDialectKind) async throws {
+        // Given
+        let request = await Fixtures.request()
+        let head = Fixtures.head(201, [("Location", "http://[not-a-host/u/1")])
+
+        // Then
+        #expect(throws: ResumableUploadDialectError(reason: .missingLocation)) {
+            try kind.dialect.resource(from: head, createdFor: request)
+        }
+    }
+
+    @Test(arguments: ResumableUploadDialectKind.allCases)
+    func resource_whenLocationDowngradesHTTPSToHTTP_throws(_ kind: ResumableUploadDialectKind) async throws {
+        // Given
+        let request = await Fixtures.request()
+        let head = Fixtures.head(201, [("Location", "http://example.com/uploads/42")])
+
+        // Then
+        #expect(throws: ResumableUploadDialectError(reason: .missingLocation)) {
+            try kind.dialect.resource(from: head, createdFor: request)
+        }
+    }
+
+    @Test(arguments: ResumableUploadDialectKind.allCases)
+    func resource_whenTheRequestIsHTTP_acceptsHTTPAndHTTPS(_ kind: ResumableUploadDialectKind) async throws {
+        // Given
+        var request = await Fixtures.request()
+        request.baseURL = "http://example.com"
+
+        // When
+        let plain = try kind.dialect.resource(
+            from: Fixtures.head(201, [("Location", "http://example.com/u/1")]),
+            createdFor: request
+        )
+        let secure = try kind.dialect.resource(
+            from: Fixtures.head(201, [("Location", "https://example.com/u/1")]),
+            createdFor: request
+        )
+
+        // Then
+        #expect(plain.url == "http://example.com/u/1")
+        #expect(secure.url == "https://example.com/u/1")
+    }
+
     // MARK: - Requests about the upload
 
     @Test(arguments: ResumableUploadDialectKind.allCases)
@@ -215,6 +275,130 @@ struct ResumableUploadDialectContractTests {
     func outcome_whenTheServerFails_isOther(_ kind: ResumableUploadDialectKind) {
         for status: UInt in [400, 401, 500, 503] {
             #expect(kind.dialect.outcome(of: Fixtures.head(status), offset: 0, length: 10) == .other)
+        }
+    }
+
+    // MARK: - Credentials
+
+    private static let otherOrigin = UploadResource(url: "https://uploads.example.net/u/9")
+
+    private func requests(
+        _ kind: ResumableUploadDialectKind,
+        to resource: UploadResource,
+        like request: RequestConfiguration
+    ) throws -> [RequestConfiguration] {
+        let dialect = kind.dialect
+
+        return [
+            dialect.offsetQuery(for: resource, like: request),
+            dialect.append(to: resource, from: 1_024, like: request),
+            try #require(dialect.cancellation(of: resource, like: request)),
+        ]
+    }
+
+    @Test(arguments: ResumableUploadDialectKind.allCases)
+    func requestsToAnotherOrigin_doNotCarryTheCallersCredentials(_ kind: ResumableUploadDialectKind) async throws {
+        // Given
+        var request = await Fixtures.request()
+        request.headers.set(name: "Proxy-Authorization", value: "Basic abc")
+        request.headers.set(name: "Origin", value: "https://example.com")
+        request.headers.set(name: "Accept", value: "application/json")
+
+        // When
+        let derived = try requests(kind, to: Self.otherOrigin, like: request)
+
+        // Then
+        for query in derived {
+            #expect(query.url == Self.otherOrigin.url)
+            #expect(query.headers.first(name: "Authorization") == nil)
+            #expect(query.headers.first(name: "Cookie") == nil)
+            #expect(query.headers.first(name: "Proxy-Authorization") == nil)
+            #expect(query.headers.first(name: "Origin") == nil)
+            #expect(query.headers.first(name: "Accept") == "application/json")
+        }
+    }
+
+    @Test(arguments: ResumableUploadDialectKind.allCases)
+    func requestsToAURLThatCannotBeRead_doNotCarryTheCallersCredentials(_ kind: ResumableUploadDialectKind) async throws
+    {
+        // Given
+        let request = await Fixtures.request()
+
+        // When
+        let derived = try requests(kind, to: UploadResource(url: "not a url"), like: request)
+
+        // Then
+        for query in derived {
+            #expect(query.headers.first(name: "Authorization") == nil)
+            #expect(query.headers.first(name: "Cookie") == nil)
+        }
+    }
+
+    @Test(arguments: ResumableUploadDialectKind.allCases)
+    func requestsToAnotherOrigin_keepTheCallersCredentials_whenTheCallerAsksForIt(
+        _ kind: ResumableUploadDialectKind
+    ) async throws {
+        // Given
+        var request = await Fixtures.request()
+        request.forwardsCredentialsToOtherOrigins = true
+
+        // When
+        let derived = try requests(kind, to: Self.otherOrigin, like: request)
+
+        // Then
+        for query in derived {
+            #expect(query.url == Self.otherOrigin.url)
+            #expect(query.headers.first(name: "Authorization") == "Bearer token")
+            #expect(query.headers.first(name: "Cookie") == "session=1")
+        }
+    }
+
+    @Test(
+        arguments: ResumableUploadDialectKind.allCases,
+        [
+            "https://example.com/uploads/42",
+            "https://EXAMPLE.com:443/uploads/42",
+        ]
+    )
+    func requestsToTheSameOrigin_keepTheCallersCredentials(
+        _ kind: ResumableUploadDialectKind,
+        _ url: String
+    ) async throws {
+        // Given
+        let request = await Fixtures.request()
+
+        // When
+        let derived = try requests(kind, to: UploadResource(url: url), like: request)
+
+        // Then
+        for query in derived {
+            #expect(query.headers.first(name: "Authorization") == "Bearer token")
+            #expect(query.headers.first(name: "Cookie") == "session=1")
+        }
+    }
+
+    @Test(
+        arguments: ResumableUploadDialectKind.allCases,
+        [
+            "https://example.com:8443/u/1",
+            "https://sub.example.com/u/1",
+            "http://example.com/u/1",
+        ]
+    )
+    func requestsToADifferentSchemeHostOrPort_doNotCarryTheCallersCredentials(
+        _ kind: ResumableUploadDialectKind,
+        _ url: String
+    ) async throws {
+        // Given
+        let request = await Fixtures.request()
+
+        // When
+        let derived = try requests(kind, to: UploadResource(url: url), like: request)
+
+        // Then
+        for query in derived {
+            #expect(query.headers.first(name: "Authorization") == nil)
+            #expect(query.headers.first(name: "Cookie") == nil)
         }
     }
 }

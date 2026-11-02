@@ -8,7 +8,7 @@ Independent features cover the ways a transfer can stop:
 
 - ``RequestController`` pauses and resumes a request on purpose, while its connection stays open.
 - ``RequestTask/resumingDownloads(_:)`` reconnects a download whose connection was lost, and continues it from where it stopped.
-- ``RequestTask/resumingUploads(_:maximumAttemptsWithoutProgress:delay:onCancellation:)`` does the same for an upload, by asking the server how much of it holds and sending the rest.
+- ``RequestTask/resumingUploads(_:maximumAttemptsWithoutProgress:delay:onCancellation:forwardsCredentialsToOtherOrigins:)`` does the same for an upload, by asking the server how much of it holds and sending the rest.
 
 Neither changes a request that doesn't ask for it. All of them work on every executor.
 
@@ -140,7 +140,7 @@ It works with ``DownloadTask`` and ``DataTask``, and combines with ``RequestTask
 
 ### Continuing an upload after a lost connection
 
-An upload that loses its connection fails, and sending it again means sending all of it. A server that supports *resumable uploads* can say how much of the body it already has, and ``RequestTask/resumingUploads(_:maximumAttemptsWithoutProgress:delay:onCancellation:)`` uses that to send only the rest:
+An upload that loses its connection fails, and sending it again means sending all of it. A server that supports *resumable uploads* can say how much of the body it already has, and ``RequestTask/resumingUploads(_:maximumAttemptsWithoutProgress:delay:onCancellation:forwardsCredentialsToOtherOrigins:)`` uses that to send only the rest:
 
 ```swift
 try await UploadTask {
@@ -203,8 +203,8 @@ To follow a request being suspended, resumed and reconnected as it happens, atta
 - ``DownloadResumptionPoint``
 - ``ChangedDownloadBehavior``
 - ``DownloadResumptionError``
-- ``RequestTask/resumingUploads(_:maximumAttemptsWithoutProgress:delay:onCancellation:)``
-- ``RequestTask/resumingUploads(maximumAttemptsWithoutProgress:delay:onCancellation:)``
+- ``RequestTask/resumingUploads(_:maximumAttemptsWithoutProgress:delay:onCancellation:forwardsCredentialsToOtherOrigins:)``
+- ``RequestTask/resumingUploads(maximumAttemptsWithoutProgress:delay:onCancellation:forwardsCredentialsToOtherOrigins:)``
 - ``ResumableUploadProtocol``
 - ``IETFResumableUpload``
 - ``TUSResumableUpload``

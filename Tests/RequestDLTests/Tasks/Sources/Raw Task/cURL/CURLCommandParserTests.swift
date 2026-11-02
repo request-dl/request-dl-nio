@@ -285,6 +285,70 @@ struct CURLCommandParserTests {
         }
     }
 
+    /// curl reads `@file` after `-d` and `--data-binary` (and `<file` after `-F name=`). Sending the
+    /// literal text instead would be a request the pasted command never makes, so these throw;
+    /// `--data-raw` is the one data flag that keeps `@` as text.
+    @Test(arguments: [
+        "curl -d @payload.json https://example.com",
+        "curl --data @payload.json https://example.com",
+        "curl --data-binary @payload.json https://example.com",
+        "curl -d @- https://example.com",
+        "curl -F 'a=<payload.txt' https://example.com",
+    ])
+    func flagsThatReadAFileWhoseContentWouldBeLostThrow(_ command: String) async throws {
+        do {
+            _ = try await CURLCommandParser.parse(command)
+            Issue.record("Not expecting success")
+        } catch let error as CURLParsingError {
+            #expect(error.context == .unsupportedFlag)
+        }
+    }
+
+    @Test
+    func dataRawKeepsAnAtSignAsText() async throws {
+        // Given / When
+        let configuration = try await CURLCommandParser.parse(
+            "curl --data-raw @payload.json https://example.com"
+        )
+
+        // Then
+        #expect(try await bodyString(configuration) == "@payload.json")
+    }
+
+    @Test
+    func dataWithAnAtSignInTheMiddleIsText() async throws {
+        // Given / When
+        let configuration = try await CURLCommandParser.parse(
+            "curl -d 'user=a@b.com' https://example.com"
+        )
+
+        // Then
+        #expect(try await bodyString(configuration) == "user=a@b.com")
+    }
+
+    @Test
+    func headerWithoutAValueRemovesTheHeader() async throws {
+        // Given / When
+        let configuration = try await CURLCommandParser.parse(
+            "curl -H 'X-Foo: 1' -H 'X-Foo:' -H 'X-Bar: 2' https://example.com"
+        )
+
+        // Then
+        #expect(configuration.headers["X-Foo"] == nil)
+        #expect(configuration.headers["X-Bar"] == ["2"])
+    }
+
+    @Test
+    func contentTypeWithoutAValueIsNotReplacedByTheFormURLEncodedDefault() async throws {
+        // Given / When
+        let configuration = try await CURLCommandParser.parse(
+            "curl -H 'Content-Type:' -d 'a=1' https://example.com"
+        )
+
+        // Then
+        #expect(configuration.headers["Content-Type"] == nil)
+    }
+
     // MARK: - Session-level flags (-L, -k, -x, --resolve, --compressed, --cacert, --cert/-E, --key)
 
     @Test
@@ -341,6 +405,30 @@ struct CURLCommandParserTests {
 
         // Then
         #expect(sessionConfiguration.redirectConfiguration == .follow(max: 3, allowCycles: false))
+    }
+
+    @Test
+    func maxRedirsOfMinusOneFollowsWithoutLimit() async throws {
+        // Given
+        let command = try await CURLCommandParser.parseCommand(
+            "curl -L --max-redirs -1 https://example.com"
+        )
+
+        // When
+        var sessionConfiguration = Internals.Session.Configuration()
+        let edit = try #require(command.sessionConfigurationEdit)
+        edit(&sessionConfiguration)
+
+        // Then
+        #expect(sessionConfiguration.redirectConfiguration == .follow(max: .max, allowCycles: false))
+    }
+
+    @Test
+    func maxRedirsBelowMinusOneThrows() async throws {
+        // Given / When / Then
+        await #expect(throws: CURLParsingError.self) {
+            try await CURLCommandParser.parse("curl -L --max-redirs -2 https://example.com")
+        }
     }
 
     @Test
@@ -467,6 +555,21 @@ struct CURLCommandParserTests {
         // Then: the port is validated but not carried into `dnsOverride`, which has no port
         // dimension.
         #expect(sessionConfiguration.dnsOverride == ["example.com": "127.0.0.1"])
+    }
+
+    @Test(arguments: [
+        "curl -x http://proxy.example.com:99999 https://example.com",
+        "curl -x http://proxy.example.com:-1 https://example.com",
+        "curl --resolve example.com:99999:127.0.0.1 https://example.com",
+        "curl --resolve example.com:-1:127.0.0.1 https://example.com",
+    ])
+    func aPortOutsideTheValidRangeThrows(_ command: String) async throws {
+        do {
+            _ = try await CURLCommandParser.parseCommand(command)
+            Issue.record("Not expecting success")
+        } catch let error as CURLParsingError {
+            #expect(error.context == .malformedArgument)
+        }
     }
 
     @Test

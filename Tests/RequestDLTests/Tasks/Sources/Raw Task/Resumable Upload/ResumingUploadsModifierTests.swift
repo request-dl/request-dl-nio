@@ -41,6 +41,22 @@ struct ResumingUploadsModifierTests {
         #expect(setup.maximumAttemptsWithoutProgress == 3)
         #expect(setup.delay == 1_000_000_000)
         #expect(setup.cancellation == .terminate)
+        #expect(!setup.forwardsCredentialsToOtherOrigins)
+    }
+
+    @Test
+    func credentialsAreForwardedToAnotherOriginOnlyWhenAskedTo() async throws {
+        // When
+        let withProtocol = try #require(
+            try await Probe().resumingUploads(.tus, forwardsCredentialsToOtherOrigins: true).result()
+        )
+        let withoutProtocol = try #require(
+            try await Probe().resumingUploads(forwardsCredentialsToOtherOrigins: true).result()
+        )
+
+        // Then
+        #expect(withProtocol.forwardsCredentialsToOtherOrigins)
+        #expect(withoutProtocol.forwardsCredentialsToOtherOrigins)
     }
 
     @Test

@@ -20,13 +20,18 @@ struct ResumableUploadSetup: Sendable {
     /// What is done on the server when the request is cancelled.
     let cancellation: UploadCancellation
 
+    /// Whether the upload's requests keep the caller's credentials when the server sends them to
+    /// another origin.
+    let forwardsCredentialsToOtherOrigins: Bool
+
     // MARK: - Inits
 
     init(
         dialect: any ResumableUploadDialect,
         maximumAttemptsWithoutProgress: Int = 3,
         delay: UInt64 = 1_000_000_000,
-        cancellation: UploadCancellation = .terminate
+        cancellation: UploadCancellation = .terminate,
+        forwardsCredentialsToOtherOrigins: Bool = false
     ) {
         precondition(maximumAttemptsWithoutProgress > .zero, "A resumable upload allows at least one attempt")
 
@@ -34,6 +39,7 @@ struct ResumableUploadSetup: Sendable {
         self.maximumAttemptsWithoutProgress = maximumAttemptsWithoutProgress
         self.delay = delay
         self.cancellation = cancellation
+        self.forwardsCredentialsToOtherOrigins = forwardsCredentialsToOtherOrigins
     }
 }
 
@@ -48,7 +54,7 @@ private struct ResumableUploadSetupRequestEnvironmentKey: RequestEnvironmentKey 
 
 extension RequestEnvironmentValues {
 
-    /// Set by ``RequestTask/resumingUploads(_:maximumAttemptsWithoutProgress:delay:onCancellation:)``;
+    /// Set by ``RequestTask/resumingUploads(_:maximumAttemptsWithoutProgress:delay:onCancellation:forwardsCredentialsToOtherOrigins:)``;
     /// never touched directly.
     ///
     /// `RawTask` is the only thing that reads it, once it has the client an execution runs on.
@@ -117,6 +123,12 @@ extension RequestTask {
     ///   - delay: Seconds to wait before each attempt. Negative values are treated as zero.
     ///   - onCancellation: What is done on the server when the request is cancelled. Defaults to
     ///   ``UploadCancellation/terminate``.
+    ///   - forwardsCredentialsToOtherOrigins: The server chooses where the upload lives, which can
+    ///   be another origin than the request's. By default the requests that go there leave behind
+    ///   `Authorization`, `Cookie`, `Proxy-Authorization` and `Origin`, and an upload is never
+    ///   moved from `https` to `http` or to a scheme that is not `http`. Pass `true` when the
+    ///   uploads of a server you trust are served from another origin that expects the same
+    ///   credentials.
     /// - Returns: A task that produces this task's actual result, exactly as ``result()`` would.
     ///
     /// - Important: Only a request with a body is an upload. A body that is compressed as it is
@@ -131,7 +143,8 @@ extension RequestTask {
         _ protocol: Protocol,
         maximumAttemptsWithoutProgress: Int = 3,
         delay: Double = 1,
-        onCancellation: UploadCancellation = .terminate
+        onCancellation: UploadCancellation = .terminate,
+        forwardsCredentialsToOtherOrigins: Bool = false
     ) -> AnyTask<Element> {
         // `NaN` waits as little as a negative delay does: converting it would trap.
         let nanoseconds = (max(delay.isNaN ? .zero : delay, .zero) * 1_000_000_000).rounded()
@@ -140,7 +153,8 @@ extension RequestTask {
             dialect: `protocol`.dialect,
             maximumAttemptsWithoutProgress: max(1, maximumAttemptsWithoutProgress),
             delay: nanoseconds >= Double(UInt64.max) ? .max : UInt64(nanoseconds),
-            cancellation: onCancellation
+            cancellation: onCancellation,
+            forwardsCredentialsToOtherOrigins: forwardsCredentialsToOtherOrigins
         )
 
         return resumingUploads(using: setup)
@@ -148,17 +162,19 @@ extension RequestTask {
 
     /// Makes an upload resumable with the IETF working group's protocol, ``IETFResumableUpload``.
     ///
-    /// See ``resumingUploads(_:maximumAttemptsWithoutProgress:delay:onCancellation:)``.
+    /// See ``resumingUploads(_:maximumAttemptsWithoutProgress:delay:onCancellation:forwardsCredentialsToOtherOrigins:)``.
     public func resumingUploads(
         maximumAttemptsWithoutProgress: Int = 3,
         delay: Double = 1,
-        onCancellation: UploadCancellation = .terminate
+        onCancellation: UploadCancellation = .terminate,
+        forwardsCredentialsToOtherOrigins: Bool = false
     ) -> AnyTask<Element> {
         resumingUploads(
             .ietf,
             maximumAttemptsWithoutProgress: maximumAttemptsWithoutProgress,
             delay: delay,
-            onCancellation: onCancellation
+            onCancellation: onCancellation,
+            forwardsCredentialsToOtherOrigins: forwardsCredentialsToOtherOrigins
         )
     }
 

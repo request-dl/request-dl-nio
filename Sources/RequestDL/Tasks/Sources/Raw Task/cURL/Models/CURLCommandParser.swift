@@ -100,7 +100,13 @@ enum CURLCommandParser {
 
             case "-H", "--header":
                 let (name, headerValue) = try splitOnce(try value(for: token), separator: ":")
-                configuration.headers.add(name: name, value: headerValue)
+
+                // curl removes the header when the value is empty (`-H 'Accept:'`).
+                if headerValue.isEmpty {
+                    configuration.headers.remove(name: name)
+                } else {
+                    configuration.headers.add(name: name, value: headerValue)
+                }
 
                 // `.lowercased()`, not Foundation's `caseInsensitiveCompare(_:)`, which is
                 // unavailable under `FoundationEssentials`/Linux.
@@ -109,13 +115,26 @@ enum CURLCommandParser {
                 }
 
             case "-d", "--data", "--data-raw", "--data-binary":
-                dataFragments.append(try value(for: token))
+                let data = try value(for: token)
+
+                // curl reads `@file` (and `@-`, stdin) for every data flag but `--data-raw`.
+                // Sending the text instead would be a request the command never makes.
+                if token != "--data-raw", data.hasPrefix("@") {
+                    throw CURLParsingError(.unsupportedFlag, token: token)
+                }
+
+                dataFragments.append(data)
 
             case "-F", "--form":
                 let field = try value(for: token)
 
                 if isFile(field) {
                     try require(.localFiles, for: token)
+                }
+
+                // `name=<file` sends the content of the file as the value, which is not supported.
+                if readsFileContent(field) {
+                    throw CURLParsingError(.unsupportedFlag, token: token)
                 }
 
                 formItems.append(try makeFormItem(field))
@@ -145,11 +164,12 @@ enum CURLCommandParser {
             case "--max-redirs":
                 let rawValue = try value(for: token)
 
-                guard let count = Int(rawValue) else {
+                // `-1` is curl's "no limit". Any other negative number is not a count.
+                guard let count = Int(rawValue), count >= -1 else {
                     throw CURLParsingError(.malformedArgument, token: rawValue)
                 }
 
-                maxRedirects = count
+                maxRedirects = count < 0 ? .max : count
 
             case "-k", "--insecure":
                 try require(.disabledTLSVerification, for: token)
@@ -384,6 +404,10 @@ enum CURLCommandParser {
             )
         }
 
+        guard (0...65_535).contains(port) else {
+            throw CURLParsingError(.malformedArgument, token: value)
+        }
+
         return Internals.Proxy(
             host: String(remainder[remainder.startIndex..<colonIndex]),
             port: port,
@@ -402,7 +426,8 @@ enum CURLCommandParser {
         guard
             components.count == 3,
             !components[0].isEmpty,
-            Int(components[1]) != nil,
+            let port = Int(components[1]),
+            (0...65_535).contains(port),
             !components[2].isEmpty
         else {
             throw CURLParsingError(.malformedArgument, token: value)
@@ -482,6 +507,15 @@ enum CURLCommandParser {
         }
 
         return field[field.index(after: separator)...].trimming(where: \.isWhitespace).hasPrefix("@")
+    }
+
+    /// Whether a `-F`/`--form` field takes its value from the content of a file (`name=<path`).
+    private static func readsFileContent(_ field: String) -> Bool {
+        guard let separator = field.firstIndex(of: "=") else {
+            return false
+        }
+
+        return field[field.index(after: separator)...].trimming(where: \.isWhitespace).hasPrefix("<")
     }
 
     /// Parses one `-F`/`--form` field: `name=value`, or `name=@path;type=mime` for a file.
