@@ -28,9 +28,12 @@ import RequestDLInternals
 /// effect.
 ///
 /// > Note: Proxy auto configuration (a PAC script) is evaluated (fetched and run as JavaScript
-/// against the request's URL, exactly like a browser would), with results cached briefly per
-/// script/URL pair so a burst of requests to the same host doesn't re-fetch and re-evaluate the
-/// same script for each one. A PAC script that's unreachable, or fails to evaluate, resolves to a
+/// against the request's URL), with results cached briefly per script and origin (scheme, host
+/// and port) so a burst of requests to the same host doesn't re-fetch and re-evaluate the same
+/// script for each one. Unlike a browser, the script only sees the origin: the path and query of
+/// the URL are dropped, for `http` as for `https`, so a script that routes on them
+/// (`shExpMatch(url, "http://host/api/*")`) will not match. Routing on the host or the port is
+/// unaffected. A PAC script that's unreachable, or fails to evaluate, resolves to a
 /// direct connection and a warning in the log by default, which on a network that requires a
 /// proxy sends the request around it. Declare ``PACFailurePolicy/fail`` to fail the request
 /// instead, with a ``ProxyAutoConfigurationError``, or use the last answer the script gave:
