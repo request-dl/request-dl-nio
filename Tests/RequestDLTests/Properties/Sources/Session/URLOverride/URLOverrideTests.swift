@@ -395,4 +395,57 @@ struct URLOverrideTests {
         // Then
         try await assertNever(property.body)
     }
+
+    // MARK: - Percent encoded paths
+
+    /// A rule written with an escape matches the request it was written for, and a segment with an
+    /// escaped slash is one segment on both sides.
+    @Test
+    func pathPrefixOverride_matchesAnEscapedSegmentWhateverTheCaseOfTheEscape() async throws {
+        // Given / When
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL("google.com")
+                Path("files")
+                Path("a%2fb")
+                Path("report")
+                URLOverride("https://apple.com/v2", from: "https://google.com/files/a%2Fb")
+            }
+        )
+
+        // Then
+        #expect(resolved.requestConfiguration.url == "https://apple.com/v2/report")
+    }
+
+    @Test
+    func pathPrefixOverride_doesNotTakeAnEscapedSlashForASeparator() async throws {
+        // Given / When: the request's `files/a%2Fb` is two segments, not three.
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL("google.com")
+                Path("files")
+                Path("a%2Fb")
+                URLOverride("https://apple.com/v2", from: "https://google.com/files/a/b")
+            }
+        )
+
+        // Then: unchanged.
+        #expect(resolved.requestConfiguration.url == "https://google.com/files/a%2Fb")
+    }
+
+    @Test
+    func pathPrefixOverride_matchesASpaceWrittenEitherWay() async throws {
+        // Given / When
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL("google.com")
+                Path("my files")
+                Path("report")
+                URLOverride("https://apple.com/v2", from: "https://google.com/my%20files")
+            }
+        )
+
+        // Then
+        #expect(resolved.requestConfiguration.url == "https://apple.com/v2/report")
+    }
 }

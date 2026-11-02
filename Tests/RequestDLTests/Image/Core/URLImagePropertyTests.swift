@@ -47,6 +47,18 @@ struct URLImagePropertyTests {
     }
 
     @Test
+    func pathWithPercentEscapes_keepsThem() async throws {
+        // Given
+        let url = URL(string: "https://example.com/a%2Fb/100%25/photo.png")!
+
+        // When
+        let resolved = try await resolve(URLImageProperty(url: url))
+
+        // Then
+        #expect(resolved.requestConfiguration.url == "https://example.com/a%2Fb/100%25/photo.png")
+    }
+
+    @Test
     func hostWithPath() async throws {
         // Given
         let url = URL(string: "https://example.com/assets/avatar.png")!

@@ -62,6 +62,31 @@ struct DigestAuthenticationTests {
         #expect(header.contains("nc=00000001"))
     }
 
+    /// The server hashes the request-target it receives, so the `uri` has to be the encoded one.
+    @Test
+    func digestAuthentication_whenThePathNeedsEncoding_hashesTheTargetThatGoesOnTheWire() async throws {
+        // Given
+        let credential = DigestCredential()
+        credential.challenge = DigestChallenge(
+            headerValue: #"Digest realm="test", qop="auth", nonce="abc123", algorithm=MD5"#
+        )
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                Path("users/a b")
+                Path("caf\u{E9}")
+                Query(name: "q", value: "x y")
+                DigestAuthentication(username: "user", password: "pass")
+                    .environment(\.digestCredential, credential)
+            }
+        )
+
+        // Then
+        let header = try #require(resolved.requestConfiguration.headers["Authorization"]?.first)
+        #expect(header.contains(#"uri="/users/a%20b/caf%C3%A9?q=x%20y""#))
+    }
+
     @Test
     func digestAuthentication_whenCredentialReusedAcrossRequests_incrementsNonceCount() async throws {
         // Given

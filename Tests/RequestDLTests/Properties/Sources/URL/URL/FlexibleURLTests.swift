@@ -239,8 +239,9 @@ struct FlexibleURLTests {
 
     @Test func endpointWithSpacesTrimmed() async throws {
         // Given
+        // The spaces around the whole string are trimmed. One inside is part of the path.
         let endpointPath = " / spaced/path/ "
-        let expectedUrl = "https://api.service.com/spaced/path/"
+        let expectedUrl = "https://api.service.com/%20spaced/path/"
 
         // When
         let resolved = try await resolve(
@@ -257,7 +258,7 @@ struct FlexibleURLTests {
     @Test func invalidURLStringThrowsError() async throws {
         // Given
         let invalidFlexibleURLString = "not a valid url at all!"
-        let expectedUrl = "/not a valid url at all!"
+        let expectedUrl = "/not%20a%20valid%20url%20at%20all!"
 
         // When
         let resolved = try await resolve(FlexibleURL(invalidFlexibleURLString))
@@ -436,5 +437,47 @@ struct FlexibleURLTests {
 
         // Then
         #expect(resolved.requestConfiguration.url == "https://example.com/users/a@b.c")
+    }
+
+    // MARK: - Percent encoded path
+
+    /// `%2F` is a slash that belongs to its segment, and `%25` is a literal percent sign. Reading
+    /// the decoded path turned the first into another resource and dropped the second.
+    @Test func fullURLKeepsThePercentEscapesOfItsPath() async throws {
+        // Given
+        let resolved = try await resolve(FlexibleURL("https://example.com/a%2Fb/100%25/x%20y"))
+
+        // Then
+        #expect(resolved.requestConfiguration.pathComponents == ["a%2Fb", "100%25", "x%20y"])
+        #expect(resolved.requestConfiguration.url == "https://example.com/a%2Fb/100%25/x%20y")
+    }
+
+    @Test func relativePathKeepsThePercentEscapesOfItsPath() async throws {
+        // Given
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL("example.com")
+                FlexibleURL("/files/a%2Fb/%C3%A9?x=1")
+            }
+        )
+
+        // Then
+        #expect(resolved.requestConfiguration.url == "https://example.com/files/a%2Fb/%C3%A9?x=1")
+    }
+
+    @Test func dotSegmentsAreKeptAsGiven() async throws {
+        // Given
+        let resolved = try await resolve(FlexibleURL("https://example.com/files/%2e%2e/secret"))
+
+        // Then
+        #expect(resolved.requestConfiguration.url == "https://example.com/files/%2E%2E/secret")
+    }
+
+    @Test func aSpaceInThePathIsEncoded() async throws {
+        // Given
+        let resolved = try await resolve(FlexibleURL("https://example.com/a b/c"))
+
+        // Then
+        #expect(resolved.requestConfiguration.url == "https://example.com/a%20b/c")
     }
 }

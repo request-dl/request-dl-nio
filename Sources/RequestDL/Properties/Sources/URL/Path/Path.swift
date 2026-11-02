@@ -31,6 +31,12 @@ import struct Foundation.URLComponents
 /// Path(18900)
 /// ```
 ///
+/// The text is the path, not a URL to parse: a space or a non-ASCII character is encoded for you,
+/// and a percent escape already in it (`%2F`, `%25`) is kept as it is, so `Path("a%2Fb")` is one
+/// segment and `Path("100%25")` is `100%`. A `%` that starts no escape is encoded as `%25`. Text
+/// that would read as an escape but is meant literally, such as `100%AB`, cannot be told apart
+/// and is taken as one.
+///
 /// By using the `Path` component, you can easily construct the desired URL path for your request in RequestDL.
 public struct Path: Property {
 

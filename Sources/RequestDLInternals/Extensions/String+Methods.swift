@@ -103,20 +103,84 @@ extension StringProtocol {
     }
 }
 
+// MARK: - Path encoding
+
+extension StringProtocol {
+
+    /// This text as it goes on the wire in a URL path, the way a URL string is canonicalized.
+    ///
+    /// - A `%` followed by two hexadecimal digits is a percent-encoded byte already and stays
+    ///   one, with the digits in upper case (`%2f` and `%2F` are the same byte). That is what
+    ///   keeps `%2F` a segment's own slash and `%25` a literal percent sign.
+    /// - Anything else a path may not contain is encoded, one `%XX` per UTF-8 byte: a space, a
+    ///   non-ASCII character, a `%` that is not part of an escape, `#`, `?`, `\`.
+    ///
+    /// Text that already means something else by an escape, such as `100%AB` that is meant to be
+    /// the literal `100%AB`, can't be told apart from an encoded byte and is taken as one.
+    package func addingPercentEncodingForURLPath() -> String {
+        let bytes = Array(utf8)
+        var result = ""
+        result.reserveCapacity(bytes.count)
+
+        var index = 0
+
+        while index < bytes.count {
+            let byte = bytes[index]
+
+            if byte == UInt8(ascii: "%"),
+                index + 2 < bytes.count,
+                Self.isHexDigit(bytes[index + 1]),
+                Self.isHexDigit(bytes[index + 2])
+            {
+                result.append("%")
+                result.append(Character(UnicodeScalar(bytes[index + 1])).uppercased())
+                result.append(Character(UnicodeScalar(bytes[index + 2])).uppercased())
+                index += 3
+                continue
+            }
+
+            if byte < 0x80, Character(UnicodeScalar(byte)).isURLPathAllowed {
+                result.append(Character(UnicodeScalar(byte)))
+            } else {
+                result.append("%")
+                let hex = String(byte, radix: 16, uppercase: true)
+                result.append(hex.count == 1 ? "0\(hex)" : hex)
+            }
+
+            index += 1
+        }
+
+        return result
+    }
+
+    private static func isHexDigit(_ byte: UInt8) -> Bool {
+        switch byte {
+        case UInt8(ascii: "0")...UInt8(ascii: "9"),
+            UInt8(ascii: "a")...UInt8(ascii: "f"),
+            UInt8(ascii: "A")...UInt8(ascii: "F"):
+            return true
+        default:
+            return false
+        }
+    }
+}
+
 extension Array where Element == String {
 
-    /// Joins path components with single separators, dropping empties.
+    /// Joins path components with single separators, dropping empties, in the form that goes on
+    /// the wire (see ``addingPercentEncodingForURLPath()``).
     ///
-    /// Each component is trimmed of anything a path may not contain, and of its own slashes, so
+    /// Each component is trimmed of whitespace and of its own slashes, so
     /// `["a/", "/b/", "", "c"]` comes out as `"a/b/c"`. A trailing slash on the last component
     /// survives, because that is the difference between a directory and a file.
     package func joinedAsPath() -> String {
         var cleanedComponents = Array(
             lazy
                 .map { component in
-                    component.trimming { !$0.isURLPathAllowed || $0 == "/" }
+                    component.trimming { $0.isWhitespace || $0 == "/" }
                 }
                 .filter { !$0.isEmpty }
+                .map { $0.addingPercentEncodingForURLPath() }
         )
 
         if let lastOriginal = last, lastOriginal.hasSuffix("/"), !cleanedComponents.isEmpty {
