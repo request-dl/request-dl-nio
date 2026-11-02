@@ -154,4 +154,89 @@ struct InternalsSystemProxyResolverEnvironmentTests {
 
         #expect(try proxy("http://example.com", environment) == nil)
     }
+
+    // MARK: - Edge cases
+
+    @Test
+    func aURLWithoutAHost_isDirect() throws {
+        #expect(try proxy("file:///tmp/a", Self.proxied) == nil)
+    }
+
+    @Test(arguments: ["not a url", "http://", ""])
+    func aProxyValueWithoutAHost_isDirect(_ value: String) throws {
+        #expect(try proxy("http://example.com", ["http_proxy": value]) == nil)
+    }
+
+    @Test
+    func anHttpProxyWithoutAPort_defaultsTo8080() throws {
+        #expect(try proxy("http://example.com", ["http_proxy": "http://proxy.example"])?.port == 8_080)
+    }
+
+    @Test
+    func aProxyWithAUserAndNoPassword_hasNoAuthorization() throws {
+        let proxy = try proxy("http://example.com", ["http_proxy": "http://user@proxy.example:1"])
+
+        #expect(proxy?.authorization == nil)
+    }
+
+    @Test(arguments: [
+        ("ws://example.com", "example.com:80", false),
+        ("wss://example.com", "example.com:443", false),
+        ("ws://example.com", "example.com:443", true),
+        ("ftp://example.com", "example.com:21", true),
+        ("ftp://example.com", "example.com", false),
+    ])
+    func noProxy_withAPort_usesTheDefaultPortOfTheScheme(
+        _ url: String,
+        _ noProxy: String,
+        _ expectedProxied: Bool
+    ) throws {
+        #expect(try isProxied(url, noProxy: noProxy) == expectedProxied)
+    }
+
+    @Test(arguments: [
+        ("http://[::1]:8080/", "[::1]:8080", false),
+        ("http://[::1]:9090/", "[::1]:8080", true),
+        ("http://[::1]/", "[::1]", false),
+        ("http://[::1]/", "::1", false),
+        ("http://example.com", "example.com:abc", true),
+        ("http://example.com", "other.org,, ,", true),
+        ("http://example.com", "other.org,,example.com", false),
+    ])
+    func noProxy_entryForms(_ url: String, _ noProxy: String, _ expectedProxied: Bool) throws {
+        #expect(try isProxied(url, noProxy: noProxy) == expectedProxied)
+    }
+
+    @Test(arguments: [
+        "300.1.1.1/8",
+        "1.2.3/8",
+        "1.2.3.4.5/8",
+        "a.b.c.d/8",
+        "1..3.4/8",
+        "10.0.0.0/-1",
+        "10.0.0.0/",
+        "1::2::3/64",
+        "g::1/64",
+        "12345::/16",
+        "1:2:3:4:5:6:7::8/64",
+        "1:2:3/16",
+        "1:2:3:4:5:6:7:8:9/64",
+        ":::/0",
+        "[::1/64",
+    ])
+    func noProxy_invalidRanges_neverSkipTheProxy(_ noProxy: String) throws {
+        #expect(try isProxied("http://10.1.2.3", noProxy: noProxy))
+        #expect(try isProxied("http://[::1]/", noProxy: noProxy))
+    }
+
+    @Test(arguments: [
+        ("http://[2001:db8::1]/", "2001:db8:0:0:0:0:0:0/32", false),
+        ("http://[2001:db8::1]/", "2001:db8:0:0:0:0:0:1/128", false),
+        ("http://[2001:db8::2]/", "2001:db8:0:0:0:0:0:1/128", true),
+        ("http://[::]/", "::/128", false),
+        ("http://[0:0:0:0:0:0:0:1]/", "::1/128", false),
+    ])
+    func noProxy_ipv6WrittenInFull(_ url: String, _ noProxy: String, _ expectedProxied: Bool) throws {
+        #expect(try isProxied(url, noProxy: noProxy) == expectedProxied)
+    }
 }
