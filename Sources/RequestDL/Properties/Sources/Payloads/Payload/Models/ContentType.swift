@@ -30,7 +30,21 @@ public struct ContentType: Sendable, Hashable {
     /// Content type for XML data.
     public static let xml: ContentType = "application/xml"
 
-    /// Content type for form data with files.
+    /// Content type for form data with files, as `multipart/form-data`.
+    ///
+    /// > Note: ``Form`` sets its own `Content-Type` with the boundary of its body. Use this
+    /// to name the type in headers such as ``AcceptHeader``.
+    public static let multipartFormData: ContentType = "multipart/form-data"
+
+    /// The value `"form-data"`, which is not a media type.
+    ///
+    /// Kept as it was so that existing requests keep sending the same header.
+    @available(
+        *,
+        deprecated,
+        renamed: "multipartFormData",
+        message: "\"form-data\" is not a media type. Use multipartFormData, which is multipart/form-data."
+    )
     public static let formData: ContentType = "form-data"
 
     /// Content type for form data in the `x-www-form-urlencoded` format.
