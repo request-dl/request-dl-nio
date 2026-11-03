@@ -75,6 +75,8 @@ jobs:
       # defaults: on, 12 minutes) already fail a genuinely stuck run well before 45 minutes,
       # independently of this budget.
       apple-tests-timeout-minutes: 45
+      # watchOS also gets `rerun`: the runner unmounts the watchOS 27.0 runtime about every 10 minutes
+      # (see #441), which kills the tests running at that moment; they are run again alone.
       # Same destinations the workflow runs by default, spelled out only to give visionOS a budget
       # of its own. Its Simulator is the slowest of the set: when it finishes, it takes 21 to 44
       # minutes, and 16 of the legs run over the last few days were cut off by the 45-minute cap
@@ -84,7 +86,7 @@ jobs:
       apple-tests-matrix: >-
         [{"destination":"platform=iOS Simulator,arch=arm64,name=iPhone 18 Pro,OS=27.0","name":"iOS"},
         {"destination":"platform=iOS Simulator,arch=arm64,name=iPad (A16),OS=27.0","name":"iPadOS"},
-        {"destination":"platform=watchOS Simulator,arch=arm64,name=Apple Watch Series 12 (42mm),OS=27.0","name":"watchOS"},
+        {"destination":"platform=watchOS Simulator,arch=arm64,name=Apple Watch Series 12 (42mm),OS=27.0","name":"watchOS","rerun":1},
         {"destination":"platform=tvOS Simulator,arch=arm64,name=Apple TV 4K (3rd generation) (at 1080p),OS=27.0","name":"tvOS"},
         {"destination":"platform=visionOS Simulator,arch=arm64,name=Apple Vision Pro,OS=27.0","name":"visionOS","timeout":75},
         {"destination":"platform=macOS,arch=arm64,name=My Mac","name":"macOS"},

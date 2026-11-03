@@ -222,7 +222,11 @@ struct ContinuingDownloadFromPointRequestTaskTests {
             #expect(isIntact)
 
             // The first request asked from the point; the next one from further on, but never from
-            // before it or from past what the cut connection carried.
+            // before it or from past what the cut connection carried. "Further on" includes the
+            // point itself: the server drops the connection with a reset, and a reset throws away
+            // whatever the client had not read yet, so under load URLSession can report nothing
+            // received from the cut connection at all (seen as `[2000000, 2000000]`). Starting
+            // over from the point is still correct, and the body checked above is intact.
             try await awaitRecordedRequests(server, atLeast: 2) { $0.header("Range") != nil }
 
             let starts = server.requests
@@ -234,7 +238,7 @@ struct ContinuingDownloadFromPointRequestTaskTests {
             // that counted more than it was sent.
             #expect(starts.first == offset, "Range starts: \(starts), the point is at \(offset)")
             #expect(
-                starts.dropFirst().allSatisfy { $0 > offset && $0 <= offset + 1_000_000 },
+                starts.dropFirst().allSatisfy { $0 >= offset && $0 <= offset + 1_000_000 },
                 "Range starts: \(starts), the point is at \(offset)"
             )
         }

@@ -162,13 +162,15 @@ struct DataCacheWriteInProgressTests {
         await dataCache.discardFailedWrite(failed, forKey: key)
 
         // When
-        let start = Date()
+        let retriesBefore = DiskStorage.retryCount
         let cached = await dataCache.getCachedData(forKey: key, policy: .disk)
-        let elapsed = Date().timeIntervalSince(start)
+        let retries = DiskStorage.retryCount - retriesBefore
 
-        // Then
+        // Then: counted, not timed. A read that goes to the directory that is gone spends 299
+        // retries of 50 ms, while a clock bound has to sit below the 15 s that costs and a
+        // runner that stalls the whole process for seconds can already take most of that.
         #expect(cached == nil)
-        #expect(elapsed < 5, "took \(elapsed)s")
+        #expect(retries < 100)
     }
 
     /// Another key is not held back by a write to this one.
