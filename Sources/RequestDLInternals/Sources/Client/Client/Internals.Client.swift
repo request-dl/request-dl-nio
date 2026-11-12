@@ -241,6 +241,20 @@ extension Internals {
                 )
             }
 
+            // The request keeps its client alive until it has finished, however it finishes
+            // (response, failure, cancellation). `Internals.ClientManager` no longer does that for
+            // a configuration that can never be pooled (see
+            // `Internals.Session.Configuration.isPoolable`): such a client is not tracked at all,
+            // and `deinit` below shuts it down as soon as nothing refers to it, which this makes
+            // "when its last request is over" and not "when the caller's reference to it, which
+            // is gone as soon as the response head arrives, goes". Registered on the future, not
+            // captured by the seed or the delegate, so it ends with the request and never
+            // outlives it. For a pooled client it is only one more reference to something the
+            // table already holds.
+            task.futureResult.whenComplete { _ in
+                withExtendedLifetime(self) {}
+            }
+
             return UnsafeTask(task) {
                 // No lock and no task hop. Completing an operation is a counter decrement now,
                 // so wrapping it in `AsyncLock` only bought a suspension on a path that can be

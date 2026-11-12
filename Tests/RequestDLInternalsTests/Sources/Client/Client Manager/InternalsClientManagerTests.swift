@@ -14,6 +14,12 @@ import NIOPosix
 import SwiftAsyncTesting
 import Testing
 
+#if canImport(FoundationEssentials)
+import struct FoundationEssentials.UUID
+#else
+import struct Foundation.UUID
+#endif
+
 @testable import RequestDLInternals
 @testable import RequestDLTestSupport
 
@@ -355,14 +361,13 @@ struct InternalsClientManagerTests {
     }
 
     /// `Internals.RedirectConfiguration.==` answers `false` for `.strategy` against everything,
-    /// itself included, so a pooled `.strategy` entry can never be handed back to anyone and the
-    /// linear scan looking for one is guaranteed to walk the whole list and find nothing.
-    ///
-    /// The entry is still *stored*: the table is also what owns a client for its lifetime, and a
-    /// `.nio` client tears its connections down as soon as the last reference to it goes, which
-    /// is well before the response body still streaming over them is finished.
+    /// itself included, so a `.strategy` entry could never be handed back to anyone: the linear
+    /// scan looking for one is guaranteed to walk the whole list and find nothing, and the entry
+    /// itself would only sit in the table, with its whole connection pool and TLS context, until
+    /// the idle sweep or the ceiling got to it. So it is neither searched for nor stored; the
+    /// caller owns the client, and the client shuts itself down once nothing refers to it.
     @Test
-    func manager_whenConfigurationCarriesARedirectStrategy_shouldNotBeReusedButStillTracked() async throws {
+    func manager_whenConfigurationCarriesARedirectStrategy_shouldNotBeReusedNorTracked() async throws {
         // Given
         let manager = Internals.ClientManager(lifetime: 5 * 60 * 1_000_000_000)
         let provider = Internals.SharedSessionProvider()
@@ -381,10 +386,133 @@ struct InternalsClientManagerTests {
             sessionConfiguration: sessionConfiguration
         )
 
-        // Then: a fresh client either way (that part never worked), each still retained by the
-        // table so it outlives the caller's own reference to it.
+        // Then
         #expect(sut1 !== sut2)
-        #expect(manager.count == 2)
+        #expect(manager.count == 0)
+    }
+
+    /// The case the table used to cover for: nothing but the request keeps the client alive once
+    /// the caller has its response, and the request has to be enough, however it ends.
+    @Test
+    func manager_whenRequestWithRedirectStrategyCompletes_shouldNotAccumulateClients() async throws {
+        // Given
+        let localServer = try await LocalServer(.standard)
+        let uri = "/" + UUID().uuidString
+
+        localServer.insert(try LocalServer.ResponseConfiguration(jsonObject: "ok"), at: uri)
+        defer { localServer.cleanup(at: uri) }
+
+        let manager = Internals.ClientManager(lifetime: 5 * 60 * 1_000_000_000)
+        let provider = Internals.SharedSessionProvider()
+
+        var sessionConfiguration = Internals.Session.Configuration()
+        sessionConfiguration.redirectConfiguration = .strategy(NeverFollowingRedirectStrategy())
+        sessionConfiguration.secureConnection = {
+            var secureConnection = Internals.SecureConnection()
+            secureConnection.certificateVerification = .some(.none)
+            return secureConnection
+        }()
+
+        let requests = 10
+        var weakClients = [WeakClient]()
+
+        // When
+        for _ in 0..<requests {
+            let weakClient = try await {
+                let client = try await manager.client(
+                    provider: provider,
+                    sessionConfiguration: sessionConfiguration
+                )
+
+                let response = try await client.execute(
+                    request: try HTTPClient.Request(url: "https://\(localServer.baseURL)\(uri)"),
+                    logger: nil
+                ).response()
+
+                #expect(response.status == .ok)
+
+                return WeakClient(client)
+            }()
+
+            weakClients.append(weakClient)
+        }
+
+        // Then
+        #expect(manager.count == 0)
+        #expect(await WeakClient.allReleased(weakClients))
+    }
+
+    @Test
+    func manager_whenRequestWithRedirectStrategyIsCancelled_shouldReleaseTheClient() async throws {
+        try await withHangingTCPServer { port in
+            // Given
+            let manager = Internals.ClientManager(lifetime: 5 * 60 * 1_000_000_000)
+
+            var sessionConfiguration = Internals.Session.Configuration()
+            sessionConfiguration.redirectConfiguration = .strategy(NeverFollowingRedirectStrategy())
+
+            // When: a request that is still waiting for an answer is cancelled.
+            let weakClient = try await {
+                let client = try await manager.client(
+                    provider: Internals.SharedSessionProvider(),
+                    sessionConfiguration: sessionConfiguration
+                )
+
+                let task = try await client.execute(
+                    request: try HTTPClient.Request(url: "http://127.0.0.1:\(port)/"),
+                    logger: nil
+                )
+
+                #expect(client.isRunning)
+
+                task()()
+
+                await #expect(throws: (any Error).self) {
+                    _ = try await task.response()
+                }
+
+                return WeakClient(client)
+            }()
+
+            // Then
+            #expect(manager.count == 0)
+            #expect(await WeakClient.allReleased([weakClient]))
+        }
+    }
+
+    @Test
+    func manager_whenRequestWithRedirectStrategyFails_shouldReleaseTheClient() async throws {
+        // Given: nothing listens on the port the listener was just bound to.
+        let port = try await withHangingTCPServer { $0 }
+        let manager = Internals.ClientManager(lifetime: 5 * 60 * 1_000_000_000)
+
+        var sessionConfiguration = Internals.Session.Configuration()
+        sessionConfiguration.redirectConfiguration = .strategy(NeverFollowingRedirectStrategy())
+        // A refused connection is only reported once the connect window (10s by default) is over.
+        sessionConfiguration.timeout.connect = 500_000_000
+
+        // When
+        let weakClient = try await {
+            let client = try await manager.client(
+                provider: Internals.SharedSessionProvider(),
+                sessionConfiguration: sessionConfiguration
+            )
+
+            let task = try await client.execute(
+                request: try HTTPClient.Request(url: "http://127.0.0.1:\(port)/"),
+                logger: nil
+            )
+
+            await #expect(throws: (any Error).self) {
+                _ = try await task.response()
+            }
+
+            return WeakClient(client)
+        }()
+
+        // Then
+        #expect(manager.count == 0)
+        #expect(await WeakClient.allReleased([weakClient]))
     }
 
     /// The ordinary configuration still pools, so the short-circuit above can't have been written
@@ -524,6 +652,31 @@ private func withHangingTCPServer<Result>(
         try? await channel.close()
         try? await group.shutdownGracefully()
         throw error
+    }
+}
+
+/// Observes a client without keeping it alive, so a test can tell when the last reference to it
+/// (the one a request holds until it finishes included) is gone.
+private struct WeakClient {
+
+    private weak var client: Internals.Client?
+
+    init(_ client: Internals.Client) {
+        self.client = client
+    }
+
+    /// Polled, since a request releases its client from the event loop, after the result the
+    /// caller was waiting on has already been delivered.
+    static func allReleased(_ clients: [WeakClient]) async -> Bool {
+        for _ in 0..<200 {
+            if clients.allSatisfy({ $0.client == nil }) {
+                return true
+            }
+
+            try? await _Concurrency.Task.sleep(nanoseconds: 50_000_000)
+        }
+
+        return false
     }
 }
 
