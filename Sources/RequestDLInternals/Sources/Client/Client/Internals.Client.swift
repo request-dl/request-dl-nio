@@ -380,6 +380,7 @@ extension Internals {
                 uploadingBytes: uploadingBytes,
                 upload: upload,
                 decompressionDispatch: decompressionDispatch,
+                readingMode: readingMode,
                 head: head,
                 download: download.stream
             )

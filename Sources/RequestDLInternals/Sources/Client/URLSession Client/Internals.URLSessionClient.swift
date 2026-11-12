@@ -730,6 +730,7 @@ extension Internals {
                 uploadingBytes: uploadingBytes,
                 upload: upload,
                 decompressionDispatch: decompressionDispatch,
+                readingMode: readingMode,
                 head: head,
                 download: downloadBuffer.stream
             )
@@ -854,10 +855,19 @@ extension Internals {
                 // persist the still-compressed body under a cached head that (on replay, which
                 // never re-runs decompression) claims it's already decoded. See
                 // `Internals.ManualDecompressionDispatch.requiresManualDecoding(for:)`.
-                if !decompressionDispatch.requiresManualDecoding(for: responseHead),
-                    let cacheStream = cache?(responseHead)
-                {
+                let requiresManualDecoding = decompressionDispatch.requiresManualDecoding(for: responseHead)
+
+                if !requiresManualDecoding, let cacheStream = cache?(responseHead) {
                     downloadBuffer.cacheStream(cacheStream)
+                }
+
+                // The body is about to be decoded, and the decoder cuts its output to the reading
+                // mode: cutting its input as well would only be copying.
+                let wireReadingMode: Internals.DownloadStep.ReadingMode =
+                    requiresManualDecoding ? .passthrough : readingMode
+
+                if requiresManualDecoding {
+                    downloadBuffer.passThrough()
                 }
 
                 transferControl?.observer?.didReceiveHead(responseHead)
@@ -883,7 +893,7 @@ extension Internals {
                 do {
                     try await pumpResponseBody(
                         bytes,
-                        readingMode: readingMode,
+                        readingMode: wireReadingMode,
                         into: downloadBuffer,
                         flowControl: flowControl,
                         deliveredBytes: &deliveredBytes
@@ -908,7 +918,7 @@ extension Internals {
                         request: request,
                         continuationDelegate: continuationDelegate,
                         box: box,
-                        readingMode: readingMode,
+                        readingMode: wireReadingMode,
                         downloadBuffer: downloadBuffer,
                         flowControl: flowControl,
                         transferControl: transferControl

@@ -86,7 +86,19 @@ public struct RequestConfiguration: Sendable {
         return body == nil && !cachePolicy.isEmpty && (method == nil || method == "GET")
     }
 
-    var readingMode: Internals.DownloadStep.ReadingMode
+    /// How the body is cut into chunks: what a ``ReadingMode`` property asked for, or, when none
+    /// did, ``defaultReadingMode``.
+    var readingMode: Internals.DownloadStep.ReadingMode {
+        get { explicitReadingMode ?? defaultReadingMode }
+        set { explicitReadingMode = newValue }
+    }
+
+    /// What ``readingMode`` is when no ``ReadingMode`` property set one. A task that does not care
+    /// how the body is chunked (`DataTask` joins it all) swaps this for `.passthrough`; a
+    /// property the caller wrote always wins over it.
+    var defaultReadingMode: Internals.DownloadStep.ReadingMode = .length(1_024)
+
+    private var explicitReadingMode: Internals.DownloadStep.ReadingMode?
 
     /// `true` only when the `User-Agent` currently in ``headers`` is exactly RequestDL's own
     /// untouched default (``UserAgentHeader/init()``): no other `User-Agent` node has written
@@ -127,7 +139,6 @@ public struct RequestConfiguration: Sendable {
         self.method = nil
         self.headers = .init()
         self.body = nil
-        self.readingMode = .length(1_024)
         self.cachePolicy = []
         self.cacheStrategy = .ignoreCachedData
         self.serviceContext = nil

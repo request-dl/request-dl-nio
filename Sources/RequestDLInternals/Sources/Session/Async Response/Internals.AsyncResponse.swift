@@ -14,6 +14,7 @@ extension Internals {
             package let uploadingBytes: Int
             package let upload: AsyncStream<Int>.AsyncIterator?
             package let decompressionDispatch: Internals.ManualDecompressionDispatch
+            package let readingMode: Internals.DownloadStep.ReadingMode
             package let download:
                 (
                     head: Internals.AsyncStream<Internals.ResponseHead>,
@@ -29,6 +30,7 @@ extension Internals {
                         uploadingBytes: uploadingBytes,
                         upload: upload,
                         decompressionDispatch: decompressionDispatch,
+                        readingMode: readingMode,
                         download: download
                     )
 
@@ -55,6 +57,7 @@ extension Internals {
                     uploadingBytes: uploadingBytes,
                     upload: nil,
                     decompressionDispatch: decompressionDispatch,
+                    readingMode: readingMode,
                     download: nil
                 )
 
@@ -66,7 +69,11 @@ extension Internals {
                         .compactMap { Int($0) }
                         .max()
 
-                    let resolvedStream = try decompressionDispatch.resolvedStream(for: head, source: data)
+                    let resolvedStream = try decompressionDispatch.resolvedStream(
+                        for: head,
+                        source: data,
+                        readingMode: readingMode
+                    )
 
                     return .download(
                         DownloadStep(
@@ -93,6 +100,7 @@ extension Internals {
         private let uploadingBytes: Int
         private let upload: Internals.AsyncStream<Int>
         private let decompressionDispatch: Internals.ManualDecompressionDispatch
+        private let readingMode: Internals.DownloadStep.ReadingMode
         private let head: Internals.AsyncStream<Internals.ResponseHead>
         private let download: Internals.AsyncStream<Internals.DataBuffer>
 
@@ -103,6 +111,7 @@ extension Internals {
             uploadingBytes: Int,
             upload: Internals.AsyncStream<Int>,
             decompressionDispatch: Internals.ManualDecompressionDispatch,
+            readingMode: Internals.DownloadStep.ReadingMode = .passthrough,
             head: Internals.AsyncStream<Internals.ResponseHead>,
             download: Internals.AsyncStream<Internals.DataBuffer>
         ) {
@@ -110,6 +119,7 @@ extension Internals {
             self.uploadingBytes = uploadingBytes
             self.upload = upload
             self.decompressionDispatch = decompressionDispatch
+            self.readingMode = readingMode
             self.head = head
             self.download = download
         }
@@ -122,6 +132,7 @@ extension Internals {
                 uploadingBytes: uploadingBytes,
                 upload: upload.makeAsyncIterator(),
                 decompressionDispatch: decompressionDispatch,
+                readingMode: readingMode,
                 download: (head, download)
             )
         }

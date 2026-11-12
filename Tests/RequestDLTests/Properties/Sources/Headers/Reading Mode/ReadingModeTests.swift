@@ -139,4 +139,43 @@ struct ReadingModeTests {
         }
     }
     #endif
+
+    // MARK: - Default reading mode
+
+    @Test
+    func withoutAProperty_keepsTheLengthDefault() async throws {
+        // When
+        let resolved = try await resolve(TestProperty {})
+
+        // Then
+        #expect(resolved.requestConfiguration.readingMode == .length(1_024))
+    }
+
+    @Test
+    func withoutAProperty_usesTheDefaultTheTaskAsked() async throws {
+        // When
+        let resolved = try await Resolve(
+            root: TestProperty {},
+            environment: .init(),
+            defaultReadingMode: .passthrough
+        ).build()
+
+        // Then
+        #expect(resolved.requestConfiguration.readingMode == .passthrough)
+    }
+
+    @Test
+    func withAProperty_theTaskDefaultDoesNotOverrideIt() async throws {
+        // When
+        let resolved = try await Resolve(
+            root: TestProperty {
+                ReadingMode(length: 77)
+            },
+            environment: .init(),
+            defaultReadingMode: .passthrough
+        ).build()
+
+        // Then
+        #expect(resolved.requestConfiguration.readingMode == .length(77))
+    }
 }
