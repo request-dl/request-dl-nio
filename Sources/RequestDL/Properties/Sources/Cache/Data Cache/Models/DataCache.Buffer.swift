@@ -93,7 +93,9 @@ extension DataCache {
         // MARK: - Internal methods
 
         mutating func writeBuffer(_ buffer: Internals.AnyBuffer) async {
-            guard let bytes = await buffer.getBytes() else {
+            // `Data` end to end: going through `[UInt8]` copied the block once to read it and
+            // again to write it into each tier.
+            guard let bytes = await buffer.getData() else {
                 return
             }
 
@@ -111,7 +113,7 @@ extension DataCache {
                     memoryOverflowed = true
                     await onOverflow?(.memory)
                 } else {
-                    await memoryBuffer?.writeBytes(bytes)
+                    await memoryBuffer?.writeData(bytes)
                 }
             }
 
@@ -123,7 +125,7 @@ extension DataCache {
                     diskOverflowed = true
                     await onOverflow?(.disk)
                 } else {
-                    await diskBuffer?.writeBytes(bytes)
+                    await diskBuffer?.writeData(bytes)
                 }
             }
         }

@@ -43,9 +43,22 @@ package protocol BufferURL: Sendable {
 
     /// Removes the backing resource when this URL owns a temporary one.
     func removeIfTemporary() async
+
+    /// Whether a storage over this URL has anything to tear down once it is deallocated: open
+    /// handles to close, or a temporary resource to remove.
+    ///
+    /// Storage `deinit` cannot suspend, so any teardown costs a detached task. In memory
+    /// resources have nothing to tear down (ARC reclaims the bytes and the handles hold no
+    /// system resource), so they answer `false` and skip that task entirely.
+    var requiresTeardownOnDeinit: Bool { get }
 }
 
 extension BufferURL {
+
+    /// Conservative default: assume there is something to tear down. In memory URLs opt out.
+    package var requiresTeardownOnDeinit: Bool {
+        true
+    }
 
     package static func make(from url: URL) -> Self? {
         nil

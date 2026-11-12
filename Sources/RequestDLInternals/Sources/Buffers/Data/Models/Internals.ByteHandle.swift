@@ -117,11 +117,9 @@ extension Internals {
                     bytes.moveWriterIndex(to: writtenBytes)
                     bytes.moveReaderIndex(to: index)
 
-                    guard var slice = bytes.readSlice(length: length) else {
-                        return nil
-                    }
-
-                    return slice.asData()
+                    // One copy straight into the `Data` handed to the caller. Going through
+                    // `readSlice` and then `asData()` materialized the same bytes twice.
+                    return bytes.readData(length: length)
                 }
 
                 _index = UInt64(index + (data?.count ?? .zero))

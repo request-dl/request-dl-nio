@@ -149,6 +149,13 @@ extension Internals {
                 // The consequence is that a temporary file is removed asynchronously. A
                 // process that exits immediately after dropping its last buffer can leave the
                 // file behind. Call `close()` and `clear()` explicitly when that matters.
+                //
+                // In memory storage has nothing to tear down, and spawning a task per storage
+                // is real overhead when a download creates one per re-chunked block.
+                guard self.url.requiresTeardownOnDeinit else {
+                    return
+                }
+
                 let streams = _detachStreams()
                 let url = self.url
 
@@ -698,6 +705,12 @@ extension Internals.Buffer {
     /// - Note: Same semantics as ``writeData(_:)``.
     package mutating func writeBytes<Bytes: Sequence & Sendable>(_ bytes: Bytes) async where Bytes.Element == UInt8 {
         await writeData(Data(bytes))
+    }
+
+    /// - Note: Same semantics as ``writeData(_:)``. Contiguous byte collections such as
+    /// `[UInt8]` and `Data` go straight to the store, instead of through a `Data` copy first.
+    package mutating func writeBytes<Bytes: DataProtocol & Sendable>(_ bytes: Bytes) async {
+        await writeData(bytes)
     }
 
     /// Drains `buffer` into this one.

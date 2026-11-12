@@ -96,7 +96,7 @@ extension Internals.NIOTrustEvaluator {
             // so `additionalTrustRoots` alone stays additive here too instead of silently dropping
             // every publicly-trusted host.
             if !trustRootsAreExclusive {
-                certificates += (try? Self.systemDefaultCertificates()) ?? []
+                certificates += Self.cachedSystemDefaultCertificates
             }
 
             return CertificateStore(certificates)
@@ -202,6 +202,21 @@ extension Internals.NIOTrustEvaluator {
 
         return extendedKeyUsage.contains(.serverAuth) || extendedKeyUsage.contains(.any)
     }
+
+    /// The system CA bundle, parsed once per process.
+    ///
+    /// Every evaluator used to parse the whole bundle again (a couple of hundred X.509
+    /// certificates) into its own `CertificateStore`, and one evaluator is built per client, so
+    /// a pool of clients held that many copies. A `static let` is initialized lazily and
+    /// exactly once, thread safely.
+    ///
+    /// - Important: A bundle that cannot be read is cached as empty, matching what each
+    /// evaluator did on its own with the `try?` it used to carry. The bundle changing on disk
+    /// while the process runs is not picked up, as NIOSSL's own default trust roots are not
+    /// either.
+    private static let cachedSystemDefaultCertificates: [Certificate] = {
+        (try? systemDefaultCertificates()) ?? []
+    }()
 
     #if os(Android)
     /// Mirrors NIOSSL's own `AndroidCABundle.swift` search heuristic. Android ships its trust
