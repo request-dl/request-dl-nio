@@ -64,7 +64,7 @@ jobs:
       # Step 4 – Apple
       enable-apple-tests: true
       package-name: "request-dl"
-      xcode-version: '27.1'
+      xcode-version: '27.2'
       apple-coverage-enabled: true
       apple-tests-max-parallelization-width: '2'
       apple-tests-parallel-testing-worker-count: '2'
@@ -84,11 +84,11 @@ jobs:
       # lines of their logs are tests passing, not a hang. A genuine hang is still caught long
       # before this, by apple-tests-crash-watch-enabled above.
       apple-tests-matrix: >-
-        [{"destination":"platform=iOS Simulator,arch=arm64,name=iPhone 18 Pro,OS=27.0","name":"iOS"},
-        {"destination":"platform=iOS Simulator,arch=arm64,name=iPad (A16),OS=27.0","name":"iPadOS"},
-        {"destination":"platform=watchOS Simulator,arch=arm64,name=Apple Watch Series 12 (42mm),OS=27.0","name":"watchOS","rerun":1},
-        {"destination":"platform=tvOS Simulator,arch=arm64,name=Apple TV 4K (3rd generation) (at 1080p),OS=27.0","name":"tvOS"},
-        {"destination":"platform=visionOS Simulator,arch=arm64,name=Apple Vision Pro,OS=27.0","name":"visionOS","timeout":75},
+        [{"destination":"platform=iOS Simulator,arch=arm64,name=iPhone 18 Pro,OS=27.2","name":"iOS"},
+        {"destination":"platform=iOS Simulator,arch=arm64,name=iPad (A16),OS=27.2","name":"iPadOS"},
+        {"destination":"platform=watchOS Simulator,arch=arm64,name=Apple Watch Series 12 (42mm),OS=27.2","name":"watchOS","rerun":1},
+        {"destination":"platform=tvOS Simulator,arch=arm64,name=Apple TV 4K (3rd generation) (at 1080p),OS=27.2","name":"tvOS"},
+        {"destination":"platform=visionOS Simulator,arch=arm64,name=Apple Vision Pro,OS=27.2","name":"visionOS","timeout":75},
         {"destination":"platform=macOS,arch=arm64,name=My Mac","name":"macOS"},
         {"destination":"platform=macOS,arch=arm64,variant=Mac Catalyst,name=My Mac","name":"macOS Catalyst"}]
 
@@ -118,7 +118,7 @@ jobs:
     # Takes 9 to 19 minutes; without a cap a stuck run holds a macOS runner for GitHub's six hours.
     timeout-minutes: 30
     env:
-      DEVELOPER_DIR: /Applications/Xcode_27.1.app
+      DEVELOPER_DIR: /Applications/Xcode_27.2.app
     steps:
       - uses: actions/checkout@v7
       - name: Build RequestDL with the NIOTransport trait disabled

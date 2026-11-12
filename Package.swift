@@ -1,4 +1,4 @@
-// swift-tools-version: 6.3
+// swift-tools-version: 6.4
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
@@ -37,11 +37,11 @@ let package = Package(
     dependencies: [
         .package(
             url: "https://github.com/request-dl/async-http-client",
-            from: "1.40.1"
+            from: "1.40.2"
         ),
         .package(
             url: "https://github.com/apple/swift-nio",
-            from: "2.104.0"
+            from: "2.105.0"
         ),
         .package(
             url: "https://github.com/apple/swift-nio-extras",
@@ -53,7 +53,7 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/apple/swift-nio-ssl",
-            from: "2.37.5"
+            from: "2.37.6"
         ),
         .package(
             url: "https://github.com/apple/swift-nio-transport-services",
@@ -61,11 +61,11 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/apple/swift-log",
-            from: "1.16.2"
+            from: "1.17.0"
         ),
         .package(
             url: "https://github.com/apple/swift-collections",
-            from: "1.7.5"
+            from: "1.7.6"
         ),
         .package(
             url: "https://github.com/o-nnerb/swift-async-stream",
@@ -81,7 +81,7 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/apple/swift-distributed-tracing",
-            from: "1.7.3"
+            from: "1.7.4"
         ),
         .package(
             url: "https://github.com/apple/swift-metrics",
@@ -89,12 +89,12 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/apple/swift-configuration",
-            from: "1.4.0",
+            from: "1.5.0",
             traits: []
         ),
         .package(
             url: "https://github.com/apple/swift-crypto.git",
-            from: "5.0.3"
+            from: "5.1.1"
         ),
         .package(
             url: "https://github.com/apple/swift-certificates.git",
