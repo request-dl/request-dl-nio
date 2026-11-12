@@ -730,9 +730,11 @@ extension Internals {
                 // Read exactly once, by the task below. Buffering until that read begins
                 // covers the hop it takes to get going, and from then on only the gap between
                 // the download and the disk writer stays in memory.
-                let asyncBuffers = Internals.AsyncStream<Internals.DataBuffer>(
-                    bufferingPolicy: .untilFirstIteration
-                )
+                //
+                // Metered, so that gap has a limit: past it the download gives up on the cache
+                // (see `Internals.DownloadBuffer.cacheBacklogLimit`) instead of buffering the rest
+                // of a body for a writer that is not keeping up.
+                let asyncBuffers = Internals.DownloadBuffer.makeCacheStream()
 
                 dataCache.trackWrite {
                     // On every exit path. Without it, a task that gives up before reaching the
@@ -776,6 +778,9 @@ extension Internals {
                                 "size_bytes": .stringConvertible(cacheBuffer.readableBytes)
                             ]
                         )
+                    } catch let error as Internals.CacheBacklogExceededError {
+                        logger?.log(level: .warning, "Response will not be cached - \(error)")
+                        await dataCache.discardFailedWrite(cacheBuffer, forKey: requestConfiguration.url)
                     } catch {
                         logger?.log(level: .error, "Failed to cache response: \(String(describing: error))")
                         await dataCache.discardFailedWrite(cacheBuffer, forKey: requestConfiguration.url)

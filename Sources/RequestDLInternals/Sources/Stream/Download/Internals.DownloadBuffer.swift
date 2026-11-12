@@ -420,7 +420,26 @@ extension Internals {
 
             private func _dispatch(_ dataBuffer: Result<DataBuffer, Error>) {
                 stream.append(dataBuffer)
-                _cacheStream?.append(dataBuffer)
+
+                guard let cacheStream = _cacheStream else {
+                    return
+                }
+
+                // The cache writer is not the reader: `flowControl` meters `stream` alone, and the
+                // network is never held back for a disk. So a writer that cannot keep up would let
+                // this stream grow to the whole body. Rather than that, or slowing the download
+                // down to the disk's pace, caching is given up once the writer is further behind
+                // than its own window allows.
+                //
+                // Ended with a failure, not closed: closing would present the part of the body
+                // that did arrive as a complete one, and it would be stored as the response.
+                if case .success = dataBuffer, let window = cacheStream.flowControlWindow, !window.isWritable {
+                    _cacheStream = nil
+                    cacheStream.append(.failure(Internals.CacheBacklogExceededError(limit: window.highWatermark)))
+                    return
+                }
+
+                cacheStream.append(dataBuffer)
             }
         }
 
@@ -535,6 +554,46 @@ extension Internals.DownloadStep {
         /// Items end at `separator`, which they include. `maximumItemSize` is the most bytes one
         /// item may take, separator included; `nil` puts no limit on it.
         case separator([UInt8], maximumItemSize: Int? = nil)
+    }
+}
+
+extension Internals {
+
+    /// Ends a cache tee whose writer fell further behind the download than its window allows. See
+    /// ``Internals/DownloadBuffer/cacheBacklogLimit``.
+    package struct CacheBacklogExceededError: Swift.Error, Sendable, Hashable, CustomStringConvertible {
+
+        /// The most bytes the writer was allowed to be behind, the window's high watermark.
+        package let limit: Int
+
+        package var description: String {
+            "The cache writer fell more than \(limit) bytes behind the download."
+        }
+
+        package init(limit: Int) {
+            self.limit = limit
+        }
+    }
+}
+
+extension Internals.DownloadBuffer {
+
+    /// The most bytes a cache tee may hold that its writer has not taken yet.
+    ///
+    /// Sized for a writer that is momentarily slow, not for one that is slow throughout: the
+    /// window this meters sits beside the download's own (1 MiB), and the body only ever sits in
+    /// memory twice over once the writer is behind, so this is the most extra memory caching can
+    /// cost a download.
+    package static let cacheBacklogLimit = 16 * 1_024 * 1_024
+
+    /// A stream for ``cacheStream(_:)`` that is metered against ``cacheBacklogLimit``.
+    package static func makeCacheStream() -> Internals.AsyncStream<Internals.DataBuffer> {
+        .init(
+            flowControl: Internals.FlowControlWindow(
+                highWatermark: cacheBacklogLimit,
+                lowWatermark: cacheBacklogLimit / 2
+            )
+        )
     }
 }
 

@@ -6,7 +6,7 @@ import Crypto
 import SwiftAsyncTesting
 import Testing
 
-@testable import RequestDLInternals
+@testable @_spi(Testing) import RequestDLInternals
 @testable import RequestDLTestSupport
 
 #if canImport(FoundationEssentials)
@@ -570,5 +570,97 @@ struct InternalsDownloadBufferTests {
         // Then
         let bytes = Internals.AsyncBytes(logger: nil, totalSize: 11, stream: download.stream)
         #expect(try await Array(bytes) == parts)
+    }
+
+    // MARK: - Cache tee
+
+    /// Reads a cache stream to its end, keeping what arrived and how it ended.
+    private func drain(
+        _ cacheStream: Internals.AsyncStream<Internals.DataBuffer>
+    ) async -> (received: Int, error: (any Error)?) {
+        var received = 0
+
+        do {
+            for try await var chunk in cacheStream {
+                received += chunk.readableBytes
+                _ = await chunk.readData(chunk.readableBytes)
+            }
+
+            return (received, nil)
+        } catch {
+            return (received, error)
+        }
+    }
+
+    @Test
+    func cacheStream_whenTheWriterNeverReads_givesUpAtItsWindowInsteadOfBufferingTheBody() async throws {
+        // Given: a tee whose window holds 4 KiB, and a writer that has not started reading.
+        let window = Internals.FlowControlWindow(highWatermark: 4_096, lowWatermark: 2_048)
+        let cacheStream = Internals.AsyncStream<Internals.DataBuffer>(flowControl: window)
+        let download = await Internals.DownloadBuffer(readingMode: .length(1_024))
+        download.cacheStream(cacheStream)
+
+        // When: 64 KiB goes through.
+        let input = Data((0..<65_536).map { UInt8($0 % 251) })
+        await download.append(Internals.DataBuffer(input))
+        download.close()
+        await download.waitUntilIdle()
+
+        // Then: the download itself is whole.
+        let bytes = Internals.AsyncBytes(logger: nil, totalSize: input.count, stream: download.stream)
+        #expect(try await Array(bytes).reduce(into: Data()) { $0.append($1) } == input)
+
+        // And the tee kept a window's worth, then failed, rather than keeping everything or
+        // ending as though it were complete.
+        let (received, error) = await drain(cacheStream)
+
+        #expect(error is Internals.CacheBacklogExceededError)
+        #expect(received >= 4_096)
+        #expect(received <= 4_096 + 1_024)
+    }
+
+    @Test
+    func cacheStream_whenTheWriterKeepsUp_receivesTheWholeBody() async throws {
+        // Given
+        let window = Internals.FlowControlWindow(highWatermark: 4_096, lowWatermark: 2_048)
+        let cacheStream = Internals.AsyncStream<Internals.DataBuffer>(flowControl: window)
+        let download = await Internals.DownloadBuffer(readingMode: .length(1_024))
+        download.cacheStream(cacheStream)
+
+        let writer = Task { await drain(cacheStream) }
+
+        // When: appended in parts, letting the writer run in between.
+        for _ in 0..<64 {
+            await download.append(Internals.DataBuffer(Data(repeating: 1, count: 1_024)))
+            await download.waitUntilIdle()
+            await Task.yield()
+        }
+
+        download.close()
+
+        // Then
+        let (received, error) = await writer.value
+
+        #expect(error == nil)
+        #expect(received == 65_536)
+    }
+
+    @Test
+    func cacheStream_whenGivenUp_leavesTheDownloadFlowingAndTheLaterPartsUncounted() async throws {
+        // Given
+        let window = Internals.FlowControlWindow(highWatermark: 2_048, lowWatermark: 1_024)
+        let cacheStream = Internals.AsyncStream<Internals.DataBuffer>(flowControl: window)
+        let download = await Internals.DownloadBuffer(readingMode: .length(1_024))
+        download.cacheStream(cacheStream)
+
+        // When
+        await download.append(Internals.DataBuffer(Data(repeating: 1, count: 100 * 1_024)))
+        await download.waitUntilIdle()
+
+        // Then: nothing past the first few chunks was charged to the tee's window.
+        #expect(window.isWritable == false)
+        #expect(window.bufferedBytesForTesting <= 2_048 + 1_024)
+
+        download.close()
     }
 }
