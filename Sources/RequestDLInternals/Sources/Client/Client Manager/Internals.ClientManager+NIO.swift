@@ -117,16 +117,18 @@ extension Internals.ClientManager {
         )
         #endif
 
-        // Tracked even when `isPoolable` is `false` and nothing will ever match this entry again.
-        // The table is not only a reuse cache, it is also what owns a client for its lifetime:
-        // `Internals.Client.deinit` shuts the underlying `HTTPClient` down, and the caller's
-        // reference does not outlive the call that handed it out (it returns as soon as the
-        // response head arrives, with the body still streaming). Dropping the entry here would tear
-        // down the connection out from under the response that is using it.
-        //
-        // Skipping the *scan* is what removes this configuration's real cost (see
-        // `client(provider:sessionConfiguration:)`); `maximumCount`'s eviction is what keeps the
-        // entries it leaves behind from accumulating without bound.
+        // A configuration that can never be pooled (`isPoolable == false`) is not tracked: nothing
+        // could ever be handed this entry again, so it would only sit in the table, with its whole
+        // connection pool and TLS context, until the idle sweep or the `maximumCount` ceiling got
+        // to it. The caller owns that client instead, and `Internals.Client` is what keeps it alive
+        // for as long as a request is using it (see `Internals.Client.execute(request:delegate:logger:)`)
+        // and shuts it down in `deinit` once nothing is, whether the request completed, failed or
+        // was cancelled, or never got as far as being sent.
+        guard sessionConfiguration.isPoolable else {
+            return client
+        }
+
+        // Pooled clients are also owned by the table, which is what keeps one alive between requests.
         let evicted = tableLock.withLock {
             var items = _table[id] ?? []
 
