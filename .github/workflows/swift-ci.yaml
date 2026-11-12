@@ -87,7 +87,7 @@ jobs:
         [{"destination":"platform=iOS Simulator,arch=arm64,name=iPhone 18 Pro,OS=27.2","name":"iOS"},
         {"destination":"platform=iOS Simulator,arch=arm64,name=iPad (A16),OS=27.2","name":"iPadOS"},
         {"destination":"platform=watchOS Simulator,arch=arm64,name=Apple Watch Series 12 (42mm),OS=27.2","name":"watchOS","rerun":1},
-        {"destination":"platform=tvOS Simulator,arch=arm64,name=Apple TV 4K (3rd generation) (at 1080p),OS=27.2","name":"tvOS"},
+        {"destination":"platform=tvOS Simulator,arch=arm64,name=Apple TV 4K (4th generation) (at 1080p),OS=27.2","name":"tvOS"},
         {"destination":"platform=visionOS Simulator,arch=arm64,name=Apple Vision Pro,OS=27.2","name":"visionOS","timeout":75},
         {"destination":"platform=macOS,arch=arm64,name=My Mac","name":"macOS"},
         {"destination":"platform=macOS,arch=arm64,variant=Mac Catalyst,name=My Mac","name":"macOS Catalyst"}]
