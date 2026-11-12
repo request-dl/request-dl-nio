@@ -17,6 +17,20 @@ struct RawTask<Content: Property>: RequestTask {
 
     let content: Content
 
+    /// What the body is chunked by when the request has no ``ReadingMode`` property of its own.
+    /// `nil` keeps `RequestConfiguration`'s default.
+    ///
+    /// A task that reads the whole body into one value passes `.passthrough` here: cutting it into
+    /// fixed chunks first, only to join them again, was most of what that read cost.
+    let defaultReadingMode: Internals.DownloadStep.ReadingMode?
+
+    // MARK: - Inits
+
+    init(content: Content, defaultReadingMode: Internals.DownloadStep.ReadingMode? = nil) {
+        self.content = content
+        self.defaultReadingMode = defaultReadingMode
+    }
+
     // MARK: - Internal methods
 
     func _result(environment: RequestEnvironmentValues) async throws -> AsyncResponse {
@@ -26,7 +40,8 @@ struct RawTask<Content: Property>: RequestTask {
         let (resolvedFromProperties, resourceDeadline) = try await surfacingResourceTimeout {
             try await Resolve(
                 root: content,
-                environment: environment
+                environment: environment,
+                defaultReadingMode: defaultReadingMode
             ).buildBoundedByResourceDeadline()
         }
 

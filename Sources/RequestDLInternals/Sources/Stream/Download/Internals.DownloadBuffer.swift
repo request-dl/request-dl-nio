@@ -4,6 +4,12 @@
 
 import SwiftAsyncStream
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.Data
+#endif
+
 extension Internals {
 
     package struct DownloadBuffer: Sendable {
@@ -140,6 +146,8 @@ extension Internals {
 
                 do {
                     switch readingMode {
+                    case .passthrough:
+                        try await _appendPassthrough(&incomeBytes)
                     case .length(let length):
                         try await _appendByLength(&incomeBytes, length: length, into: &buffer)
                     case .separator(let separator, let maximumItemSize):
@@ -159,13 +167,45 @@ extension Internals {
                 }
             }
 
+            /// Forwards the incoming bytes as they are, with no re-chunking at all.
+            ///
+            /// An in-memory buffer (what the network executors hand over) is dispatched itself:
+            /// no byte is read out of it or written into another one. Anything behind the file
+            /// system (a cached body) is read in blocks of ``readBlockSize``, so an entry is
+            /// never pulled into memory whole.
+            ///
+            /// - Throws: ``AsyncBytesReadError``. See ``readableData(_:count:)``.
+            private func _appendPassthrough(_ incomeBytes: inout Internals.AnyBuffer) async throws {
+                if let dataBuffer = incomeBytes as? Internals.DataBuffer {
+                    if dataBuffer.readableBytes > .zero {
+                        _dispatch(.success(dataBuffer))
+                    }
+
+                    return
+                }
+
+                while incomeBytes.readableBytes > .zero {
+                    let block = try await Self.readableData(
+                        &incomeBytes,
+                        count: min(incomeBytes.readableBytes, Self.readBlockSize)
+                    )
+
+                    _dispatch(.success(await DataBuffer(block)))
+                }
+            }
+
             /// Reads the incoming bytes in blocks of ``readBlockSize``, not in chunks of `length`,
             /// and cuts the chunks out of each block in memory. Reading `length` at a time made a
             /// source behind the file system (a cached body) cost one trip per chunk, 1 KiB by
             /// default.
             ///
+            /// A chunk that fits inside the current block while nothing is pending is built
+            /// straight from that slice. Only the piece of a chunk that straddles two blocks goes
+            /// through `buffer`, and a finished `buffer` is handed over as the chunk itself
+            /// instead of being copied into a new one.
+            ///
             /// - Throws: ``AsyncBytesReadError`` when `incomeBytes` says it holds bytes and cannot
-            ///   give them. See ``readableBytes(_:count:)``.
+            ///   give them. See ``readableData(_:count:)``.
             private func _appendByLength(
                 _ incomeBytes: inout Internals.AnyBuffer,
                 length: Int,
@@ -177,7 +217,7 @@ extension Internals {
                 }
 
                 while incomeBytes.readableBytes > .zero {
-                    let block = try await Self.readableBytes(
+                    let block = try await Self.readableData(
                         &incomeBytes,
                         count: min(incomeBytes.readableBytes, Self.readBlockSize)
                     )
@@ -185,9 +225,15 @@ extension Internals {
                     var offset = block.startIndex
 
                     while offset < block.endIndex {
+                        if buffer.readableBytes == .zero, block.endIndex - offset >= length {
+                            _dispatch(.success(await DataBuffer(block[offset..<offset + length])))
+                            offset += length
+                            continue
+                        }
+
                         let count = min(length - buffer.readableBytes, block.endIndex - offset)
 
-                        await buffer.writeBytes(Array(block[offset..<offset + count]))
+                        await buffer.writeBytes(block[offset..<offset + count])
                         offset += count
 
                         if buffer.readableBytes == length {
@@ -309,27 +355,32 @@ extension Internals {
             ///
             /// - Throws: ``AsyncBytesReadError``.
             private static func readableBytes(_ buffer: inout Internals.AnyBuffer, count: Int) async throws -> [UInt8] {
-                guard let bytes = await buffer.readBytes(count), !bytes.isEmpty else {
+                [UInt8](try await readableData(&buffer, count: count))
+            }
+
+            /// ``readableBytes(_:count:)`` for the callers that do not need an array, which would
+            /// be one more copy of every block.
+            private static func readableData(_ buffer: inout Internals.AnyBuffer, count: Int) async throws -> Data {
+                guard let data = await buffer.readData(count), !data.isEmpty else {
                     throw AsyncBytesReadError()
                 }
 
-                return bytes
+                return data
             }
 
-            /// Dispatches the accumulated bytes as one chunk and resets the buffer.
+            /// Dispatches the accumulated bytes as one chunk and starts over with an empty buffer.
+            ///
+            /// The accumulator itself is what gets dispatched, not a copy of it: its store is
+            /// shared by reference, so handing it over costs nothing, and the replacement is a
+            /// fresh store. That is also what keeps the allocation from staying pinned at the size
+            /// of the single largest chunk (one unusually large `.length` window, or one long
+            /// line before a `.separator`) for the rest of the connection, which reusing one
+            /// accumulator for every chunk did unless it was cleared.
             private func _emit(_ buffer: inout DataBuffer) async {
-                var dataBuffer = await DataBuffer()
-                await dataBuffer.writeBuffer(&buffer)
+                let chunk = buffer
+                buffer = await DataBuffer()
 
-                _dispatch(.success(dataBuffer))
-
-                // `clear()`, not a bare cursor reset: this same accumulation `buffer` is reused for
-                // every chunk over the whole life of the download/stream, so merely moving the
-                // cursors back to zero leaves the store's allocation pinned at whatever size it
-                // grew to for its single largest chunk (e.g. one unusually large `.length` window,
-                // or one long line before a `.separator`) for the connection's entire remaining
-                // lifetime. `clear()` actually releases that capacity between chunks.
-                await buffer.clear()
+                _dispatch(.success(chunk))
             }
 
             private func _close() async {
@@ -435,6 +486,13 @@ extension Internals {
 extension Internals.DownloadStep {
 
     package enum ReadingMode: Sendable, Hashable {
+        /// Delivers each received part as it arrives, without cutting or joining anything.
+        ///
+        /// For a reader that concatenates the whole body anyway, where re-chunking would only be
+        /// copying: one chunk per part the network (or a block of a cached body) delivered, so the
+        /// sizes are whatever the transport happens to produce.
+        case passthrough
+
         case length(Int)
 
         /// Items end at `separator`, which they include. `maximumItemSize` is the most bytes one

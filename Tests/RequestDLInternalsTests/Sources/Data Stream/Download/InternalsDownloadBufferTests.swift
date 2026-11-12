@@ -380,6 +380,7 @@ struct InternalsDownloadBufferTests {
     @Test(arguments: [
         Internals.DownloadStep.ReadingMode.length(1_024),
         .separator(Array("\n".utf8)),
+        .passthrough,
     ])
     func download_whenTheIncomingBufferCannotBeRead_failsInsteadOfEndingTheBody(
         _ readingMode: Internals.DownloadStep.ReadingMode
@@ -459,5 +460,95 @@ struct InternalsDownloadBufferTests {
         #expect(chunks.map(\.count) == [1_000, 1_000])
         #expect(chunks[0] == first + second.prefix(300))
         #expect(chunks[1] == second.suffix(400) + third)
+    }
+
+    // MARK: - Passthrough
+
+    @Test
+    func download_whenPassthrough_forwardsEachPartUntouched() async throws {
+        // Given: parts that line up with no chunk size at all.
+        let parts = [
+            Data(repeating: 1, count: 1),
+            Data(repeating: 2, count: 70_000),
+            Data(repeating: 3, count: 1_025),
+        ]
+
+        let download = await Internals.DownloadBuffer(readingMode: .passthrough)
+
+        // When
+        for part in parts {
+            await download.append(Internals.DataBuffer(part))
+        }
+
+        download.close()
+
+        // Then
+        let bytes = Internals.AsyncBytes(logger: nil, totalSize: 71_026, stream: download.stream)
+        #expect(try await Array(bytes) == parts)
+    }
+
+    @Test
+    func download_whenPassthrough_doesNotCopyAnInMemoryPart() async throws {
+        // Given
+        let part = await Internals.DataBuffer(Data(repeating: 7, count: 4_096))
+        let download = await Internals.DownloadBuffer(readingMode: .passthrough)
+
+        // When
+        await download.append(part)
+        download.close()
+
+        // Then: the very store that was appended comes out of the stream, not a copy of it, which
+        // a write straight to that store shows.
+        var iterator = download.stream.makeAsyncIterator()
+        var forwarded = try #require(await iterator.next())
+
+        try await part.setData(Data([9]), at: 0)
+
+        #expect(forwarded.readableBytes == 4_096)
+        #expect(await forwarded.readData(1) == Data([9]))
+    }
+
+    @Test
+    func download_whenPassthrough_skipsEmptyPartsAndKeepsOrder() async throws {
+        // Given
+        let download = await Internals.DownloadBuffer(readingMode: .passthrough)
+
+        // When
+        await download.append(Internals.DataBuffer(Data()))
+        await download.append(Internals.DataBuffer(Data([1, 2, 3])))
+        await download.append(Internals.DataBuffer(Data()))
+        await download.append(Internals.DataBuffer(Data([4])))
+        download.close()
+
+        // Then
+        let bytes = Internals.AsyncBytes(logger: nil, totalSize: 4, stream: download.stream)
+        let chunks = try await Array(bytes)
+
+        #expect(chunks.reduce(into: Data()) { $0.append($1) } == Data([1, 2, 3, 4]))
+        #expect(chunks.allSatisfy { !$0.isEmpty })
+    }
+
+    @Test
+    func download_whenPassthroughReadsABodyBehindTheFileSystem_deliversItInBoundedBlocks() async throws {
+        try await withTemporaryFileURL("body.bin") { fileURL in
+            // Given: a body of several blocks, behind a file, as a cached body is.
+            let input = Data((0..<200_000).map { UInt8($0 % 251) })
+            try input.write(to: fileURL)
+
+            let source = await Internals.Buffer<Internals.FileStreamBuffer>(addressing: .init(fileURL))
+            let download = await Internals.DownloadBuffer(readingMode: .passthrough)
+
+            // When
+            download.append(source)
+            download.close()
+
+            // Then: never the whole entry at once, and nothing lost.
+            let bytes = Internals.AsyncBytes(logger: nil, totalSize: input.count, stream: download.stream)
+            let chunks = try await Array(bytes)
+
+            #expect(chunks.count > 1)
+            #expect(chunks.allSatisfy { $0.count <= 65_536 })
+            #expect(chunks.reduce(into: Data()) { $0.append($1) } == input)
+        }
     }
 }
