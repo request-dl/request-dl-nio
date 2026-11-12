@@ -276,6 +276,35 @@ extension Internals {
             }
         }
 
+        /// Reads `length` bytes from the reader index, advancing it, and returns them as `Data`:
+        /// `nil` when fewer than `length` bytes are readable.
+        ///
+        /// Copies once. ``readSlice(length:)`` followed by ``asData(byteTransferStrategy:)``
+        /// materializes the bytes twice, and for a `ByteBuffer`-backed value also caches the
+        /// converted `Data` into the temporary slice that is dropped right after.
+        package mutating func readData(length: Int) -> Data? {
+            guard length >= .zero, length <= readableBytes else {
+                return nil
+            }
+
+            switch storage {
+            case .data(var dataStorage):
+                let range = dataStorage.readerIndex..<(dataStorage.readerIndex + length)
+                let data = Data(dataStorage.data[range])
+                dataStorage.readerIndex += length
+                storage = .data(dataStorage)
+                return data
+            #if canImport(NIOCore)
+            case .byteBuffer(var buffer):
+                guard let data = buffer.readData(length: length, byteTransferStrategy: .copy) else {
+                    return nil
+                }
+                storage = .byteBuffer(buffer)
+                return data
+            #endif
+            }
+        }
+
         /// The readable range as a new, independent ``Bytes`` starting at index `0`. Does not
         /// move this cursor.
         package func slice() -> Self {

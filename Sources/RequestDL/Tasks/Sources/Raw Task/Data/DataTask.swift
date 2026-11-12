@@ -41,7 +41,9 @@ public struct DataTask<Content: Property>: RequestTask {
     /// - Parameter content: The content of the request.
     ///
     public init(@PropertyBuilder content: () -> Content) {
-        self.task = RawTask(content: content())
+        // The body is joined into one `Data` anyway, so there is no reason to cut it into fixed
+        // chunks on the way. A `ReadingMode` property in `content` still overrides this.
+        self.task = RawTask(content: content(), defaultReadingMode: .passthrough)
     }
 
     // MARK: - Public methods

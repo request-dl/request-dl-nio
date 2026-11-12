@@ -153,9 +153,8 @@ extension Internals.URLSessionClient {
     /// `TaskDelegate.urlSession(_:dataTask:didReceive:)` for why the order of appends must not
     /// depend on it.
     private static func makeBuffer(_ data: Data) -> Internals.DataBuffer {
-        let byteURL = Internals.ByteURL()
-        byteURL.replace(with: data)
-        return Internals.DataBuffer(byteURL)
+        // Adopted, not written: `replace(with:)` would copy the block into the store again.
+        Internals.DataBuffer(Internals.ByteURL(adopting: data))
     }
 
     /// The most bytes `pumpResponseBody` holds back before a flush regardless of `readingMode`.

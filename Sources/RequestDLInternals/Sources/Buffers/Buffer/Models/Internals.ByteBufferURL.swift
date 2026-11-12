@@ -29,6 +29,11 @@ extension Internals {
             }
         }
 
+        /// Never. Bytes are reclaimed by ARC and the stream handles own no system resource.
+        package var requiresTeardownOnDeinit: Bool {
+            false
+        }
+
         // MARK: - Private properties
 
         private let url: ByteURL

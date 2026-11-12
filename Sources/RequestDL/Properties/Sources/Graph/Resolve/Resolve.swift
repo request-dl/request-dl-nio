@@ -12,6 +12,7 @@ struct Resolve<Root: Property>: Sendable {
     private let environment: RequestEnvironmentValues
     private let namespaceID: PropertyNamespace.ID
     private let seedFactory: SeedFactory
+    private let defaultReadingMode: Internals.DownloadStep.ReadingMode?
 
     // MARK: - Inits
 
@@ -33,16 +34,20 @@ struct Resolve<Root: Property>: Sendable {
     ///   top-level tree) each independently compute seed `.zero` for `.global`, colliding on the
     ///   same `Internals.Storage` entry for any `@StoredObject`-bearing type they happen to share,
     ///   instead of getting independent instances.
+    ///   - defaultReadingMode: What the body is chunked by unless a ``ReadingMode`` property says
+    ///   otherwise. `nil` keeps `RequestConfiguration`'s own default.
     init(
         root: Root,
         environment: RequestEnvironmentValues,
         namespaceID: PropertyNamespace.ID = .global,
-        seedFactory: SeedFactory = SeedFactory()
+        seedFactory: SeedFactory = SeedFactory(),
+        defaultReadingMode: Internals.DownloadStep.ReadingMode? = nil
     ) {
         self.root = .root(.init(body: root))
         self.environment = environment
         self.namespaceID = namespaceID
         self.seedFactory = seedFactory
+        self.defaultReadingMode = defaultReadingMode
     }
 
     // MARK: - Internal methods
@@ -98,9 +103,15 @@ struct Resolve<Root: Property>: Sendable {
     func partiallyBuild() async throws -> (_PropertyOutputs, Make) {
         let output = try await outputs()
 
+        var requestConfiguration = RequestConfiguration()
+
+        if let defaultReadingMode {
+            requestConfiguration.defaultReadingMode = defaultReadingMode
+        }
+
         var make = Make(
             sessionConfiguration: .init(),
-            requestConfiguration: .init()
+            requestConfiguration: requestConfiguration
         )
 
         try await output.node._make(&make)

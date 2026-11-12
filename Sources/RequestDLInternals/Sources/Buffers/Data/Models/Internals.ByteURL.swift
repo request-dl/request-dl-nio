@@ -58,6 +58,16 @@ extension Internals {
 
         package init() {}
 
+        /// Adopts `data` as the store without copying it.
+        ///
+        /// Prefer this over `init()` followed by ``replace(with:)-(DataProtocol)`` when the
+        /// store is being created around bytes that already exist: that path writes them into
+        /// the store a second time.
+        package init(adopting data: Data) {
+            self._bytes = Internals.Bytes(data)
+            self._writtenBytes = data.count
+        }
+
         #if canImport(NIOCore)
         /// - Important: Only for a `ByteBuffer` that this instance will own exclusively from
         /// here on. The slice is taken, not copied.

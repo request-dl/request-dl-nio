@@ -164,6 +164,14 @@ extension Internals {
                     { self.upload.close() },
                     { self.head.close() },
                     {
+                        // The body is about to be decoded, and the decoder cuts its output to the
+                        // reading mode: cutting its input as well would only be copying. Before
+                        // the first body part, which this effect is ordered ahead of.
+                        if self.decompressionDispatch.requiresManualDecoding(for: responseHead) {
+                            self.download.passThrough()
+                        }
+                    },
+                    {
                         // The cache factory allocates a buffer and starts a task, so it is
                         // caller supplied work that has no business running under the lock.
                         //

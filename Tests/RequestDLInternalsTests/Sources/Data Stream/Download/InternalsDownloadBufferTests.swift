@@ -6,7 +6,7 @@ import Crypto
 import SwiftAsyncTesting
 import Testing
 
-@testable import RequestDLInternals
+@testable @_spi(Testing) import RequestDLInternals
 @testable import RequestDLTestSupport
 
 #if canImport(FoundationEssentials)
@@ -380,6 +380,7 @@ struct InternalsDownloadBufferTests {
     @Test(arguments: [
         Internals.DownloadStep.ReadingMode.length(1_024),
         .separator(Array("\n".utf8)),
+        .passthrough,
     ])
     func download_whenTheIncomingBufferCannotBeRead_failsInsteadOfEndingTheBody(
         _ readingMode: Internals.DownloadStep.ReadingMode
@@ -459,5 +460,207 @@ struct InternalsDownloadBufferTests {
         #expect(chunks.map(\.count) == [1_000, 1_000])
         #expect(chunks[0] == first + second.prefix(300))
         #expect(chunks[1] == second.suffix(400) + third)
+    }
+
+    // MARK: - Passthrough
+
+    @Test
+    func download_whenPassthrough_forwardsEachPartUntouched() async throws {
+        // Given: parts that line up with no chunk size at all.
+        let parts = [
+            Data(repeating: 1, count: 1),
+            Data(repeating: 2, count: 70_000),
+            Data(repeating: 3, count: 1_025),
+        ]
+
+        let download = await Internals.DownloadBuffer(readingMode: .passthrough)
+
+        // When
+        for part in parts {
+            await download.append(Internals.DataBuffer(part))
+        }
+
+        download.close()
+
+        // Then
+        let bytes = Internals.AsyncBytes(logger: nil, totalSize: 71_026, stream: download.stream)
+        #expect(try await Array(bytes) == parts)
+    }
+
+    @Test
+    func download_whenPassthrough_doesNotCopyAnInMemoryPart() async throws {
+        // Given
+        let part = await Internals.DataBuffer(Data(repeating: 7, count: 4_096))
+        let download = await Internals.DownloadBuffer(readingMode: .passthrough)
+
+        // When
+        await download.append(part)
+        download.close()
+
+        // Then: the very store that was appended comes out of the stream, not a copy of it, which
+        // a write straight to that store shows.
+        var iterator = download.stream.makeAsyncIterator()
+        var forwarded = try #require(await iterator.next())
+
+        try await part.setData(Data([9]), at: 0)
+
+        #expect(forwarded.readableBytes == 4_096)
+        #expect(await forwarded.readData(1) == Data([9]))
+    }
+
+    @Test
+    func download_whenPassthrough_skipsEmptyPartsAndKeepsOrder() async throws {
+        // Given
+        let download = await Internals.DownloadBuffer(readingMode: .passthrough)
+
+        // When
+        await download.append(Internals.DataBuffer(Data()))
+        await download.append(Internals.DataBuffer(Data([1, 2, 3])))
+        await download.append(Internals.DataBuffer(Data()))
+        await download.append(Internals.DataBuffer(Data([4])))
+        download.close()
+
+        // Then
+        let bytes = Internals.AsyncBytes(logger: nil, totalSize: 4, stream: download.stream)
+        let chunks = try await Array(bytes)
+
+        #expect(chunks.reduce(into: Data()) { $0.append($1) } == Data([1, 2, 3, 4]))
+        #expect(chunks.allSatisfy { !$0.isEmpty })
+    }
+
+    @Test
+    func download_whenPassthroughReadsABodyBehindTheFileSystem_deliversItInBoundedBlocks() async throws {
+        try await withTemporaryFileURL("body.bin") { fileURL in
+            // Given: a body of several blocks, behind a file, as a cached body is.
+            let input = Data((0..<200_000).map { UInt8($0 % 251) })
+            try input.write(to: fileURL)
+
+            let source = await Internals.Buffer<Internals.FileStreamBuffer>(addressing: .init(fileURL))
+            let download = await Internals.DownloadBuffer(readingMode: .passthrough)
+
+            // When
+            download.append(source)
+            download.close()
+
+            // Then: never the whole entry at once, and nothing lost.
+            let bytes = Internals.AsyncBytes(logger: nil, totalSize: input.count, stream: download.stream)
+            let chunks = try await Array(bytes)
+
+            #expect(chunks.count > 1)
+            #expect(chunks.allSatisfy { $0.count <= 65_536 })
+            #expect(chunks.reduce(into: Data()) { $0.append($1) } == input)
+        }
+    }
+
+    @Test
+    func download_whenToldToPassThrough_stopsCuttingWhatFollows() async throws {
+        // Given: a reading mode that would have cut these parts apart.
+        let download = await Internals.DownloadBuffer(readingMode: .length(4))
+        let parts = [Data("hello ".utf8), Data("world".utf8)]
+
+        // When
+        download.passThrough()
+
+        for part in parts {
+            await download.append(Internals.DataBuffer(part))
+        }
+
+        download.close()
+
+        // Then
+        let bytes = Internals.AsyncBytes(logger: nil, totalSize: 11, stream: download.stream)
+        #expect(try await Array(bytes) == parts)
+    }
+
+    // MARK: - Cache tee
+
+    /// Reads a cache stream to its end, keeping what arrived and how it ended.
+    private func drain(
+        _ cacheStream: Internals.AsyncStream<Internals.DataBuffer>
+    ) async -> (received: Int, error: (any Error)?) {
+        var received = 0
+
+        do {
+            for try await var chunk in cacheStream {
+                received += chunk.readableBytes
+                _ = await chunk.readData(chunk.readableBytes)
+            }
+
+            return (received, nil)
+        } catch {
+            return (received, error)
+        }
+    }
+
+    @Test
+    func cacheStream_whenTheWriterNeverReads_givesUpAtItsWindowInsteadOfBufferingTheBody() async throws {
+        // Given: a tee whose window holds 4 KiB, and a writer that has not started reading.
+        let window = Internals.FlowControlWindow(highWatermark: 4_096, lowWatermark: 2_048)
+        let cacheStream = Internals.AsyncStream<Internals.DataBuffer>(flowControl: window)
+        let download = await Internals.DownloadBuffer(readingMode: .length(1_024))
+        download.cacheStream(cacheStream)
+
+        // When: 64 KiB goes through.
+        let input = Data((0..<65_536).map { UInt8($0 % 251) })
+        await download.append(Internals.DataBuffer(input))
+        download.close()
+        await download.waitUntilIdle()
+
+        // Then: the download itself is whole.
+        let bytes = Internals.AsyncBytes(logger: nil, totalSize: input.count, stream: download.stream)
+        #expect(try await Array(bytes).reduce(into: Data()) { $0.append($1) } == input)
+
+        // And the tee kept a window's worth, then failed, rather than keeping everything or
+        // ending as though it were complete.
+        let (received, error) = await drain(cacheStream)
+
+        #expect(error is Internals.CacheBacklogExceededError)
+        #expect(received >= 4_096)
+        #expect(received <= 4_096 + 1_024)
+    }
+
+    @Test
+    func cacheStream_whenTheWriterKeepsUp_receivesTheWholeBody() async throws {
+        // Given
+        let window = Internals.FlowControlWindow(highWatermark: 4_096, lowWatermark: 2_048)
+        let cacheStream = Internals.AsyncStream<Internals.DataBuffer>(flowControl: window)
+        let download = await Internals.DownloadBuffer(readingMode: .length(1_024))
+        download.cacheStream(cacheStream)
+
+        let writer = Task { await drain(cacheStream) }
+
+        // When: appended in parts, letting the writer run in between.
+        for _ in 0..<64 {
+            await download.append(Internals.DataBuffer(Data(repeating: 1, count: 1_024)))
+            await download.waitUntilIdle()
+            await Task.yield()
+        }
+
+        download.close()
+
+        // Then
+        let (received, error) = await writer.value
+
+        #expect(error == nil)
+        #expect(received == 65_536)
+    }
+
+    @Test
+    func cacheStream_whenGivenUp_leavesTheDownloadFlowingAndTheLaterPartsUncounted() async throws {
+        // Given
+        let window = Internals.FlowControlWindow(highWatermark: 2_048, lowWatermark: 1_024)
+        let cacheStream = Internals.AsyncStream<Internals.DataBuffer>(flowControl: window)
+        let download = await Internals.DownloadBuffer(readingMode: .length(1_024))
+        download.cacheStream(cacheStream)
+
+        // When
+        await download.append(Internals.DataBuffer(Data(repeating: 1, count: 100 * 1_024)))
+        await download.waitUntilIdle()
+
+        // Then: nothing past the first few chunks was charged to the tee's window.
+        #expect(window.isWritable == false)
+        #expect(window.bufferedBytesForTesting <= 2_048 + 1_024)
+
+        download.close()
     }
 }
