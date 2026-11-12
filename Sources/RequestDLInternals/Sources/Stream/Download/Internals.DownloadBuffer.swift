@@ -32,7 +32,6 @@ extension Internals {
             // background QoS is deferred under thermal or low power pressure. Producing at the
             // lowest priority for a consumer that is usually higher is a priority inversion.
             private let queue = AsyncQueue(priority: .utility)
-            private let readingMode: Internals.DownloadStep.ReadingMode
 
             // The Knuth-Morris-Pratt "longest proper prefix that's also a suffix" table for the
             // separator, computed once up front. It lets `_appendBySeparator` backtrack a failed
@@ -48,6 +47,9 @@ extension Internals {
             private var _buffer: DataBuffer?
             private var _cacheStream: Internals.AsyncStream<DataBuffer>?
 
+            // Starts as what the caller asked for. Only ever replaced by ``passThrough()``.
+            private var _readingMode: Internals.DownloadStep.ReadingMode
+
             // How many leading bytes of the separator are currently matched against the tail of
             // what's been scanned so far (the KMP automaton's current state).
             //
@@ -60,9 +62,11 @@ extension Internals {
             package init(
                 readingMode: Internals.DownloadStep.ReadingMode,
                 flowControl: Internals.FlowControlWindow?
-            ) async {
-                self._buffer = await DataBuffer()
-                self.readingMode = readingMode
+            ) {
+                // The synchronous in-memory initializer: same store as `DataBuffer()`, without
+                // the suspension that `init()` needs for the stream types that open a file.
+                self._buffer = DataBuffer(Internals.ByteURL())
+                self._readingMode = readingMode
                 self.flowControl = flowControl
 
                 if case .separator(let separator, _) = readingMode {
@@ -118,6 +122,14 @@ extension Internals {
                 }
             }
 
+            /// Stops re-chunking from the next append on, ordered against them like everything else.
+            package func passThrough() {
+                queue.addOperation {
+                    self._readingMode = .passthrough
+                    self._matchLength = 0
+                }
+            }
+
             package func close() {
                 queue.addOperation {
                     await self._close()
@@ -145,7 +157,7 @@ extension Internals {
                 var incomeBytes = incomeBytes
 
                 do {
-                    switch readingMode {
+                    switch _readingMode {
                     case .passthrough:
                         try await _appendPassthrough(&incomeBytes)
                     case .length(let length):
@@ -449,8 +461,19 @@ extension Internals {
             flowControl: Internals.FlowControlWindow? = nil,
             observer: Internals.ExecutionObserver? = nil
         ) async {
-            self.storage = await .init(readingMode: readingMode, flowControl: flowControl)
+            self.storage = .init(readingMode: readingMode, flowControl: flowControl)
             self.observer = observer
+        }
+
+        /// ``init(readingMode:flowControl:observer:)`` for a caller that cannot suspend.
+        ///
+        /// Nothing in construction needs to: the first buffer is held in memory.
+        package init(
+            immediate readingMode: Internals.DownloadStep.ReadingMode,
+            flowControl: Internals.FlowControlWindow? = nil
+        ) {
+            self.storage = .init(readingMode: readingMode, flowControl: flowControl)
+            self.observer = nil
         }
 
         // MARK: - Internal methods
@@ -462,6 +485,20 @@ extension Internals {
 
         package func close() {
             storage.close()
+        }
+
+        /// Forwards what is appended from now on without re-chunking it, whatever reading mode this
+        /// was made with.
+        ///
+        /// For a body that is about to be transformed (decompressed) before anybody reads it: the
+        /// reading mode is meant for what the reader gets, so cutting the input into chunks that
+        /// the transformation only takes apart again is pure copying. Whatever sits downstream
+        /// cuts the output instead, see `Internals.ManualDecompressionDispatch.resolvedStream`.
+        ///
+        /// Meant to be called before the first byte is appended: bytes already waiting in a
+        /// partly filled chunk stay where they are until the next close.
+        package func passThrough() {
+            storage.passThrough()
         }
 
         package func failed(_ error: Error) {

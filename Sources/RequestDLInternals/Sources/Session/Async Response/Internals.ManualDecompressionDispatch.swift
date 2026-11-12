@@ -74,9 +74,15 @@ extension Internals.ManualDecompressionDispatch {
     /// of the dispatch algorithms. This is only reachable in `.dispatch`, meaning this package has
     /// already taken over decoding for this request, so a server sending something it wasn't
     /// asked for is a real, reportable mismatch rather than something to silently pass through.
+    ///
+    /// - Parameter readingMode: How the *decoded* body is cut. Wherever this decodes, `source` is
+    /// expected to carry the wire bytes in whatever sizes they arrived (see
+    /// `Internals.DownloadBuffer.passThrough()`), so this is where the body is chunked, once.
+    /// Where it returns `source` itself, `source` has been cut by the reading mode already.
     package func resolvedStream(
         for head: Internals.ResponseHead,
-        source: Internals.AsyncStream<Internals.DataBuffer>
+        source: Internals.AsyncStream<Internals.DataBuffer>,
+        readingMode: Internals.DownloadStep.ReadingMode = .passthrough
     ) throws -> Internals.AsyncStream<Internals.DataBuffer> {
         guard case .dispatch(let algorithms, let nativelyDecoded) = self else {
             return source
@@ -110,7 +116,7 @@ extension Internals.ManualDecompressionDispatch {
             throw Internals.UnsupportedContentEncodingError(value: normalized)
         }
 
-        return Internals.AsyncStream.decompressing(source, using: algorithm)
+        return Internals.AsyncStream.decompressing(source, using: algorithm, readingMode: readingMode)
     }
 
     /// Whether reading this specific response's body will actually run this package's own
@@ -164,14 +170,19 @@ extension Internals.ManualDecompressionDispatch {
 
 extension Internals.AsyncStream where Element == Internals.DataBuffer {
 
-    /// Feeds every chunk `source` produces through a fresh decoder, one per response, forwarding
-    /// whatever comes back, no further ahead of the returned stream's reader than `source`'s own
-    /// flow control window allows (when it has one). `[UInt8]` decoding chunks may be empty, and
-    /// empty chunks are simply not forwarded, since a `DecompressorStream` is explicitly allowed
-    /// to buffer internally and emit nothing for a given call.
+    /// Feeds every chunk `source` produces through a fresh decoder, cutting what comes back to
+    /// `readingMode` (see `Internals.DownloadBuffer`), no further ahead of the returned stream's
+    /// reader than `source`'s own flow control window allows (when it has one). `[UInt8]` decoding
+    /// chunks may be empty, and empty chunks are simply not forwarded, since a `DecompressorStream`
+    /// is explicitly allowed to buffer internally and emit nothing for a given call.
     ///
     /// `finish()` runs once `source` ends, flushing whatever the decoder is still holding before
     /// this stream itself closes.
+    ///
+    /// The reading mode applies to the decoded bytes, the ones the reader gets. Cutting the input
+    /// as well, as happened when the wire bytes went through `Internals.DownloadBuffer` first, cost
+    /// a read and a buffer per chunk of a few hundred bytes, and left the output with whatever
+    /// sizes the decoder happened to emit, so a `.separator` never split a decoded body at all.
     ///
     /// - Important: The background task this spawns is otherwise unstructured and its handle
     /// discarded, so nothing would ever stop it if the caller inspected only the response head
@@ -183,15 +194,15 @@ extension Internals.AsyncStream where Element == Internals.DataBuffer {
     /// partway through) cancels this task instead.
     fileprivate static func decompressing(
         _ source: Internals.AsyncStream<Internals.DataBuffer>,
-        using algorithm: any Internals.DecompressionAlgorithm
+        using algorithm: any Internals.DecompressionAlgorithm,
+        readingMode: Internals.DownloadStep.ReadingMode
     ) -> Internals.AsyncStream<Internals.DataBuffer> {
-        // `.untilFirstIteration`, not the default `.unbounded`: `output` is read exactly once,
-        // by the single downstream consumer this decompressed stream is built for, the same way
-        // `Internals.DownloadBuffer.stream` is. `.unbounded` retains every chunk for the life of
-        // the stream (see `ReplaySubject`'s own doc), which for a large compressed download (the
-        // `.brotli` fallback under `.nio`, or any custom `Decompressor`) meant the entire
-        // decompressed body stayed resident in memory even after being read, defeating the
-        // point of streaming it in the first place.
+        // A `DownloadBuffer` rather than a bare stream: `output` is read exactly once, by the
+        // single downstream consumer this decompressed stream is built for, which is what its
+        // `.untilFirstIteration` stream is for (`.unbounded` retained every decoded chunk for the
+        // life of the stream, so for a large compressed download, the `.brotli` fallback under
+        // `.nio` or any custom `Decompressor`, the entire decompressed body stayed resident even
+        // after being read), and it is the one place that already knows how to cut a body.
         //
         // Metered by a window of its own whenever `source` is. This task is `source`'s reader,
         // so it is what credits `source`'s window, and it reads as fast as it can decode: left
@@ -207,7 +218,7 @@ extension Internals.AsyncStream where Element == Internals.DataBuffer {
             Internals.FlowControlWindow(highWatermark: $0.highWatermark, lowWatermark: $0.lowWatermark)
         }
 
-        let output = Internals.AsyncStream<Internals.DataBuffer>(flowControl: flowControl)
+        let output = Internals.DownloadBuffer(immediate: readingMode, flowControl: flowControl)
 
         // Captures this untouched `output`, not the token-carrying copy returned below, so this
         // task's own reference never keeps that token alive by itself. See
@@ -225,7 +236,7 @@ extension Internals.AsyncStream where Element == Internals.DataBuffer {
                     let decoded = try stream(decompressing: data)
 
                     if !decoded.isEmpty {
-                        output.append(.success(await Internals.DataBuffer(decoded)))
+                        output.append(await Internals.DataBuffer(decoded))
                     }
 
                     // Before pulling the next chunk, not before appending this one: what's
@@ -248,15 +259,15 @@ extension Internals.AsyncStream where Element == Internals.DataBuffer {
                 let tail = try stream.finish()
 
                 if !tail.isEmpty {
-                    output.append(.success(await Internals.DataBuffer(tail)))
+                    output.append(await Internals.DataBuffer(tail))
                 }
 
                 output.close()
             } catch {
-                output.append(.failure(error))
+                output.failed(error)
             }
         }
 
-        return output.withTerminationToken { task.cancel() }
+        return output.stream.withTerminationToken { task.cancel() }
     }
 }

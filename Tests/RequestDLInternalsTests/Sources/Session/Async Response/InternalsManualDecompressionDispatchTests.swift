@@ -344,7 +344,10 @@ struct InternalsManualDecompressionDispatchTests {
         }
 
         #expect(collected == pattern(0..<16_384))
-        #expect(outputWindow.peakBufferedBytesForTesting <= 2_048)
+        // One part more than the window holds at rest: `Internals.DownloadBuffer`, which cuts the
+        // output, counts a part once as it is queued and again as it goes into the stream, and
+        // credits the first only after the second. See `Internals.FlowControlWindow`.
+        #expect(outputWindow.peakBufferedBytesForTesting <= 2_048 + 1_024)
         #expect(sourceWindow.bufferedBytesForTesting == 0)
     }
 
@@ -445,5 +448,62 @@ struct InternalsManualDecompressionDispatchTests {
             nativelyDecoded: ["gzip"]
         )
         #expect(!dispatch.requiresManualDecoding(for: responseHead(contentEncoding: "gzip")))
+    }
+
+    // MARK: - Reading mode of the decoded body
+
+    private func decodedChunks(
+        of parts: [String],
+        readingMode: Internals.DownloadStep.ReadingMode
+    ) async throws -> [String] {
+        let source = Internals.AsyncStream<Internals.DataBuffer>()
+
+        for part in parts {
+            source.append(.success(await Internals.DataBuffer(Array(part.utf8))))
+        }
+
+        source.close()
+
+        let dispatch = Internals.ManualDecompressionDispatch.dispatch(algorithms: [MockIdentityAlgorithm()])
+        let output = try dispatch.resolvedStream(
+            for: responseHead(contentEncoding: "gzip"),
+            source: source,
+            readingMode: readingMode
+        )
+
+        var chunks = [String]()
+        var iterator = output.makeAsyncIterator()
+
+        while var chunk = try await iterator.next() {
+            chunks.append(String(decoding: await chunk.readData(chunk.readableBytes) ?? Data(), as: UTF8.self))
+        }
+
+        return chunks
+    }
+
+    @Test
+    func resolvedStream_whenDispatching_cutsTheDecodedBodyToTheLength() async throws {
+        // The wire parts are neither the size of the chunks nor a multiple of it.
+        let chunks = try await decodedChunks(of: ["hello ", "world"], readingMode: .length(4))
+
+        #expect(chunks == ["hell", "o wo", "rld"])
+    }
+
+    @Test
+    func resolvedStream_whenDispatching_splitsTheDecodedBodyOnTheSeparator() async throws {
+        // A separator that straddles two wire parts.
+        let chunks = try await decodedChunks(
+            of: ["one\nt", "wo\nthr", "ee"],
+            readingMode: .separator(Array("\n".utf8))
+        )
+
+        #expect(chunks == ["one\n", "two\n", "three"])
+    }
+
+    @Test
+    func resolvedStream_whenDispatching_withPassthroughKeepsTheDecodedPartsWhole() async throws {
+        let chunks = try await decodedChunks(of: ["hello ", "world"], readingMode: .passthrough)
+
+        #expect(chunks == ["hello ", "world"])
     }
 }

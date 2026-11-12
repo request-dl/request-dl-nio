@@ -551,4 +551,24 @@ struct InternalsDownloadBufferTests {
             #expect(chunks.reduce(into: Data()) { $0.append($1) } == input)
         }
     }
+
+    @Test
+    func download_whenToldToPassThrough_stopsCuttingWhatFollows() async throws {
+        // Given: a reading mode that would have cut these parts apart.
+        let download = await Internals.DownloadBuffer(readingMode: .length(4))
+        let parts = [Data("hello ".utf8), Data("world".utf8)]
+
+        // When
+        download.passThrough()
+
+        for part in parts {
+            await download.append(Internals.DataBuffer(part))
+        }
+
+        download.close()
+
+        // Then
+        let bytes = Internals.AsyncBytes(logger: nil, totalSize: 11, stream: download.stream)
+        #expect(try await Array(bytes) == parts)
+    }
 }
