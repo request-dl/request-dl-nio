@@ -7,6 +7,12 @@ import Testing
 @testable import RequestDLInternals
 @testable import RequestDLTestSupport
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.Data
+#endif
+
 // Only `byteURL_whenInitWithBuffer`/`byteURL_whenInitWithBufferSlice` need `NIOCore.ByteBuffer`;
 // `Internals.ByteURL.init(_:)` taking one only exists under `canImport(NIOCore)`.
 #if canImport(NIOCore)
@@ -57,6 +63,69 @@ struct InternalsByteURLTests {
         #expect(url.writtenBytes == 64)
     }
     #endif
+
+    @Test
+    func byteURL_whenAdoptingData() {
+        // Given
+        let data = Data([1, 2, 3, 4])
+
+        // When
+        let url = Internals.ByteURL(adopting: data)
+
+        // Then
+        #expect(url.bytes.readerIndex == .zero)
+        #expect(url.bytes.writerIndex == 4)
+        #expect(url.writtenBytes == 4)
+    }
+
+    @Test
+    func byteURL_whenAdoptingDataSlice_shouldRebaseToZero() {
+        // Given
+        let data = Data([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+        let slice = data[4..<8]
+        #expect(slice.startIndex == 4)
+
+        // When
+        let url = Internals.ByteURL(adopting: slice)
+
+        // Then
+        #expect(url.bytes.readerIndex == .zero)
+        #expect(url.bytes.writerIndex == 4)
+        #expect(url.writtenBytes == 4)
+    }
+
+    @Test
+    func byteURL_whenAdoptingDataSlice_shouldBeReadableThroughAHandle() throws {
+        // Given
+        let data = Data([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+        let url = Internals.ByteURL(adopting: data[4..<8])
+        let handle = Internals.ByteHandle(forReadingFrom: url)
+
+        // When
+        let first = try handle.read(upToCount: 3)
+        let second = try handle.read(upToCount: 3)
+        let third = try handle.read(upToCount: 3)
+
+        // Then
+        #expect(first == Data([4, 5, 6]))
+        #expect(second == Data([7]))
+        #expect(third == nil)
+    }
+
+    @Test
+    func byteURL_whenAdoptingDataThatStartsAtZero_shouldNotCopy() {
+        // Given
+        let data = Data(repeating: 7, count: 4_096)
+        let original = data.withUnsafeBytes { $0.baseAddress }
+
+        // When
+        let url = Internals.ByteURL(adopting: data)
+
+        // Then
+        var bytes = url.bytes
+        let adopted = bytes.asData().withUnsafeBytes { $0.baseAddress }
+        #expect(original == adopted)
+    }
 
     @Test
     func byteURL_whenEquals() {
