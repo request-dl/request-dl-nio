@@ -51,6 +51,18 @@ These are the main usage methods:
 
 > Note: Just like we use methods to specify the storage location in a request specification, the ``RequestDL/DataCache`` initializers are available with the same options.
 
+### Large responses and a slow cache
+
+The response is stored while it downloads, not after: each chunk is handed to the caller and, in parallel, to a writer that puts it in the memory and disk tiers. The network is never slowed down for that writer, so the chunks it has not taken yet wait in memory.
+
+That wait has a limit of 16 MiB. If the writer falls more than 16 MiB behind the download, which takes a body larger than that, arriving faster than the cache can write it (a fast connection, or a ``RequestDL/DataCache`` busy with other reads and writes), RequestDL stops caching that response:
+
+- The request is not affected. It succeeds, and the caller receives the whole body.
+- What had been written is discarded, never kept as if it were the full response, and a `.warning` is logged ("Response will not be cached").
+- The next request for that URL finds no entry and goes to the network, the same as for a response that was never cacheable. There is no error to catch: this is only visible as a cache miss.
+
+Responses that are cacheable but this large are best served by a cache that can keep up, for example one on its own storage URL rather than one shared with a lot of other traffic. The 16 MiB bound is not configurable.
+
 ### Encrypting the disk tier
 
 By default, cached responses are written to disk as plaintext. If the cached content is sensitive — auth-protected API responses, personal data, anything you wouldn't want readable by something else with access to the device's file system — set an ``RequestDL/DataCache/EncryptionKey`` so RequestDL encrypts the disk tier at rest with AES-GCM.

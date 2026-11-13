@@ -39,6 +39,11 @@ extension Property {
     ///
     /// Adds a cache policy to the request using the specified cache policy set.
     ///
+    /// A response is stored as it downloads. If the cache writer falls more than 16 MiB behind
+    /// the download (a body larger than that, on a fast network, while the ``DataCache`` is busy),
+    /// the response is not cached: the request still succeeds and returns the whole body, nothing
+    /// is stored, and a warning is logged. The next request for the same URL is then a cache miss.
+    ///
     /// - Parameter cachePolicy: The cache policy set to be added to the request.
     /// - Returns: A property with the added cache policy.
     ///
