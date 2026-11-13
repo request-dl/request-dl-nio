@@ -329,12 +329,22 @@ struct InternalsManualDecompressionDispatchTests {
         let output = try dispatch.resolvedStream(for: responseHead(contentEncoding: "gzip"), source: source)
         let outputWindow = try #require(output.flowControlWindow)
 
-        // Then: the decoder pulls two chunks (the second takes its output past the high
-        // watermark) and parks, leaving the other fourteen counted against the source.
+        // Then: the decoder pulls a couple of chunks, parks once its output is past the high
+        // watermark, and leaves nearly all of the rest counted against the source.
+        //
+        // Not exact counts: `Internals.DownloadBuffer.append` charges a chunk to the window
+        // right away and credits that charge back only once the chunk has been dispatched into
+        // the stream, which charges it again, so for a moment a chunk counts twice. Sampled in
+        // that moment the output reads 3 KiB, and a decoder that checked the window in it parks
+        // although the backlog is then back to 1 KiB, where the window's hysteresis keeps it
+        // until a reader brings the backlog down to the low watermark. Either way it is parked,
+        // with the output bounded and the source still holding back what it never pulled, and
+        // that is what is asserted. Sixteen chunks are waiting, so a decoder that did not stop
+        // would leave the source empty.
         try await eventually { outputWindow.waitingCountForTesting == 1 }
 
-        #expect(outputWindow.bufferedBytesForTesting == 2_048)
-        #expect(sourceWindow.bufferedBytesForTesting == 14_336)
+        #expect((1_024...3_072).contains(outputWindow.bufferedBytesForTesting))
+        #expect((13_312...15_360).contains(sourceWindow.bufferedBytesForTesting))
         #expect(!sourceWindow.isWritable)
 
         // Reading the output is what lets it go on, all the way through, intact.
