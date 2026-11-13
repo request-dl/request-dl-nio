@@ -644,7 +644,9 @@ extension Internals {
 
             let tlsDelegate = makeTLSDelegate(for: request.url)
 
-            let upload = Internals.AsyncStream<Int>()
+            // Read once, by the response's iterator. `.unbounded` would keep one entry per uploaded part
+            // for as long as the response lives, long after the one reader has consumed it.
+            let upload = Internals.AsyncStream<Int>(bufferingPolicy: .untilFirstIteration)
             let head = Internals.AsyncStream<Internals.ResponseHead>()
             let downloadBuffer = await Internals.DownloadBuffer(
                 readingMode: readingMode,

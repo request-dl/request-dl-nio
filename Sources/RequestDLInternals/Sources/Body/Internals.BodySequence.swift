@@ -67,11 +67,14 @@ extension Internals {
                 self.chunkSize = chunkSize
                 self.totalSize = totalSize
                 self.buffers = buffers
-                // Allocated once at full size and then rewound, so the capacity is reused for
-                // every chunk instead of growing again per iteration. `ByteBuffer`-backed when
-                // NIOCore is available, so every chunk this iterator emits stays on the
-                // zero-copy path through `asByteBuffer()` instead of paying a conversion on the
-                // NIO writer side.
+                // Sized for a whole chunk up front, so filling one never grows the storage.
+                // Each emitted chunk is a snapshot that shares this storage, so the first write
+                // after it has been handed out copies into fresh storage of the same capacity:
+                // one allocation per chunk, which an independent chunk needs anyway, and no
+                // bytes are copied by that step (the cursors are rewound by then). `ByteBuffer`-
+                // backed when NIOCore is available, so every chunk this iterator emits stays on
+                // the zero-copy path through `asByteBuffer()` instead of paying a conversion on
+                // the NIO writer side.
                 #if canImport(NIOCore)
                 self.bytes = Internals.Bytes(NIOCore.ByteBuffer(repeating: .zero, count: chunkSize))
                 #else
