@@ -34,6 +34,12 @@ extension Internals {
         let dataCache: DataCache
         let logger: Internals.TaskLogger?
 
+        /// Awaited by the cache writer before it allocates its buffer, and so before it reads the
+        /// first chunk. Nothing sets it outside the tests, which hold the writer back with it to
+        /// have a download run far ahead of the cache without depending on how the two happen to
+        /// be scheduled.
+        var beforeWriting: (@Sendable () async -> Void)?
+
         // MARK: - Internal methods
 
         func callAsFunction(_ client: any RequestExecutingClient) async -> Output {
@@ -744,6 +750,8 @@ extension Internals {
                     // that its reader is gone.
                     defer { asyncBuffers.close() }
 
+                    await beforeWriting?()
+
                     guard
                         var cacheBuffer = await dataCache.allocateBuffer(
                             key: requestConfiguration.url,
@@ -812,7 +820,7 @@ extension Internals {
 
             for try await buffer in asyncBuffers {
                 // By value, not `inout`. This is `DataCache.Buffer.writeBuffer`, which reads
-                // through `getBytes()` and leaves the argument's cursor alone, not the draining
+                // through `getData()` and leaves the argument's cursor alone, not the draining
                 // `Internals.Buffer.writeBuffer(_:)`.
                 await cacheBuffer.writeBuffer(buffer)
 
