@@ -4,6 +4,7 @@
 
 #if canImport(NIOCore) && !canImport(Darwin)
 
+import NIOConcurrencyHelpers
 import NIOCore
 import NIOSSL
 import SwiftASN1
@@ -96,7 +97,7 @@ extension Internals.NIOTrustEvaluator {
             // so `additionalTrustRoots` alone stays additive here too instead of silently dropping
             // every publicly-trusted host.
             if !trustRootsAreExclusive {
-                certificates += Self.cachedSystemDefaultCertificates
+                certificates += Self.systemCertificatesCache.certificates(load: Self.systemDefaultCertificates)
             }
 
             return CertificateStore(certificates)
@@ -203,20 +204,49 @@ extension Internals.NIOTrustEvaluator {
         return extendedKeyUsage.contains(.serverAuth) || extendedKeyUsage.contains(.any)
     }
 
-    /// The system CA bundle, parsed once per process.
+    /// The system CA bundle, parsed once per process after the first *successful* read.
     ///
     /// Every evaluator used to parse the whole bundle again (a couple of hundred X.509
     /// certificates) into its own `CertificateStore`, and one evaluator is built per client, so
-    /// a pool of clients held that many copies. A `static let` is initialized lazily and
-    /// exactly once, thread safely.
+    /// a pool of clients held that many copies.
     ///
-    /// - Important: A bundle that cannot be read is cached as empty, matching what each
-    /// evaluator did on its own with the `try?` it used to carry. The bundle changing on disk
+    /// - Important: Only a successful, non-empty read is kept. A read that throws, or that finds
+    /// no certificates at all (no bundle file at any known path, an empty directory), is not
+    /// cached: that evaluator proceeds without system roots, as it always did, and the next
+    /// evaluator tries again. Caching the failure would instead leave every public host
+    /// untrusted for the rest of the process after one unlucky read (the file missing, unreadable
+    /// or half written at that moment). Once a read has succeeded, the bundle changing on disk
     /// while the process runs is not picked up, as NIOSSL's own default trust roots are not
     /// either.
-    private static let cachedSystemDefaultCertificates: [Certificate] = {
-        (try? systemDefaultCertificates()) ?? []
-    }()
+    static let systemCertificatesCache = SystemCertificatesCache()
+
+    /// Holds the system CA bundle once it has been read successfully; see ``systemCertificatesCache``.
+    final class SystemCertificatesCache: Sendable {
+
+        private let storage = NIOLockedValueBox<[Certificate]?>(nil)
+
+        init() {}
+
+        /// The cached certificates, or the result of `load` when nothing is cached yet.
+        ///
+        /// `load` runs under the lock, so concurrent first callers wait for a single parse rather
+        /// than each doing their own. A `load` that throws or returns an empty list yields `[]`
+        /// for this call and leaves the cache empty so the next call loads again.
+        func certificates(load: () throws -> [Certificate]) -> [Certificate] {
+            storage.withLockedValue { cached in
+                if let cached {
+                    return cached
+                }
+
+                guard let loaded = try? load(), !loaded.isEmpty else {
+                    return []
+                }
+
+                cached = loaded
+                return loaded
+            }
+        }
+    }
 
     #if os(Android)
     /// Mirrors NIOSSL's own `AndroidCABundle.swift` search heuristic. Android ships its trust
