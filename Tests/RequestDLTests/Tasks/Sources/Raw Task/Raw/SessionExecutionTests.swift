@@ -172,6 +172,47 @@ struct SessionExecutionTests {
         }
     }
 
+    /// An `AsyncResponse` iterated a second time replays its upload steps and its head, as it
+    /// did in 4.5.7: only the body bytes are single use. The upload progress stream is therefore
+    /// left `.unbounded`; this pins that on the real client rather than on a hand-built response.
+    @Test
+    func session_whenIteratedTwice_shouldReplayUploadSteps() async throws {
+        let testState = try await TestState()
+
+        // Given
+        let session = testState.session
+        let data = await Data.randomData(length: 1_023)
+
+        var requestConfiguration = RequestConfiguration()
+        requestConfiguration.baseURL = "https://localhost:8888"
+        requestConfiguration.pathComponents = [testState.uri.trimmingCharacters(in: .init(charactersIn: "/"))]
+        requestConfiguration.method = "POST"
+        requestConfiguration.body = await RequestBody(buffers: [
+            Internals.DataBuffer(data)
+        ])
+
+        let response = try await execute(session: session, requestConfiguration: requestConfiguration)
+
+        // When
+        let first = try await Array(response)
+        let second = try await Array(response)
+
+        // Then
+        func uploadSteps(_ steps: [ResponseStep]) -> [UploadStep] {
+            steps.compactMap { step in
+                guard case .upload(let step) = step else {
+                    return nil
+                }
+
+                return step
+            }
+        }
+
+        #expect(!uploadSteps(first).isEmpty)
+        #expect(uploadSteps(second) == uploadSteps(first))
+        #expect(second.count == first.count)
+    }
+
     @Test
     func session_whenPerformingPostEmptyData_shouldBeValid() async throws {
         let testState = try await TestState()
