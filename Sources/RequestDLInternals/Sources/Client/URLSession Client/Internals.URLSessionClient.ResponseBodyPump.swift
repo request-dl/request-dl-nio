@@ -34,6 +34,17 @@ extension Internals.URLSessionClient {
     /// `maximumPendingBytes`, which only bounds this function's own buffer. A `.separator` match
     /// can straddle two flushes; `DownloadBuffer`'s matcher carries its state across appends.
     ///
+    /// `.passthrough` has no boundary, and waiting for `maximumPendingBytes` would starve what
+    /// `DownloadBuffer.append` feeds: the read timeout (`Internals.IdleDeadline`) and the progress
+    /// observer, which a body that is slow but steady (a long poll, a report built piece by piece)
+    /// would only reach once per 64 KiB. So it is handed on where the stream is about to run dry:
+    /// `AsyncBytes` suspends only once everything CFNetwork delivered has been pulled, and
+    /// `URLSessionTask.countOfBytesReceived` says how much that is, so the loop pulls exactly what
+    /// is there and flushes before the pull that would wait. A fast stream keeps being pulled
+    /// without ever running dry and is flushed every `maximumPendingBytes`, as before. The count
+    /// is read once per run, not per byte. Should it ever be behind what was pulled (a task that
+    /// does not count), the flush falls back to every `unhintedFlushBytes`.
+    ///
     /// ## Cost
     ///
     /// Every byte is an `async` call, hence one tight loop per reading mode below, writing into
@@ -121,6 +132,69 @@ extension Internals.URLSessionClient {
                     }
                 }
 
+            case .passthrough:
+                // No boundary to flush on, so what decides is whether the stream is about to run
+                // dry: a body that is slow but steady (a long poll, a report built piece by piece)
+                // must reach `downloadBuffer`, and so feed the read timeout and the progress
+                // observer, as it arrives, not once `capacity` bytes of it have piled up.
+                //
+                // `AsyncBytes` suspends only when what CFNetwork delivered so far is used up, and
+                // `countOfBytesReceived` is how much it delivered (to the byte, also when
+                // `URLSession` itself decodes the body). So the loop pulls exactly what is already
+                // there, in runs, and hands over whatever it holds right before the pull that
+                // would wait. A fast stream is pulled in runs as long as `capacity`, and flushes
+                // only there.
+                let task = bytes.task
+                var pulled: Int64 = 0
+
+                // Until the counter turns out to be behind what was pulled, which a task that
+                // counts cannot be (none is known not to): then it is not telling where the stream
+                // runs dry, and asking it again would flush one byte at a time. The flush falls
+                // back to a fixed size small enough to keep a slow body moving.
+                var isCounted = true
+
+                streaming: while true {
+                    var run = max(Self.unhintedFlushBytes - count, 1)
+
+                    if isCounted {
+                        let available = task.countOfBytesReceived &- pulled
+
+                        if available < .zero {
+                            isCounted = false
+                            continue streaming
+                        }
+
+                        if available == .zero {
+                            // The pull below suspends until more arrives: nothing held back may
+                            // wait for that.
+                            if count > .zero {
+                                await flush()
+                            }
+
+                            run = 1
+                        } else {
+                            run = Int(clamping: min(available, Int64(capacity - count)))
+                        }
+                    }
+
+                    let limit = count &+ run
+
+                    while count < limit {
+                        guard let byte = try await iterator.next() else {
+                            break streaming
+                        }
+
+                        storage[count] = byte
+                        count &+= 1
+                    }
+
+                    pulled &+= Int64(run)
+
+                    if count >= (isCounted ? capacity : Self.unhintedFlushBytes) {
+                        await flush()
+                    }
+                }
+
             default:
                 // A degenerate reading mode (`.length` <= 0, empty `.separator`): no boundary to
                 // flush on, only the capacity.
@@ -161,6 +235,11 @@ extension Internals.URLSessionClient {
     /// Only bounds its own buffer; it has no bearing on what the reader sees, since
     /// `Internals.DownloadBuffer` re-chunks whatever it is given.
     static let maximumPendingBytes = 65_536
+
+    /// How many bytes of a `.passthrough` body `pumpResponseBody` holds back when it cannot tell
+    /// from the task's byte count where the stream is about to run dry. The size `.length` chunks
+    /// had by default when the body went through `Internals.DownloadBuffer` one chunk at a time.
+    static let unhintedFlushBytes = 1_024
 }
 
 #endif
