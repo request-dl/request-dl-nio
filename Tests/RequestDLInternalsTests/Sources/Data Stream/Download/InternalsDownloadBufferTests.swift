@@ -629,11 +629,15 @@ struct InternalsDownloadBufferTests {
 
         let writer = Task { await drain(cacheStream) }
 
-        // When: appended in parts, letting the writer run in between.
+        // When: appended in parts, each one only once the writer has taken everything before it.
+        // Waiting for that, and not for the writer to have been scheduled "soon enough", is what
+        // keeps the backlog at one part however the two tasks happen to be interleaved: with the
+        // CPU saturated the writer could be left several parts behind, and the 4 KiB window would
+        // give up on it.
         for _ in 0..<64 {
             await download.append(Internals.DataBuffer(Data(repeating: 1, count: 1_024)))
             await download.waitUntilIdle()
-            await Task.yield()
+            try await eventually { window.bufferedBytesForTesting == 0 }
         }
 
         download.close()
