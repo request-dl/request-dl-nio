@@ -14,6 +14,8 @@ import Testing
 
 #if canImport(Darwin)
 import Security
+#else
+import X509
 #endif
 
 @testable import RequestDLInternals
@@ -223,6 +225,77 @@ struct InternalsNIOTrustEvaluatorTests {
 
         // Then
         #expect(try Internals.NIOTrustEvaluator.resolve(from: secureConnection) != nil)
+    }
+
+    private struct BundleReadFailure: Error {}
+
+    /// A failed first read of the system CA bundle (file missing, unreadable or half written at
+    /// that moment) must not leave every later evaluator without system roots for the rest of
+    /// the process: the next one retries, and a success from then on is kept.
+    @Test
+    func systemCertificatesCache_whenFirstReadFails_retriesAndThenCaches() throws {
+        // Given
+        let cache = Internals.NIOTrustEvaluator.SystemCertificatesCache()
+        let root = try Certificate(pemEncoded: Self.rootPEM)
+        var loads = 0
+
+        // When
+        let failed = cache.certificates {
+            loads += 1
+            throw BundleReadFailure()
+        }
+        let recovered = cache.certificates {
+            loads += 1
+            return [root]
+        }
+        let cached = cache.certificates {
+            loads += 1
+            throw BundleReadFailure()
+        }
+
+        // Then
+        #expect(failed.isEmpty)
+        #expect(recovered == [root])
+        #expect(cached == [root])
+        #expect(loads == 2)
+    }
+
+    /// A read that completes but finds no certificates (no bundle at any known path, an empty
+    /// directory) is not a usable trust store either, so it is retried instead of cached.
+    @Test
+    func systemCertificatesCache_whenReadFindsNoCertificates_isNotCached() throws {
+        // Given
+        let cache = Internals.NIOTrustEvaluator.SystemCertificatesCache()
+        let root = try Certificate(pemEncoded: Self.rootPEM)
+
+        // When
+        let empty = cache.certificates { [] }
+        let loaded = cache.certificates { [root] }
+
+        // Then
+        #expect(empty.isEmpty)
+        #expect(loaded == [root])
+    }
+
+    /// The speed-up for the success case: once read, the bundle is not parsed again.
+    @Test
+    func systemCertificatesCache_whenReadSucceeds_loadsOnlyOnce() throws {
+        // Given
+        let cache = Internals.NIOTrustEvaluator.SystemCertificatesCache()
+        let root = try Certificate(pemEncoded: Self.rootPEM)
+        var loads = 0
+
+        // When
+        let results = (0..<3).map { _ in
+            cache.certificates {
+                loads += 1
+                return [root]
+            }
+        }
+
+        // Then
+        #expect(results == [[root], [root], [root]])
+        #expect(loads == 1)
     }
     #endif
 
