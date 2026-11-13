@@ -29,6 +29,7 @@ struct RequestBodyUnreadableErrorTests {
                 uploadingBytes: .zero,
                 upload: .empty(),
                 decompressionDispatch: .skip,
+                readingMode: .passthrough,
                 head: head,
                 download: .empty()
             )

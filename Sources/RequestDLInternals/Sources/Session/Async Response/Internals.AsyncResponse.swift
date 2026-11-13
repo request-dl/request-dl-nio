@@ -111,7 +111,7 @@ extension Internals {
             uploadingBytes: Int,
             upload: Internals.AsyncStream<Int>,
             decompressionDispatch: Internals.ManualDecompressionDispatch,
-            readingMode: Internals.DownloadStep.ReadingMode = .passthrough,
+            readingMode: Internals.DownloadStep.ReadingMode,
             head: Internals.AsyncStream<Internals.ResponseHead>,
             download: Internals.AsyncStream<Internals.DataBuffer>
         ) {

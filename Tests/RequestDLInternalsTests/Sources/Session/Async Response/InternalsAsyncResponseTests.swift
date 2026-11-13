@@ -238,6 +238,7 @@ extension InternalsAsyncResponseTests {
             uploadingBytes: uploadingBytes,
             upload: upload,
             decompressionDispatch: .skip,
+            readingMode: .passthrough,
             head: head,
             download: download
         )

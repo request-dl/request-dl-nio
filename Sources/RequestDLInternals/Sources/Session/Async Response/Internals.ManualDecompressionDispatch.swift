@@ -82,7 +82,7 @@ extension Internals.ManualDecompressionDispatch {
     package func resolvedStream(
         for head: Internals.ResponseHead,
         source: Internals.AsyncStream<Internals.DataBuffer>,
-        readingMode: Internals.DownloadStep.ReadingMode = .passthrough
+        readingMode: Internals.DownloadStep.ReadingMode
     ) throws -> Internals.AsyncStream<Internals.DataBuffer> {
         guard case .dispatch(let algorithms, let nativelyDecoded) = self else {
             return source

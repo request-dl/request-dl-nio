@@ -110,6 +110,7 @@ struct AsyncResponseCollectTests {
             uploadingBytes: .zero,
             upload: .empty(),
             decompressionDispatch: .skip,
+            readingMode: .passthrough,
             head: .empty(),
             download: .empty()
         )
@@ -129,6 +130,7 @@ struct AsyncResponseCollectTests {
             uploadingBytes: .zero,
             upload: .empty(),
             decompressionDispatch: .skip,
+            readingMode: .passthrough,
             head: .empty(),
             download: .empty()
         )

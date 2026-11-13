@@ -93,6 +93,7 @@ extension Internals {
                     uploadingBytes: .zero,
                     upload: .empty(),
                     decompressionDispatch: .skip,
+                    readingMode: requestConfiguration.readingMode,
                     head: .throwing(EmptyCachedDataError()),
                     download: .empty()
                 )
@@ -384,6 +385,7 @@ extension Internals {
                     uploadingBytes: .zero,
                     upload: .empty(),
                     decompressionDispatch: .skip,
+                    readingMode: requestConfiguration.readingMode,
                     head: .constant(cachedData.cachedResponse.response),
                     download: download.stream
                 ),

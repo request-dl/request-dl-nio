@@ -115,6 +115,7 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
             uploadingBytes: .zero,
             upload: .empty(),
             decompressionDispatch: .skip,
+            readingMode: resolved.requestConfiguration.readingMode,
             head: .constant(mockResponseHead(resolved)),
             download: downloadBuffer.stream
         )

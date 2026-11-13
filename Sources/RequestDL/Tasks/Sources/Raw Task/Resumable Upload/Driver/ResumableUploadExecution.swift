@@ -150,6 +150,7 @@ final class ResumableUploadExecution: @unchecked Sendable {
             upload: upload,
             // What the exchange that is the response hands over is already decoded.
             decompressionDispatch: .skip,
+            readingMode: request.readingMode,
             head: head,
             download: download.stream
         )

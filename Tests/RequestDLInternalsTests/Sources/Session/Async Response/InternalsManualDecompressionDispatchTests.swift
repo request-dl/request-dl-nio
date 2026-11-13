@@ -71,7 +71,11 @@ struct InternalsManualDecompressionDispatchTests {
         let dispatch = Internals.ManualDecompressionDispatch.dispatch(algorithms: [MockIdentityAlgorithm()])
 
         // When
-        let output = try dispatch.resolvedStream(for: responseHead(contentEncoding: "gzip"), source: source)
+        let output = try dispatch.resolvedStream(
+            for: responseHead(contentEncoding: "gzip"),
+            source: source,
+            readingMode: .passthrough
+        )
 
         var iterator = output.makeAsyncIterator()
         var collected = Data()
@@ -103,7 +107,11 @@ struct InternalsManualDecompressionDispatchTests {
         source.close()
 
         let dispatch = Internals.ManualDecompressionDispatch.dispatch(algorithms: [MockIdentityAlgorithm()])
-        let output = try dispatch.resolvedStream(for: responseHead(contentEncoding: "gzip"), source: source)
+        let output = try dispatch.resolvedStream(
+            for: responseHead(contentEncoding: "gzip"),
+            source: source,
+            readingMode: .passthrough
+        )
 
         var first = output.makeAsyncIterator()
         while try await first.next() != nil {}
@@ -137,7 +145,8 @@ struct InternalsManualDecompressionDispatchTests {
         #expect(throws: Internals.UnsupportedContentEncodingError.self) {
             _ = try dispatch.resolvedStream(
                 for: responseHead(contentEncodings: "gzip", "br"),
-                source: source
+                source: source,
+                readingMode: .passthrough
             )
         }
     }
@@ -157,7 +166,8 @@ struct InternalsManualDecompressionDispatchTests {
         #expect(throws: Internals.UnsupportedContentEncodingError.self) {
             _ = try dispatch.resolvedStream(
                 for: responseHead(contentEncoding: "gzip, br"),
-                source: source
+                source: source,
+                readingMode: .passthrough
             )
         }
     }
@@ -176,7 +186,8 @@ struct InternalsManualDecompressionDispatchTests {
         // When
         let output = try dispatch.resolvedStream(
             for: responseHead(contentEncodings: "identity", "gzip"),
-            source: source
+            source: source,
+            readingMode: .passthrough
         )
 
         var iterator = output.makeAsyncIterator()
@@ -243,7 +254,11 @@ struct InternalsManualDecompressionDispatchTests {
         // When: the resolved stream is created and immediately discarded (assigned to nothing,
         // never iterated), exactly the "inspected only the response head" scenario this guards
         // against.
-        _ = try dispatch.resolvedStream(for: responseHead(contentEncoding: "gzip"), source: source)
+        _ = try dispatch.resolvedStream(
+            for: responseHead(contentEncoding: "gzip"),
+            source: source,
+            readingMode: .passthrough
+        )
 
         // Gives the background task a chance to run, process whatever was already buffered, and
         // observe its own cancellation on the next suspension.
@@ -277,7 +292,8 @@ struct InternalsManualDecompressionDispatchTests {
         // When
         let output = try dispatch.resolvedStream(
             for: responseHead(contentEncoding: "  GZIP  "),
-            source: source
+            source: source,
+            readingMode: .passthrough
         )
 
         var iterator = output.makeAsyncIterator()
@@ -326,7 +342,11 @@ struct InternalsManualDecompressionDispatchTests {
         let dispatch = Internals.ManualDecompressionDispatch.dispatch(algorithms: [MockIdentityAlgorithm()])
 
         // When
-        let output = try dispatch.resolvedStream(for: responseHead(contentEncoding: "gzip"), source: source)
+        let output = try dispatch.resolvedStream(
+            for: responseHead(contentEncoding: "gzip"),
+            source: source,
+            readingMode: .passthrough
+        )
         let outputWindow = try #require(output.flowControlWindow)
 
         // Then: the decoder pulls a couple of chunks, parks once its output is past the high
@@ -376,7 +396,11 @@ struct InternalsManualDecompressionDispatchTests {
         let outputWindow: Internals.FlowControlWindow
 
         do {
-            let output = try dispatch.resolvedStream(for: responseHead(contentEncoding: "gzip"), source: source)
+            let output = try dispatch.resolvedStream(
+                for: responseHead(contentEncoding: "gzip"),
+                source: source,
+                readingMode: .passthrough
+            )
             outputWindow = try #require(output.flowControlWindow)
 
             try await eventually { outputWindow.waitingCountForTesting == 1 }
@@ -399,7 +423,11 @@ struct InternalsManualDecompressionDispatchTests {
         let dispatch = Internals.ManualDecompressionDispatch.dispatch(algorithms: [MockIdentityAlgorithm()])
 
         // When
-        let output = try dispatch.resolvedStream(for: responseHead(contentEncoding: "gzip"), source: source)
+        let output = try dispatch.resolvedStream(
+            for: responseHead(contentEncoding: "gzip"),
+            source: source,
+            readingMode: .passthrough
+        )
 
         // Then
         #expect(output.flowControlWindow == nil)
