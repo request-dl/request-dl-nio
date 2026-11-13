@@ -63,9 +63,17 @@ extension Internals {
         /// Prefer this over `init()` followed by ``replace(with:)-(DataProtocol)`` when the
         /// store is being created around bytes that already exist: that path writes them into
         /// the store a second time.
+        ///
+        /// A `Data` that is a slice of a larger one (its `startIndex` is not zero) is rebased to
+        /// index zero first, which copies it. The store addresses its content by offset from
+        /// zero (`writtenBytes` is a count, and `ByteHandle.read(upToCount:)` moves the indices
+        /// to offsets within it), whereas `Internals.Bytes` initialised from a slice starts its
+        /// indices at the slice's own `startIndex`, so the two would disagree and the read would
+        /// trip a precondition. The common case, a `Data` that starts at zero, is adopted as is.
         package init(adopting data: Data) {
-            self._bytes = Internals.Bytes(data)
-            self._writtenBytes = data.count
+            let rebased = data.startIndex == .zero ? data : data.subdata(in: data.startIndex..<data.endIndex)
+            self._bytes = Internals.Bytes(rebased)
+            self._writtenBytes = rebased.count
         }
 
         #if canImport(NIOCore)

@@ -301,9 +301,10 @@ extension Internals {
             // already holds.
             transferControl?.attach(flowControl)
 
-            // Read once, by the response's iterator. `.unbounded` would keep one entry per uploaded part
-            // for as long as the response lives, long after the one reader has consumed it.
-            let upload = Internals.AsyncStream<Int>(bufferingPolicy: .untilFirstIteration)
+            // Left `.unbounded` on purpose: the response replays its upload steps to every iterator, which is
+            // part of what `AsyncResponse` has always done (see `InternalsAsyncResponseTests`). Retaining one
+            // small entry per uploaded part does not justify changing that contract.
+            let upload = Internals.AsyncStream<Int>()
             let head = Internals.AsyncStream<Internals.ResponseHead>()
             let download = await Internals.DownloadBuffer(
                 readingMode: readingMode,

@@ -127,6 +127,94 @@ struct InternalsAsyncResponseTests {
             ]
         )
     }
+
+    /// Pins the contract of iterating one response more than once, which is what 4.5.7 did and
+    /// what the upload stream's default (`.unbounded`) policy provides: every iterator replays
+    /// the upload steps and the head, and only the body bytes are single use, surfacing
+    /// `AlreadyConsumedError` when the second iterator reads them.
+    @Test
+    func response_whenIteratedTwice_shouldReplayUploadAndHeadAndFailOnlyOnBodyBytes() async throws {
+        // Given
+        let uploadingBytes = 8
+        let parts = 0..<3
+
+        let configuration = response(
+            uploadingBytes: uploadingBytes,
+            download: .init(bufferingPolicy: .untilFirstIteration)
+        )
+
+        let head = Internals.ResponseHead(
+            url: "https://127.0.0.1",
+            status: .init(code: 200, reason: "OK"),
+            version: .init(minor: .zero, major: 1),
+            headers: [.init(name: "Content-Length", value: "3")],
+            isKeepAlive: false
+        )
+
+        for part in parts {
+            configuration.upload.append(.success(part))
+        }
+
+        configuration.head.append(.success(head))
+        await configuration.download.append(.success(.init(Data([1, 2, 3]))))
+
+        configuration.upload.close()
+        configuration.head.close()
+        configuration.download.close()
+
+        func steps() async throws -> (uploads: [Internals.UploadStep], head: Internals.ResponseHead?, bytes: Int) {
+            var uploads: [Internals.UploadStep] = []
+            var head: Internals.ResponseHead?
+            var bytes = 0
+
+            for try await step in configuration.response {
+                switch step {
+                case .upload(let step):
+                    uploads.append(step)
+                case .download(let step):
+                    head = step.head
+
+                    for try await chunk in step.bytes {
+                        bytes += chunk.count
+                    }
+                }
+            }
+
+            return (uploads, head, bytes)
+        }
+
+        // When
+        let first = try await steps()
+
+        var secondUploads: [Internals.UploadStep] = []
+        var secondHead: Internals.ResponseHead?
+        var secondError: Error?
+
+        do {
+            _ = try await steps()
+        } catch {
+            secondError = error
+        }
+
+        var iterator = configuration.response.makeAsyncIterator()
+        while let step = try await iterator.next() {
+            switch step {
+            case .upload(let step):
+                secondUploads.append(step)
+            case .download(let step):
+                secondHead = step.head
+            }
+        }
+
+        // Then
+        #expect(first.uploads.map(\.chunkSize) == Array(parts))
+        #expect(first.head == head)
+        #expect(first.bytes == 3)
+
+        #expect(secondError is AlreadyConsumedError)
+        #expect(secondUploads.map(\.chunkSize) == Array(parts))
+        #expect(secondHead == head)
+    }
 }
 
 extension InternalsAsyncResponseTests {
@@ -150,6 +238,7 @@ extension InternalsAsyncResponseTests {
             uploadingBytes: uploadingBytes,
             upload: upload,
             decompressionDispatch: .skip,
+            readingMode: .passthrough,
             head: head,
             download: download
         )

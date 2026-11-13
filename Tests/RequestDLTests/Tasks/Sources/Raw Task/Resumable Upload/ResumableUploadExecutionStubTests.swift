@@ -528,6 +528,7 @@ struct ResumableUploadExecutionStubTests {
                 uploadingBytes: 0,
                 upload: upload,
                 decompressionDispatch: .skip,
+                readingMode: .passthrough,
                 head: heads,
                 download: download
             )
