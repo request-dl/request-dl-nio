@@ -812,7 +812,7 @@ extension Internals {
 
             for try await buffer in asyncBuffers {
                 // By value, not `inout`. This is `DataCache.Buffer.writeBuffer`, which reads
-                // through `getBytes()` and leaves the argument's cursor alone, not the draining
+                // through `getData()` and leaves the argument's cursor alone, not the draining
                 // `Internals.Buffer.writeBuffer(_:)`.
                 await cacheBuffer.writeBuffer(buffer)
 
