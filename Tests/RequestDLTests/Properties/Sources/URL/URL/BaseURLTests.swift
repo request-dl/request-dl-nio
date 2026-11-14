@@ -234,6 +234,49 @@ struct BaseURLTests {
         }
     }
 
+    /// `?` and `#` end the authority of a URL: `"attacker.com#.good.com"` passes a caller's
+    /// `hasSuffix(".good.com")` check, but the request goes to `attacker.com`, and whatever
+    /// `Path`/`Query` comes after is dropped or shifted into the query/fragment.
+    @Test(
+        arguments: [
+            "attacker.com#.good.com",
+            "attacker.com?x=.good.com",
+            "127.0.0.1:8080#.good.com",
+            "apple.com\\evil.com",
+            "apple.com evil.com",
+            "apple.com\tevil.com",
+            "apple.com\nevil.com",
+            "apple.com\u{0}evil.com",
+            "apple.com\u{7F}",
+        ]
+    )
+    func url_whenHostCarriesAuthorityTerminatorsOrWhitespace_throwsUnexpectedHost(host: String) async throws {
+        do {
+            // When
+            _ = try await resolve(
+                TestProperty {
+                    BaseURL(host)
+                }
+            )
+
+            // Then
+            Issue.record("Not expecting success for \(host.debugDescription)")
+        } catch let error as BaseURLError {
+            #expect(error.context == .unexpectedHost)
+        } catch {
+            throw error
+        }
+    }
+
+    @Test
+    func url_whenHostCarriesAPort_stillResolves() async throws {
+        // When
+        let resolved = try await resolve(BaseURL(.http, host: "127.0.0.1:8080"))
+
+        // Then
+        #expect(resolved.requestConfiguration.url == "http://127.0.0.1:8080")
+    }
+
     @Test
     func neverBody() async throws {
         // Given
