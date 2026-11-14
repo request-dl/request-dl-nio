@@ -233,28 +233,7 @@ extension ResolveTests {
         """
     }
 
-    /// `pskHint`/`keyLogger`/`pskIdentityResolver` only exist on `Internals.SecureConnection`
-    /// under `canImport(NIOCore)` (see that type's own gating), so its debug description omits
-    /// those three lines entirely under `--disable-default-traits`. Rather than duplicate this
-    /// whole fixture for the two cases, the literal below always includes them and this strips
-    /// the matching lines back out when they won't actually appear.
     static var secureConnectionOutput: String {
-        let full = Self.secureConnectionOutputWithEveryField
-        #if canImport(NIOCore)
-        return full
-        #else
-        return
-            full
-            .split(separator: "\n", omittingEmptySubsequences: false)
-            .filter { line in
-                !["pskHint = nil,", "keyLogger = nil,", "pskIdentityResolver = nil,"]
-                    .contains { line.contains($0) }
-            }
-            .joined(separator: "\n")
-        #endif
-    }
-
-    private static var secureConnectionOutputWithEveryField: String {
         """
         Resolve {
             ChildrenNode {
@@ -270,31 +249,8 @@ extension ResolveTests {
                     property = SecureConnectionNode {
                         source = Source.node(
                             Node {
-                                secureConnection = SecureConnection {
-                                    certificateChain = nil,
-                                    certificateVerification = nil,
-                                    useDefaultTrustRoots = false,
-                                    trustRoots = nil,
-                                    additionalTrustRoots = nil,
-                                    tlsPinningPolicy = nil,
-                                    tlsPins = nil,
-                                    revocationPolicy = nil,
-                                    trustDecisionObserver = nil,
-                                    privateKey = nil,
-                                    signingSignatureAlgorithms = nil,
-                                    verifySignatureAlgorithms = nil,
-                                    sendCANameList = nil,
-                                    renegotiationSupport = nil,
-                                    shutdownTimeout = nil,
-                                    pskHint = nil,
-                                    applicationProtocols = nil,
-                                    keyLogger = nil,
-                                    pskIdentityResolver = nil,
-                                    minimumTLSVersion = nil,
-                                    maximumTLSVersion = nil,
-                                    cipherSuites = nil,
-                                    cipherSuiteValues = nil
-                                },
+                                mode = .merging,
+                                edits = [],
                                 nodes = [
                                     LeafNode<SecureConnectionNode> {
                                         property = SecureConnectionNode {

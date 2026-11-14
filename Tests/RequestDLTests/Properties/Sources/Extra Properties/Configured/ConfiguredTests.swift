@@ -1040,6 +1040,34 @@ struct ConfiguredTests {
         )
     }
 
+    /// `Configured` declares the TLS version through a `SecureConnection` after the pins. That
+    /// wrapper used to replace everything declared before it, so a configuration that set both
+    /// silently ran without its pins.
+    @Test
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func secureConnectionSPKIPinningSurvivesTheTLSVersion() async throws {
+        // Given
+        let pin = makeValidPin()
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "secureConnection.spkiPinning.pins": .init(.stringArray([pin]), isSecret: false),
+                "secureConnection.tlsMinimumVersion": "1.2",
+            ])
+        )
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                Configured(reader)
+            }
+        )
+
+        // Then
+        let secureConnection = try #require(resolved.session.configuration.secureConnection)
+        #expect(secureConnection.tlsPins == [.init(source: .base64String(pin), algorithm: SHA256.self)])
+        #expect(secureConnection.minimumTLSVersion == TLSVersion.v1_2.build())
+    }
+
     @Test
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func emptySPKIPinningPinsThrows() async throws {

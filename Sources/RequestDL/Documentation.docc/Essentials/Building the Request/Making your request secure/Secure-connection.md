@@ -22,6 +22,21 @@ As supported by SwiftNIO, we have the following definitions:
 
 > Note: ``RequestDL/TrustRoots``, ``RequestDL/DefaultTrustRoots``, ``RequestDL/AdditionalTrustRoots``, ``RequestDL/Certificates``, ``RequestDL/PrivateKey``, ``RequestDL/PSKIdentity``, and ``RequestDL/SPKIPinning`` can each be declared on their own — RequestDL creates the underlying secure connection configuration automatically the first time one of them is resolved. Wrap them in ``RequestDL/SecureConnection`` only when you also need to configure a setting that lives directly on it, such as the TLS version range or cipher suites (see "TLS settings" below).
 
+> Important: **Behavior change.** A ``RequestDL/SecureConnection`` used to replace everything declared before it, silently dropping, for example, an ``RequestDL/SPKIPinning`` or a ``RequestDL/TrustRoots``. It now builds on top of what was declared before it (``RequestDL/SecureConnectionMode/merging``, the default): pins, trust roots, client certificates and the rest are kept, and only what the ``RequestDL/SecureConnection`` itself configures is applied over them, winning over the same setting declared before. To get the previous behavior, write ``RequestDL/SecureConnection/init(_:)`` with ``RequestDL/SecureConnectionMode/override``.
+> ```swift
+> SPKIPinning {
+>     SPKIHash("base64-active-pin")
+> }
+>
+> // The pins above are kept, and the minimum TLS version is added.
+> SecureConnection()
+>     .version(minimum: .v1_3)
+>
+> // Starts over: the pins above are discarded.
+> SecureConnection(.override)
+>     .version(minimum: .v1_3)
+> ```
+
 ### SPKI Pinning
 
 SPKI (SubjectPublicKeyInfo) pinning provides defense-in-depth security beyond standard certificate validation. By pinning the cryptographic hash of the server's public key structure, you ensure connections only succeed with certificates containing the exact expected public key — even if a compromised Certificate Authority issues a fraudulent certificate.
@@ -183,6 +198,7 @@ Although ``RequestDL/Property/body-swift.property`` executes per request, Reques
 - ``RequestDL/SSLPSKIdentityResolver``
 
 ### TLS configuration
+- ``RequestDL/SecureConnectionMode``
 - ``RequestDL/SecureConnection``
 - ``RequestDL/TLSVersion``
 - ``RequestDL/TLSCipher``
