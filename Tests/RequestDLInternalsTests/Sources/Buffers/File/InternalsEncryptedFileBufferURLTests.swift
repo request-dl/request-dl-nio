@@ -46,14 +46,12 @@ struct InternalsEncryptedFileBufferURLTests {
     /// `plaintextSize(fromRawSize:)`'s own doc comment), unlike the test above, whose body
     /// divides evenly into `chunkPlaintextSize` but still carries a genuine empty final chunk's
     /// 16-byte tag on top. It is what a writer that flushed full intermediate chunks and then
-    /// crashed before `close()` ran leaves behind. `plaintextSize(fromRawSize:)` must not treat
-    /// the last of those on-disk chunks as a genuine, `isLast`-flagged final chunk, which would
-    /// over-report by a full `chunkPlaintextSize`. That matters because
-    /// `Internals.CacheControl.isCachedDataValid` compares this exact value against the origin's
-    /// `Content-Length` to decide whether a cache entry is complete, so an inflated size could
-    /// make a truncated cache entry look complete.
+    /// crashed before `close()` ran leaves behind. It has no authenticated final chunk, so none of
+    /// its chunks may be reported as readable: each verifies on its own, and a size that counted
+    /// them would let `Internals.CacheControl.isCachedDataValid` take the truncated entry for a
+    /// complete one when its `Content-Length` happens to match.
     @Test
-    func writtenBytes_whenBodyIsExactMultipleOfChunkOnDiskSize_reportsOnlyTheGenuinelyReadableChunks() async throws {
+    func writtenBytes_whenBodyIsExactMultipleOfChunkOnDiskSize_reportsNothingReadable() async throws {
         try await withTemporaryFileURL("encrypted.bin") { fileURL in
             let chunkPlaintextSize = Internals.EncryptedFileStreamBuffer.chunkPlaintextSize
             let url = Internals.EncryptedFileBufferURL(inner: .init(fileURL), key: .init(size: .bits256))
@@ -79,12 +77,9 @@ struct InternalsEncryptedFileBufferURLTests {
             raw.removeLast(tagSize)
             try raw.write(to: fileURL)
 
-            // Then: only the first two chunks are genuinely readable. The third sits exactly at the
-            // truncated file's end, so it gets misread as the final chunk (`isLast: true`) even
-            // though it was sealed as `isLast: false`, and its own tag check would fail were it
-            // ever attempted, so its `chunkPlaintextSize` bytes must not be counted.
+            // Then: nothing is readable, since the file ends without an `isLast` chunk.
             let plaintextSize = await url.writtenBytes
-            #expect(plaintextSize == chunkPlaintextSize * 2)
+            #expect(plaintextSize == 0)
         }
     }
 
