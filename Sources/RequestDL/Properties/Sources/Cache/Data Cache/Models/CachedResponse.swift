@@ -33,11 +33,12 @@ struct CachedResponse: Sendable, Codable, Hashable {
     init(
         response: Internals.ResponseHead,
         policy: DataCache.Policy.Set,
-        varyRequestHeaders: [String: String]? = nil
+        varyRequestHeaders: [String: String]? = nil,
+        date: Date = Date()
     ) {
         self.response = response
         self.policy = policy
-        self.date = Date()
+        self.date = date
         self.varyRequestHeaders = varyRequestHeaders
     }
 }

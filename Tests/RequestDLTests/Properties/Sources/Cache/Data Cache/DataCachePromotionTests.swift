@@ -189,9 +189,10 @@ struct DataCachePromotionTests {
     func promotion_whenTheKeyIsRevalidatedMeanwhile_isNotKept() async {
         let (dataCache, key) = makeCache()
         let stored = keyInStorage(key, in: dataCache)
+        let revalidated = response(key, policy: [.memory, .disk])
 
         #expect(dataCache.storage.beginPromotion(key: stored))
-        await dataCache.updateCached(key: key, cachedResponse: response(key, policy: [.memory, .disk]))
+        await dataCache.updateCached(key: key, cachedResponse: revalidated, expecting: revalidated)
 
         #expect(finish(stored, in: dataCache) == false)
     }
