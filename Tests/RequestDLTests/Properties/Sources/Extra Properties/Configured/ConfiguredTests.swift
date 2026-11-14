@@ -12,10 +12,17 @@ import Testing
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
+import struct Foundation.Data
 import struct Foundation.UUID
 #endif
 
 struct ConfiguredTests {
+
+    /// A well-formed SHA-256 SPKI pin (32 random bytes, Base64). `SPKIPinning` rejects a pin that
+    /// doesn't decode to a digest of the algorithm's size, so a UUID string won't do.
+    private func makeValidPin() -> String {
+        Data((0..<32).map { _ in UInt8.random(in: .min ... .max) }).base64EncodedString()
+    }
 
     @Test
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
@@ -979,8 +986,8 @@ struct ConfiguredTests {
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func secureConnectionSPKIPinningDefaultsToStrictPolicy() async throws {
         // Given
-        let pin1 = UUID().uuidString
-        let pin2 = UUID().uuidString
+        let pin1 = makeValidPin()
+        let pin2 = makeValidPin()
         let reader = ConfigReader(
             provider: InMemoryProvider(values: [
                 "secureConnection.spkiPinning.pins": .init(.stringArray([pin1, pin2]), isSecret: false)
@@ -1009,7 +1016,7 @@ struct ConfiguredTests {
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func secureConnectionSPKIPinningWithAuditPolicy() async throws {
         // Given
-        let pin = UUID().uuidString
+        let pin = makeValidPin()
         let reader = ConfigReader(
             provider: InMemoryProvider(values: [
                 "secureConnection.spkiPinning.pins": .init(.stringArray([pin]), isSecret: false),

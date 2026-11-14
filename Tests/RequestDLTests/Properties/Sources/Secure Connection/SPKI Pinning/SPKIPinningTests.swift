@@ -106,6 +106,40 @@ struct SPKIPinningTests {
     /// through `SPKIHash`'s own `_makeProperty`, so a loose `SPKIHash` declared anywhere else
     /// (even directly inside `SecureConnection`, with no enclosing `SPKIPinning` at all) would
     /// silently contribute nothing, with no diagnostic.
+    /// An undecodable pin can never match. Only `.urlSession` used to say so; the NIO executors
+    /// treated it as "no match", so a mistyped backup pin looked fine until the certificate
+    /// rotated. It's rejected at resolve time now, whatever the executor.
+    @Test
+    func pinning_whenAPinIsNotValidBase64_throws() async throws {
+        await #expect(throws: Internals.SPKIHashError.self) {
+            _ = try await resolve(
+                TestProperty {
+                    SecureConnection {
+                        SPKIPinning {
+                            SPKIHash("not base64!")
+                        }
+                    }
+                }
+            )
+        }
+    }
+
+    @Test
+    func pinning_whenAPinHasTheWrongDigestLength_throws() async throws {
+        await #expect(throws: Internals.SPKIHashError.self) {
+            _ = try await resolve(
+                TestProperty {
+                    SecureConnection {
+                        SPKIPinning {
+                            // A SHA-256 digest (32 bytes) declared as SHA-384 (48 bytes).
+                            SPKIHash(Data(repeating: 0x1, count: 32).base64EncodedString(), algorithm: SHA384.self)
+                        }
+                    }
+                }
+            )
+        }
+    }
+
     @Test
     func hash_whenDeclaredOutsideSPKIPinning_hasNoEffect() async throws {
         // Given

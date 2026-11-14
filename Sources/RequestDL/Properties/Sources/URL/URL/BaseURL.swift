@@ -59,7 +59,20 @@ public struct BaseURL: Property {
             // of using `Path`) is rejected, rather than silently truncated to its leading component
             // (`"apple.com/api/v1"` → `"apple.com"`), which would send a different request than the
             // one written. An empty host is rejected the same way.
-            guard !host.isEmpty, !host.contains("/") else {
+            //
+            // The same goes for the characters that end the authority part of a URL, or that a
+            // URL parser treats as one: `?` and `#` (`"attacker.com#.good.com"` would validate
+            // as a `.good.com` host in the caller, then send the request to `attacker.com`, with
+            // whatever `Path`/`Query` follows silently dropped or shifted into the fragment or
+            // query), a backslash (read as `/` by some parsers), and whitespace or control
+            // characters.
+            guard
+                !host.isEmpty,
+                !host.contains(where: { $0 == "/" || $0 == "?" || $0 == "#" || $0 == "\\" }),
+                !host.unicodeScalars.contains(where: {
+                    $0.properties.isWhitespace || $0.value < 0x20 || $0.value == 0x7F
+                })
+            else {
                 throw BaseURLError(
                     context: .unexpectedHost,
                     baseURL: URLUserInfo.redacting(host: host)
