@@ -712,8 +712,15 @@ struct DiskStorage: Sendable {
     ) async -> (buffer: Internals.AnyBuffer?, usage: Int64?, recordURL: URL?) {
         guard let response = try? JSONEncoder().encode(cachedResponse) else { return (nil, nil, nil) }
 
-        let writableBytes = Int64(response.count) + contentLength
-        guard writableBytes <= maximumCapacity else { return (nil, nil, nil) }
+        // `contentLength` comes from a response's `Content-Length`, which a server controls, so
+        // it can be as large as `Int64.max`. A plain `+` would trap and take the process down;
+        // an overflowing (or negative) hint simply cannot fit, so the entry is turned down.
+        guard
+            contentLength >= 0,
+            case let (writableBytes, overflow) = Int64(response.count).addingReportingOverflow(contentLength),
+            !overflow,
+            writableBytes <= maximumCapacity
+        else { return (nil, nil, nil) }
 
         let usageAfterEviction = await freeSpace(
             maximumCapacity - writableBytes,

@@ -79,6 +79,30 @@ struct DiskStorageTests {
         fatalError("unreachable: the loop above always returns or throws on its last attempt")
     }
 
+    /// A `Content-Length` is whatever the server says it is. A value near `Int64.max` used to
+    /// overflow the `response.count + contentLength` sum in `allocateBuffer` and trap, taking the
+    /// whole process down; it has to be turned down like any other entry that doesn't fit.
+    @Test(arguments: [Int64.max, Int64.max - 1, -1, Int64.min])
+    func diskStorage_whenContentLengthOverflowsOrIsNegative_turnsTheEntryDownWithoutTrapping(
+        contentLength: Int64
+    ) async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            let storage = DiskStorage(directory: directoryURL)
+
+            let (buffer, usage, recordURL) = await storage.allocateBuffer(
+                key: "k1",
+                cachedResponse: makeCachedResponse(key: "k1"),
+                contentLength: contentLength,
+                maximumCapacity: .max
+            )
+
+            #expect(buffer == nil)
+            #expect(usage == nil)
+            #expect(recordURL == nil)
+            #expect(await storage["k1"] == nil)
+        }
+    }
+
     @Test
     func diskStorage_whenFreeingSpaceBelowTotalUsage_shouldEvictOnlyTheOldestEntries() async throws {
         try await withTemporaryFileURL(createPath: false) { directoryURL in

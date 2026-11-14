@@ -30,6 +30,16 @@ public struct SPKIPinning<Content: Property>: Property {
         let nodes: [LeafNode<SPKIHashNode>]
 
         func make(_ secureConnection: inout Internals.SecureConnection) throws {
+            // A pin whose digest doesn't decode (a typo in the Base64, or a digest of the wrong
+            // length for its algorithm) can never match. The NIO executors would swallow that as
+            // "no match" and the `.urlSession` executor throws, so it's rejected here, once, for
+            // all of them: otherwise a mistyped backup pin only shows up as a lockout when the
+            // certificate rotates, and a policy whose pins are all invalid either blocks every
+            // connection (`.strict`) or lets every one through unnoticed (`.audit`).
+            for node in nodes {
+                _ = try node.hash.resolvedDigest()
+            }
+
             secureConnection.tlsPinningPolicy = policy.build()
             secureConnection.tlsPins = nodes.map(\.hash)
         }
