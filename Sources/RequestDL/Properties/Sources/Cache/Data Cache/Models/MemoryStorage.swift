@@ -108,12 +108,20 @@ struct MemoryStorage: Sendable {
         }
     }
 
+    /// Replaces the response a record stores, keeping its body, but only when the record is still
+    /// the one `expected` describes.
+    ///
+    /// A revalidation spans a round trip to the server, and in that time the key can be written
+    /// again by a request that did not match what was stored (another account, say). Updating
+    /// whatever sits at `key` then would give the new body the old record's response, and its
+    /// credential digests with it.
     mutating func updateCached(
         key: String,
         cachedResponse: CachedResponse,
+        expecting expected: CachedResponse,
         maximumCapacity: Int64
     ) {
-        guard let record = records[key] else {
+        guard let record = records[key], record.cachedResponse == expected else {
             return
         }
 

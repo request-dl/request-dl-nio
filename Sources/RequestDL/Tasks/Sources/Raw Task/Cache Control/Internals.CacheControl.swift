@@ -491,10 +491,12 @@ extension Internals {
                 with: headers
             )
 
-            guard modifiedHeaders != cachedData.response.headers else {
-                return cachedData
-            }
-
+            // Written back whether or not a header changed. What revalidating confirms is that
+            // the stored response is current as of now (RFC 9111 §4.3.4), and that is carried by
+            // `CachedResponse.date`, which a server repeating the same `Cache-Control` leaves
+            // looking just as old as it was: skipping the write kept the entry stale, removed it
+            // on the next look and sent the request to the network after all, a conditional
+            // request and a full download per use.
             let cachedResponse = updateCachedResponse(
                 cachedData.cachedResponse,
                 with: modifiedHeaders
@@ -502,13 +504,27 @@ extension Internals {
 
             await dataCache.updateCached(
                 key: requestConfiguration.url,
-                cachedResponse: cachedResponse
+                cachedResponse: cachedResponse,
+                expecting: cachedData.cachedResponse
             )
 
-            return await dataCache.getCachedData(
-                forKey: requestConfiguration.url,
-                policy: requestConfiguration.cachePolicy
-            )
+            // What is stored now has to be what was just written. The conditional request is a
+            // round trip, and the key can be written meanwhile by a request that did not match
+            // this entry (another account, a different `Vary`): that record is not what was
+            // confirmed, and is handed to no one on the strength of this response. It is checked
+            // against this request again for the same reason, since nothing above did.
+            guard
+                let updated = await dataCache.getCachedData(
+                    forKey: requestConfiguration.url,
+                    policy: requestConfiguration.cachePolicy
+                ),
+                updated.cachedResponse == cachedResponse,
+                matchesVary(of: updated.cachedResponse)
+            else {
+                return nil
+            }
+
+            return updated
         }
 
         private func getUpdatedHeadersForCache(
@@ -628,6 +644,16 @@ extension Internals {
 
             replaceHeader(&merged, with: newHeaders, for: "Cache-Control")
             replaceHeader(&merged, with: newHeaders, for: "Expires")
+
+            // `Age` is how old the response already was when it was received, counted from there
+            // on. What was just confirmed is as old as this response says, which is no age at all
+            // when it carries none. Left in place, the one the stored response arrived with would
+            // be added to the age of an entry whose clock has just restarted.
+            merged.remove(name: "Age")
+
+            for value in newHeaders["Age"] ?? [] {
+                merged.add(name: "Age", value: value)
+            }
 
             return merged
         }
@@ -854,20 +880,37 @@ extension Internals {
                 return false
             }
 
-            if let expiresDate = expiresDate(headers: headers["Expires"] ?? []) {
-                if expiresDate < Date() {
+            // A freshness value that is there and cannot be read is a stale response, not a
+            // missing value (RFC 9111 §4.2.1, §5.3): ignoring it kept the entry fresh for as long
+            // as the other directive said, or for ever when there was none, and `Expires: 0` is
+            // what servers send to say "already expired".
+            let expires = headers["Expires"] ?? []
+
+            if !expires.isEmpty {
+                guard let expiresDate = expiresDate(headers: expires), expiresDate >= Date() else {
                     return false
                 }
             }
 
-            if let maxAge = maxAgeSeconds(headers: headers["Cache-Control"] ?? []) {
-                // `>= .zero`, not `> .zero`: `max-age=0` is a valid, common directive ("cacheable,
-                // but revalidate before every reuse") and must make the entry immediately stale,
-                // not skip this check entirely. A negative value is malformed and still ignored,
-                // same as before.
+            switch maxAgeSeconds(headers: headers["Cache-Control"] ?? []) {
+            case .absent:
+                break
+
+            case .invalid:
+                return false
+
+            case .seconds(let maxAge):
+                // `>= .zero` is implied by `.seconds`: `max-age=0` is a valid, common directive
+                // ("cacheable, but revalidate before every reuse") and has to make the entry
+                // immediately stale, not skip this check entirely.
+                //
+                // The age the response had when it was received counts too (RFC 9111 §4.2.3): a
+                // CDN that sends `Age: 3500` with `max-age=3600` has 100 seconds left, not 3600.
                 //
                 // `Double`, not `TimeInterval`. Same type, one fewer Foundation import.
-                if maxAge >= .zero, cachedData.cachedResponse.date.advanced(by: Double(maxAge)) < Date() {
+                let age = Double(ageSeconds(headers: headers["Age"] ?? []))
+
+                if cachedData.cachedResponse.date.advanced(by: Double(maxAge) - age) < Date() {
                     return false
                 }
             }
@@ -908,7 +951,12 @@ extension Internals {
                 .max()
         }
 
-        /// The latest `Expires` date across the given values.
+        /// The earliest `Expires` date across the given values, `nil` when any of them is not a
+        /// date.
+        ///
+        /// The caller reads `nil` as already expired: an `Expires` that cannot be read (`0`, `-1`,
+        /// an empty value) is how servers say so, and RFC 9111 §5.3 says to take it that way.
+        /// Duplicates give the earliest, the one that makes the entry stale soonest.
         ///
         /// - Important: Must not run through ``directives(_:)``. An HTTP date contains a comma
         /// of its own, right after the day name, so splitting the value on commas tears
@@ -917,30 +965,84 @@ extension Internals {
         /// is not a fix, since `Expires` is a single date, not a list, and splitting is never
         /// appropriate here.
         private func expiresDate(headers: [String]) -> Date? {
-            headers
-                .compactMap { Date(httpDate: $0.trimming(where: \.isWhitespace)) }
-                .max()
+            var earliest: Date?
+
+            for header in headers {
+                guard let date = Date(httpDate: header.trimming(where: \.isWhitespace)) else {
+                    return nil
+                }
+
+                earliest = min(earliest ?? date, date)
+            }
+
+            return earliest
         }
 
-        /// The largest `max-age` across the given directives.
+        /// What a response says of its `max-age`.
+        private enum MaxAge {
+            case absent
+            /// A `max-age` directive whose value is not a number of seconds.
+            case invalid
+            case seconds(Int)
+        }
+
+        /// The `max-age` across the given directives: the smallest when there are several, and
+        /// invalid when any of them is.
         ///
         /// - Note: Matches the directive name exactly. It used `range(of:options:)`, which is a
         /// Foundation member this file has no import for, and which searches anywhere in the
         /// string, so `s-maxage` and any vendor directive ending in `max-age` were read as one.
-        private func maxAgeSeconds(headers: [String]) -> Int? {
-            directives(headers)
-                .compactMap { directive -> Int? in
-                    let parts = directive.split(separator: "=", maxSplits: 1)
+        private func maxAgeSeconds(headers: [String]) -> MaxAge {
+            var result = MaxAge.absent
 
-                    guard
-                        parts.count == 2,
-                        parts[0].trimming(where: \.isWhitespace).lowercased() == "max-age"
-                    else { return nil }
+            for directive in directives(headers) {
+                let parts = directive.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
 
-                    return Int(parts[1].trimming(where: \.isWhitespace))
+                guard parts[0].trimming(where: \.isWhitespace).lowercased() == "max-age" else {
+                    continue
                 }
-                .max()
+
+                guard parts.count == 2, let seconds = Self.deltaSeconds(String(parts[1])) else {
+                    return .invalid
+                }
+
+                if case .seconds(let current) = result {
+                    result = .seconds(min(current, seconds))
+                } else {
+                    result = .seconds(seconds)
+                }
+            }
+
+            return result
         }
+
+        /// The greatest `Age` across the given values, `0` for those that are not a number of
+        /// seconds: an `Age` that cannot be read is no better a reason to hold an entry fresh than
+        /// to drop it, and the freshness directives decide that.
+        private func ageSeconds(headers: [String]) -> Int {
+            headers
+                .compactMap { Self.deltaSeconds($0) }
+                .max() ?? 0
+        }
+
+        /// What RFC 9111 §1.2.2 calls `delta-seconds`: digits only, optionally in quotes, which a
+        /// recipient ought to accept. A value too large for an `Int` reads as 2^31, as the RFC
+        /// says, which is already more than a cache keeps anything for.
+        private static func deltaSeconds(_ value: String) -> Int? {
+            var digits = value.trimming(where: \.isWhitespace)
+
+            if digits.count >= 2, digits.hasPrefix("\""), digits.hasSuffix("\"") {
+                digits = String(digits.dropFirst().dropLast())
+            }
+
+            guard !digits.isEmpty, digits.utf8.allSatisfy({ $0 >= 0x30 && $0 <= 0x39 }) else {
+                return nil
+            }
+
+            return min(Int(digits) ?? Self.largestDeltaSeconds, Self.largestDeltaSeconds)
+        }
+
+        private static let largestDeltaSeconds = 2_147_483_648
 
         /// Flattens header values into individual directives.
         ///

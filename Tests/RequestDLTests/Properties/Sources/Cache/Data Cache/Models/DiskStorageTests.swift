@@ -2,9 +2,12 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Crypto
 import RequestDLInternals
 import SwiftAsyncStream
 import Testing
+
+import class Foundation.FileManager
 
 @testable import RequestDL
 @testable import RequestDLTestSupport
@@ -19,7 +22,6 @@ import class Foundation.JSONEncoder
 #endif
 
 #if canImport(Darwin)
-import class Foundation.FileManager
 import struct Foundation.FileProtectionType
 #endif
 
@@ -684,6 +686,92 @@ struct DiskStorageTests {
         }
     }
 
+    /// The record of one key, copied under the name of another: what anyone who can write the
+    /// directory can do. Authentic as far as the encryption goes, but it is not the other key's.
+    @Test
+    func subscript_whenAnEncryptedRecordIsCopiedUnderAnotherKey_missesInsteadOfAnsweringForIt() async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            var storage = DiskStorage(directory: directoryURL)
+            storage.encryptionKey = .init(Data(repeating: 0x07, count: 32))
+
+            var (buffer, _, _) = await storage.allocateBuffer(
+                key: "k1",
+                cachedResponse: makeCachedResponse(key: "k1"),
+                contentLength: 5,
+                maximumCapacity: .max
+            )
+            await buffer?.writeData(Data("hello".utf8))
+            try? await buffer?.close()
+            #expect(await storage["k1"] != nil)
+
+            // When: the directory is copied to a name that says it is k2's.
+            let source = try await encryptedRecordDirectoryURL(in: directoryURL)
+            let copy = directoryURL.appendingPathComponent(
+                source.lastPathComponent.replacingKey("k1", with: "k2"),
+                isDirectory: true
+            )
+
+            try FileManager.default.copyItem(at: source, to: copy)
+
+            // Then: k2 is a miss, through a storage that has not seen either (a new launch)...
+            var reopened = DiskStorage(directory: directoryURL)
+            reopened.encryptionKey = storage.encryptionKey
+
+            #expect(await reopened["k2"] == nil)
+
+            // ...and k1 still answers for itself.
+            #expect(await reopened["k1"] != nil)
+        }
+    }
+
+    /// A record written before the key was part of what authenticates it, in the format the cache
+    /// had until then: it does not open, which is a miss, and the entry that replaces it does.
+    @Test
+    func subscript_whenAnEncryptedRecordWasWrittenWithoutTheKeyBound_missesAndIsReplaced() async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            var storage = DiskStorage(directory: directoryURL)
+            let encryptionKey = DataCache.EncryptionKey(Data(repeating: 0x08, count: 32))
+            storage.encryptionKey = encryptionKey
+
+            let response = makeCachedResponse(key: "k1")
+
+            var (buffer, _, _) = await storage.allocateBuffer(
+                key: "k1",
+                cachedResponse: response,
+                contentLength: 5,
+                maximumCapacity: .max
+            )
+            await buffer?.writeData(Data("hello".utf8))
+            try? await buffer?.close()
+
+            // Given: the response record as an earlier version wrote it, with no associated data.
+            let recordURL = try await encryptedRecordDirectoryURL(in: directoryURL)
+            let responseURL = recordURL.appendingPathComponent("response.record")
+            let legacy = try AES.GCM.seal(
+                try JSONEncoder().encode(response),
+                using: encryptionKey.symmetricKey
+            ).combined
+
+            try #require(legacy).write(to: responseURL)
+
+            // Then: a miss, not a crash.
+            #expect(await storage["k1"] == nil)
+
+            // And a write for the key replaces it.
+            var (replacement, _, _) = await storage.allocateBuffer(
+                key: "k1",
+                cachedResponse: makeCachedResponse(key: "k1"),
+                contentLength: 3,
+                maximumCapacity: .max
+            )
+            await replacement?.writeData(Data("new".utf8))
+            try? await replacement?.close()
+
+            let cachedData = await storage["k1"]
+            #expect(await cachedData?.buffer.getData() == Data("new".utf8))
+        }
+    }
+
     @Test
     func subscript_whenResponseRecordCorrupted_shouldMissRatherThanCrash() async throws {
         try await withTemporaryFileURL(createPath: false) { directoryURL in
@@ -1221,4 +1309,15 @@ struct DiskStorageTests {
         }
     }
     #endif
+}
+
+extension String {
+
+    /// `self` with `key`, the part of a record directory's name between its date and its
+    /// extension, replaced by `other`.
+    fileprivate func replacingKey(_ key: String, with other: String) -> String {
+        split(separator: ".", omittingEmptySubsequences: false)
+            .map { $0 == key ? other : String($0) }
+            .joined(separator: ".")
+    }
 }
