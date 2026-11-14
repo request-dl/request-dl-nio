@@ -1382,11 +1382,16 @@ extension Internals.URLSessionClient {
         /// follow is not itself a failure.
         ///
         /// Both `.follow` and `.strategy` strip `Authorization`/`Cookie`/`Origin`/
-        /// `Proxy-Authorization` from `request` when it no longer shares the previously sent
-        /// request's origin (scheme, host, and port). `URLSession` does not do this on its own
-        /// (it only ever removes `Authorization`, on every redirect), unlike the NIO executor's
+        /// `Proxy-Authorization`, and an explicit `Host`, from `request` when it no longer shares
+        /// the previously sent request's origin (scheme, host, and port); see
+        /// ``Internals/RedirectSanitizer``. `URLSession` does not do this on its own (it only ever
+        /// removes `Authorization`, on every redirect), unlike the NIO executor's
         /// `followingRedirect`/`transformRequestForRedirect`, which this mirrors so a redirect
         /// leaking credentials to a different host fails the same way under either transport.
+        ///
+        /// `.strategy` strips twice: before the strategy sees the candidate request, and again on
+        /// what the strategy answers with, which can be a URL on yet another origin than the
+        /// candidate's own, with headers the strategy copied from somewhere else.
         func urlSession(
             _ session: URLSession,
             task: URLSessionTask,
@@ -1461,7 +1466,11 @@ extension Internals.URLSessionClient {
                     let newRequest: URLRequest
 
                     do {
-                        newRequest = try sanitizedRequest.applyingRedirectDecision(redirectRequest)
+                        // Sanitized again, against the same previous hop: the strategy may have
+                        // answered with a URL on another origin than the candidate's.
+                        newRequest = try sanitizedForRedirect(
+                            sanitizedRequest.applyingRedirectDecision(redirectRequest)
+                        )
                     } catch {
                         lock.withLock { _redirectError = error }
                         completionHandler(nil)
@@ -1515,7 +1524,7 @@ extension Internals.URLSessionClient {
             }
         }
 
-        /// Strips `Authorization`/`Cookie`/`Origin`/`Proxy-Authorization` from `request` when it
+        /// Strips ``Internals/RedirectSanitizer/crossOriginHeaders`` from `request` when it
         /// no longer shares `_lastRequest`'s origin. See the doc comment on
         /// `urlSession(_:task:willPerformHTTPRedirection:newRequest:completionHandler:)`.
         private func sanitizedForRedirect(_ request: URLRequest) -> URLRequest {
@@ -1530,7 +1539,7 @@ extension Internals.URLSessionClient {
             }
 
             var sanitized = request
-            for header in ["Origin", "Cookie", "Authorization", "Proxy-Authorization"] {
+            for header in Internals.RedirectSanitizer.crossOriginHeaders {
                 sanitized.setValue(nil, forHTTPHeaderField: header)
             }
             return sanitized

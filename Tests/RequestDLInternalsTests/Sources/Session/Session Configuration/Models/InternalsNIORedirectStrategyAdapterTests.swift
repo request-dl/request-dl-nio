@@ -120,6 +120,152 @@ struct InternalsNIORedirectStrategyAdapterTests {
             try adapter.redirectDecision(for: context)
         }
     }
+
+    // MARK: - Cross-origin headers
+
+    @Test
+    func redirectDecision_whenRedirectLeavesTheOrigin_doesNotHandTheStrategyAHostHeader() throws {
+        // Given: AsyncHTTPClient strips the credentials for another origin, but not `Host`.
+        var candidateRequest = HTTPClientRequest(url: "https://other.example.com/redirected")
+        candidateRequest.headers = ["Host": "api.internal", "X-Original": "kept"]
+
+        let strategy = RecordingStrategy { context in .follow(context.redirectRequest) }
+        let adapter = Internals.NIORedirectStrategyAdapter(strategy: strategy)
+
+        // When
+        let decision = try adapter.redirectDecision(
+            for: context(candidateRequest, from: "https://example.com/original")
+        )
+
+        // Then
+        let seenHeaders = try #require(strategy.seenContext).redirectRequest.headers
+        #expect(!seenHeaders.contains(name: "Host"))
+        #expect(seenHeaders.first(name: "X-Original") == "kept")
+
+        guard case .follow(let resultingRequest) = decision else {
+            Issue.record("Expected .follow, got \(decision)")
+            return
+        }
+
+        #expect(!resultingRequest.headers.contains(name: "Host"))
+    }
+
+    @Test
+    func redirectDecision_whenRedirectStaysOnTheOrigin_keepsTheHostHeader() throws {
+        // Given
+        var candidateRequest = HTTPClientRequest(url: "https://example.com/redirected")
+        candidateRequest.headers = ["Host": "api.internal", "Cookie": "session=abc"]
+
+        let strategy = RecordingStrategy { context in .follow(context.redirectRequest) }
+        let adapter = Internals.NIORedirectStrategyAdapter(strategy: strategy)
+
+        // When
+        let decision = try adapter.redirectDecision(
+            for: context(candidateRequest, from: "https://example.com/original")
+        )
+
+        // Then
+        guard case .follow(let resultingRequest) = decision else {
+            Issue.record("Expected .follow, got \(decision)")
+            return
+        }
+
+        #expect(resultingRequest.headers.first(name: "Host") == "api.internal")
+        #expect(resultingRequest.headers.first(name: "Cookie") == "session=abc")
+    }
+
+    /// The strategy saw a same-origin candidate, `Cookie` and all, and moved it to another origin:
+    /// nothing had checked the URL it answered with.
+    @Test
+    func redirectDecision_whenTheStrategyMovesTheRedirectToAnotherOrigin_stripsWhatDoesNotBelongThere() throws {
+        // Given
+        var candidateRequest = HTTPClientRequest(url: "https://example.com/redirected")
+        candidateRequest.headers = [
+            "Host": "api.internal",
+            "Cookie": "session=abc",
+            "Authorization": "Bearer secret",
+            "Origin": "https://example.com",
+            "Proxy-Authorization": "Basic secret",
+            "X-Custom": "kept",
+        ]
+
+        let strategy = RecordingStrategy { context in
+            var request = context.redirectRequest
+            request.url = "https://other.example.com/moved"
+            return .follow(request)
+        }
+
+        let adapter = Internals.NIORedirectStrategyAdapter(strategy: strategy)
+
+        // When
+        let decision = try adapter.redirectDecision(
+            for: context(candidateRequest, from: "https://example.com/original")
+        )
+
+        // Then
+        let seenHeaders = try #require(strategy.seenContext).redirectRequest.headers
+        #expect(seenHeaders.first(name: "Cookie") == "session=abc")
+
+        guard case .follow(let resultingRequest) = decision else {
+            Issue.record("Expected .follow, got \(decision)")
+            return
+        }
+
+        #expect(resultingRequest.url == "https://other.example.com/moved")
+
+        for name in ["Host", "Cookie", "Authorization", "Origin", "Proxy-Authorization"] {
+            #expect(!resultingRequest.headers.contains(name: name), "\(name) must not follow to another origin")
+        }
+
+        #expect(resultingRequest.headers.first(name: "X-Custom") == "kept")
+    }
+
+    /// A strategy that adds credentials of its own for the origin it sends the request to is the
+    /// one thing this takes away: the rule is on the origin, not on who put the header there.
+    @Test
+    func redirectDecision_whenTheStrategyAddsACredentialForAnotherOrigin_stripsItToo() throws {
+        // Given
+        let strategy = RecordingStrategy { context in
+            var request = context.redirectRequest
+            request.url = "https://other.example.com/moved"
+            request.headers = .init([("Authorization", "Bearer for-other")])
+            return .follow(request)
+        }
+
+        let adapter = Internals.NIORedirectStrategyAdapter(strategy: strategy)
+
+        // When
+        let decision = try adapter.redirectDecision(
+            for: context(
+                HTTPClientRequest(url: "https://example.com/redirected"),
+                from: "https://example.com/original"
+            )
+        )
+
+        // Then
+        guard case .follow(let resultingRequest) = decision else {
+            Issue.record("Expected .follow, got \(decision)")
+            return
+        }
+
+        #expect(!resultingRequest.headers.contains(name: "Authorization"))
+    }
+
+    // MARK: - Private methods
+
+    private func context(_ candidate: HTTPClientRequest, from previousURL: String) -> HTTPClientRedirectContext {
+        HTTPClientRedirectContext(
+            redirectRequest: candidate,
+            response: .init(version: .http1_1, status: .found),
+            history: [
+                HTTPClientRequestResponse(
+                    request: HTTPClientRequest(url: previousURL),
+                    responseHead: .init(version: .http1_1, status: .found)
+                )
+            ],
+            redirectCount: 0
+        )
+    }
 }
 
 // MARK: - Test doubles

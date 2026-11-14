@@ -47,6 +47,11 @@ extension Internals {
             pairs.append((name: Self.strippingCRLF(name), value: Self.strippingCRLF(value)))
         }
 
+        /// Removes every pair stored under `name`, compared case insensitively.
+        package mutating func remove(name: String) {
+            pairs.removeAll { Self.namesEqual($0.name, name) }
+        }
+
         /// The first value stored under `name`, compared case insensitively per RFC 9110 (same
         /// contract as `NIOHTTP1.HTTPHeaders.first(name:)`/`RequestDL.HTTPHeaders.first(name:)`).
         package func first(name: String) -> String? {

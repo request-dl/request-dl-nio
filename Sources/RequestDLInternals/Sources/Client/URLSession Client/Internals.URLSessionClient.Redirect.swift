@@ -54,16 +54,4 @@ extension URLRequest {
     }
 }
 
-extension URL {
-
-    /// Whether `self` and `other` share an origin (scheme, host, and port), per RFC 6454. This
-    /// mirrors `AsyncHTTPClient`'s own (internal, so not reachable from here) `URL
-    /// .hasTheSameOrigin(as:)`, which the NIO executor's `followingRedirect` uses for the same
-    /// cross-origin header stripping this type's own caller implements for the `URLSession`
-    /// executor.
-    func hasTheSameOrigin(as other: URL) -> Bool {
-        host == other.host && scheme == other.scheme && port == other.port
-    }
-}
-
 #endif
