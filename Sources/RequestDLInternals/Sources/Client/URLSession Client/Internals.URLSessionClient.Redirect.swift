@@ -33,13 +33,19 @@ extension URLRequest {
     ///
     /// - Throws: ``Internals/RedirectError`` (``Internals/RedirectError/Reason/invalidURL(_:)``) if the decision's URL
     ///   doesn't parse. Keeping the request's own URL instead would follow the `Location` the
-    ///   server sent, a destination the strategy had just decided against.
+    ///   server sent, a destination the strategy had just decided against. The error
+    ///   ``Internals/HeaderValidation/validate(_:)`` throws if one of the decision's headers is not a
+    ///   valid HTTP header.
     func applyingRedirectDecision(_ redirectRequest: Internals.RedirectRequest) throws -> URLRequest {
         var request = self
 
         guard let url = URL(string: redirectRequest.url) else {
             throw Internals.RedirectError(.invalidURL(redirectRequest.url))
         }
+
+        // The NIO executor validates the headers of every request it sends, a redirect's
+        // included, and these come from a strategy: no more trusted than the caller's own.
+        try Internals.HeaderValidation.validate(redirectRequest.headers)
 
         request.url = url
 

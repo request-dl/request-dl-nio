@@ -243,6 +243,11 @@ extension RequestConfiguration {
             throw InvalidRequestURLError(url: url)
         }
 
+        // Before anything is added: `URLRequest` checks nothing, so a name of `X-A: injected` would
+        // go out as the line `X-A: injected: v` and a NUL in a value as a NUL. `.nio` refuses both
+        // (AsyncHTTPClient validates every request it sends), and so does this, with the same error.
+        try Internals.HeaderValidation.validate(headers)
+
         var request = URLRequest(url: requestURL)
         request.httpMethod = method ?? "GET"
 

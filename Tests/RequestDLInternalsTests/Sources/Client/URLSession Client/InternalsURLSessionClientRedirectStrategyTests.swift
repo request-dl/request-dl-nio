@@ -217,6 +217,46 @@ struct InternalsURLSessionClientRedirectStrategyTests {
         }
     }
 
+    /// The NIO executor validates the headers of every request it sends, a redirected one
+    /// included, so a header a strategy answers with is refused there. It is refused here too,
+    /// instead of reaching the server.
+    @Test
+    func execute_whenStrategyFollowsWithAnInvalidHeader_failsInsteadOfSendingIt() async throws {
+        // Given
+        let localServer = try await LocalServer(.standard)
+        let origin = "/" + UUID().uuidString
+        let destination = "/" + UUID().uuidString
+
+        localServer.cleanup(at: origin)
+        localServer.cleanup(at: destination)
+
+        localServer.insert(
+            LocalServer.ResponseConfiguration(status: .found, headers: ["Location": destination], data: Data()),
+            at: origin
+        )
+        localServer.insert(try LocalServer.ResponseConfiguration(jsonObject: "reached"), at: destination)
+
+        defer {
+            localServer.cleanup(at: origin)
+            localServer.cleanup(at: destination)
+        }
+
+        let client = try Internals.URLSessionClient(
+            configuration: .ephemeral,
+            redirectConfiguration: .strategy(InvalidHeaderRedirectStrategy())
+        )
+
+        let url = try #require(URL(string: "https://\(localServer.baseURL)\(origin)"))
+
+        // When / Then
+        await #expect(throws: (any Error).self) {
+            _ = try await client.execute(
+                request: URLRequest(url: url),
+                delegate: AcceptAnyServerTrustDelegate()
+            )
+        }
+    }
+
     /// A strategy that answers `.follow` with a URL that doesn't parse fails the request on
     /// `.urlSession`, as it does on the NIO executor, instead of following the server's own
     /// `Location`.
@@ -302,6 +342,15 @@ private struct InvalidURLRedirectStrategy: Internals.RedirectStrategy {
     func redirectDecision(for context: Internals.RedirectContext) throws -> Internals.RedirectDecision {
         var request = context.redirectRequest
         request.url = ""
+        return .follow(request)
+    }
+}
+
+private struct InvalidHeaderRedirectStrategy: Internals.RedirectStrategy {
+
+    func redirectDecision(for context: Internals.RedirectContext) throws -> Internals.RedirectDecision {
+        var request = context.redirectRequest
+        request.headers.add(name: "X-A: injected", value: "v")
         return .follow(request)
     }
 }
