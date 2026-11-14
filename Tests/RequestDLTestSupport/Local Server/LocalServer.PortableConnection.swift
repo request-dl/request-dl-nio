@@ -130,11 +130,16 @@ extension LocalServer.PortableServer {
                 $0.name.caseInsensitiveCompare("User-Agent") == .orderedSame
             }?.value
 
+            let hostHeader = head.headers.first {
+                $0.name.caseInsensitiveCompare("Host") == .orderedSame
+            }?.value
+
             let responseBody = LocalServer.makeResponseBody(
                 configuredData: configuration?.data,
                 receivedBytes: receivedBytes,
                 cookieHeader: cookieHeader,
-                userAgentHeader: userAgentHeader
+                userAgentHeader: userAgentHeader,
+                hostHeader: hostHeader
             )
 
             let status = configuration?.status ?? .ok

@@ -28,7 +28,8 @@ extension Internals {
             case .disallow:
                 return .disallow
             case .follow(let max, let allowCycles):
-                return .follow(max: max, allowCycles: allowCycles)
+                // Not `.follow(max:allowCycles:)`: see ``Internals/NIOFollowRedirectStrategy``.
+                return .strategy(Internals.NIOFollowRedirectStrategy(max: max, allowCycles: allowCycles))
             case .strategy(let strategy):
                 return .strategy(Internals.NIORedirectStrategyAdapter(strategy: strategy))
             }

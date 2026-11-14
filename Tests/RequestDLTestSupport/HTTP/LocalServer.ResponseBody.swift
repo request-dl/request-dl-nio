@@ -25,7 +25,8 @@ extension LocalServer {
         configuredData: Data?,
         receivedBytes: Int,
         cookieHeader: String?,
-        userAgentHeader: String?
+        userAgentHeader: String?,
+        hostHeader: String? = nil
     ) -> Data? {
         let response = configuredData.flatMap {
             try? JSONDecoder().decode(Internals.JSONValue.self, from: $0)
@@ -48,6 +49,10 @@ extension LocalServer {
 
         if let userAgentHeader {
             jsonObject["receivedUserAgentHeader"] = .string(userAgentHeader)
+        }
+
+        if let hostHeader {
+            jsonObject["receivedHostHeader"] = .string(hostHeader)
         }
 
         let encoder = JSONEncoder()
