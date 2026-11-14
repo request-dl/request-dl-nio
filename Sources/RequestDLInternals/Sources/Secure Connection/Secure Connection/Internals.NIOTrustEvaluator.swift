@@ -98,6 +98,12 @@ extension Internals {
                 }
             }
 
+            // `TrustRoots` replaces the system's roots, so an exclusive set with nothing in it must
+            // not reach an evaluator that treats "no anchors" as "use the system's".
+            if secureConnection.trustRootsAreExclusive, trustRootCertificates.isEmpty {
+                throw Internals.EmptyTrustRootsError()
+            }
+
             #if canImport(Darwin)
             return try Self.makeDarwinEvaluator(
                 pins: tlsPins,

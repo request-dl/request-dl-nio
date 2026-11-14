@@ -75,6 +75,16 @@ struct Resolve<Root: Property>: Sendable {
         var (_, make) = try await partiallyBuild()
         applyingURLOverride(&make)
 
+        // Checked here, on the finished configuration, rather than by whichever property is
+        // declared last: `SecureConnection` replaces the base it's handed, so no single node
+        // sees both halves of the combination regardless of declaration order.
+        if make.sessionConfiguration.secureConnection?.pinsAreIgnoredWithoutCertificateVerification == true {
+            Internals.Log.pinsIgnoredWithoutCertificateVerification().log(
+                level: .warning,
+                logger: environment.logger
+            )
+        }
+
         let deadline = Internals.ResourceDeadline(
             nanoseconds: make.sessionConfiguration.timeout.resource
         )

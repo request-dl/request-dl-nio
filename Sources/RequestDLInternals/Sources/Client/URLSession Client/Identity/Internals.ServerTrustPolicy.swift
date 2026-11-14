@@ -262,6 +262,12 @@ extension Internals {
                 }
             }
 
+            // Same as `NIOTrustEvaluator.resolve(from:)`: an exclusive set with no certificate in it
+            // would make `DarwinTrustEvaluation.prepare` skip anchoring and fall back to the system's.
+            if secureConnection.trustRootsAreExclusive, trustedRootCertificates.isEmpty {
+                throw Internals.EmptyTrustRootsError()
+            }
+
             let isStrict = (secureConnection.tlsPinningPolicy ?? .strict) == .strict
 
             // Each pin's digest is resolved exactly once here (base64 decoded, length-checked):

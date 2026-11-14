@@ -49,6 +49,33 @@ struct InternalsNIOTrustEvaluatorTests {
         #expect(try Internals.NIOTrustEvaluator.resolve(from: secureConnection) == nil)
     }
 
+    /// `TrustRoots` replaces the system's roots. On Darwin an empty anchor list makes the
+    /// evaluator skip anchoring, which would hand trust back to the system's roots, so an
+    /// exclusive set with nothing in it is rejected instead of being evaluated.
+    @Test
+    func resolve_whenExclusiveTrustRootsResolveToNothing_throws() throws {
+        // Given
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.trustRoots = .certificates([])
+        secureConnection.tlsPins = [.init(source: .base64String(Self.unrelatedPinBase64), algorithm: SHA256.self)]
+
+        // Then
+        #expect(throws: Internals.EmptyTrustRootsError.self) {
+            _ = try Internals.NIOTrustEvaluator.resolve(from: secureConnection)
+        }
+    }
+
+    @Test
+    func resolve_whenOnlyAdditionalTrustRootsAreEmpty_stillInstallsEvaluator() throws {
+        // Given: additional roots extend the system's, so an empty list is not an error.
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.additionalTrustRoots = [.certificates([])]
+        secureConnection.tlsPins = [.init(source: .base64String(Self.unrelatedPinBase64), algorithm: SHA256.self)]
+
+        // Then
+        #expect(try Internals.NIOTrustEvaluator.resolve(from: secureConnection) != nil)
+    }
+
     #if canImport(Darwin)
     @Test
     func resolve_whenOnlyRevocationPolicyConfigured_installsEvaluator() throws {

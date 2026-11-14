@@ -21,8 +21,17 @@ import RequestDLInternals
 ///
 /// - Warning: Always deploy non-empty backup pins in production to avoid lockout during certificate rotation.
 ///
-/// - Note: Incompatible with ``Session/enableNetworkFramework(_:)``: pinning is never dropped to honor that flag.
-/// The session instead falls back to plain SwiftNIO and keeps enforcing the pins.
+/// - Important: An `SPKIPinning` that declares no ``SPKIHash`` at all (an empty `PropertyForEach`,
+/// a false `if`, ...) throws when the request is resolved instead of silently pinning nothing, for
+/// either policy.
+///
+/// - Warning: Combined with ``SecureConnection/verification(_:)`` set to ``CertificateVerification/none``,
+/// the pins are not enforced by the SwiftNIO and URLSession executors, since `.none` opts out of trust evaluation
+/// altogether, while Network.framework still enforces them. RequestDL logs a warning when it sees the combination.
+///
+/// - Note: Pinning is enforced by every executor, including Network.framework (``Session/enableNetworkFramework(_:)``),
+/// which gets the same pin check through a custom trust evaluation. Pinning is never dropped to
+/// honor that flag.
 public struct SPKIPinning<Content: Property>: Property {
 
     private struct Node: SecureConnectionPropertyNode {
@@ -30,6 +39,15 @@ public struct SPKIPinning<Content: Property>: Property {
         let nodes: [LeafNode<SPKIHashNode>]
 
         func make(_ secureConnection: inout Internals.SecureConnection) throws {
+            // Every executor reads an empty pin set as "nothing to pin against" and validates the
+            // chain alone, so `SPKIPinning(.strict)` over zero pins (an empty `PropertyForEach`, a
+            // false `if`, ...) would silently turn pinning off instead of failing closed. `.audit`
+            // is rejected too: with no pin there is nothing to compare against, so it could never
+            // report a match or a mismatch, only look like a working migration window.
+            guard !nodes.isEmpty else {
+                throw Internals.SPKIPinningError()
+            }
+
             // A pin whose digest doesn't decode (a typo in the Base64, or a digest of the wrong
             // length for its algorithm) can never match. The NIO executors would swallow that as
             // "no match" and the `.urlSession` executor throws, so it's rejected here, once, for

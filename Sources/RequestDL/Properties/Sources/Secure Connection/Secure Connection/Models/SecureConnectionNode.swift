@@ -172,4 +172,17 @@ extension Internals.SecureConnection {
     func collector() -> SecureConnectionNode.Collector {
         .init(self)
     }
+
+    /// `.verification(.none)` opts out of trust evaluation altogether. NIOSSL and URLSession never
+    /// run the pin check then (BoringSSL doesn't invoke the custom verification callback, and
+    /// `ServerTrustPolicy` returns before evaluating), while Network.framework still does.
+    var pinsAreIgnoredWithoutCertificateVerification: Bool {
+        // Spelled out: a bare `.none` here would match the optional's own `nil` (no verification
+        // configured at all) instead of `CertificateVerification.none`.
+        guard certificateVerification == Internals.CertificateVerification.none else {
+            return false
+        }
+
+        return !(tlsPins ?? []).isEmpty
+    }
 }
