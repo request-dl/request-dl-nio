@@ -53,15 +53,22 @@ extension Internals {
     ///
     /// ## Where "is this the last chunk" comes from on read
     ///
-    /// Position in the file, not a stored flag: the last on-disk block, whatever its size, is
-    /// always attempted as final. By construction (see `writeData`'s flush loop), that block is
-    /// always strictly shorter, on disk, than a full `chunkOnDiskSize`, so there is no ambiguity
-    /// between "coincidentally full-size" and genuinely non-final. A writer that crashed before
-    /// flushing its final, `isLast=true`-flagged chunk leaves the file's real last block flagged
-    /// `isLast=false`; reading it back and asserting `isLast=true` (the read side's positional
-    /// guess) produces the wrong associated data, the tag check fails, and the whole file
-    /// degrades to a decrypt-failure/cache-miss, which is the outcome wanted for a truncated
-    /// write, with no special-case code.
+    /// Position in the file, not a stored flag, and only for a file whose shape allows it. A
+    /// closed writer always leaves `n` full on-disk chunks followed by a final block of
+    /// `tagSize ..< chunkOnDiskSize` bytes (the empty final chunk of a chunk-aligned body is
+    /// just its tag), so `finalChunkIndex(rawSize:)` can name the final chunk from the size
+    /// alone. A file whose tail is a full-size block, or fewer than a tag's bytes, cannot come
+    /// from a closed writer: it is what a writer killed after flushing whole `isLast=false`
+    /// chunks leaves behind (the rest only ever lived in memory). It has no final chunk to
+    /// authenticate, so it is unreadable, not readable minus its last chunk.
+    ///
+    /// The first read verifies the final chunk before returning anything. Without that, a file
+    /// cut at a chunk boundary would serve every chunk up to the cut as a valid, shorter body,
+    /// since each chunk authenticates on its own, and a cut inside the final block would only
+    /// surface once a reader got that far, after the earlier chunks were already handed out. A
+    /// tag mismatch (a cut inside the block, a tampered file, the wrong key) takes the same
+    /// path: the read throws, which `Internals.Buffer.Storage.read` turns into an ordinary
+    /// failed read, so the whole entry degrades to a cache miss.
     ///
     /// ## Append-only, by construction
     ///
@@ -150,6 +157,7 @@ extension Internals {
         private var _cachedBaseNonce: Data?
         private var _cachedChunkIndex: UInt64?
         private var _cachedChunkPlaintext: Data?
+        private var _hasVerifiedFinalChunk = false
 
         // MARK: - Inits
 
@@ -241,6 +249,8 @@ extension Internals {
             }
 
             return try await lock.withLock { () async throws -> Data? in
+                try await verifyFinalChunk(using: readStream)
+
                 var result = Data()
                 var remaining = length
 
@@ -329,39 +339,42 @@ extension Internals {
         /// without decrypting anything: pure arithmetic over the fixed header/chunk/tag sizes.
         /// See ``Internals/EncryptedFileBufferURL``'s `writtenBytes` for why this has to be exact.
         ///
-        /// - Important: A `body` that divides *exactly* by `chunkOnDiskSize` (`remainder == 0`
-        /// below) can never come from a genuinely valid, fully-closed file: `close()`'s final chunk
-        /// is sealed even when empty (see the type-level doc and `writeData`'s flush loop), so a
-        /// valid file's on-disk body is always `n * chunkOnDiskSize + r` for some `0 < r <=
-        /// chunkOnDiskSize` (`r == tagSize` for an exactly-chunk-aligned body, since an empty final
-        /// chunk still contributes its 16-byte tag). A `remainder` of exactly `0` therefore means
-        /// the file has no authenticated final chunk at all, e.g. a writer that flushed
-        /// `chunkCount` full intermediate chunks (each sealed with `isLast: false`) and then
-        /// crashed before `close()` ran. Reading such a file back, `decryptedChunk(at:using:)`
-        /// finds the last of those chunks at the file's end and infers `isLast: true` for it from
-        /// its position, the opposite of how it was sealed, so its AEAD tag check fails and only
-        /// the `chunkCount - 1` chunks before it are readable. Reporting `chunkCount` would
-        /// over-report by one whole `chunkPlaintextSize`.
+        /// - Important: A file without a final chunk (see ``finalChunkIndex(rawSize:)``) reports
+        /// `0`, not the size of the chunks that happen to precede the cut. Those chunks verify
+        /// on their own, so counting them would let `Internals.CacheControl.isCachedDataValid`
+        /// accept a truncated entry as complete. Reading such a file fails as well
+        /// (`verifyFinalChunk`), so `0` and the read path agree that nothing is readable.
         package static func plaintextSize(fromRawSize rawSize: Int) -> Int {
-            guard rawSize > headerSize else {
+            guard let finalIndex = finalChunkIndex(rawSize: UInt64(max(0, rawSize))) else {
                 return .zero
             }
 
-            let body = rawSize - headerSize
+            let finalOnDiskSize = UInt64(rawSize - headerSize) - finalIndex * UInt64(chunkOnDiskSize)
+            return Int(finalIndex) * chunkPlaintextSize + Int(finalOnDiskSize) - tagSize
+        }
 
-            guard body > .zero else {
-                return .zero
+        /// The index of the final (`isLast=true`) chunk of a file of `rawSize` bytes, or `nil`
+        /// when no closed writer could have produced a file of that size.
+        ///
+        /// Every chunk but the last is exactly `chunkOnDiskSize` bytes, and the last holds at
+        /// least its tag and strictly less than a full chunk (`close()` flushes whatever is
+        /// pending, and `writeData` flushes as soon as it reaches `chunkPlaintextSize`).
+        private static func finalChunkIndex(rawSize: UInt64) -> UInt64? {
+            let header = UInt64(headerSize)
+
+            guard rawSize >= header + UInt64(tagSize) else {
+                return nil
             }
 
-            let chunkCount = body / chunkOnDiskSize
-            let remainder = body % chunkOnDiskSize
+            let body = rawSize - header
+            let chunkSize = UInt64(chunkOnDiskSize)
+            let remainder = body % chunkSize
 
-            guard remainder > .zero else {
-                return max(0, chunkCount - 1) * chunkPlaintextSize
+            guard remainder >= UInt64(tagSize) else {
+                return nil
             }
 
-            let lastChunkPlaintext = max(0, remainder - tagSize)
-            return chunkCount * chunkPlaintextSize + lastChunkPlaintext
+            return body / chunkSize
         }
 
         // MARK: - Private methods
@@ -410,27 +423,19 @@ extension Internals {
 
             let rawSize = try await rawFileSize()
 
-            guard rawSize > UInt64(Self.headerSize) else {
+            guard let finalIndex = Self.finalChunkIndex(rawSize: rawSize) else {
+                throw StreamError.truncatedChunk
+            }
+
+            guard index <= finalIndex else {
                 return nil
             }
 
             let baseNonce = try await baseNonce(using: stream)
 
             let chunkStart = UInt64(Self.headerSize) + index * UInt64(Self.chunkOnDiskSize)
-
-            guard chunkStart < rawSize else {
-                return nil
-            }
-
-            let remainingInFile = rawSize - chunkStart
-            let onDiskSize = min(remainingInFile, UInt64(Self.chunkOnDiskSize))
-            let isLast = chunkStart + onDiskSize == rawSize
-
-            // A body that is a whole number of chunks ends with a final chunk that holds only its
-            // tag, so a chunk of exactly `tagSize` bytes is valid and decrypts to nothing.
-            guard onDiskSize >= UInt64(Self.tagSize) else {
-                throw StreamError.truncatedChunk
-            }
+            let isLast = index == finalIndex
+            let onDiskSize = isLast ? rawSize - chunkStart : UInt64(Self.chunkOnDiskSize)
 
             try await stream.seek(to: chunkStart)
 
@@ -453,6 +458,24 @@ extension Internals {
             _cachedChunkPlaintext = plaintext
 
             return plaintext
+        }
+
+        /// Authenticates the final chunk, once, before the first read returns anything.
+        ///
+        /// Throws when the file has no final chunk (a writer killed before `close()`), or when
+        /// that chunk does not authenticate as `isLast=true`. See the type-level doc for why this
+        /// cannot wait for a reader to reach the end.
+        private func verifyFinalChunk(using stream: Internals.FileStreamBuffer) async throws {
+            guard !_hasVerifiedFinalChunk else {
+                return
+            }
+
+            guard let finalIndex = Self.finalChunkIndex(rawSize: try await rawFileSize()) else {
+                throw StreamError.truncatedChunk
+            }
+
+            _ = try await decryptedChunk(at: finalIndex, using: stream)
+            _hasVerifiedFinalChunk = true
         }
 
         /// The random base nonce from the file's own 13 byte header, read and cached once.
