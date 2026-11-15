@@ -222,28 +222,34 @@ struct CachedRequestTests {
         #expect(thrownError is EmptyCachedDataError)
     }
 
-    /// An `Expires` the date parser cannot hold has to read as no `Expires` at all. A year far
-    /// beyond what `Int64` seconds can represent used to end the process on the lookup.
+    /// An `Expires` the date parser cannot hold is an `Expires` that is not a date, which is a stale
+    /// entry (RFC 9111 §5.3), and not the end of the process: a year far beyond what `Int64`
+    /// seconds can represent used to end it on the lookup.
     @Test
-    func cache_whenExpiresHasAnAbsurdYear_ignoresTheHeaderInsteadOfTrapping() async throws {
+    func cache_whenExpiresHasAnAbsurdYear_isStaleInsteadOfTrapping() async throws {
         let testState = try await TestState()
         let cacheData = await mockCachedData([
             ("Cache-Control", "public"),
             ("Expires", "Sun, 06 Nov 400000000000 08:49:37 GMT"),
         ])
         let cacheKey = "https://localhost:8888" + testState.uri
+        var thrownError: Error?
 
         // When
         await testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
 
-        let response = try await performCacheRequest(
-            testState: testState,
-            headers: makeHeaders(eTag: UUID()),
-            cacheStrategy: .useCachedDataOnly
-        )
+        do {
+            _ = try await performCacheRequest(
+                testState: testState,
+                headers: makeHeaders(eTag: UUID()),
+                cacheStrategy: .useCachedDataOnly
+            )
+        } catch {
+            thrownError = error
+        }
 
         // Then
-        #expect(response.head == cacheData.response)
+        #expect(thrownError is EmptyCachedDataError)
     }
 
     @Test
@@ -414,12 +420,10 @@ struct CachedRequestTests {
         #expect(try responseText(response) == testState.output)
     }
 
-    /// A chunk of an encrypted entry is authenticated whole, so the first piece vouches for the
-    /// first 4 MiB only. A body that fails later cannot be taken back once it started, but the
-    /// entry must not stay: the next request would read the same first piece, pass, and fail at
-    /// the same place for as long as the entry is fresh.
+    /// The final chunk of an encrypted entry is authenticated before the first piece is handed
+    /// out, so an entry that fails there is a miss, not a response that dies halfway.
     @Test
-    func cache_whenALaterChunkOfAnEncryptedEntryFails_theNextRequestIsServedFromTheNetwork() async throws {
+    func cache_whenTheFinalChunkOfAnEncryptedEntryFails_theFirstRequestIsAlreadyServedFromTheNetwork() async throws {
         let testState = try await TestState()
         let encryptionKey = DataCache.EncryptionKey(Data(repeating: 0x07, count: 32))
         testState.dataCache.encryptionKey = encryptionKey
@@ -437,6 +441,49 @@ struct CachedRequestTests {
         await testState.dataCache.waitUntilIdle()
 
         try flipLastByteOfStoredBody(in: testState.dataCache.directoryURL)
+
+        // When
+        let response = try await performCacheRequest(
+            testState: testState,
+            headers: makeHeaders(eTag: UUID()),
+            cacheStrategy: .returnCachedDataElseLoad,
+            encryptionKey: encryptionKey
+        )
+
+        // Then: what the server answered, with nothing of the stored body served first.
+        #expect(try responseText(response) == testState.output)
+    }
+
+    /// A chunk of an encrypted entry is authenticated whole, so the first piece vouches for the
+    /// first 4 MiB only. A body that fails later, in a chunk that is neither the first nor the
+    /// final one, cannot be taken back once it started, but the entry must not stay: the next
+    /// request would read the same first piece, pass, and fail at the same place for as long as
+    /// the entry is fresh.
+    @Test
+    func cache_whenAMiddleChunkOfAnEncryptedEntryFails_theNextRequestIsServedFromTheNetwork() async throws {
+        let testState = try await TestState()
+        let encryptionKey = DataCache.EncryptionKey(Data(repeating: 0x07, count: 32))
+        testState.dataCache.encryptionKey = encryptionKey
+
+        // Given: an entry of three chunks, a byte inside the second one flipped.
+        let chunkSize = Internals.EncryptedFileStreamBuffer.chunkPlaintextSize
+        let size = chunkSize * 2 + 100_000
+        let cacheData = await mockCachedData(
+            makeHeaders(maxAgeSeconds: 3_600),
+            policy: .disk,
+            body: Data(repeating: 0x5A, count: size)
+        )
+        let cacheKey = "https://localhost:8888" + testState.uri
+
+        await testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
+        await testState.dataCache.waitUntilIdle()
+
+        let headerSize = 13
+        let tagSize = 16
+        try flipByteOfStoredBody(
+            in: testState.dataCache.directoryURL,
+            at: headerSize + (chunkSize + tagSize) + 1_000
+        )
 
         // When: the first request starts from the entry and fails part of the way.
         var firstError: (any Error)?
@@ -1659,16 +1706,20 @@ extension CachedRequestTests {
         try await _Concurrency.Task.sleep(nanoseconds: twoSecondsAndAQuarter)
     }
 
-    /// Flips the last byte of the body of the only disk entry in `directoryURL`, leaving its
-    /// size alone.
-    func flipLastByteOfStoredBody(in directoryURL: URL) throws {
+    /// Flips the byte at `offset` of the body of the only disk entry in `directoryURL` (the last
+    /// one when `nil`), leaving its size alone.
+    func flipByteOfStoredBody(in directoryURL: URL, at offset: Int? = nil) throws {
         let entries = try FileManager.default.contentsOfDirectory(atPath: directoryURL.path)
         let record = try #require(entries.first { $0.hasSuffix(".cached") })
         let bodyURL = directoryURL.appendingPathComponent(record).appendingPathComponent("data.record")
 
         var raw = try Data(contentsOf: bodyURL)
-        raw[raw.count - 1] ^= 0xFF
+        raw[offset ?? raw.count - 1] ^= 0xFF
         try raw.write(to: bodyURL)
+    }
+
+    func flipLastByteOfStoredBody(in directoryURL: URL) throws {
+        try flipByteOfStoredBody(in: directoryURL)
     }
 
     func mockCachedData(

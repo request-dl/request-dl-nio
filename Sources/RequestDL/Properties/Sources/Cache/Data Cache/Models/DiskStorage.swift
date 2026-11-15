@@ -352,6 +352,21 @@ struct DiskStorage: Sendable {
             lock.withLock { locationsByKey[key] = url }
         }
 
+        /// Points `key` at `url` only if it still points at `old`: a write that landed in between
+        /// owns the key, and a revalidation of what it replaced must not take it back.
+        ///
+        /// - Returns: Whether `key` was repointed.
+        func replace(_ key: String, ifLocation old: URL, with url: URL) -> Bool {
+            lock.withLock {
+                guard locationsByKey[key] == old else {
+                    return false
+                }
+
+                locationsByKey[key] = url
+                return true
+            }
+        }
+
         /// Monotonic, so a clock that moves backwards cannot freeze or skip the window.
         @Sendable
         static func uptime() -> UInt64 {
@@ -446,7 +461,7 @@ struct DiskStorage: Sendable {
         get async {
             guard let record = await record(key) else { return nil }
 
-            guard let responseData = await readResponseData(at: record.responseURL) else {
+            guard let responseData = await readResponseData(at: record.responseURL, key: key) else {
                 return nil
             }
 
@@ -490,7 +505,7 @@ struct DiskStorage: Sendable {
     /// not a genuine absence. Skipping the retry would surface that flake all the way up
     /// through this method, and therefore `subscript(_:)`, as `nil` for an entry that was just
     /// written.
-    private func readResponseData(at url: URL) async -> Data? {
+    private func readResponseData(at url: URL, key: String) async -> Data? {
         guard
             let handle = await Self.retryingUntilSuccess({
                 try? await Internals.fileSystem.openFile(forReadingAt: url.filePath)
@@ -524,7 +539,11 @@ struct DiskStorage: Sendable {
         // either into a miss, matching every other fault-tolerance path in this type.
         guard
             let sealedBox = try? AES.GCM.SealedBox(combined: raw),
-            let opened = try? AES.GCM.open(sealedBox, using: encryptionKey.symmetricKey)
+            let opened = try? AES.GCM.open(
+                sealedBox,
+                using: encryptionKey.symmetricKey,
+                authenticating: Self.associatedData(forResponseOf: key)
+            )
         else {
             return nil
         }
@@ -643,13 +662,24 @@ struct DiskStorage: Sendable {
         }
     }
 
+    /// Replaces the response of `key`'s record with `cachedResponse`, keeping its body, but only
+    /// while that record is still the one `expected` describes.
+    ///
+    /// A revalidation spans a round trip to the server. If the key is written again meanwhile (a
+    /// request for another account, say), the record at `key` is no longer the one that was
+    /// revalidated, and giving it the old response would label the new body with the old
+    /// credential digests.
     func updateCached(
         key: String,
         cachedResponse: CachedResponse,
+        expecting expected: CachedResponse,
         maximumCapacity: Int64
     ) async {
         guard let record = await record(key),
-            let response = try? JSONEncoder().encode(cachedResponse)
+            let response = try? JSONEncoder().encode(cachedResponse),
+            let storedData = await readResponseData(at: record.responseURL, key: key),
+            let stored = try? JSONDecoder().decode(CachedResponse.self, from: storedData),
+            stored == expected
         else { return }
 
         let responseInfo = try? await Internals.fileSystem.info(forFileAt: record.responseURL.filePath)
@@ -670,7 +700,7 @@ struct DiskStorage: Sendable {
             let newDataPath = newRecord.dataURL.filePath
             try await Internals.fileSystem.moveItem(at: oldDataPath, to: newDataPath)
 
-            try await writeAndClose(response, to: newRecord.responseURL)
+            try await writeAndClose(response, to: newRecord.responseURL, key: key)
 
             // `newDataPath` carries whatever protection class it already had across the move
             // above: renaming within the same volume does not touch a file's contents or its
@@ -680,7 +710,13 @@ struct DiskStorage: Sendable {
             await applyFileProtection(toResponseRecordAt: newRecord.responseURL)
             #endif
 
-            index.set(key, location: newRecord.url)
+            // Only if `key` still points at the record that was revalidated. A write that
+            // landed during the awaits above owns the key now, and what was moved here is the
+            // body of a record it replaced.
+            if !index.replace(key, ifLocation: record.url, with: newRecord.url) {
+                await Self.removeItem(at: newRecord.url.filePath)
+                index.remove(key, ifLocation: newRecord.url)
+            }
         } catch {
             await Self.removeItem(at: newRecord.url.filePath)
             index.remove(key, ifLocation: newRecord.url)
@@ -730,7 +766,7 @@ struct DiskStorage: Sendable {
         guard let record = await record(key, createdAt: cachedResponse.date) else { return (nil, nil, nil) }
 
         do {
-            try await writeAndClose(response, to: record.responseURL)
+            try await writeAndClose(response, to: record.responseURL, key: key)
         } catch {
             // The directory itself was already created above (`Record.init(directory:key:at:)`
             // creates it unconditionally). Left behind, it would be indistinguishable from the
@@ -896,7 +932,19 @@ struct DiskStorage: Sendable {
     /// represent. Never expected to actually throw today.
     private struct SealFailureError: Error {}
 
-    private func writeAndClose(_ data: Data, to url: URL) async throws {
+    /// What an encrypted `response.record` is authenticated against besides its contents: the key
+    /// it was stored under.
+    ///
+    /// Without it a record is valid wherever it is found, and anyone who can write the cache
+    /// directory can copy the record of one URL under another's name and have the second URL
+    /// answered with the first one's response, authentic as far as the check goes. A record
+    /// written before this was bound to anything does not open under it, which makes it a miss
+    /// that the next request for the key writes over.
+    private static func associatedData(forResponseOf key: String) -> Data {
+        Data("request-dl.cache.response.v1\n\(key)".utf8)
+    }
+
+    private func writeAndClose(_ data: Data, to url: URL, key: String) async throws {
         let payload: Data
 
         if let encryptionKey {
@@ -907,7 +955,13 @@ struct DiskStorage: Sendable {
             // guarded rather than force-unwrapped so a future change can't silently start
             // writing plaintext under this branch; it throws instead, same as any other write
             // failure.
-            guard let combined = try AES.GCM.seal(data, using: encryptionKey.symmetricKey).combined else {
+            guard
+                let combined = try AES.GCM.seal(
+                    data,
+                    using: encryptionKey.symmetricKey,
+                    authenticating: Self.associatedData(forResponseOf: key)
+                ).combined
+            else {
                 throw SealFailureError()
             }
             payload = combined
