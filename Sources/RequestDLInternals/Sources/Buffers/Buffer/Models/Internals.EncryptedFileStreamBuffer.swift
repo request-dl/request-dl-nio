@@ -51,6 +51,15 @@ extension Internals {
     /// own. With the index and finality authenticated, any of those changes what a chunk decrypts
     /// against, and the tag check fails.
     ///
+    /// The file's address (``Internals/EncryptedFileBufferURL``) may also carry a context, which
+    /// goes in front of both. It is what keeps a file from opening anywhere but where it belongs:
+    /// a cache entry's body is bound to its key, so the file copied under another key's name fails
+    /// its first tag check. A file written without one only opens without one.
+    ///
+    /// The header's version byte says whether the context exists at all (`0x02`), so a file from
+    /// before it, which cannot be told apart by its tags alone from one opened with the wrong
+    /// context, is refused by name.
+    ///
     /// ## Where "is this the last chunk" comes from on read
     ///
     /// Position in the file, not a stored flag, and only for a file whose shape allows it. A
@@ -89,7 +98,10 @@ extension Internals {
 
         // MARK: - Private static properties
 
-        private static let formatVersion: UInt8 = 0x01
+        /// `0x02` binds ``Internals/EncryptedFileBufferURL/associatedData`` into every chunk. A file
+        /// with any other version is unreadable, which is what turns one written before that into a
+        /// miss rather than something opened without the binding.
+        private static let formatVersion: UInt8 = 0x02
         private static let baseNonceSize = 12
         private static let tagSize = 16
         private static let headerSize = 1 + baseNonceSize
@@ -133,6 +145,7 @@ extension Internals {
         private let lock = AsyncLock(watchdog: watchdog)
         private let handle: Handle
         private let key: SymmetricKey
+        private let context: Data
         private let innerURL: Internals.FileBufferURL
 
         // MARK: - Unsafe write-side properties
@@ -164,6 +177,7 @@ extension Internals {
         package init(readingFrom url: URL) async throws {
             handle = .read(try await Internals.FileStreamBuffer(readingFrom: url.inner))
             key = url.key
+            context = url.associatedData
             innerURL = url.inner
         }
 
@@ -174,6 +188,7 @@ extension Internals {
         package init(writingTo url: URL) async throws {
             handle = .write(try await Internals.FileStreamBuffer(writingTo: url.inner))
             key = url.key
+            context = url.associatedData
             innerURL = url.inner
         }
 
@@ -353,6 +368,15 @@ extension Internals {
             return Int(finalIndex) * chunkPlaintextSize + Int(finalOnDiskSize) - tagSize
         }
 
+        /// Whether a file of `rawSize` bytes can be a closed writer's: one that holds a final chunk.
+        ///
+        /// What a storage asks before it opens a body, since a file that fails this reads as
+        /// nothing at all (``plaintextSize(fromRawSize:)`` is `0`), which is indistinguishable
+        /// from an empty body once it has been opened.
+        package static func hasFinalChunk(rawSize: Int) -> Bool {
+            finalChunkIndex(rawSize: UInt64(max(0, rawSize))) != nil
+        }
+
         /// The index of the final (`isLast=true`) chunk of a file of `rawSize` bytes, or `nil`
         /// when no closed writer could have produced a file of that size.
         ///
@@ -403,7 +427,7 @@ extension Internals {
             }
 
             let nonce = try Self.nonce(base: baseNonce, chunkIndex: _chunkIndex)
-            let aad = Self.associatedData(chunkIndex: _chunkIndex, isLast: isLast)
+            let aad = Self.associatedData(context: context, chunkIndex: _chunkIndex, isLast: isLast)
             let sealedBox = try AES.GCM.seal(plaintext, using: key, nonce: nonce, authenticating: aad)
 
             var payload = sealedBox.ciphertext
@@ -450,7 +474,7 @@ extension Internals {
             let tag = raw.suffix(Self.tagSize)
 
             let nonce = try Self.nonce(base: baseNonce, chunkIndex: index)
-            let aad = Self.associatedData(chunkIndex: index, isLast: isLast)
+            let aad = Self.associatedData(context: context, chunkIndex: index, isLast: isLast)
             let sealedBox = try AES.GCM.SealedBox(nonce: nonce, ciphertext: ciphertext, tag: tag)
             let plaintext = try AES.GCM.open(sealedBox, using: key, authenticating: aad)
 
@@ -478,23 +502,26 @@ extension Internals {
             _hasVerifiedFinalChunk = true
         }
 
-        /// The random base nonce from the file's own 13 byte header, read and cached once.
+        /// The random base nonce from the file's own 13 byte header, read and cached once, after
+        /// checking the header's format version.
         private func baseNonce(using stream: Internals.FileStreamBuffer) async throws -> Data {
             if let cached = _cachedBaseNonce {
                 return cached
             }
 
-            try await stream.seek(to: 1)
+            try await stream.seek(to: .zero)
 
             guard
-                let bytes = try await stream.readData(length: UInt64(Self.baseNonceSize)),
-                bytes.count == Self.baseNonceSize
+                let header = try await stream.readData(length: UInt64(Self.headerSize)),
+                header.count == Self.headerSize,
+                header[header.startIndex] == Self.formatVersion
             else {
                 throw StreamError.truncatedChunk
             }
 
-            _cachedBaseNonce = bytes
-            return bytes
+            let bytes = header.dropFirst()
+            _cachedBaseNonce = Data(bytes)
+            return Data(bytes)
         }
 
         /// The real on-disk (ciphertext) file size, stat'd and cached once. Safe to cache for a
@@ -525,11 +552,15 @@ extension Internals {
             return try AES.GCM.Nonce(data: bytes)
         }
 
-        /// The associated data authenticated alongside chunk `chunkIndex`: the index itself
-        /// (big-endian, 8 bytes) followed by a 1 byte finality flag. See the type-level doc for
-        /// why this is what catches reordering, splicing, and truncation.
-        private static func associatedData(chunkIndex: UInt64, isLast: Bool) -> Data {
-            var data = Data(withUnsafeBytes(of: chunkIndex.bigEndian) { Array($0) })
+        /// The associated data authenticated alongside chunk `chunkIndex`: the caller's `context`,
+        /// then the index itself (big-endian, 8 bytes) and a 1 byte finality flag. See the
+        /// type-level doc for why this is what catches reordering, splicing, and truncation.
+        ///
+        /// The context goes first and the rest has a fixed width, so no context can be made to
+        /// read as part of the index.
+        private static func associatedData(context: Data, chunkIndex: UInt64, isLast: Bool) -> Data {
+            var data = context
+            data.append(Data(withUnsafeBytes(of: chunkIndex.bigEndian) { Array($0) }))
             data.append(isLast ? 0x01 : 0x00)
             return data
         }

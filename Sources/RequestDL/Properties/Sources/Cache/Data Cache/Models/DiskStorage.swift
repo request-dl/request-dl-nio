@@ -472,12 +472,71 @@ struct DiskStorage: Sendable {
                 )
             else { return nil }
 
+            guard await hasReadableBody(record, response: cachedResponse) else {
+                return nil
+            }
+
             index.markUsed(key)
 
             return await .init(
                 cachedResponse: cachedResponse,
-                buffer: dataBuffer(for: record)
+                buffer: dataBuffer(for: record, key: key)
             )
+        }
+    }
+
+    /// Whether the body of an encrypted `record` can be told apart from one that was never
+    /// finished, which is the one thing nothing above this type can do for it.
+    ///
+    /// A `data.record` with no final chunk (a writer killed before `close()`, with the rest of
+    /// the body only ever in memory) opens with nothing readable, exactly like an empty body, and
+    /// is then served as a `200` with no content. `Content-Length` would catch it, but a chunked,
+    /// HTTP/2 or compressed response has none to compare against. So the file is checked here, by
+    /// its size alone, and an entry that fails is a miss.
+    ///
+    /// A file with no bytes at all is what a body that was never written through leaves too (the
+    /// output stream opens on the first write, so there is no header and no final chunk), and it
+    /// is also what a writer killed before its first chunk leaves. It is only believed when the
+    /// response says it has no body.
+    ///
+    /// - Note: Not retried past the first answer when the size is acceptable. A size that is not
+    /// is stat'd again for as long as `Internals.Buffer.init(addressing:)` would, since the same
+    /// stat can report a file smaller than what was written under heavy disk contention, and a
+    /// healthy entry should not be lost to it.
+    private func hasReadableBody(_ record: Record, response: CachedResponse) async -> Bool {
+        guard encryptionKey != nil else {
+            return true
+        }
+
+        let url = Internals.FileBufferURL(record.dataURL)
+        let attempts = 30
+
+        for attempt in 0..<attempts {
+            let size = await url.writtenBytes
+
+            if Internals.EncryptedFileStreamBuffer.hasFinalChunk(rawSize: size) {
+                return true
+            }
+
+            if size == .zero, Self.declaresNoBody(response) {
+                return true
+            }
+
+            if attempt + 1 < attempts {
+                try? await Task.sleep(nanoseconds: 10_000_000)
+            }
+        }
+
+        return false
+    }
+
+    private static func declaresNoBody(_ response: CachedResponse) -> Bool {
+        if response.response.status.code == 204 || response.response.status.code == 205 {
+            return true
+        }
+
+        return response.response.headers.contains {
+            $0.name.lowercased() == "content-length" && Int($0.value.filter { !$0.isWhitespace }) == 0
         }
     }
 
@@ -562,6 +621,7 @@ struct DiskStorage: Sendable {
     /// budget (~290ms of sleeping before every encrypted cache write).
     private func dataBuffer(
         for record: Record,
+        key: String,
         retryingEmptyContent: Bool = true
     ) async -> Internals.AnyBuffer {
         guard let encryptionKey else {
@@ -570,7 +630,8 @@ struct DiskStorage: Sendable {
 
         let url = Internals.EncryptedFileBufferURL(
             inner: .init(record.dataURL),
-            key: encryptionKey.symmetricKey
+            key: encryptionKey.symmetricKey,
+            associatedData: Self.associatedData(forBodyOf: key)
         )
 
         return await Internals.Buffer<Internals.EncryptedFileStreamBuffer>(
@@ -790,7 +851,7 @@ struct DiskStorage: Sendable {
         await applyFileProtection(to: record)
         #endif
 
-        let buffer = await dataBuffer(for: record, retryingEmptyContent: false)
+        let buffer = await dataBuffer(for: record, key: key, retryingEmptyContent: false)
         index.set(key, location: record.url)
         return (buffer, usageAfterEviction + writableBytes, record.url)
     }
@@ -942,6 +1003,24 @@ struct DiskStorage: Sendable {
     /// that the next request for the key writes over.
     private static func associatedData(forResponseOf key: String) -> Data {
         Data("request-dl.cache.response.v1\n\(key)".utf8)
+    }
+
+    /// What every chunk of an encrypted `data.record` is authenticated against besides its
+    /// contents and position: the key it was stored under, so it is not the body of another's.
+    ///
+    /// Without it a body is valid wherever it is found, and anyone who can write the cache
+    /// directory can move the `data.record` of one URL under another's name and have the second
+    /// answered with the first one's body behind its own head, every part authentic as far as
+    /// the checks go. A body written before this was bound to anything is also a different file
+    /// format (see `EncryptedFileStreamBuffer`), so it does not open: it is a miss that the next
+    /// request for the key writes over.
+    ///
+    /// - Note: Binding the body to its key, not to the particular `response.record` next to it,
+    /// leaves a body replaced by an older one for the same key. That is a rollback of the whole
+    /// entry, which nothing stored beside the entry can detect anyway: whoever can write one of
+    /// its files can write both back to an older, consistent state.
+    static func associatedData(forBodyOf key: String) -> Data {
+        Data("request-dl.cache.body.v1\n\(key)".utf8)
     }
 
     private func writeAndClose(_ data: Data, to url: URL, key: String) async throws {
