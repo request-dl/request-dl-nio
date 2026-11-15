@@ -99,6 +99,34 @@ struct ModifiersStatusCodeTests {
 
         #expect(failures.count == statusCodes.count - statusCodeSet.count)
     }
+
+    /// A set that ended up empty (an intersection, a list read from a configuration) accepts
+    /// nothing: it used to accept everything, which turned the check off exactly when it had
+    /// nothing left to allow.
+    @Test(arguments: [200, 404, 500])
+    func emptyStatusCodeSet_rejectsEveryStatusCode(_ code: UInt) async throws {
+        // Given
+        let statusCodeSet = StatusCodeSet.success.intersection(StatusCodeSet([StatusCode(404)]))
+        var accepted = false
+
+        // When
+        do {
+            _ = try await MockedTask(
+                status: .init(code: code, reason: "mock"),
+                content: { BaseURL("localhost") }
+            )
+            .collectData()
+            .acceptOnlyStatusCode(statusCodeSet)
+            .result()
+            accepted = true
+        } catch is InvalidStatusCodeError<TaskResult<Data>> {
+            accepted = false
+        }
+
+        // Then
+        #expect(statusCodeSet.isEmpty)
+        #expect(!accepted)
+    }
 }
 
 extension ModifiersStatusCodeTests {

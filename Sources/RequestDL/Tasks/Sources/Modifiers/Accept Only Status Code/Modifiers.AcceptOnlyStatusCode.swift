@@ -19,14 +19,12 @@ extension Modifiers {
         /// - Parameter task: The task to modify.
         /// - Returns: The modified task that accepts only the specified status codes.
         /// - Throws: An `InvalidStatusCodeError` if the status code of the result is not
-        /// included in the set of accepted status codes.
+        /// included in the set of accepted status codes. An empty set accepts nothing.
         ///
         public func body(_ task: Content) async throws -> Input {
             let result = try await task.result()
 
-            guard
-                statusCodes.isEmpty || statusCodes.contains(StatusCode(result.head.status.code))
-            else {
+            guard statusCodes.contains(StatusCode(result.head.status.code)) else {
                 throw InvalidStatusCodeError<Content.Element>(data: result)
             }
 
