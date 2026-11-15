@@ -472,12 +472,71 @@ struct DiskStorage: Sendable {
                 )
             else { return nil }
 
+            guard await hasReadableBody(record, response: cachedResponse) else {
+                return nil
+            }
+
             index.markUsed(key)
 
             return await .init(
                 cachedResponse: cachedResponse,
                 buffer: dataBuffer(for: record)
             )
+        }
+    }
+
+    /// Whether the body of an encrypted `record` can be told apart from one that was never
+    /// finished, which is the one thing nothing above this type can do for it.
+    ///
+    /// A `data.record` with no final chunk (a writer killed before `close()`, with the rest of
+    /// the body only ever in memory) opens with nothing readable, exactly like an empty body, and
+    /// is then served as a `200` with no content. `Content-Length` would catch it, but a chunked,
+    /// HTTP/2 or compressed response has none to compare against. So the file is checked here, by
+    /// its size alone, and an entry that fails is a miss.
+    ///
+    /// A file with no bytes at all is what a body that was never written through leaves too (the
+    /// output stream opens on the first write, so there is no header and no final chunk), and it
+    /// is also what a writer killed before its first chunk leaves. It is only believed when the
+    /// response says it has no body.
+    ///
+    /// - Note: Not retried past the first answer when the size is acceptable. A size that is not
+    /// is stat'd again for as long as `Internals.Buffer.init(addressing:)` would, since the same
+    /// stat can report a file smaller than what was written under heavy disk contention, and a
+    /// healthy entry should not be lost to it.
+    private func hasReadableBody(_ record: Record, response: CachedResponse) async -> Bool {
+        guard encryptionKey != nil else {
+            return true
+        }
+
+        let url = Internals.FileBufferURL(record.dataURL)
+        let attempts = 30
+
+        for attempt in 0..<attempts {
+            let size = await url.writtenBytes
+
+            if Internals.EncryptedFileStreamBuffer.hasFinalChunk(rawSize: size) {
+                return true
+            }
+
+            if size == .zero, Self.declaresNoBody(response) {
+                return true
+            }
+
+            if attempt + 1 < attempts {
+                try? await Task.sleep(nanoseconds: 10_000_000)
+            }
+        }
+
+        return false
+    }
+
+    private static func declaresNoBody(_ response: CachedResponse) -> Bool {
+        if response.response.status.code == 204 || response.response.status.code == 205 {
+            return true
+        }
+
+        return response.response.headers.contains {
+            $0.name.lowercased() == "content-length" && Int($0.value.filter { !$0.isWhitespace }) == 0
         }
     }
 

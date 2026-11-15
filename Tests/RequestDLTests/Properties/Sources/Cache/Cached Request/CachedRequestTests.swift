@@ -454,6 +454,43 @@ struct CachedRequestTests {
         #expect(try responseText(response) == testState.output)
     }
 
+    /// A writer killed after whole chunks leaves an entry with no final chunk. With nothing to
+    /// compare its size to (no `Content-Length`, or a `Content-Encoding` that makes the one it
+    /// has describe other bytes) it used to open as an empty body and be answered as a `200`
+    /// with no content, where the network was the right answer.
+    @Test(arguments: [false, true])
+    func cache_whenAnEncryptedEntryWasCutAfterWholeChunks_isServedFromTheNetwork(_ isCompressed: Bool) async throws {
+        let testState = try await TestState()
+        let encryptionKey = DataCache.EncryptionKey(Data(repeating: 0x07, count: 32))
+        testState.dataCache.encryptionKey = encryptionKey
+
+        // Given: an entry of two chunks and a bit, cut right after its second whole chunk.
+        let chunkSize = Internals.EncryptedFileStreamBuffer.chunkPlaintextSize
+        let cacheData = await mockCachedData(
+            makeHeaders(maxAgeSeconds: 3_600) + (isCompressed ? [("Content-Encoding", "gzip")] : []),
+            includeContentLength: isCompressed,
+            policy: .disk,
+            body: Data(repeating: 0x5A, count: chunkSize * 2 + 100_000)
+        )
+        let cacheKey = "https://localhost:8888" + testState.uri
+
+        await testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
+        await testState.dataCache.waitUntilIdle()
+
+        try truncateStoredBody(in: testState.dataCache.directoryURL, to: 13 + (chunkSize + 16) * 2)
+
+        // When
+        let response = try await performCacheRequest(
+            testState: testState,
+            headers: makeHeaders(eTag: UUID()),
+            cacheStrategy: .returnCachedDataElseLoad,
+            encryptionKey: encryptionKey
+        )
+
+        // Then
+        #expect(try responseText(response) == testState.output)
+    }
+
     /// A chunk of an encrypted entry is authenticated whole, so the first piece vouches for the
     /// first 4 MiB only. A body that fails later, in a chunk that is neither the first nor the
     /// final one, cannot be taken back once it started, but the entry must not stay: the next
@@ -1716,6 +1753,15 @@ extension CachedRequestTests {
         var raw = try Data(contentsOf: bodyURL)
         raw[offset ?? raw.count - 1] ^= 0xFF
         try raw.write(to: bodyURL)
+    }
+
+    /// Cuts the body of the only disk entry in `directoryURL` down to its first `size` bytes.
+    func truncateStoredBody(in directoryURL: URL, to size: Int) throws {
+        let entries = try FileManager.default.contentsOfDirectory(atPath: directoryURL.path)
+        let record = try #require(entries.first { $0.hasSuffix(".cached") })
+        let bodyURL = directoryURL.appendingPathComponent(record).appendingPathComponent("data.record")
+
+        try Data(contentsOf: bodyURL).prefix(size).write(to: bodyURL)
     }
 
     func flipLastByteOfStoredBody(in directoryURL: URL) throws {

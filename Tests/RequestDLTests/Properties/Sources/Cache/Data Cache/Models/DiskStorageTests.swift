@@ -27,13 +27,17 @@ import struct Foundation.FileProtectionType
 
 struct DiskStorageTests {
 
-    private func makeCachedResponse(key: String) -> CachedResponse {
+    private func makeCachedResponse(
+        key: String,
+        statusCode: UInt = 200,
+        headers: [(String, String)] = []
+    ) -> CachedResponse {
         CachedResponse(
             response: .init(
                 url: "https://www.apple.com/\(key)",
-                status: .init(code: 200, reason: "OK"),
+                status: .init(code: statusCode, reason: "OK"),
                 version: .init(minor: 0, major: 1),
-                headers: [],
+                headers: headers.map { .init(name: $0.0, value: $0.1) },
                 isKeepAlive: true
             ),
             policy: .all
@@ -599,6 +603,166 @@ struct DiskStorageTests {
         }
 
         return try #require(nil as URL?)
+    }
+
+    private struct NotYetFlushedError: Error {}
+
+    /// Writes `plaintext` as an encrypted entry under `key` and cuts its `data.record` down to
+    /// `rawSize(fullSize)` bytes, which is what a writer killed before `close()` leaves behind
+    /// when the cut falls after whole chunks.
+    private func storeEncryptedEntry(
+        in storage: DiskStorage,
+        directoryURL: URL,
+        key: String = "k1",
+        statusCode: UInt = 200,
+        headers: [(String, String)] = [],
+        plaintext: Data,
+        keeping rawSize: (_ fullSize: Int) -> Int = { $0 }
+    ) async throws {
+        var (buffer, _, _) = await storage.allocateBuffer(
+            key: key,
+            cachedResponse: makeCachedResponse(key: key, statusCode: statusCode, headers: headers),
+            contentLength: Int64(plaintext.count),
+            maximumCapacity: .max
+        )
+        await buffer?.writeData(plaintext)
+        try? await buffer?.close()
+
+        let recordURL = try await encryptedRecordDirectoryURL(in: directoryURL)
+        let dataURL = recordURL.appendingPathComponent("data.record")
+        let raw = try await readWithRetry { () -> Data in
+            let raw = try Data(contentsOf: dataURL)
+            // The body is flushed by a task that outlives `close()`, so it can still be growing.
+            guard plaintext.isEmpty || raw.count > 13 else { throw NotYetFlushedError() }
+            return raw
+        }
+
+        try raw.prefix(rawSize(raw.count)).write(to: dataURL)
+    }
+
+    /// A writer killed after flushing whole chunks, with the rest of the body only ever in memory,
+    /// leaves a `data.record` with no final chunk. The cache has no `Content-Length` to compare
+    /// against for a chunked or compressed response, so the storage itself has to refuse the entry:
+    /// without that it opens with nothing readable, and a reader that finds nothing to read takes
+    /// it for a body that is simply empty and serves it as a `200`.
+    @Test(arguments: [0, 5], [false, true])
+    func subscript_whenEncryptedBodyEndsWithoutAFinalChunk_shouldBeAMiss(
+        _ strayBytes: Int,
+        _ withContentLength: Bool
+    ) async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            var storage = DiskStorage(directory: directoryURL)
+            storage.encryptionKey = .init(Data(repeating: 0x02, count: 32))
+
+            let chunk = Internals.EncryptedFileStreamBuffer.chunkPlaintextSize
+            let plaintext = Data((0..<(chunk * 2 + 1_234)).map { UInt8($0 % 251) })
+
+            try await storeEncryptedEntry(
+                in: storage,
+                directoryURL: directoryURL,
+                headers: withContentLength ? [("Content-Length", String(plaintext.count))] : [],
+                plaintext: plaintext
+            ) { _ in 13 + (chunk + 16) * 2 + strayBytes }
+
+            #expect(await storage["k1"] == nil)
+        }
+    }
+
+    @Test
+    func subscript_whenEncryptedBodyIsCutInsideItsFinalChunk_shouldBeAMiss() async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            var storage = DiskStorage(directory: directoryURL)
+            storage.encryptionKey = .init(Data(repeating: 0x02, count: 32))
+
+            let chunk = Internals.EncryptedFileStreamBuffer.chunkPlaintextSize
+            let plaintext = Data((0..<(chunk + 1_234)).map { UInt8($0 % 251) })
+
+            try await storeEncryptedEntry(in: storage, directoryURL: directoryURL, plaintext: plaintext) {
+                $0 - 100
+            }
+
+            let cached = await storage["k1"]
+            var body = try #require(cached?.buffer)
+
+            // The size alone cannot tell this cut from a whole entry, so what is asked of the
+            // read is that it fails before handing anything out, not that it is hidden here.
+            let piece = await Internals.CacheControl.readPiece(of: &body)
+            #expect(piece == nil)
+        }
+    }
+
+    @Test(arguments: [1, 2])
+    func subscript_whenEncryptedBodyIsIntact_shouldStillBeAHit(_ chunks: Int) async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            var storage = DiskStorage(directory: directoryURL)
+            storage.encryptionKey = .init(Data(repeating: 0x02, count: 32))
+
+            let chunk = Internals.EncryptedFileStreamBuffer.chunkPlaintextSize
+            let plaintext = Data((0..<(chunk * chunks + 1_234)).map { UInt8($0 % 251) })
+
+            try await storeEncryptedEntry(in: storage, directoryURL: directoryURL, plaintext: plaintext)
+
+            let cached = try #require(await storage["k1"])
+            #expect(cached.buffer.readableBytes == plaintext.count)
+            #expect(await cached.buffer.getData() == plaintext)
+        }
+    }
+
+    /// An empty body that was closed carries a header and the tag of an empty final chunk, 29
+    /// bytes, and has to keep reading as an empty body.
+    @Test
+    func subscript_whenEncryptedBodyIsEmptyButSealed_shouldStillBeAHit() async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            var storage = DiskStorage(directory: directoryURL)
+            let key = DataCache.EncryptionKey(Data(repeating: 0x02, count: 32))
+            storage.encryptionKey = key
+
+            try await storeEncryptedEntry(in: storage, directoryURL: directoryURL, plaintext: Data([0x01]))
+
+            let recordURL = try await encryptedRecordDirectoryURL(in: directoryURL)
+            let dataURL = recordURL.appendingPathComponent("data.record")
+
+            // Replace the body with what a closed writer that was never given a byte writes.
+            try Data().write(to: dataURL)
+            let url = Internals.EncryptedFileBufferURL(inner: .init(dataURL), key: key.symmetricKey)
+            let writer = try await Internals.EncryptedFileStreamBuffer(writingTo: url)
+            try await writer.close()
+            #expect(try Data(contentsOf: dataURL).count == 13 + 16)
+
+            let cached = try #require(await storage["k1"])
+            #expect(cached.buffer.readableBytes == 0)
+        }
+    }
+
+    /// An empty body that was never written through is a file with no bytes at all: the output
+    /// stream is opened by the first write, so a response with nothing to write never gets a
+    /// header or a final chunk. That is also what a writer killed before its first chunk leaves,
+    /// so only a response that says it has no body can be believed.
+    @Test(arguments: [
+        (UInt(200), [("Content-Length", "0")], true),
+        (UInt(204), [], true),
+        (UInt(200), [], false),
+        (UInt(200), [("Content-Length", "10")], false),
+    ])
+    func subscript_whenEncryptedBodyHasNoBytesAtAll_shouldBeAHitOnlyForAResponseWithoutABody(
+        _ statusCode: UInt,
+        _ headers: [(String, String)],
+        _ isHit: Bool
+    ) async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            var storage = DiskStorage(directory: directoryURL)
+            storage.encryptionKey = .init(Data(repeating: 0x02, count: 32))
+
+            let (buffer, _, _) = await storage.allocateBuffer(
+                key: "k1",
+                cachedResponse: makeCachedResponse(key: "k1", statusCode: statusCode, headers: headers),
+                contentLength: 0,
+                maximumCapacity: .max
+            )
+            try? await buffer?.close()
+
+            #expect((await storage["k1"] != nil) == isHit)
+        }
     }
 
     @Test

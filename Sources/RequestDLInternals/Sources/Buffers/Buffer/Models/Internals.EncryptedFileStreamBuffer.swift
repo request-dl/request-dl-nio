@@ -353,6 +353,15 @@ extension Internals {
             return Int(finalIndex) * chunkPlaintextSize + Int(finalOnDiskSize) - tagSize
         }
 
+        /// Whether a file of `rawSize` bytes can be a closed writer's: one that holds a final chunk.
+        ///
+        /// What a storage asks before it opens a body, since a file that fails this reads as
+        /// nothing at all (``plaintextSize(fromRawSize:)`` is `0`), which is indistinguishable
+        /// from an empty body once it has been opened.
+        package static func hasFinalChunk(rawSize: Int) -> Bool {
+            finalChunkIndex(rawSize: UInt64(max(0, rawSize))) != nil
+        }
+
         /// The index of the final (`isLast=true`) chunk of a file of `rawSize` bytes, or `nil`
         /// when no closed writer could have produced a file of that size.
         ///
