@@ -220,6 +220,63 @@ struct ServerSentEventParserTests {
     }
 
     @Test
+    func feed_whenEventTypeIsEmpty_shouldFallBackToMessage() {
+        // Given
+        var parser = ServerSentEventParser()
+
+        // When
+        let events = parser.feed(Data("event:\ndata: hello\n\nevent: \ndata: world\n\n".utf8))
+
+        // Then
+        #expect(
+            events == [
+                ServerSentEvent(id: nil, event: "message", data: "hello", retry: nil),
+                ServerSentEvent(id: nil, event: "message", data: "world", retry: nil),
+            ]
+        )
+    }
+
+    @Test
+    func feed_whenEventTypeIsClearedByEmptyValue_shouldFallBackToMessage() {
+        // Given
+        var parser = ServerSentEventParser()
+
+        // When
+        let events = parser.feed(Data("event: greeting\nevent:\ndata: hello\n\n".utf8))
+
+        // Then
+        #expect(events == [ServerSentEvent(id: nil, event: "message", data: "hello", retry: nil)])
+    }
+
+    @Test
+    func feed_whenRetryIsSet_shouldPersistAsTheStreamReconnectionTime() {
+        // Given
+        var parser = ServerSentEventParser()
+
+        // When
+        let first = parser.feed(Data("retry: 3000\ndata: hello\n\n".utf8))
+        let second = parser.feed(Data("data: world\n\n".utf8))
+
+        // Then
+        #expect(first.map(\.retry) == [3000])
+        #expect(second.map(\.retry) == [3000])
+    }
+
+    @Test
+    func feed_whenRetryOverflowsInt_shouldKeepThePreviousValue() {
+        // Given
+        var parser = ServerSentEventParser()
+
+        // When
+        let events = parser.feed(
+            Data("retry: 3000\nretry: 99999999999999999999999999\ndata: hello\n\n".utf8)
+        )
+
+        // Then
+        #expect(events.map(\.retry) == [3000])
+    }
+
+    @Test
     func feed_whenFieldHasNoColon_shouldTreatItAsFieldNameWithEmptyValue() {
         // Given
         var parser = ServerSentEventParser()
