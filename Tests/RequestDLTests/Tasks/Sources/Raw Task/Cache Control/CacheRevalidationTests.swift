@@ -215,15 +215,15 @@ struct CacheRevalidationTests {
 
     @Test
     func revalidation_whenA304RepeatsTheSameCacheControl_servesTheEntryInsteadOfGoingToTheNetwork() async throws {
-        // Given: a stale entry (stored ten seconds ago with a `max-age` of five), and a server
+        // Given: a stale entry (stored two hours ago with a `max-age` of one hour), and a server
         // that answers the conditional request with a 304 that says the same thing again.
         let dataCache = makeCache()
         let configuration = makeConfiguration(strategy: .reloadAndValidateCachedData)
-        let headers = [("ETag", "\"v1\""), ("Cache-Control", "public, max-age=5")]
+        let headers = [("ETag", "\"v1\""), ("Cache-Control", "public, max-age=3600")]
 
-        await store(response(headers, age: 10), key: configuration.url, in: dataCache)
+        await store(response(headers, age: 7_200), key: configuration.url, in: dataCache)
 
-        let client = Client(head: head(status: 304, [("Cache-Control", "public, max-age=5")]))
+        let client = Client(head: head(status: 304, [("Cache-Control", "public, max-age=3600")]))
 
         // When
         let output = await decide(configuration, in: dataCache, client: client)
@@ -238,11 +238,11 @@ struct CacheRevalidationTests {
         // Given
         let dataCache = makeCache()
         let configuration = makeConfiguration(strategy: .reloadAndValidateCachedData)
-        let headers = [("ETag", "\"v1\""), ("Cache-Control", "public, max-age=5")]
+        let headers = [("ETag", "\"v1\""), ("Cache-Control", "public, max-age=3600")]
 
-        await store(response(headers, age: 10), key: configuration.url, in: dataCache)
+        await store(response(headers, age: 7_200), key: configuration.url, in: dataCache)
 
-        let client = Client(head: head(status: 304, [("Cache-Control", "public, max-age=5")]))
+        let client = Client(head: head(status: 304, [("Cache-Control", "public, max-age=3600")]))
         _ = await decide(configuration, in: dataCache, client: client)
 
         // When: the next request takes what is stored without asking the origin again.
@@ -261,7 +261,7 @@ struct CacheRevalidationTests {
         let configuration = makeConfiguration(strategy: .reloadAndValidateCachedData)
 
         await store(
-            response([("ETag", "\"v1\""), ("Cache-Control", "public, max-age=5")], age: 10),
+            response([("ETag", "\"v1\""), ("Cache-Control", "public, max-age=3600")], age: 7_200),
             key: configuration.url,
             in: dataCache
         )
