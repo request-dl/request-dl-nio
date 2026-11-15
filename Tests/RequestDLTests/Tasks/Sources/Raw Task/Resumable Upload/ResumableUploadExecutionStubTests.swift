@@ -2,6 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Dispatch
 import SwiftAsyncStream
 import Testing
 
@@ -126,7 +127,7 @@ struct ResumableUploadExecutionStubTests {
                 entered.withLockedValue { $0 = true }
                 await gate.wait()
 
-                return Self.sessionTask(
+                return await Self.sessionTask(
                     head: Self.head(status: 201, headers: [("Location", "/uploads/1")]),
                     seed: Internals.TaskSeed { cancelled.withLockedValue { $0 = true } }
                 )
@@ -167,7 +168,7 @@ struct ResumableUploadExecutionStubTests {
                     await gate.wait()
                 }
 
-                return Self.sessionTask(
+                return await Self.sessionTask(
                     head: Self.head(status: 201, headers: [("Location", "https://uploads.example.net/u/1")])
                 )
             }
@@ -207,7 +208,7 @@ struct ResumableUploadExecutionStubTests {
                     await gate.wait()
                 }
 
-                return Self.sessionTask(head: Self.head(status: 201, headers: [("Location", "/uploads/1")]))
+                return await Self.sessionTask(head: Self.head(status: 201, headers: [("Location", "/uploads/1")]))
             }
         )
 
@@ -241,7 +242,7 @@ struct ResumableUploadExecutionStubTests {
                     await gate.wait()
                 }
 
-                return Self.sessionTask(head: Self.head(status: 201, headers: [("Location", "/uploads/1")]))
+                return await Self.sessionTask(head: Self.head(status: 201, headers: [("Location", "/uploads/1")]))
             }
         )
 
@@ -274,7 +275,7 @@ struct ResumableUploadExecutionStubTests {
                     await gate.wait()
                 }
 
-                return Self.sessionTask(head: Self.head(status: 201, headers: [("Location", "/uploads/1")]))
+                return await Self.sessionTask(head: Self.head(status: 201, headers: [("Location", "/uploads/1")]))
             }
         )
 
@@ -300,7 +301,7 @@ struct ResumableUploadExecutionStubTests {
             client: ScriptedClient { configuration in
                 methods.withLockedValue { $0.append(configuration.method ?? "") }
                 await gate.wait()
-                return Self.sessionTask(head: Self.head(status: 201, headers: [("Location", "/uploads/1")]))
+                return await Self.sessionTask(head: Self.head(status: 201, headers: [("Location", "/uploads/1")]))
             }
         )
 
@@ -326,10 +327,10 @@ struct ResumableUploadExecutionStubTests {
                 methods.withLockedValue { $0.append(configuration.method ?? "") }
 
                 if configuration.method == "PATCH" {
-                    return Self.sessionTask(head: Self.head(status: 200), body: .endless)
+                    return await Self.sessionTask(head: Self.head(status: 200), body: .endless)
                 }
 
-                return Self.sessionTask(head: Self.head(status: 201, headers: [("Location", "/uploads/1")]))
+                return await Self.sessionTask(head: Self.head(status: 201, headers: [("Location", "/uploads/1")]))
             }
         )
 
@@ -365,7 +366,7 @@ struct ResumableUploadExecutionStubTests {
                     await gate.wait()
                 }
 
-                return Self.sessionTask(head: Self.head(status: 201, headers: [("Location", "/uploads/1")]))
+                return await Self.sessionTask(head: Self.head(status: 201, headers: [("Location", "/uploads/1")]))
             }
         )
 
@@ -381,6 +382,196 @@ struct ResumableUploadExecutionStubTests {
         #expect(methods.withLockedValue { $0 } == ["PUT", "PATCH"])
     }
 
+    // MARK: - A server whose offset does not hold still
+
+    /// Two replicas behind one balancer that hold 10 and 5 bytes, and answer in turn. The offset
+    /// that is adopted moves forward and back, and what counts as progress is getting past the
+    /// furthest the server was ever said to be, not past where it last said it was.
+    @Test
+    func aServerWhoseOffsetKeepsMovingBackAndForth_isGivenUpOn() async throws {
+        // Given
+        let patches = LockedValueBox(0)
+
+        let execution = try await Self.execution(
+            client: ScriptedClient { configuration in
+                guard configuration.method == "PATCH" else {
+                    return await Self.sessionTask(head: Self.head(status: 201, headers: [("Location", "/uploads/1")]))
+                }
+
+                let count = patches.withLockedValue { value -> Int in
+                    value += 1
+                    return value
+                }
+
+                // A server that would be satisfied after enough of this, so that a client that
+                // never gives up ends the test instead of hanging it.
+                guard count <= 40 else {
+                    return await Self.sessionTask(head: Self.head(status: 200))
+                }
+
+                return await await Self.sessionTask(
+                    head: Self.head(status: 409, headers: [("Upload-Offset", count.isMultiple(of: 2) ? "5" : "10")])
+                )
+            }
+        )
+
+        // When
+        execution.start()
+
+        // Then
+        await #expect(throws: UploadResumptionError(.conflictingOffsets)) {
+            for try await _ in execution.response {}
+        }
+
+        // The first, and the three that were allowed after it, give or take the one that moved forward.
+        #expect(patches.withLockedValue { $0 } <= 6)
+    }
+
+    @Test
+    func attemptsThatMoveNothingNew_waitBeforeTheNextOne() async throws {
+        // Given: a server that disagrees, and says it holds nothing, every time.
+        let instants = LockedValueBox<[UInt64]>([])
+
+        let execution = try await Self.execution(
+            delay: 100_000_000,
+            client: ScriptedClient { configuration in
+                guard configuration.method == "PATCH" else {
+                    return await Self.sessionTask(head: Self.head(status: 201, headers: [("Location", "/uploads/1")]))
+                }
+
+                instants.withLockedValue { $0.append(DispatchTime.now().uptimeNanoseconds) }
+                return await Self.sessionTask(head: Self.head(status: 409, headers: [("Upload-Offset", "0")]))
+            }
+        )
+
+        // When
+        execution.start()
+
+        await #expect(throws: UploadResumptionError(.conflictingOffsets)) {
+            for try await _ in execution.response {}
+        }
+
+        // Then: each attempt after the first waited, instead of asking again right away.
+        let recorded = instants.withLockedValue { $0 }
+        #expect(recorded.count >= 3)
+
+        for (previous, next) in zip(recorded, recorded.dropFirst()) {
+            #expect(next - previous >= 80_000_000)
+        }
+    }
+
+    @Test
+    func aServerThatKeepsPartOfEveryAttempt_isNotMadeToWaitBetweenThem() async throws {
+        // Given: each `PATCH` moves the upload forward by 100 bytes, which is what a server with a
+        // limit on what it takes at once does, and is no reason to wait.
+        let patches = LockedValueBox(0)
+
+        let execution = try await Self.execution(
+            delay: 5_000_000_000,
+            client: ScriptedClient { configuration in
+                guard configuration.method == "PATCH" else {
+                    return await Self.sessionTask(head: Self.head(status: 201, headers: [("Location", "/uploads/1")]))
+                }
+
+                let count = patches.withLockedValue { value -> Int in
+                    value += 1
+                    return value
+                }
+
+                guard count < 5 else {
+                    return await Self.sessionTask(head: Self.head(status: 200))
+                }
+
+                return await await Self.sessionTask(
+                    head: Self.head(status: 409, headers: [("Upload-Offset", String(count * 100))])
+                )
+            }
+        )
+
+        // When
+        execution.start()
+
+        // Then: far sooner than a single delay.
+        let start = DispatchTime.now().uptimeNanoseconds
+        for try await _ in execution.response {}
+        let elapsed = DispatchTime.now().uptimeNanoseconds - start
+
+        #expect(elapsed < 3_000_000_000)
+        #expect(patches.withLockedValue { $0 } == 5)
+    }
+
+    // MARK: - Where the upload lives
+
+    // MARK: - Cancelling, again
+
+    @Test
+    func cancellingTwice_tellsTheServerOnce() async throws {
+        // Given: a body that is being sent.
+        let methods = LockedValueBox<[String]>([])
+        let gate = Gate()
+
+        let execution = try await Self.execution(
+            client: ScriptedClient { configuration in
+                methods.withLockedValue { $0.append(configuration.method ?? "") }
+
+                if configuration.method == "PATCH" {
+                    await gate.wait()
+                }
+
+                return await Self.sessionTask(head: Self.head(status: 201, headers: [("Location", "/uploads/1")]))
+            }
+        )
+
+        execution.start()
+        try await eventually { methods.withLockedValue { $0 }.contains("PATCH") }
+
+        // When: whoever holds the response, and the seed it dropped, both end it.
+        execution.cancel()
+        execution.cancel()
+        gate.open()
+
+        // Then
+        try await eventually { methods.withLockedValue { $0 }.contains("DELETE") }
+        try await _Concurrency.Task.sleep(nanoseconds: 300_000_000)
+        #expect(methods.withLockedValue { $0 }.filter { $0 == "DELETE" }.count == 1)
+    }
+
+    @Test
+    func cancellingWhileTheResponseWaitsForItsReader_endsTheUpload() async throws {
+        // Given: a response whose body nobody reads, so the execution is held back in front of
+        // room that is never made.
+        let delivered = LockedValueBox(false)
+        let reference = WeakReference<ResumableUploadExecution>()
+
+        do {
+            let execution = try await Self.execution(
+                client: ScriptedClient { configuration in
+                    if configuration.method == "PATCH" {
+                        delivered.withLockedValue { $0 = true }
+                        return await Self.sessionTask(
+                            head: Self.head(status: 200),
+                            body: .piecesThenEndless(count: 8, size: 1_048_576)
+                        )
+                    }
+
+                    return await Self.sessionTask(head: Self.head(status: 201, headers: [("Location", "/uploads/1")]))
+                }
+            )
+
+            reference.value = execution
+            execution.start()
+
+            try await eventually { delivered.withLockedValue { $0 } }
+            try await _Concurrency.Task.sleep(nanoseconds: 500_000_000)
+
+            // When
+            execution.cancel()
+        }
+
+        // Then: nothing is left holding the execution.
+        try await eventually(timeout: 10) { reference.value == nil }
+    }
+
     // MARK: - A body that breaks
 
     @Test
@@ -389,13 +580,13 @@ struct ResumableUploadExecutionStubTests {
         let execution = try await Self.execution(
             client: ScriptedClient { configuration in
                 if configuration.method == "PATCH" {
-                    return Self.sessionTask(
+                    return await Self.sessionTask(
                         head: Self.head(status: 200),
                         body: .failure(StubError())
                     )
                 }
 
-                return Self.sessionTask(head: Self.head(status: 201, headers: [("Location", "/uploads/1")]))
+                return await Self.sessionTask(head: Self.head(status: 201, headers: [("Location", "/uploads/1")]))
             }
         )
 
@@ -444,6 +635,10 @@ struct ResumableUploadExecutionStubTests {
     }
 
     // MARK: - Helpers
+
+    private final class WeakReference<Object: AnyObject>: @unchecked Sendable {
+        weak var value: Object?
+    }
 
     private final class Gate: @unchecked Sendable {
 
@@ -497,13 +692,16 @@ struct ResumableUploadExecutionStubTests {
 
         /// A body that has begun and never ends.
         case endless
+
+        /// A body that gives `count` pieces of `size` bytes and then never ends.
+        case piecesThenEndless(count: Int, size: Int)
     }
 
     private static func sessionTask(
         head: Internals.ResponseHead,
         body: Body = .success(Data()),
         seed: Internals.TaskSeed = .withoutCancellation
-    ) -> SessionTask {
+    ) async -> SessionTask {
         let upload = Internals.AsyncStream<Int>()
         let heads = Internals.AsyncStream<Internals.ResponseHead>()
         let download = Internals.AsyncStream<Internals.DataBuffer>()
@@ -519,6 +717,10 @@ struct ResumableUploadExecutionStubTests {
             download.append(.failure(error))
         case .endless:
             break
+        case .piecesThenEndless(let count, let size):
+            for _ in 0..<count {
+                download.append(.success(await Internals.DataBuffer(Data(repeating: 7, count: size))))
+            }
         }
 
         return SessionTask(
@@ -539,6 +741,7 @@ struct ResumableUploadExecutionStubTests {
         dialect: any ResumableUploadDialect = IETFResumableUploadDialect(),
         cancellation: UploadCancellation = .terminate,
         forwardsCredentialsToOtherOrigins: Bool = false,
+        delay: UInt64 = 1_000_000,
         client: ScriptedClient
     ) async throws -> ResumableUploadExecution {
         var request = RequestConfiguration()
@@ -555,7 +758,7 @@ struct ResumableUploadExecutionStubTests {
             client: client,
             setup: ResumableUploadSetup(
                 dialect: dialect,
-                delay: 1_000_000,
+                delay: delay,
                 cancellation: cancellation,
                 forwardsCredentialsToOtherOrigins: forwardsCredentialsToOtherOrigins
             ),
