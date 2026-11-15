@@ -99,6 +99,40 @@ struct InternalsRawBytesIdentityBuilderKeychainTests {
         #expect(!fixture.hasCertificate, "the certificate item outlived its last handle")
     }
 
+    /// Two certificates for one key (a renewal) share the key item: it goes with the last of
+    /// them, and each certificate with its own handle.
+    @Test
+    func release_whenTwoCertificatesShareAKey_keepsTheKeyUntilTheLastOne() throws {
+        // Given
+        let first = try Fixture()
+        let second = try first.makeSecondCertificateForTheSameKey()
+        defer {
+            first.cleanUp()
+            second.cleanUp()
+        }
+
+        var firstHandle: Internals.IdentityHandle? = try Internals.RawBytesIdentityBuilder.makeIdentity(
+            certificateDER: first.certificateDER,
+            privateKeyDER: first.pkcs1
+        )
+        let secondHandle = try Internals.RawBytesIdentityBuilder.makeIdentity(
+            certificateDER: second.certificateDER,
+            privateKeyDER: first.pkcs8
+        )
+
+        // When
+        #expect(firstHandle !== secondHandle)
+        firstHandle = nil
+
+        // Then: only the first certificate is gone; the key still serves the second.
+        withExtendedLifetime(secondHandle) {
+            #expect(!first.hasCertificate, "the first certificate outlived its handle")
+            #expect(second.hasCertificate, "the second handle's certificate was deleted")
+            #expect(second.hasPrivateKey, "the key was deleted under the second handle")
+            #expect(second.canSign(with: secondHandle.identity), "the second handle can no longer sign")
+        }
+    }
+
     // MARK: - Failed builds
 
     /// A key that is not the certificate's (a plain misconfiguration) never pairs into an
@@ -243,8 +277,13 @@ extension InternalsRawBytesIdentityBuilderKeychainTests {
         let pkcs1: Data
         let pkcs8: Data
 
+        private let key: _RSA.Signing.PrivateKey
+
         init() throws {
-            let key = try _RSA.Signing.PrivateKey(keySize: .bits2048)
+            try self.init(key: _RSA.Signing.PrivateKey(keySize: .bits2048))
+        }
+
+        private init(key: _RSA.Signing.PrivateKey) throws {
             let commonName = "request-dl-test-\(UUID().uuidString)"
             let name = try DistinguishedName { CommonName(commonName) }
             let now = Date()
@@ -262,10 +301,16 @@ extension InternalsRawBytesIdentityBuilderKeychainTests {
                 issuerPrivateKey: Certificate.PrivateKey(key)
             )
 
+            self.key = key
             self.commonName = commonName
             self.certificateDER = Data(try certificate.serializeAsPEM().derBytes)
             self.pkcs1 = key.derRepresentation
             self.pkcs8 = key.pkcs8DERRepresentation
+        }
+
+        /// Another certificate, with its own subject and serial, for the same key.
+        func makeSecondCertificateForTheSameKey() throws -> Fixture {
+            try Fixture(key: key)
         }
 
         /// A fresh RSA key (PKCS#1), unrelated to any certificate.

@@ -29,7 +29,10 @@ extension Internals {
         /// The certificate this handle's build put in the Keychain, when it did (see
         /// `RawBytesIdentityBuilder.StoredIdentity/addedCertificate`). It is what the handle
         /// deletes the certificate item by.
-        fileprivate let ownedCertificate: SecCertificate?
+        ///
+        /// Only read and written under ``IdentityManager``'s lock: a release that finds this
+        /// handle already registered for its label hands the certificate over (see `release`).
+        fileprivate var ownedCertificate: SecCertificate?
 
         /// Which Keychain the items behind `identity` were stored in, so that releasing the
         /// handle deletes from that same one. On macOS the build can land in either, depending
@@ -168,7 +171,7 @@ extension Internals {
         /// The deletion targets the Keychain the releasing handle was built in, not a fixed one:
         /// a signed macOS app stores in the data-protection Keychain, and deleting from the
         /// legacy one would leave the imported private key behind for good.
-        fileprivate func release(
+        func release(
             label: String,
             keyLabel: String,
             ownedCertificate: SecCertificate?,
@@ -179,6 +182,13 @@ extension Internals {
                 keyUsers[keyLabel] = remainingKeyUsers > 0 ? remainingKeyUsers : nil
 
                 guard live[label]?.value == nil else {
+                    // The newer handle for this label was built while this one was dying, so it
+                    // found the certificate this handle had added "already there" and does not
+                    // own it. This is the last reference to it that can delete it: pass it on, or
+                    // the certificate stays in the (legacy) keychain for good.
+                    if let ownedCertificate, let newer = live[label]?.value, newer.ownedCertificate == nil {
+                        newer.ownedCertificate = ownedCertificate
+                    }
                     return
                 }
 

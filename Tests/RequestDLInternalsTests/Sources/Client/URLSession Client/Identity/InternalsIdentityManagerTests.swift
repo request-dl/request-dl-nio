@@ -268,6 +268,71 @@ extension InternalsIdentityManagerTests {
     }
 }
 
+extension InternalsIdentityManagerTests {
+
+    /// A new handle can be registered for a label while the old one is already dying (its weak
+    /// reference is zeroed before its `deinit` takes the lock). The new one found the old one's
+    /// certificate "already there" and does not own it, so the old one's release hands it over,
+    /// or nobody would ever delete it.
+    @Test
+    func release_whenANewerHandleIsAlreadyRegisteredForTheLabel_handsItTheCertificate() async throws {
+        func run() throws {
+            // Given
+            let client = Certificates().client()
+            let secureConnection = Internals.SecureConnection.testMTLSConnection(client: client)
+
+            let certificateChain = try #require(secureConnection.certificateChain)
+            let certificateDER = try #require(
+                try Internals.RawBytesIdentityBuilder.certificateDERs(from: certificateChain).first
+            )
+            let privateKeySource = try #require(secureConnection.privateKey)
+            let privateKeyDER = try Internals.RawBytesIdentityBuilder.privateKeyDER(from: privateKeySource)
+
+            let source = try Internals.RawBytesIdentityBuilder.makeIdentity(
+                certificateDER: certificateDER,
+                privateKeyDER: privateKeyDER
+            )
+            let certificate = try Internals.RawBytesIdentityBuilder.certificate(fromDER: certificateDER)
+
+            let deletions = LockedValueBox<[String]>([])
+            let manager = Internals.IdentityManager { label, certificate, _ in
+                deletions.withLockedValue { $0.append("\(label):\(certificate == nil ? "label" : "reference")") }
+            }
+
+            var newer: Internals.IdentityHandle? = try manager.handle(for: "cert") {
+                (source.identity, false, nil)
+            }
+
+            // When: the older handle's release runs while the newer one is registered.
+            manager.release(
+                label: "cert",
+                keyLabel: "cert",
+                ownedCertificate: certificate,
+                useDataProtectionKeychain: false
+            )
+
+            #expect(deletions.withLockedValue { $0 }.isEmpty)
+
+            // Then: the newer one deletes it with its own release.
+            newer = nil
+
+            #expect(deletions.withLockedValue { $0 } == ["cert:reference"])
+
+            _ = newer
+        }
+
+        #if os(macOS)
+        try run()
+        #else
+        await withKnownIssue(
+            "no Keychain Sharing entitlement on this platform's SwiftPM-generated Xcode scheme; see RequestConfigurationURLSessionClientMTLSTests's own doc comment"
+        ) {
+            try run()
+        }
+        #endif
+    }
+}
+
 extension Internals.SecureConnection {
 
     fileprivate static func testMTLSConnection(client: CertificateResource) -> Self {

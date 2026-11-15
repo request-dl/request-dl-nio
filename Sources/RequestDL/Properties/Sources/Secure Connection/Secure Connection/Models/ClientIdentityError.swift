@@ -95,6 +95,8 @@ public struct ClientIdentityError: Error, Sendable {
                 self = .keychainOperationFailed(operation: operation, status: status)
             case .identityLookupReturnedWrongType:
                 self = .identityLookupReturnedWrongType
+            case .privateKeyDoesNotMatchCertificate:
+                self = .keyCreationFailed(message: "it is not the private key of the configured certificate")
             }
         }
     }

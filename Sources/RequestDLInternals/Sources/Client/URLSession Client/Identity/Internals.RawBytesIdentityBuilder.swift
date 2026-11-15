@@ -35,6 +35,9 @@ extension Internals {
             case missingKeychainSharingEntitlement(operation: String)
             case identityLookupReturnedWrongType
 
+            /// The private key is not the one of the certificate: no identity can be built from them.
+            case privateKeyDoesNotMatchCertificate
+
             package var description: String {
                 switch self {
                 case .invalidCertificateData:
@@ -68,6 +71,8 @@ extension Internals {
                         """
                 case .identityLookupReturnedWrongType:
                     return "SecItemCopyMatching(kSecClassIdentity) returned an unexpected type."
+                case .privateKeyDoesNotMatchCertificate:
+                    return "The private key is not the one of the configured certificate (their public keys differ)."
                 }
             }
         }
@@ -687,10 +692,7 @@ extension Internals {
             }
 
             guard Data(Insecure.SHA1.hash(data: representation)) == applicationLabel else {
-                throw Error.keychainOperationFailed(
-                    errSecItemNotFound,
-                    operation: "matching identity by certificate (the private key is not the certificate's)"
-                )
+                throw Error.privateKeyDoesNotMatchCertificate
             }
         }
 

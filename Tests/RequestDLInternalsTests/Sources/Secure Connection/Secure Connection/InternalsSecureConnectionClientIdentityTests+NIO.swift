@@ -107,6 +107,34 @@ struct InternalsSecureConnectionClientIdentityTests {
         #expect(asSingleCertificate.networkFrameworkIncompatibilityReasons().isEmpty)
     }
 
+    /// The answer is remembered, so a file is not read for every request, but a file that changed
+    /// is read again.
+    @Test
+    func networkFrameworkIncompatibilityReasons_whenTheChainFileChanges_followsIt() throws {
+        // Given
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("client-chain-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let file = directory.appendingPathComponent("chain.pem")
+        try Data(try Self.pem("client_chain_leaf")).write(to: file)
+
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.certificateChain = .file(file.path)
+
+        // When / Then
+        #expect(secureConnection.networkFrameworkIncompatibilityReasons().isEmpty)
+        #expect(secureConnection.networkFrameworkIncompatibilityReasons().isEmpty)
+
+        try Data(try Self.leafAndIntermediatePEM()).write(to: file)
+
+        #expect(
+            secureConnection.networkFrameworkIncompatibilityReasons()
+                .contains(.multipleClientCertificatesUnderNetworkFramework)
+        )
+    }
+
     /// What cannot be read now is reported when the identity is built, with its own error; the
     /// compatibility check, which has no way to fail, must not hide it behind a different reason.
     @Test
@@ -197,11 +225,46 @@ struct InternalsSecureConnectionClientIdentityTests {
         onlyPrivateKey.privateKey = .privateKey(.init(try Self.privateKeyPEM("client_chain_leaf"), format: .pem))
 
         // Then
-        #expect(throws: (any Error).self) {
+        #expect(throws: Internals.URLSessionIdentityPolicy.ConfigurationError.self) {
             _ = try onlyCertificate.build(isCompatibleWithNetworkFramework: true)
         }
-        #expect(throws: (any Error).self) {
+        #expect(throws: Internals.URLSessionIdentityPolicy.ConfigurationError.self) {
             _ = try onlyPrivateKey.build(isCompatibleWithNetworkFramework: true)
+        }
+    }
+
+    /// What the executor choice sees, not only the reasons: a chain with an intermediate in one
+    /// PEM keeps Network.framework from being picked, even when it is asked for, and from being
+    /// forced.
+    @Test
+    func
+        resolveExecutor_whenNetworkFrameworkIsEnabledAndTheChainIsOnePEMWithAnIntermediate_doesNotPickNetworkFramework()
+        throws
+    {
+        // Given
+        var configuration = Internals.Session.Configuration()
+        configuration.enableNetworkFramework = true
+
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.certificateChain = .bytes(try Self.leafAndIntermediatePEM())
+        configuration.secureConnection = secureConnection
+
+        // Then: `.urlSession` sends the intermediates, so it is what is left.
+        #expect(configuration.resolveExecutor() == .urlSession)
+    }
+
+    @Test
+    func requireExecutor_whenNIOTransportServicesIsPinnedAndTheChainIsOnePEMWithAnIntermediate_throws() throws {
+        // Given
+        var configuration = Internals.Session.Configuration()
+
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.certificateChain = .bytes(try Self.leafAndIntermediatePEM())
+        configuration.secureConnection = secureConnection
+
+        // Then
+        #expect(throws: Internals.IncompatibleExecutorConfigurationError.self) {
+            try configuration.requireExecutor(.nioTransportServices)
         }
     }
     #endif

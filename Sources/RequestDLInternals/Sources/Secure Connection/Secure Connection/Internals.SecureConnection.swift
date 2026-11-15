@@ -11,6 +11,12 @@ import NIOSSL
 import Security
 #endif
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import protocol Foundation.LocalizedError
+#endif
+
 extension Internals {
 
     package struct SecureConnection: Sendable {
@@ -149,7 +155,9 @@ extension Internals {
             return reasons
         }
 
-        /// How many certificates `certificateChain` holds, read from the PEM data itself.
+        /// How many certificates `certificateChain` holds, read from the PEM data itself (see
+        /// `CertificateChain.resolvedCertificateCount`, which remembers the answer: this runs
+        /// for every request).
         ///
         /// A chain that cannot be read or parsed here is not what this answers: building the
         /// identity reports that, with its own error, and this check, which has no way to fail,
@@ -159,7 +167,7 @@ extension Internals {
                 return 0
             }
 
-            if let count = try? certificateChain.resolvedDERBytes().count {
+            if let count = certificateChain.resolvedCertificateCount {
                 return count
             }
 
@@ -477,7 +485,7 @@ extension Internals.SecureConnection {
     /// The `.urlSession` and Network.framework counterparts are
     /// `Internals.URLSessionIdentityPolicy.ConfigurationError`, which only exists on Darwin; the
     /// `.nio` executor is the one that runs everywhere, so its error cannot depend on it.
-    package enum ConfigurationError: Swift.Error, CustomStringConvertible, Equatable, Sendable {
+    package enum ConfigurationError: Swift.Error, LocalizedError, CustomStringConvertible, Equatable, Sendable {
 
         /// Only one of `certificateChain` and `privateKey` was configured.
         case incompleteClientIdentity
@@ -488,6 +496,10 @@ extension Internals.SecureConnection {
                 return
                     "mTLS needs both a certificateChain and a privateKey; only one was configured, so no client certificate would have been sent."
             }
+        }
+
+        package var errorDescription: String? {
+            description
         }
     }
 }
