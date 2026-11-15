@@ -178,7 +178,16 @@ public struct RequestConfiguration: Sendable {
     /// - Parameter uploadGate: Pauses the body between chunks while shut: an
     /// `Internals.TransferControl`'s `gate`. `nil` never pauses.
     func build(eventLoop: EventLoop, uploadGate: Internals.FlowControlWindow? = nil) throws -> HTTPClient.Request {
-        try HTTPClient.Request(
+        // AsyncHTTPClient turns a method it does not know into `.RAW(value:)` and writes it on the
+        // request line as it is, so a `\r\n` in it starts a request of the caller's own.
+        if let method {
+            try Internals.MethodValidation.validate(method)
+        }
+
+        // AsyncHTTPClient lets an empty header name through; the rule is the one `.urlSession` has.
+        try Internals.HeaderValidation.validate(headers)
+
+        return try HTTPClient.Request(
             url: url,
             method: method.map { .init(rawValue: $0) } ?? .GET,
             headers: headers.build(),
@@ -247,6 +256,12 @@ extension RequestConfiguration {
         // go out as the line `X-A: injected: v` and a NUL in a value as a NUL. `.nio` refuses both
         // (AsyncHTTPClient validates every request it sends), and so does this, with the same error.
         try Internals.HeaderValidation.validate(headers)
+
+        // `URLRequest` checks nothing here either, and CFNetwork writes `httpMethod` on the request
+        // line as it is: a `\r\n` in it starts a request of the caller's own.
+        if let method {
+            try Internals.MethodValidation.validate(method)
+        }
 
         var request = URLRequest(url: requestURL)
         request.httpMethod = method ?? "GET"

@@ -19,9 +19,10 @@ extension Internals {
     /// on the other, with a header the caller never wrote.
     ///
     /// This is the same check, with the same error, so which of the two runs a request does not
-    /// change whether it is sent. The predicates are AsyncHTTPClient's own, byte for byte (see
-    /// `RequestValidation.swift` there), not a stricter reading of the RFC: tightening them here
-    /// would make `.urlSession` refuse what `.nio` sends.
+    /// change whether it is sent. The predicates are AsyncHTTPClient's own (see
+    /// `RequestValidation.swift` there), not a stricter reading of the RFC, except for the empty
+    /// name that ``isValid(name:)`` refuses: tightening them any further here would make
+    /// `.urlSession` refuse what `.nio` sends. `.nio` applies this check too, before AsyncHTTPClient's.
     ///
     /// - Important: Not a limit on what a value may *say*. Bytes from `0x80` up are allowed,
     /// since a non-ASCII value (`José`, `日本語`) is legitimate on `.nio`, which sends it as UTF-8.
@@ -59,10 +60,16 @@ extension Internals {
             }
         }
 
-        /// Whether `name` is a `token`: made of `tchar`s (RFC 9110 §5.6.2), as AsyncHTTPClient has it, which
-        /// also lets an empty one through.
+        /// Whether `name` is a `token`: one or more `tchar`s (RFC 9110 §5.6.2).
+        ///
+        /// AsyncHTTPClient's own predicate, but for an empty name, which it lets through and a token
+        /// (at least one `tchar`) is not: it goes out as the line `: value`.
         package static func isValid(name: String) -> Bool {
-            name.utf8.allSatisfy { byte in
+            guard !name.isEmpty else {
+                return false
+            }
+
+            return name.utf8.allSatisfy { byte in
                 switch byte {
                 case UInt8(ascii: "a")...UInt8(ascii: "z"),
                     UInt8(ascii: "A")...UInt8(ascii: "Z"),
