@@ -76,8 +76,10 @@ struct Resolve<Root: Property>: Sendable {
         applyingURLOverride(&make)
 
         // Checked here, on the finished configuration, rather than by whichever property is
-        // declared last: `SecureConnection` replaces the base it's handed, so no single node
-        // sees both halves of the combination regardless of declaration order.
+        // declared last: `SecureConnection` builds on what was declared before it (or, with
+        // `.override`, replaces it), and `.verification` and the pins can come from different
+        // declarations, so no single node sees both halves of the combination regardless of
+        // declaration order.
         if make.sessionConfiguration.secureConnection?.pinsAreIgnoredWithoutCertificateVerification == true {
             Internals.Log.pinsIgnoredWithoutCertificateVerification().log(
                 level: .warning,

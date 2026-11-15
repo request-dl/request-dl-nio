@@ -76,6 +76,27 @@ struct MemoryStorageTests {
         #expect(await storage["k1"] == nil)
     }
 
+    /// A `Content-Length` is whatever the server says it is. `Int64.min` overflowed the
+    /// `maximumCapacity - contentLength` subtraction and trapped, and a negative one is no size at
+    /// all: either is turned down like an entry that does not fit, as `DiskStorage` does.
+    @Test(arguments: [-1, Int64.min])
+    func allocateBuffer_whenContentLengthIsNegative_turnsTheEntryDownWithoutTrapping(
+        contentLength: Int64
+    ) async throws {
+        var storage = MemoryStorage(directory: URL(fileURLWithPath: "/tmp"))
+
+        let (dataURL, usage) = storage.allocateBuffer(
+            key: "k1",
+            cachedResponse: makeCachedResponse(key: "k1"),
+            contentLength: contentLength,
+            maximumCapacity: .max
+        )
+
+        #expect(dataURL == nil)
+        #expect(usage == nil)
+        #expect(await storage["k1"] == nil)
+    }
+
     @Test
     func allocateBuffer_shouldReturnUsageReflectingTheNewEntry() {
         var storage = MemoryStorage(directory: URL(fileURLWithPath: "/tmp"))

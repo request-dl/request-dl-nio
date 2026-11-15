@@ -12,6 +12,7 @@ import Testing
 import FoundationEssentials
 #else
 import struct Foundation.Data
+import struct Foundation.Date
 import struct Foundation.UUID
 #endif
 
@@ -185,16 +186,32 @@ struct DataCachePromotionTests {
         #expect(finish(stored, in: dataCache) == false)
     }
 
+    /// The entry is revalidated for real: `expected` is what is stored, so the update goes through
+    /// instead of being turned away for not matching, and it is the update that has to keep the
+    /// promotion that began before it from installing the old copy.
     @Test
-    func promotion_whenTheKeyIsRevalidatedMeanwhile_isNotKept() async {
+    func promotion_whenTheKeyIsRevalidatedMeanwhile_isNotKept() async throws {
         let (dataCache, key) = makeCache()
+        try await store(100, key: key, policy: [.memory, .disk], in: dataCache)
         let stored = keyInStorage(key, in: dataCache)
-        let revalidated = response(key, policy: [.memory, .disk])
+
+        // Disk only: asking for memory too would promote the entry right here.
+        let current = try #require(await dataCache.getCachedData(forKey: key, policy: .disk)).cachedResponse
+        let revalidated = CachedResponse(
+            response: current.response,
+            policy: current.policy,
+            varyRequestHeaders: current.varyRequestHeaders,
+            date: Date().addingTimeInterval(1)
+        )
 
         #expect(dataCache.storage.beginPromotion(key: stored))
-        await dataCache.updateCached(key: key, cachedResponse: revalidated, expecting: revalidated)
+        await dataCache.updateCached(key: key, cachedResponse: revalidated, expecting: current)
 
         #expect(finish(stored, in: dataCache) == false)
+
+        // And the update did happen.
+        let afterwards = try #require(await dataCache.getCachedData(forKey: key, policy: .disk))
+        #expect(afterwards.cachedResponse.date == revalidated.date)
     }
 
     @Test
