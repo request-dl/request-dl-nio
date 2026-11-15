@@ -6,6 +6,31 @@ import RequestDLInternals
 
 /// Represents a secure connection with various configuration options.
 ///
+/// A `SecureConnection` builds on top of the secure connection configuration declared before it
+/// (``SecureConnectionMode/merging``, the default): ``SPKIPinning``, ``TrustRoots``,
+/// ``Certificates``, ``PrivateKey`` and the rest are kept, and only what the `SecureConnection`
+/// itself configures is applied over them, winning over what was there.
+///
+/// ```swift
+/// DataTask {
+///     SPKIPinning {
+///         SPKIHash("base64-encoded-active-pin")
+///     }
+///
+///     // The pins stay; only the minimum TLS version is added.
+///     SecureConnection()
+///         .version(minimum: .v1_3)
+/// }
+/// ```
+///
+/// Pass ``SecureConnectionMode/override`` to start from a blank configuration instead, discarding
+/// whatever was declared before it. That is what `SecureConnection` did before ``merging`` became
+/// the default.
+///
+/// > Important: Behavior change. A `SecureConnection` used to replace everything declared before
+/// it, silently dropping, for example, an ``SPKIPinning`` or a ``TrustRoots``. If you relied on
+/// that reset, write `SecureConnection(.override)`.
+///
 /// > Note: ``TrustRoots``, ``Certificates``, ``AdditionalTrustRoots``, ``PrivateKey``,
 /// ``PSKIdentity``, and ``DefaultTrustRoots`` don't require nesting inside a `SecureConnection`:
 /// each creates the underlying secure connection configuration on its own the first time it's
@@ -26,7 +51,8 @@ public struct SecureConnection<Content: Property>: Property {
 
     private struct Node: SecureConnectionPropertyNode {
 
-        let secureConnection: Internals.SecureConnection
+        let mode: SecureConnectionMode
+        let edits: [@Sendable (inout Internals.SecureConnection) -> Void]
         let nodes: [LeafNode<SecureConnectionNode>]
 
         // Conforms to `SecureConnectionPropertyNode` (rather than mutating `Make` directly) so
@@ -38,14 +64,20 @@ public struct SecureConnection<Content: Property>: Property {
         // invisible to the outer one's search, and every certificate/trust root/TLS setting it
         // configured would be silently dropped.
         //
-        // Mirrors, synchronously, the exact sequence the top-level path already runs: replace
-        // the base wholesale, then apply each found `SecureConnectionNode` on top of it via its
-        // own fresh collector. `secureConnection`'s own settings (TLS version, cipher suites,
-        // etc.) are not tracked field-by-field the way `trustRoots`/`certificateChain`/
-        // `additionalTrustRoots` are, so nesting still replaces the whole base: only how that
-        // replacement becomes reachable when nested has changed here, not what it does.
+        // Mirrors, synchronously, the exact sequence the top-level path already runs: pick the
+        // base (what's already configured for `.merging`, blank for `.override`), apply the
+        // wrapper's own settings on top of it, then apply each found `SecureConnectionNode` via
+        // its own fresh collector. The settings are kept as edits rather than as a finished
+        // `Internals.SecureConnection` so that `.merging` only touches what the wrapper actually
+        // configured, instead of overwriting the base with the defaults of everything it didn't.
         func make(_ secureConnection: inout Internals.SecureConnection) throws {
-            secureConnection = self.secureConnection
+            if mode == .override {
+                secureConnection = .init()
+            }
+
+            for edit in edits {
+                edit(&secureConnection)
+            }
 
             for node in nodes {
                 var collector = secureConnection.collector()
@@ -66,22 +98,43 @@ public struct SecureConnection<Content: Property>: Property {
 
     private let content: Content
 
-    private var secureConnection: Internals.SecureConnection
+    private let mode: SecureConnectionMode
+
+    private var edits: [@Sendable (inout Internals.SecureConnection) -> Void]
 
     // MARK: - Inits
 
     /// Initializes a secure connection with the given content.
     ///
+    /// The secure connection builds on top of what was configured outside of it. See
+    /// ``SecureConnectionMode/merging``.
+    ///
     /// - Parameter content: A closure that provides the content of the secure connection.
     public init(
         @PropertyBuilder content: () -> Content
     ) {
-        self.secureConnection = .init()
+        self.init(.merging, content: content)
+    }
+
+    /// Initializes a secure connection with the given content and mode.
+    ///
+    /// - Parameters:
+    ///   - mode: Whether it builds on top of (``SecureConnectionMode/merging``, what the
+    ///   initializers without a mode do) or replaces (``SecureConnectionMode/override``) the
+    ///   configuration declared outside of it.
+    ///   - content: A closure that provides the content of the secure connection.
+    public init(
+        _ mode: SecureConnectionMode,
+        @PropertyBuilder content: () -> Content
+    ) {
+        self.mode = mode
+        self.edits = []
         self.content = content()
     }
 
     /// Initializes a secure connection with no additional content, for chaining its fluent
-    /// modifiers directly, the same way `Session()` is used.
+    /// modifiers directly, the same way `Session()` is used. It builds on top of what was
+    /// configured outside of it, like ``init(content:)``.
     ///
     /// ```swift
     /// DataTask {
@@ -97,6 +150,28 @@ public struct SecureConnection<Content: Property>: Property {
     /// ```
     public init() where Content == EmptyProperty {
         self.init {}
+    }
+
+    /// Initializes a secure connection with no additional content and the given mode.
+    ///
+    /// ```swift
+    /// DataTask {
+    ///     BaseURL("apple.com")
+    ///
+    ///     SPKIPinning {
+    ///         SPKIHash("base64-encoded-active-pin")
+    ///     }
+    ///
+    ///     // Starts from a blank configuration: the pins above are not applied.
+    ///     SecureConnection(.override)
+    ///         .version(minimum: .v1_3)
+    /// }
+    /// ```
+    ///
+    /// - Parameter mode: Whether it builds on top of (``SecureConnectionMode/merging``) or
+    /// replaces (``SecureConnectionMode/override``) the configuration declared outside of it.
+    public init(_ mode: SecureConnectionMode) where Content == EmptyProperty {
+        self.init(mode) {}
     }
 
     // MARK: - Public static methods
@@ -116,7 +191,8 @@ public struct SecureConnection<Content: Property>: Property {
         return .leaf(
             SecureConnectionNode(
                 Node(
-                    secureConnection: property.secureConnection,
+                    mode: property.mode,
+                    edits: property.edits,
                     nodes: outputs.node.search(for: SecureConnectionNode.self)
                 ),
                 logger: inputs.environment.logger
@@ -138,7 +214,8 @@ public struct SecureConnection<Content: Property>: Property {
     /// - Parameter minimum: The minimum TLS version to use.
     /// - Returns: A modified `SecureConnection` with the minimum TLS version set.
     public func version(minimum: TLSVersion) -> Self {
-        edit { $0.secureConnection.minimumTLSVersion = minimum.build() }
+        let version = minimum.build()
+        return configure { $0.minimumTLSVersion = version }
     }
 
     #if canImport(NIOCore)
@@ -155,7 +232,8 @@ public struct SecureConnection<Content: Property>: Property {
     /// - Parameter maximum: The maximum TLS version to use.
     /// - Returns: A modified `SecureConnection` with the maximum TLS version set.
     public func version(maximum: TLSVersion) -> Self {
-        edit { $0.secureConnection.maximumTLSVersion = maximum.build() }
+        let version = maximum.build()
+        return configure { $0.maximumTLSVersion = version }
     }
 
     /// Sets the minimum and maximum TLS versions for the secure connection.
@@ -215,8 +293,8 @@ public struct SecureConnection<Content: Property>: Property {
     /// - Parameter keyLogger: The `SSLKeyLogger` object.
     /// - Returns: A modified `SecureConnection` with the key logger set.
     public func keyLogger(_ keyLogger: SSLKeyLogger) -> Self {
-        edit {
-            $0.secureConnection.keyLogger = keyLogger
+        configure {
+            $0.keyLogger = keyLogger
         }
     }
 
@@ -235,7 +313,7 @@ public struct SecureConnection<Content: Property>: Property {
             "shutdownTimeout cannot be negative, got \(timeout.nanoseconds) nanoseconds."
         )
 
-        return edit { $0.secureConnection.shutdownTimeout = timeout.nanoseconds }
+        return configure { $0.shutdownTimeout = timeout.nanoseconds }
     }
 
     /// Sets the renegotiation support for the secure connection.
@@ -246,7 +324,7 @@ public struct SecureConnection<Content: Property>: Property {
     /// - Parameter renegotiationSupport: The renegotiation support setting.
     /// - Returns: A modified `SecureConnection` with the renegotiation support set.
     public func renegotiationSupport(_ renegotiationSupport: RenegotiationSupport) -> Self {
-        edit { $0.secureConnection.renegotiationSupport = renegotiationSupport.build() }
+        configure { $0.renegotiationSupport = renegotiationSupport.build() }
     }
 
     /// Sets the signing signature algorithms for the secure connection.
@@ -257,8 +335,8 @@ public struct SecureConnection<Content: Property>: Property {
     /// - Parameter algorithm: The signature algorithms to use for signing.
     /// - Returns: A modified `SecureConnection` with the signing signature algorithms set.
     public func signingSignatureAlgorithms(_ algorithm: SignatureAlgorithm...) -> Self {
-        edit {
-            $0.secureConnection.signingSignatureAlgorithms = algorithm.map {
+        configure {
+            $0.signingSignatureAlgorithms = algorithm.map {
                 $0.build()
             }
         }
@@ -272,8 +350,8 @@ public struct SecureConnection<Content: Property>: Property {
     /// - Parameter algorithm: The signature algorithms to use for verification.
     /// - Returns: A modified `SecureConnection` with the verify signature algorithms set.
     public func verifySignatureAlgorithms(_ algorithm: SignatureAlgorithm...) -> Self {
-        edit {
-            $0.secureConnection.verifySignatureAlgorithms = algorithm.map {
+        configure {
+            $0.verifySignatureAlgorithms = algorithm.map {
                 $0.build()
             }
         }
@@ -285,7 +363,7 @@ public struct SecureConnection<Content: Property>: Property {
     /// - Parameter verification: The certificate verification setting.
     /// - Returns: A modified `SecureConnection` with the certificate verification setting set.
     public func verification(_ verification: CertificateVerification) -> Self {
-        edit { $0.secureConnection.certificateVerification = verification.build() }
+        configure { $0.certificateVerification = verification.build() }
     }
 
     /// Sets the revocation-checking policy for the secure connection.
@@ -298,7 +376,7 @@ public struct SecureConnection<Content: Property>: Property {
     /// - Parameter policy: The revocation-checking policy to use.
     /// - Returns: A modified `SecureConnection` with the revocation policy set.
     public func revocationPolicy(_ policy: RevocationPolicy) -> Self {
-        edit { $0.secureConnection.revocationPolicy = policy.build() }
+        configure { $0.revocationPolicy = policy.build() }
     }
 
     /// Sets an observer that's notified of each TLS trust-evaluation decision this secure
@@ -310,7 +388,7 @@ public struct SecureConnection<Content: Property>: Property {
     /// - Parameter observer: The observer to notify of each trust decision.
     /// - Returns: A modified `SecureConnection` with the trust decision observer set.
     public func trustDecisionObserver(_ observer: TrustDecisionObserver) -> Self {
-        edit { $0.secureConnection.trustDecisionObserver = observer }
+        configure { $0.trustDecisionObserver = observer }
     }
 
     #if canImport(NIOCore)
@@ -339,7 +417,7 @@ public struct SecureConnection<Content: Property>: Property {
             "Use Session.httpVersion(_:) instead. The ALPN list set here is replaced by the one the session's HTTP version dictates."
     )
     public func applicationProtocols(_ protocols: String...) -> Self {
-        edit { $0.secureConnection.applicationProtocols = protocols }
+        configure { $0.applicationProtocols = protocols }
     }
 
     /// Disables or enables sending the CA name list during handshake for the secure connection.
@@ -350,7 +428,7 @@ public struct SecureConnection<Content: Property>: Property {
     /// - Parameter isDisabled: A boolean value indicating whether to disable or enable sending the CA name list.
     /// - Returns: A modified `SecureConnection` with the CA name list setting set.
     public func sendCANameListDisabled(_ isDisabled: Bool) -> Self {
-        edit { $0.secureConnection.sendCANameList = !isDisabled }
+        configure { $0.sendCANameList = !isDisabled }
     }
 
     /// Sets the cipher suites for the secure connection using string representations.
@@ -368,7 +446,7 @@ public struct SecureConnection<Content: Property>: Property {
         for suite in suites {
             precondition(!suite.contains(":"))
         }
-        return edit { $0.secureConnection.cipherSuites = suites.joined(separator: ":") }
+        return configure { $0.cipherSuites = suites.joined(separator: ":") }
     }
 
     /// Sets the cipher suites for the secure connection using `TLSCipher` values.
@@ -379,8 +457,8 @@ public struct SecureConnection<Content: Property>: Property {
     /// - Parameter suites: The cipher suites to use as `TLSCipher` values.
     /// - Returns: A modified `SecureConnection` with the cipher suites set.
     public func cipherSuites(_ suites: TLSCipher...) -> Self {
-        edit {
-            $0.secureConnection.cipherSuiteValues = suites.map {
+        configure {
+            $0.cipherSuiteValues = suites.map {
                 $0.build()
             }
         }
@@ -389,9 +467,11 @@ public struct SecureConnection<Content: Property>: Property {
 
     // MARK: - Internal methods
 
-    func edit(_ edit: (inout Self) -> Void) -> Self {
+    func configure(
+        _ apply: @escaping @Sendable (inout Internals.SecureConnection) -> Void
+    ) -> Self {
         var mutableSelf = self
-        edit(&mutableSelf)
+        mutableSelf.edits.append(apply)
         return mutableSelf
     }
 }

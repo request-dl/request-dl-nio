@@ -100,6 +100,24 @@ extension Internals.Log {
         )
     }
 
+    package static func pinsIgnoredWithoutCertificateVerification() -> Internals.Log {
+        Internals.Log(
+            """
+            SPKIPinning is configured together with .verification(.none), \
+            which turns certificate verification off entirely.
+
+            The SwiftNIO and URLSession executors never run the pin check \
+            when verification is off, so the pins are NOT enforced there. \
+            Network.framework still enforces them, so the same request can \
+            be accepted or rejected depending on the executor.
+
+            Remove .verification(.none) to have the pins enforced \
+            everywhere, or remove SPKIPinning if you really want no \
+            verification.
+            """
+        )
+    }
+
     package static func cantOpenCertificateFile<Resource: Sendable, Bundle: Sendable>(
         _ resource: Resource,
         _ bundle: Bundle

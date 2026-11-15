@@ -225,11 +225,13 @@ public struct Session: Property {
     ///
     /// Enable the usage of Network framework on Apple Platforms when compatible.
     ///
-    /// Currently AsyncHTTPClient doesn't provide full compatibility to Apple's Network Framework. The main issue is when using mTLS
-    /// or specific secure connection settings, including ``SPKIPinning``, which Network framework's bridge into
-    /// `sec_protocol_options` never consults. When the session's ``SecureConnection`` carries any such setting, this flag
+    /// Currently AsyncHTTPClient doesn't provide full compatibility to Apple's Network Framework. The main issue is when using
+    /// secure connection settings its bridge into `sec_protocol_options` has no counterpart for (a multi-certificate mTLS chain,
+    /// cipher suites, a key logger, PSK, and so on). When the session's ``SecureConnection`` carries any such setting, this flag
     /// is silently ignored and the session falls back to plain SwiftNIO instead of failing or dropping the incompatible
     /// setting: whichever secure-connection settings were configured still apply in full, just over a different transport.
+    /// ``SPKIPinning``, additional trust roots, revocation checking and trust-decision observers are not among them: they
+    /// are enforced under Network framework too, through a custom trust evaluation.
     ///
     /// - Note: Deprecated in favor of ``preferredExecutor(_:)``, specifically
     /// `.preferredExecutor(.nioTransportServices)`, which is wired into the same live decision

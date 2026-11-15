@@ -10,6 +10,10 @@ import RequestDLInternals
 public enum CertificateVerification: Sendable, Hashable {
 
     /// Indicates that all certificate verification is disabled.
+    ///
+    /// - Warning: This includes ``SPKIPinning`` under the SwiftNIO and URLSession executors, which never run the
+    /// pin check once verification is off. Network.framework still does, so the same configuration can behave
+    /// differently per executor; RequestDL logs a warning when the two are combined.
     case none
 
     /// Specifies that certificate validation will be performed against the trust store, but without verifying

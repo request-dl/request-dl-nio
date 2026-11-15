@@ -3,7 +3,9 @@
 //
 
 import Crypto
+import Logging
 import RequestDLInternals
+import SwiftAsyncStream
 import Testing
 
 @testable import RequestDL
@@ -140,6 +142,158 @@ struct SPKIPinningTests {
         }
     }
 
+    /// An empty pin set is "nothing to pin" to every executor, so `.strict` over zero pins used to
+    /// resolve fine and quietly validate the chain alone. It's rejected at resolve time instead.
+    @Test
+    func pinning_whenStrictAndEmptyPropertyForEach_throws() async throws {
+        await #expect(throws: Internals.SPKIPinningError.self) {
+            _ = try await resolve(
+                TestProperty {
+                    SecureConnection {
+                        SPKIPinning(policy: .strict) {
+                            PropertyForEach([String](), id: \.self) {
+                                SPKIHash($0)
+                            }
+                        }
+                    }
+                }
+            )
+        }
+    }
+
+    @Test
+    func pinning_whenAuditAndEmptyPropertyForEach_throws() async throws {
+        await #expect(throws: Internals.SPKIPinningError.self) {
+            _ = try await resolve(
+                TestProperty {
+                    SecureConnection {
+                        SPKIPinning(policy: .audit) {
+                            PropertyForEach([String](), id: \.self) {
+                                SPKIHash($0)
+                            }
+                        }
+                    }
+                }
+            )
+        }
+    }
+
+    @Test
+    func pinning_whenEveryPinIsBehindAFalseCondition_throws() async throws {
+        let isEnabled = false
+
+        await #expect(throws: Internals.SPKIPinningError.self) {
+            _ = try await resolve(
+                TestProperty {
+                    SPKIPinning {
+                        if isEnabled {
+                            SPKIHash(Data(repeating: 0x1, count: 32))
+                        }
+                    }
+                }
+            )
+        }
+    }
+
+    @Test
+    func pinning_whenTheDeclarationHasNoSPKIHashAtAll_throws() async throws {
+        await #expect(throws: Internals.SPKIPinningError.self) {
+            _ = try await resolve(
+                TestProperty {
+                    SPKIPinning {
+                        EmptyProperty()
+                    }
+                }
+            )
+        }
+    }
+
+    @Test
+    func pinning_whenAtLeastOnePinSurvivesAFalseCondition_isStillAccepted() async throws {
+        // Given
+        let isEnabled = false
+        let pin = Data(repeating: 0x1, count: 32)
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                SPKIPinning {
+                    if isEnabled {
+                        SPKIHash(Data(repeating: 0x2, count: 32))
+                    }
+
+                    SPKIHash(pin)
+                }
+            }
+        )
+
+        // Then
+        #expect(
+            resolved.session.configuration.secureConnection?.tlsPins
+                == [.init(source: .rawData(pin), algorithm: SHA256.self)]
+        )
+    }
+
+    /// `.verification(.none)` skips trust evaluation altogether, and with it the pin check under
+    /// NIOSSL and URLSession, while Network.framework still runs it. The combination isn't
+    /// rejected (`.none` is an explicit opt-out), but it is reported, whatever order the two are
+    /// declared in.
+    @Test
+    func pinning_whenCombinedWithVerificationNone_logsAWarning() async throws {
+        let pin = Data(repeating: 0x1, count: 32)
+
+        let pinsInsideSecureConnection = try await warnings {
+            TestProperty {
+                SecureConnection {
+                    SPKIPinning {
+                        SPKIHash(pin)
+                    }
+                }
+                .verification(.none)
+            }
+        }
+
+        let verificationDeclaredBeforePinning = try await warnings {
+            TestProperty {
+                SecureConnection {}
+                    .verification(.none)
+
+                SPKIPinning {
+                    SPKIHash(pin)
+                }
+            }
+        }
+
+        #expect(pinsInsideSecureConnection.count == 1)
+        #expect(verificationDeclaredBeforePinning.count == 1)
+    }
+
+    @Test
+    func pinning_whenVerificationIsNotNone_doesNotLog() async throws {
+        let pin = Data(repeating: 0x1, count: 32)
+
+        let fullVerification = try await warnings {
+            TestProperty {
+                SecureConnection {
+                    SPKIPinning {
+                        SPKIHash(pin)
+                    }
+                }
+                .verification(.fullVerification)
+            }
+        }
+
+        let verificationNoneWithoutPins = try await warnings {
+            TestProperty {
+                SecureConnection {}
+                    .verification(.none)
+            }
+        }
+
+        #expect(fullVerification.isEmpty)
+        #expect(verificationNoneWithoutPins.isEmpty)
+    }
+
     @Test
     func hash_whenDeclaredOutsideSPKIPinning_hasNoEffect() async throws {
         // Given
@@ -160,6 +314,40 @@ struct SPKIPinningTests {
 }
 
 extension SPKIPinningTests {
+
+    fileprivate final class RecordBox: @unchecked Sendable {
+        private let lock = SwiftAsyncStream.Lock()
+        private var _records: [TestLogHandler.LogRecord] = []
+
+        var records: [TestLogHandler.LogRecord] {
+            lock.withLock { _records }
+        }
+
+        func append(_ record: TestLogHandler.LogRecord) {
+            lock.withLock { _records.append(record) }
+        }
+    }
+
+    /// The `.warning` records logged while resolving `property`.
+    func warnings<Content: Property>(
+        @PropertyBuilder content: () -> Content
+    ) async throws -> [TestLogHandler.LogRecord] {
+        let recordBox = RecordBox()
+        let property = content()
+
+        try await Logger.withTesting(
+            level: .trace,
+            recorded: { recordBox.append($0) },
+            perform: { logger in
+                var environment = RequestEnvironmentValues()
+                environment.logger = logger
+
+                _ = try await Resolve(root: property, environment: environment).build()
+            }
+        )
+
+        return recordBox.records.filter { $0.level == .warning }
+    }
 
     /// SPKI extraction mirrors `Internals.DarwinTrustEvaluation.chainSPKIDERBytes(of:)` exactly
     /// (NIOSSL when it's in the build, `X509`'s own portable ASN.1 parser otherwise), so this

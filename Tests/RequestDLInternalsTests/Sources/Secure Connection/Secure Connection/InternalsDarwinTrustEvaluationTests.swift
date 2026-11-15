@@ -271,6 +271,50 @@ struct InternalsDarwinTrustEvaluationTests {
         #expect(!SecTrustEvaluateWithError(sut, nil))
     }
 
+    /// Why exclusive trust roots that resolve to nothing have to be rejected before they get
+    /// here: with no anchors to set, `prepare` leaves the `SecTrust` alone, so "exclusive" has
+    /// nothing to be exclusive *about* and the system's own roots end up being the anchors.
+    @Test
+    func prepare_whenExclusiveButNoRootsToAnchorOn_fallsBackToTheSystemRoots() throws {
+        // Given
+        let sut = try Self.systemTrustedTrust()
+        let evaluation = Internals.DarwinTrustEvaluation(
+            trustRootCertificates: [],
+            pins: [],
+            isStrict: true,
+            trustRootsAreExclusive: true
+        )
+
+        // When
+        evaluation.prepare(sut, skipsHostnameVerification: false)
+
+        // Then
+        #expect(SecTrustEvaluateWithError(sut, nil))
+    }
+
+    @Test
+    func serverTrustPolicy_whenExclusiveTrustRootsResolveToNothing_throws() throws {
+        // Given: `TrustRoots` replaces the system's roots, so an empty set must not be allowed to
+        // quietly turn them back on.
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.trustRoots = .certificates([])
+
+        // Then
+        #expect(throws: Internals.EmptyTrustRootsError.self) {
+            _ = try Internals.ServerTrustPolicy.resolve(from: secureConnection)
+        }
+    }
+
+    @Test
+    func serverTrustPolicy_whenOnlyAdditionalTrustRootsAreEmpty_stillResolves() throws {
+        // Given: additional roots only ever extend the system's, so having none changes nothing.
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.additionalTrustRoots = [.certificates([])]
+
+        // Then
+        _ = try Internals.ServerTrustPolicy.resolve(from: secureConnection)
+    }
+
     @Test
     func serverTrustPolicy_whenOnlyAdditionalTrustRootsConfigured_isNotExclusiveAndPersistsThat() throws {
         // Given

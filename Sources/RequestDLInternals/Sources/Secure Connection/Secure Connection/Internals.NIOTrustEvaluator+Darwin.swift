@@ -42,6 +42,13 @@ extension Internals.NIOTrustEvaluator {
             }
         }
 
+        // `compactMap` drops whatever Security.framework refuses to parse. An exclusive set that
+        // ends up empty here would make `DarwinTrustEvaluation.prepare` skip anchoring, and the
+        // system's roots would silently become the anchors instead.
+        if trustRootsAreExclusive, secTrustRoots.isEmpty {
+            throw Internals.EmptyTrustRootsError()
+        }
+
         let resolvedPins = pins.map { pin in
             Internals.ResolvedSPKIPin { spkiDERBytes in
                 (try? pin.matchesSPKI(spkiDERBytes)) ?? false
