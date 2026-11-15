@@ -152,10 +152,19 @@ extension Date {
 
     /// Parses an HTTP date, as `Expires`, `Last-Modified` and `Date` carry it.
     ///
-    /// Accepts the preferred IMF-fixdate form of RFC 9110, `Sun, 06 Nov 1994 08:49:37 GMT`, and
-    /// tolerates the day name being absent. The obsolete RFC 850 and asctime forms are not
-    /// accepted; no server has emitted them in decades, and reading a two digit year wrong is
-    /// worse than treating the header as missing.
+    /// Accepts the three formats of RFC 9110 §5.6.7:
+    ///
+    /// - IMF-fixdate, the preferred one: `Sun, 06 Nov 1994 08:49:37 GMT`. The day name is
+    ///   tolerated being absent, and is not checked against the date.
+    /// - RFC 850, obsolete: `Sunday, 06-Nov-94 08:49:37 GMT`. A two digit year reads as the
+    ///   closest year with those digits that is not more than 50 years ahead of now, as the RFC
+    ///   says; a four digit one is taken as it is.
+    /// - asctime, obsolete: `Sun Nov  6 08:49:37 1994`. It has no zone, and is GMT.
+    ///
+    /// The zone is read, not assumed: `GMT` and `UTC`, or a numeric offset (`+0100`) that shifts
+    /// the instant. Anything else (`PST`, `garbage`) makes the whole value `nil`, since an
+    /// abbreviation like `PST` names more than one offset and guessing GMT put the date hours
+    /// away from what the server meant.
     ///
     /// - Note: Replaces a `DateComponents` plus `Calendar.current` conversion. Beyond needing
     /// three types that are not in `FoundationEssentials`, `Calendar.current` is whatever
@@ -163,41 +172,90 @@ extension Date {
     /// it year 2026 produced a date centuries away, so cache expiry silently stopped working
     /// for those users. An HTTP date is always proleptic Gregorian and always UTC.
     package init?(httpDate: String) {
+        self.init(httpDate: httpDate, relativeTo: Date())
+    }
+
+    /// - Parameter now: What a two digit year of the RFC 850 format is read against.
+    package init?(httpDate: String, relativeTo now: Date) {
         // Whitespace and the comma after the day name are the only separators that matter.
         let fields =
             httpDate
             .split(whereSeparator: { $0 == " " || $0 == "," })
             .map(String.init)
 
-        // With the day name: Sun 06 Nov 1994 08:49:37 GMT. Without it, one fewer.
-        let offset: Int
-
-        switch fields.count {
-        case 5:
-            offset = 0
-        case 6:
-            offset = 1
-        default:
+        guard let first = fields.first?.utf8.first else {
             return nil
         }
 
-        // ASCII digits only, in the lengths the grammar gives. `Int64(_:)` alone takes a sign and
-        // any number of digits, and an unbounded year overflows the arithmetic below.
-        func number(_ field: some StringProtocol, digits: ClosedRange<Int>) -> Int64? {
-            guard digits.contains(field.utf8.count), field.utf8.allSatisfy({ $0 >= 0x30 && $0 <= 0x39 }) else {
-                return nil
-            }
+        let parsed: (date: DateFields, zone: Int64)?
 
-            return Int64(field)
+        if first >= 0x30 && first <= 0x39 {
+            // No day name: `06 Nov 1994 08:49:37 GMT`.
+            parsed = Self.imfFixdate(fields[...])
+        } else if fields.count > 1, fields[1].contains("-") {
+            // `Sunday, 06-Nov-94 08:49:37 GMT`. The day name has to be one.
+            parsed = Self.isWeekday(fields[0]) ? Self.rfc850(fields, relativeTo: now) : nil
+        } else if fields.count > 1, Self.httpMonths[fields[1]] != nil {
+            // `Sun Nov  6 08:49:37 1994`.
+            parsed = Self.isWeekday(fields[0]) ? Self.asctime(fields) : nil
+        } else {
+            // `Sun, 06 Nov 1994 08:49:37 GMT`. Whatever the day name is, it is not checked.
+            parsed = Self.imfFixdate(fields.dropFirst())
         }
 
+        guard let parsed else {
+            return nil
+        }
+
+        let date = parsed.date
+
+        // Range checked before the arithmetic. The algorithm below happily accepts month 47 and
+        // rolls it forward into some other year, which turns a malformed header into a
+        // plausible looking date rather than into a rejection.
         guard
-            let day = number(fields[offset], digits: 1...2),
-            let month = Self.httpMonths[fields[offset + 1]],
-            let year = number(fields[offset + 2], digits: 4...4)
+            (1...12).contains(date.month),
+            (1...Internals.GregorianCalendar.daysInMonth(year: date.year, month: date.month))
+                .contains(date.day),
+            (0...23).contains(date.hour),
+            (0...59).contains(date.minute),
+            // 60 for a leap second, which RFC 9110 permits.
+            (0...60).contains(date.second)
         else { return nil }
 
-        let time = fields[offset + 3].split(separator: ":", omittingEmptySubsequences: false)
+        let days = Internals.GregorianCalendar.daysFromCivil(
+            year: date.year,
+            month: date.month,
+            day: date.day
+        )
+        let timestamp = days * 86_400 + date.hour * 3_600 + date.minute * 60 + date.second - parsed.zone
+
+        // `Double`, not `TimeInterval`: the typealias would need another Foundation import.
+        self.init(timeIntervalSince1970: Double(timestamp))
+    }
+
+    // MARK: - HTTP date: the three formats
+
+    private struct DateFields {
+        let year: Int64
+        let month: Int64
+        let day: Int64
+        let hour: Int64
+        let minute: Int64
+        let second: Int64
+    }
+
+    // ASCII digits only, in the lengths the grammar gives. `Int64(_:)` alone takes a sign and
+    // any number of digits, and an unbounded year overflows the arithmetic below.
+    private static func number(_ field: some StringProtocol, digits: ClosedRange<Int>) -> Int64? {
+        guard digits.contains(field.utf8.count), field.utf8.allSatisfy({ $0 >= 0x30 && $0 <= 0x39 }) else {
+            return nil
+        }
+
+        return Int64(field)
+    }
+
+    private static func time(_ field: String) -> (hour: Int64, minute: Int64, second: Int64)? {
+        let time = field.split(separator: ":", omittingEmptySubsequences: false)
 
         guard
             time.count == 3,
@@ -206,23 +264,113 @@ extension Date {
             let second = number(time[2], digits: 2...2)
         else { return nil }
 
-        // Range checked before the arithmetic. The algorithm below happily accepts month 47 and
-        // rolls it forward into some other year, which turns a malformed header into a
-        // plausible looking date rather than into a rejection.
+        return (hour, minute, second)
+    }
+
+    /// `GMT`, `UTC` or `+hhmm`/`-hhmm`, as the number of seconds the zone is ahead of UTC.
+    private static func zone(_ field: String) -> Int64? {
+        switch field.uppercased() {
+        case "GMT", "UTC":
+            return 0
+        default:
+            break
+        }
+
         guard
-            (1...12).contains(month),
-            (1...Internals.GregorianCalendar.daysInMonth(year: year, month: month)).contains(day),
-            (0...23).contains(hour),
-            (0...59).contains(minute),
-            // 60 for a leap second, which RFC 9110 permits.
-            (0...60).contains(second)
+            field.utf8.count == 5,
+            let sign = field.utf8.first,
+            sign == UInt8(ascii: "+") || sign == UInt8(ascii: "-"),
+            let hours = number(field.dropFirst().prefix(2), digits: 2...2),
+            let minutes = number(field.dropFirst(3), digits: 2...2),
+            hours <= 23,
+            minutes <= 59
         else { return nil }
 
-        let days = Internals.GregorianCalendar.daysFromCivil(year: year, month: month, day: day)
-        let timestamp = days * 86_400 + hour * 3_600 + minute * 60 + second
+        let offset = hours * 3_600 + minutes * 60
 
-        // `Double`, not `TimeInterval`: the typealias would need another Foundation import.
-        self.init(timeIntervalSince1970: Double(timestamp))
+        return sign == UInt8(ascii: "-") ? -offset : offset
+    }
+
+    /// `[Sun,] 06 Nov 1994 08:49:37 GMT`, with the day name already removed.
+    private static func imfFixdate(_ fields: ArraySlice<String>) -> (date: DateFields, zone: Int64)? {
+        let fields = Array(fields)
+
+        guard
+            fields.count == 5,
+            let day = number(fields[0], digits: 1...2),
+            let month = httpMonths[fields[1]],
+            let year = number(fields[2], digits: 4...4),
+            let time = time(fields[3]),
+            let zone = zone(fields[4])
+        else { return nil }
+
+        return (
+            DateFields(year: year, month: month, day: day, hour: time.hour, minute: time.minute, second: time.second),
+            zone
+        )
+    }
+
+    /// `Sunday, 06-Nov-94 08:49:37 GMT`.
+    private static func rfc850(_ fields: [String], relativeTo now: Date) -> (date: DateFields, zone: Int64)? {
+        let date = fields[1].split(separator: "-", omittingEmptySubsequences: false)
+
+        guard
+            fields.count == 4,
+            date.count == 3,
+            let day = number(date[0], digits: 2...2),
+            let month = httpMonths[String(date[1])],
+            let year = number(date[2], digits: 2...4),
+            date[2].count == 2 || date[2].count == 4,
+            let time = time(fields[2]),
+            let zone = zone(fields[3])
+        else { return nil }
+
+        return (
+            DateFields(
+                year: date[2].count == 4 ? year : fullYear(ofTwoDigit: year, relativeTo: now),
+                month: month,
+                day: day,
+                hour: time.hour,
+                minute: time.minute,
+                second: time.second
+            ),
+            zone
+        )
+    }
+
+    /// RFC 9110 §5.6.7: a two digit year that appears to be more than 50 years in the future is
+    /// the most recent year in the past with the same last two digits. Compared by year.
+    private static func fullYear(ofTwoDigit year: Int64, relativeTo now: Date) -> Int64 {
+        guard let timestamp = Int64(exactly: now.timeIntervalSince1970.rounded(.down)) else {
+            return 1900 + year
+        }
+
+        let currentYear = Internals.GregorianCalendar.civilFromDays(
+            Internals.GregorianCalendar.floorDivide(timestamp, by: 86_400)
+        ).year
+
+        let candidate = currentYear - currentYear % 100 + year
+
+        return candidate - currentYear > 50 ? candidate - 100 : candidate
+    }
+
+    /// `Sun Nov  6 08:49:37 1994`. No zone: asctime is GMT.
+    private static func asctime(_ fields: [String]) -> (date: DateFields, zone: Int64)? {
+        guard
+            fields.count == 5,
+            let month = httpMonths[fields[1]],
+            let day = number(fields[2], digits: 1...2),
+            let time = time(fields[3]),
+            let year = number(fields[4], digits: 4...4)
+        else { return nil }
+
+        return (
+            DateFields(year: year, month: month, day: day, hour: time.hour, minute: time.minute, second: time.second), 0
+        )
+    }
+
+    private static func isWeekday(_ field: String) -> Bool {
+        httpWeekdays.contains(field) || httpFullWeekdays.contains(field)
     }
 
     private static let httpMonths: [String: Int64] = [
@@ -237,6 +385,10 @@ extension Date {
     ]
 
     private static let httpWeekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+
+    private static let httpFullWeekdays = [
+        "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
+    ]
 
     /// This date as an HTTP date, the IMF-fixdate form of RFC 9110: `Sun, 06 Nov 1994 08:49:37 GMT`.
     ///

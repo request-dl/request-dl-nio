@@ -190,6 +190,91 @@ struct DateMethodsTests {
         #expect(Date(httpDate: "Sun, 31 May 2026 00:00:00 GMT") != nil)
     }
 
+    // MARK: - HTTP date: the other two formats of RFC 9110
+
+    /// 1994-11-06T08:49:37Z
+    private static let sixthOfNovember1994 = Date(timeIntervalSince1970: 784_111_777)
+
+    /// A recipient MUST accept the two obsolete formats, RFC 850 and asctime, next to the
+    /// IMF-fixdate one.
+    @Test(arguments: [
+        "Sunday, 06-Nov-94 08:49:37 GMT",
+        "Sunday, 06-Nov-1994 08:49:37 GMT",
+        "Sun Nov  6 08:49:37 1994",
+        "Sun Nov 06 08:49:37 1994",
+    ])
+    func httpDateParsesTheObsoleteFormats(_ value: String) {
+        #expect(Date(httpDate: value) == Self.sixthOfNovember1994)
+    }
+
+    /// The two digit year of RFC 850 reads as the closest year with those digits that is not
+    /// more than 50 years ahead of now.
+    @Test(arguments: [
+        ("Sunday, 06-Nov-26 08:49:37 GMT", "Fri, 06 Nov 2026 08:49:37 GMT"),
+        ("Sunday, 06-Nov-75 08:49:37 GMT", "Wed, 06 Nov 2075 08:49:37 GMT"),
+        ("Sunday, 06-Nov-77 08:49:37 GMT", "Sun, 06 Nov 1977 08:49:37 GMT"),
+        ("Sunday, 06-Nov-94 08:49:37 GMT", "Sun, 06 Nov 1994 08:49:37 GMT"),
+        ("Sunday, 06-Nov-00 08:49:37 GMT", "Mon, 06 Nov 2000 08:49:37 GMT"),
+    ])
+    func httpDateReadsATwoDigitYearAgainstNow(_ value: String, _ expected: String) {
+        // 2026-11-15
+        let now = Date(timeIntervalSince1970: 1_794_700_800)
+
+        #expect(Date(httpDate: value, relativeTo: now) == Date(httpDate: expected))
+    }
+
+    @Test(arguments: [
+        "Sunday, 06-Foo-94 08:49:37 GMT",
+        "Sunday, 6-Nov-94 08:49:37 GMT",
+        "Sunday, 06-Nov-9 08:49:37 GMT",
+        "Sunday, 06-Nov-994 08:49:37 GMT",
+        "Sunday, 31-Apr-94 08:49:37 GMT",
+        "Sunday, 06-Nov-94 08:49:37 PST",
+        "Sunday, 06-Nov-94 08:49:37",
+        "Foo, 06-Nov-94 08:49:37 GMT",
+        "Sun Nov  6 08:49:37 94",
+        "Sun Nov  6 08:49:37 1994 GMT",
+        "Sun Nov 32 08:49:37 1994",
+        "Sun Foo  6 08:49:37 1994",
+        "Foo Nov  6 08:49:37 1994",
+    ])
+    func httpDateRejectsAMalformedObsoleteFormat(_ value: String) {
+        #expect(Date(httpDate: value) == nil)
+    }
+
+    /// The zone was never looked at: `PST`, `+0100` and `garbage` all read as GMT, so a date in
+    /// another zone came out hours away from what the server meant.
+    @Test(arguments: [
+        "Sun, 06 Nov 1994 08:49:37 PST",
+        "Sun, 06 Nov 1994 08:49:37 EST",
+        "Sun, 06 Nov 1994 08:49:37 CET",
+        "Sun, 06 Nov 1994 08:49:37 garbage",
+        "Sun, 06 Nov 1994 08:49:37 GMT+1",
+        "Sun, 06 Nov 1994 08:49:37 +01",
+        "Sun, 06 Nov 1994 08:49:37 +0160",
+        "Sun, 06 Nov 1994 08:49:37 +2400",
+        "Sun, 06 Nov 1994 08:49:37 0100",
+        "Sun, 06 Nov 1994 08:49:37 Z",
+    ])
+    func httpDateRejectsAZoneItCannotRead(_ value: String) {
+        #expect(Date(httpDate: value) == nil)
+    }
+
+    @Test(arguments: [
+        ("Sun, 06 Nov 1994 08:49:37 GMT", 0.0),
+        ("Sun, 06 Nov 1994 08:49:37 UTC", 0),
+        ("Sun, 06 Nov 1994 08:49:37 gmt", 0),
+        ("Sun, 06 Nov 1994 08:49:37 +0000", 0),
+        ("Sun, 06 Nov 1994 08:49:37 -0000", 0),
+        ("Sun, 06 Nov 1994 09:49:37 +0100", 0),
+        ("Sun, 06 Nov 1994 03:49:37 -0500", 0),
+        ("Sun, 06 Nov 1994 14:19:37 +0530", 0),
+        ("Sun, 06 Nov 1994 08:49:37 +0100", -3_600),
+    ])
+    func httpDateAppliesANumericOrUTCZone(_ value: String, _ shift: Double) {
+        #expect(Date(httpDate: value) == Date(timeIntervalSince1970: 784_111_777 + shift))
+    }
+
     // MARK: - HTTP date formatting
 
     @Test
