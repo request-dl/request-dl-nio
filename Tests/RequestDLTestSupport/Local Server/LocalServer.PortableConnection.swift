@@ -130,11 +130,16 @@ extension LocalServer.PortableServer {
                 $0.name.caseInsensitiveCompare("User-Agent") == .orderedSame
             }?.value
 
+            let hostHeader = head.headers.first {
+                $0.name.caseInsensitiveCompare("Host") == .orderedSame
+            }?.value
+
             let responseBody = LocalServer.makeResponseBody(
                 configuredData: configuration?.data,
                 receivedBytes: receivedBytes,
                 cookieHeader: cookieHeader,
-                userAgentHeader: userAgentHeader
+                userAgentHeader: userAgentHeader,
+                hostHeader: hostHeader
             )
 
             let status = configuration?.status ?? .ok
@@ -180,12 +185,20 @@ extension LocalServer.PortableServer.Connection {
     /// Parses exactly one HTTP/1.1 request off the front of `bytes`, if a complete one is present
     /// yet. Returns `nil` when more data is needed, never a partial result: `processBuffer()`
     /// loops on this to drain as many pipelined/keep-alive requests as `bytes` already holds.
-    fileprivate static func parseRequest(
+    static func parseRequest(
         from bytes: [UInt8]
     ) -> (head: RequestHead, body: Data, consumed: Int)? {
         guard let headerEnd = find(doubleCRLF, in: bytes, from: 0) else { return nil }
 
-        guard let headerString = String(bytes: bytes[0..<headerEnd], encoding: .utf8) else {
+        // A header block is not always UTF-8: `URLSession` sends a non-ASCII value such as "José"
+        // as ISO Latin-1 (`é` is the single byte 0xE9, which is not valid UTF-8). Answering `nil`
+        // for those bytes would read as "wait for more data" and the request would never be
+        // answered, so anything that is not UTF-8 is read as Latin-1, which accepts every byte.
+        let headBytes = bytes[0..<headerEnd]
+        guard
+            let headerString = String(bytes: headBytes, encoding: .utf8)
+                ?? String(bytes: headBytes, encoding: .isoLatin1)
+        else {
             return nil
         }
 

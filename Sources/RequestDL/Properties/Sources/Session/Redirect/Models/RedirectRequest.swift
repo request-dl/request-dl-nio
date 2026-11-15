@@ -7,9 +7,14 @@
 ///
 /// Already carries the standard rewrite rules a redirect implies: method downgraded to `GET`
 /// on a `303` (or a `301`/`302` response to a `POST`), and `Authorization`/`Cookie`/`Origin`/
-/// `Proxy-Authorization` stripped when ``url`` no longer shares the original request's origin
-/// (scheme, host, and port). A strategy only needs to make further adjustments on top of that,
-/// not reimplement those rules from scratch.
+/// `Proxy-Authorization`, along with an explicit `Host`, stripped when ``url`` no longer shares the
+/// original request's origin (scheme, host, and port). A strategy only needs to make further
+/// adjustments on top of that, not reimplement those rules from scratch.
+///
+/// The same rule applies to what a strategy answers with, not only to what it is handed: a
+/// ``RedirectDecision/follow(_:)`` whose ``url`` is on another origin than the request it
+/// redirects loses those headers, whoever put them there. A strategy cannot use this to send a
+/// credential to a different origin.
 public struct RedirectRequest: Sendable {
 
     // MARK: - Public properties

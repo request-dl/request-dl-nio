@@ -72,3 +72,23 @@ struct InternalsHTTPHeadersTests {
         #expect(headers.contains(name: "etag"))
     }
 }
+
+extension InternalsHTTPHeadersTests {
+
+    @Test
+    func httpHeaders_whenRemovingAName_dropsEveryPairUnderItIgnoringCase() {
+        // Given
+        var headers = Internals.HTTPHeaders()
+        headers.add(name: "Host", value: "a")
+        headers.add(name: "X-Keep", value: "kept")
+        headers.add(name: "host", value: "b")
+
+        // When
+        headers.remove(name: "HOST")
+
+        // Then
+        #expect(!headers.contains(name: "Host"))
+        #expect(headers.first(name: "X-Keep") == "kept")
+        #expect(headers.pairs.count == 1)
+    }
+}

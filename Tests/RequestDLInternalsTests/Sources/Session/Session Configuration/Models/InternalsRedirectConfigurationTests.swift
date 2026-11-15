@@ -33,21 +33,22 @@ struct InternalsRedirectConfigurationTests {
         )
     }
 
+    /// Not AsyncHTTPClient's own `.follow(max:allowCycles:)`, which replays an explicit `Host` on a
+    /// redirect to another origin and has no hook to stop it: the same limits, as a strategy. See
+    /// `Internals.NIOFollowRedirectStrategy`.
     @Test
-    func redirect_whenFollow() {
+    func redirect_whenFollow_buildsTheFollowStrategy() {
         // Given
         let redirect = Internals.RedirectConfiguration.follow(max: 1_024, allowCycles: true)
 
         // When
         let sut = redirect.build()
 
-        // Then
-        #expect(
-            String(describing: sut)
-                == String(
-                    describing: HTTPClient.Configuration.RedirectConfiguration.follow(max: 1_024, allowCycles: true)
-                )
-        )
+        // Then: `mode` is internal to AsyncHTTPClient, so, as above, what it prints is what is compared.
+        let description = String(describing: sut)
+        #expect(description.contains("NIOFollowRedirectStrategy"))
+        #expect(description.contains("max: 1024"))
+        #expect(description.contains("allowCycles: true"))
     }
     #endif
 

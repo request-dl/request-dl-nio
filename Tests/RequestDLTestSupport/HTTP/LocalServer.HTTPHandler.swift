@@ -151,7 +151,8 @@ extension LocalServer {
                 configuredData: _configuration?.data,
                 receivedBytes: receivedBytes,
                 cookieHeader: _incomeHeaders?.first(name: "Cookie"),
-                userAgentHeader: _incomeHeaders?.first(name: "User-Agent")
+                userAgentHeader: _incomeHeaders?.first(name: "User-Agent"),
+                hostHeader: _incomeHeaders?.first(name: "Host")
             )
         }
 

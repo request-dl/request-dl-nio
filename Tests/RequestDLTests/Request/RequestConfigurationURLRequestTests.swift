@@ -89,6 +89,64 @@ struct RequestConfigurationURLRequestTests {
             #expect(error.url == configuration.url)
         }
     }
+
+    // MARK: - Header validation
+
+    /// `.nio` rejects these in AsyncHTTPClient; `URLSession` would send them: `X-A: injected` as
+    /// the line `X-A: injected: v`, a NUL as a NUL.
+    @Test
+    func buildURLRequest_whenHeaderNameIsNotAToken_throws() async throws {
+        // Given
+        var configuration = RequestConfiguration()
+        configuration.baseURL = "https://example.com"
+        configuration.headers.set(name: "X-A: injected", value: "v")
+
+        // When / Then
+        await #expect(throws: (any Error).self) {
+            _ = try await configuration.buildURLRequest()
+        }
+    }
+
+    @Test
+    func buildURLRequest_whenHeaderValueHasAControlCharacter_throws() async throws {
+        // Given
+        var configuration = RequestConfiguration()
+        configuration.baseURL = "https://example.com"
+        configuration.headers.set(name: "X-A", value: "a\u{0000}b")
+
+        // When / Then
+        await #expect(throws: (any Error).self) {
+            _ = try await configuration.buildURLRequest()
+        }
+    }
+
+    @Test
+    func buildURLRequestWithoutBody_whenHeaderIsInvalid_throws() throws {
+        // Given: the path the streamed uploads, downloads and `DataTask` take.
+        var configuration = RequestConfiguration()
+        configuration.baseURL = "https://example.com"
+        configuration.headers.set(name: "X-A", value: "a\u{007F}b")
+
+        // When / Then
+        #expect(throws: (any Error).self) {
+            _ = try configuration.buildURLRequestWithoutBody()
+        }
+    }
+
+    /// The other half of the rule above: what `.nio` sends must not become an error here.
+    @Test(arguments: ["José", "日本語", "a\u{0085}b", "a\u{2028}b", "tab\tseparated", ""])
+    func buildURLRequest_whenHeaderValueIsLegitimate_keepsIt(value: String) async throws {
+        // Given
+        var configuration = RequestConfiguration()
+        configuration.baseURL = "https://example.com"
+        configuration.headers.set(name: "X-Custom-Header_1", value: value)
+
+        // When
+        let request = try await configuration.buildURLRequest()
+
+        // Then
+        #expect(request.value(forHTTPHeaderField: "X-Custom-Header_1") != nil)
+    }
 }
 
 #endif

@@ -30,13 +30,22 @@ extension Internals {
         func redirectDecision(for context: HTTPClientRedirectContext) throws -> HTTPClientRedirectDecision {
             let history = context.history.map(Internals.RedirectHistoryEntry.init)
 
+            // The request this redirect answers: the one `context.response` came back for.
+            let previousURL = history.last?.request.url
+
+            var candidate = Internals.RedirectRequest(context.redirectRequest)
+
+            // AsyncHTTPClient has already stripped what it knows to strip for a redirect to
+            // another origin, which does not include an explicit `Host`.
+            Self.sanitize(&candidate, from: previousURL)
+
             let decision = try strategy.redirectDecision(
                 for: .init(
-                    redirectRequest: .init(context.redirectRequest),
+                    redirectRequest: candidate,
                     // `context.response` is the response of `history`'s last entry: see
                     // `HTTPClientRedirectContext`'s own doc comment ("the full per-request
                     // `history`... including the one that produced [the response]").
-                    response: .init(context.response, url: history.last?.request.url ?? ""),
+                    response: .init(context.response, url: previousURL ?? ""),
                     history: history,
                     redirectCount: context.redirectCount
                 )
@@ -45,13 +54,29 @@ extension Internals {
             switch decision {
             case .doNotFollow:
                 return .doNotFollow
-            case .follow(let redirectRequest):
+            case .follow(var redirectRequest):
+                // Again, on what the strategy answered with: nothing it did to the URL or the
+                // headers has been checked against the origin it is now going to.
+                Self.sanitize(&redirectRequest, from: previousURL)
+
                 var request = context.redirectRequest
                 request.url = redirectRequest.url
                 request.method = .init(rawValue: redirectRequest.method)
                 request.headers = redirectRequest.headers.build()
                 return .follow(request)
             }
+        }
+
+        // MARK: - Private static methods
+
+        private static func sanitize(_ request: inout Internals.RedirectRequest, from previousURL: String?) {
+            // Without a previous hop there is nothing to compare against; AsyncHTTPClient always
+            // supplies one, so this is only a guard.
+            guard let previousURL else {
+                return
+            }
+
+            Internals.RedirectSanitizer.sanitize(&request.headers, from: previousURL, to: request.url)
         }
     }
 }

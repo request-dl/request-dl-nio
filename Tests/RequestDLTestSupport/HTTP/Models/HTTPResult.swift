@@ -31,6 +31,25 @@ struct HTTPResult<Response: Codable>: Codable, Equatable where Response: Equatab
     /// caller-supplied value untouched, or, once dropped under `.urlSession`, URLSession's own
     /// native `CFNetwork`/`Darwin` report.
     var receivedUserAgentHeader: String? = nil
+
+    /// The `Host` header value `LocalServer` actually received on this request, if any; same
+    /// additive shape as ``receivedCookieHeader`` above.
+    ///
+    /// Lets a test prove which virtual host a request, a redirected one in particular, asked for.
+    ///
+    /// Not part of `==`: every request carries one, so comparing it would make every existing
+    /// comparison against a hand-built `HTTPResult` fail on a value those never mention.
+    var receivedHostHeader: String? = nil
+}
+
+extension HTTPResult {
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.receivedBytes == rhs.receivedBytes
+            && lhs.response == rhs.response
+            && lhs.receivedCookieHeader == rhs.receivedCookieHeader
+            && lhs.receivedUserAgentHeader == rhs.receivedUserAgentHeader
+    }
 }
 
 extension HTTPResult {
