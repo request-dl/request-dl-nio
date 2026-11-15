@@ -146,9 +146,25 @@ struct CustomDecompressorIntegrationTests {
                 guard client >= 0 else { return }
                 defer { close(client) }
 
-                var requestBuffer = [UInt8](repeating: 0, count: 65_536)
-                let count = requestBuffer.withUnsafeMutableBytes { read(client, $0.baseAddress, $0.count) }
-                received.withLockedValue { $0 = String(decoding: requestBuffer.prefix(max(count, 0)), as: UTF8.self) }
+                // Up to the end of the request head: it can arrive in more than one segment.
+                var requestBytes: [UInt8] = []
+                var chunk = [UInt8](repeating: 0, count: 65_536)
+
+                while true {
+                    let count = chunk.withUnsafeMutableBytes { read(client, $0.baseAddress, $0.count) }
+
+                    guard count > 0 else {
+                        break
+                    }
+
+                    requestBytes += chunk.prefix(count)
+
+                    if String(decoding: requestBytes, as: UTF8.self).contains("\r\n\r\n") {
+                        break
+                    }
+                }
+
+                received.withLockedValue { $0 = String(decoding: requestBytes, as: UTF8.self) }
 
                 let head = Array(headers.utf8)
                 head.withUnsafeBufferPointer { _ = write(client, $0.baseAddress, $0.count) }

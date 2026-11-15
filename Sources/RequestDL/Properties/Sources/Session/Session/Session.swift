@@ -429,8 +429,9 @@ public struct Session: Property {
     /// listed) and decodes all of it manually, including gzip/deflate if they're in the same
     /// list. `.nio`/`.nioTransportServices` have no such constraint: `async-http-client`'s own
     /// gzip/deflate handling can stay on alongside manual dispatch for whatever it leaves
-    /// untouched, and `Accept-Encoding` announces the algorithms listed here, in this order,
-    /// unless the request sets its own. It decodes `gzip` and `deflate` whichever of them is
+    /// untouched, and `Accept-Encoding` announces the algorithms listed here, unless the request
+    /// sets its own (sessions that list the same algorithms in another order share their
+    /// connections, so the order is not promised). It decodes `gzip` and `deflate` whichever of them is
     /// listed, and decides from the first encoding a response names.
     ///
     /// A response whose `Content-Encoding` matches none of `algorithms` throws

@@ -511,12 +511,13 @@ struct RawTask<Content: Property>: RequestTask {
         @Sendable
         func executeSessionTask() async throws -> (task: SessionTask, onResponseHead: OnResponseHead?) {
             // The conditional request of a revalidation goes out before there is a request for the
-            // idle deadline to cancel, so it is handed the revalidation itself: a server that takes
-            // that request and never answers it ends the execution like one that goes quiet later.
+            // idle deadline to cancel, so that request is bounded by it: a server that takes it and
+            // never answers ends the execution like one that goes quiet later. Only that request,
+            // and not the cache's own reads and writes around it.
             let output: Internals.CacheControl.Output
 
             if let idle = transferControl?.observer?.idle {
-                output = try await idle.bounding { await cacheControl(client) }
+                output = await cacheControl(IdleBoundedClient(client, idle: idle))
 
                 if idle.isExpired {
                     throw Internals.ReadTimeoutError()

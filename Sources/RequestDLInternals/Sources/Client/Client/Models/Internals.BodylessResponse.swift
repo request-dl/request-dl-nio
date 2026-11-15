@@ -52,6 +52,23 @@ extension Internals {
             }
         }
 
+        /// `transaction` as it should be reported for a response that ended with nothing to decode:
+        /// the decompressor's complaint is not an error of the transaction. Delivered by
+        /// AsyncHTTPClient before the error itself, so what says whether the response is the one that is
+        /// about to be tolerated is what has been seen of it so far.
+        package func reporting(
+            _ transaction: Internals.TransactionMetrics,
+            isBodylessResponse: Bool
+        ) -> Internals.TransactionMetrics {
+            guard isBodylessResponse, let error = transaction.error, isTruncatedDecoder(error) else {
+                return transaction
+            }
+
+            var transaction = transaction
+            transaction.error = nil
+            return transaction
+        }
+
         /// Whether `error` is the decompressor reporting, at the end of a message with no body, that
         /// it never saw one.
         package func isTruncatedDecoder(_ error: any Error) -> Bool {

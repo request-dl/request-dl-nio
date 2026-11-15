@@ -119,6 +119,34 @@ struct BodylessDecompressionTests {
         // Then
         #expect(result.head.status.code == kind.status)
         #expect(result.payload.isEmpty)
+
+        // What the decompressor said of it is not an error of the transaction.
+        #expect(result.metrics?.transactions.isEmpty == false)
+        #expect(result.metrics?.transactions.allSatisfy { $0.error == nil } == true)
+    }
+
+    /// A redirect with an encoding and no body is still a failure under `.nio`: it reaches the
+    /// delegate before there is a head to tell it apart by, and the redirect it was taking cannot
+    /// be resumed from there. It is for `async-http-client` (or what is in front of its
+    /// decompressor) to fix, and this fails the day it does.
+    @Test
+    private func aRedirectWithAnEncodingAndNoBody_stillFailsUnderNIO() async throws {
+        // Given
+        let server = try Server()
+        server.respondOnce(
+            headers:
+                "HTTP/1.1 301 Moved Permanently\r\nLocation: http://127.0.0.1:1/x\r\nContent-Encoding: gzip\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+            body: []
+        )
+
+        // Then
+        await withKnownIssue {
+            _ = try await DataTask {
+                BaseURL(.http, host: "127.0.0.1:\(server.port)")
+                Session().decompressionAlgorithms([.gzip]).requiredExecutor(.nio)
+            }
+            .result()
+        }
     }
 
     /// What is tolerated is a response that cannot have a body. One that has one, and whose stream

@@ -129,7 +129,18 @@ extension Internals {
             task: HTTPClient.Task<HTTPClient.Response>,
             _ metrics: HTTPClientTransactionMetrics
         ) {
-            var transaction = Internals.TransactionMetrics(metrics)
+            let isBodylessResponse = lock.withLock { () -> Bool in
+                guard let head = _head, !_hasBody else {
+                    return false
+                }
+
+                return bodyless.isBodyless(head)
+            }
+
+            var transaction = bodyless.reporting(
+                Internals.TransactionMetrics(metrics),
+                isBodylessResponse: isBodylessResponse
+            )
             transaction.source = source
 
             self.metrics.append(transaction)
