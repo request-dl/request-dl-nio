@@ -138,17 +138,36 @@ extension Internals {
             // leaf-only presentation and rejects the handshake with `unknown_ca` (confirmed end to
             // end with a real three-level chain against a server trusting only the root).
             //
-            // Only catches `certificateChain`'s `.certificates([Certificate])` case (what
-            // `Certificates { Certificate(leaf); Certificate(intermediate) }`, the DSL's own
-            // multi-certificate composition, produces), since counting certificates bundled inside
-            // a `.file`/`.bytes` blob needs parsing it, and every other reason here is a cheap,
-            // synchronous field check. A concatenated multi-certificate PEM handed to
-            // `Certificates(_:)`'s single-file/single-bytes initializer isn't caught by this.
-            if case .certificates(let certificates) = certificateChain, certificates.count > 1 {
+            // Decided by how many certificates the chain really resolves to, not by how it was
+            // declared: one PEM file or blob (`Certificates(_:)`, a single `Certificate` over a
+            // bundle) holds leaf and intermediates just as `Certificates { Certificate(leaf);
+            // Certificate(intermediate) }` does.
+            if resolvedClientCertificateCount > 1 {
                 reasons.append(.multipleClientCertificatesUnderNetworkFramework)
             }
 
             return reasons
+        }
+
+        /// How many certificates `certificateChain` holds, read from the PEM data itself.
+        ///
+        /// A chain that cannot be read or parsed here is not what this answers: building the
+        /// identity reports that, with its own error, and this check, which has no way to fail,
+        /// must not hide it behind another reason. It falls back to the declared shape.
+        private var resolvedClientCertificateCount: Int {
+            guard let certificateChain else {
+                return 0
+            }
+
+            if let count = try? certificateChain.resolvedDERBytes().count {
+                return count
+            }
+
+            if case .certificates(let certificates) = certificateChain {
+                return certificates.count
+            }
+
+            return 1
         }
 
         /// Deliberately does *not* check `certificateChain`/`privateKey`/`additionalTrustRoots`/
@@ -382,17 +401,29 @@ extension Internals {
         /// or when the connection will run over Network.framework instead (which gets its
         /// identity from `makeLocalIdentityForNetworkFramework()`).
         ///
+        /// - Throws: ``ConfigurationError/incompleteClientIdentity`` when only one of
+        ///   `certificateChain` and `privateKey` is configured, as the other executors do.
+        ///
         /// Handed to `HTTPClient.Configuration.tlsLocalIdentityProviderNIOSSL` rather than put on
         /// the `TLSConfiguration`: set there it would go to every host the client connects to,
         /// redirect targets included.
         private func makeNIOSSLIdentity(
             isCompatibleWithNetworkFramework: Bool
         ) throws -> (certificateChain: [NIOSSLCertificateSource], privateKey: NIOSSLPrivateKeySource)? {
-            guard !isCompatibleWithNetworkFramework, let certificateChain, let privateKey else {
+            guard !isCompatibleWithNetworkFramework else {
                 return nil
             }
 
-            return (try certificateChain.build(), try privateKey.build())
+            switch (certificateChain, privateKey) {
+            case (nil, nil):
+                return nil
+            case (.some(let certificateChain), .some(let privateKey)):
+                return (try certificateChain.build(), try privateKey.build())
+            case (.some, nil), (nil, .some):
+                // Not sending a client certificate the configuration asked for would be a silent
+                // downgrade: the request goes out unauthenticated.
+                throw ConfigurationError.incompleteClientIdentity
+            }
         }
 
         #if canImport(Darwin)
@@ -435,6 +466,33 @@ extension Internals {
         #endif
     }
 }
+
+#if canImport(NIOCore)
+
+extension Internals.SecureConnection {
+
+    /// A client identity that cannot be used as configured, found while building a
+    /// `TLSConfiguration` for NIOSSL.
+    ///
+    /// The `.urlSession` and Network.framework counterparts are
+    /// `Internals.URLSessionIdentityPolicy.ConfigurationError`, which only exists on Darwin; the
+    /// `.nio` executor is the one that runs everywhere, so its error cannot depend on it.
+    package enum ConfigurationError: Swift.Error, CustomStringConvertible, Equatable, Sendable {
+
+        /// Only one of `certificateChain` and `privateKey` was configured.
+        case incompleteClientIdentity
+
+        package var description: String {
+            switch self {
+            case .incompleteClientIdentity:
+                return
+                    "mTLS needs both a certificateChain and a privateKey; only one was configured, so no client certificate would have been sent."
+            }
+        }
+    }
+}
+
+#endif
 
 // MARK: - Equatable
 
