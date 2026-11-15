@@ -245,12 +245,13 @@ final class ResumableUploadExecution: @unchecked Sendable {
 
         do {
             resource = try setup.dialect.resource(from: createdHead, createdFor: request)
-            lock.withLock { _resource = resource }
             created.discard()
         } catch {
             created.discard()
             throw UploadResumptionError(.notSupported)
         }
+
+        lock.withLock { _resource = resource }
 
         // 2. Its body is sent, and sent again from wherever the server says it is.
         var budget = Budget()
@@ -288,8 +289,12 @@ final class ResumableUploadExecution: @unchecked Sendable {
                     // must spend the budget like any other attempt that did not.
                     sent.discard()
 
-                    if try advance(&budget, to: held, countsAsAttempt: true) {
-                        try await pause()
+                    // What this attempt sent from: bytes the server took past it are progress of
+                    // this attempt even when the server held more before it lost some.
+                    let sentFrom = budget.knownOffset
+
+                    if try advance(&budget, to: held, countsAsAttempt: true, acceptedFrom: sentFrom) {
+                        try await pauseUnlessGivingUp(budget)
                     }
 
                     continue
@@ -307,7 +312,7 @@ final class ResumableUploadExecution: @unchecked Sendable {
                     }
 
                     if try advance(&budget, to: adopted, countsAsAttempt: true) {
-                        try await pause()
+                        try await pauseUnlessGivingUp(budget)
                     }
 
                     continue
@@ -410,12 +415,30 @@ final class ResumableUploadExecution: @unchecked Sendable {
         try checkNotCancelled()
     }
 
+    /// ``pause()``, unless the budget is spent and the next thing that happens is the failure: it
+    /// would only arrive late.
+    private func pauseUnlessGivingUp(_ budget: Budget) async throws {
+        guard budget.withoutProgress <= setup.maximumAttemptsWithoutProgress else {
+            return
+        }
+
+        try await pause()
+    }
+
     /// Moves what is known of the server to `offset`.
     ///
+    /// - Parameter start: Where the attempt this answers began, when the answer says how much the
+    ///   server kept of it: an offset past it, though not past the furthest the server ever held,
+    ///   is neither progress nor a stall.
     /// - Returns: Whether this attempt moved nothing that was not already moved, and spent the
     ///   budget for it: the answer to wait before asking again.
     @discardableResult
-    private func advance(_ budget: inout Budget, to offset: Int64, countsAsAttempt: Bool = false) throws -> Bool {
+    private func advance(
+        _ budget: inout Budget,
+        to offset: Int64,
+        countsAsAttempt: Bool = false,
+        acceptedFrom start: Int64? = nil
+    ) throws -> Bool {
         guard offset <= source.length else {
             throw UploadResumptionError(.offsetBeyondLength(offset: offset, length: source.length))
         }
@@ -425,6 +448,8 @@ final class ResumableUploadExecution: @unchecked Sendable {
         if offset > budget.highestOffset {
             budget.withoutProgress = .zero
             budget.highestOffset = offset
+        } else if let start, offset > start {
+            // The server took bytes of this attempt: it moved, only not past where it once was.
         } else if countsAsAttempt {
             budget.withoutProgress += 1
             isStalled = true
@@ -510,6 +535,9 @@ final class ResumableUploadExecution: @unchecked Sendable {
             exchange.seed()
             throw error
         }
+
+        // An exchange that was cancelled may simply end: that is not a body that is whole.
+        try checkNotCancelled()
 
         download.close()
     }

@@ -91,8 +91,9 @@ extension RequestConfiguration {
     }
 
     /// `location` as an absolute URL, `location` being what a server answered with, which may be
-    /// relative to the URL that answered: `answeredFrom`, the final URL of the response when the
-    /// request was redirected on its way, and the URL of this request when it is not known.
+    /// relative to the URL that answered: `answeredFrom`, the URL the response reports, and the URL
+    /// of this request when it is not known. `.urlSession` reports the final URL of a request that
+    /// was redirected; `.nio` reports the one it was sent to, so there the two are the same.
     ///
     /// `nil` when it is not an `http` or `https` URL, or when it would take a request that went
     /// over `https` to `http`: the rest of the upload would then travel in the clear.

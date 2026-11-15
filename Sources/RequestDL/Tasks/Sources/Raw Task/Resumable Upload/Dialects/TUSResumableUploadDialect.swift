@@ -45,15 +45,14 @@ struct TUSResumableUploadDialect: ResumableUploadDialect {
     // MARK: - Internal methods
 
     func validate(_ request: RequestConfiguration) throws {
-        guard
-            let encoding = request.headers.first(name: "Content-Encoding")?.trimming(where: \.isWhitespace),
-            !encoding.isEmpty,
-            encoding.lowercased() != "identity"
-        else {
-            return
-        }
+        let encodings = (request.headers["Content-Encoding"] ?? [])
+            .flatMap { $0.split(separator: ",") }
+            .map { $0.trimming(where: \.isWhitespace).lowercased() }
+            .filter { !$0.isEmpty && $0 != "identity" }
 
-        throw UploadResumptionError(.contentEncodingNotSupported)
+        guard encodings.isEmpty else {
+            throw UploadResumptionError(.contentEncodingNotSupported)
+        }
     }
 
     func creation(for request: RequestConfiguration, length: Int64?) -> RequestConfiguration {

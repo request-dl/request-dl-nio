@@ -409,7 +409,7 @@ struct ResumableUploadExecutionStubTests {
                     return await Self.sessionTask(head: Self.head(status: 200))
                 }
 
-                return await await Self.sessionTask(
+                return await Self.sessionTask(
                     head: Self.head(status: 409, headers: [("Upload-Offset", count.isMultiple(of: 2) ? "5" : "10")])
                 )
             }
@@ -461,9 +461,9 @@ struct ResumableUploadExecutionStubTests {
     }
 
     @Test
-    func aServerThatKeepsPartOfEveryAttempt_isNotMadeToWaitBetweenThem() async throws {
-        // Given: each `PATCH` moves the upload forward by 100 bytes, which is what a server with a
-        // limit on what it takes at once does, and is no reason to wait.
+    func aServerThatMovesForwardOnEveryConflict_isNotMadeToWaitBetweenThem() async throws {
+        // Given: each `PATCH` is answered with a conflict that is further along than the last, which is
+        // progress, and no reason to wait.
         let patches = LockedValueBox(0)
 
         let execution = try await Self.execution(
@@ -482,7 +482,7 @@ struct ResumableUploadExecutionStubTests {
                     return await Self.sessionTask(head: Self.head(status: 200))
                 }
 
-                return await await Self.sessionTask(
+                return await Self.sessionTask(
                     head: Self.head(status: 409, headers: [("Upload-Offset", String(count * 100))])
                 )
             }
@@ -498,6 +498,101 @@ struct ResumableUploadExecutionStubTests {
 
         #expect(elapsed < 3_000_000_000)
         #expect(patches.withLockedValue { $0 } == 5)
+    }
+
+    /// tus: the server keeps part of every `PATCH`, loses data once (it held 600, and says 100 when
+    /// it is asked), and then climbs back 100 at a time. Every `PATCH` after the loss moved the
+    /// upload forward, so none of them is a reason to give up, though none passes 600.
+    @Test
+    func aPartialAnswerThatMovesForwardAfterTheServerLostData_isProgress() async throws {
+        let patches = LockedValueBox(0)
+
+        let execution = try await Self.execution(
+            dialect: TUSResumableUploadDialect(),
+            client: ScriptedClient { configuration in
+                switch configuration.method {
+                case "POST":
+                    return await Self.sessionTask(head: Self.head(status: 201, headers: [("Location", "/uploads/1")]))
+                case "HEAD":
+                    return await Self.sessionTask(
+                        head: Self.head(status: 200, headers: [("Upload-Offset", "100"), ("Upload-Length", "1000")])
+                    )
+                case "PATCH":
+                    let count = patches.withLockedValue { value -> Int in
+                        value += 1
+                        return value
+                    }
+
+                    let offset = Int(configuration.headers.first(name: "Upload-Offset") ?? "0") ?? 0
+
+                    switch count {
+                    case 1:
+                        return await Self.sessionTask(head: Self.head(status: 204, headers: [("Upload-Offset", "600")]))
+                    case 2:
+                        return await Self.sessionTask(head: Self.head(status: 409))
+                    default:
+                        return await Self.sessionTask(
+                            head: Self.head(status: 204, headers: [("Upload-Offset", String(min(offset + 100, 1_000)))])
+                        )
+                    }
+                default:
+                    return await Self.sessionTask(head: Self.head(status: 204))
+                }
+            }
+        )
+
+        execution.start()
+        for try await _ in execution.response {}
+
+        #expect(patches.withLockedValue { $0 } == 11)
+    }
+
+    /// tus: a partial answer that holds nothing new waits like any other attempt that moved nothing.
+    @Test
+    func aPartialAnswerThatHoldsNothingNew_waitsBeforeTheNextAttempt() async throws {
+        let instants = LockedValueBox<[UInt64]>([])
+
+        let execution = try await Self.execution(
+            dialect: TUSResumableUploadDialect(),
+            delay: 100_000_000,
+            client: ScriptedClient { configuration in
+                guard configuration.method == "PATCH" else {
+                    return await Self.sessionTask(head: Self.head(status: 201, headers: [("Location", "/uploads/1")]))
+                }
+
+                instants.withLockedValue { $0.append(DispatchTime.now().uptimeNanoseconds) }
+                return await Self.sessionTask(head: Self.head(status: 204, headers: [("Upload-Offset", "0")]))
+            }
+        )
+
+        execution.start()
+
+        await #expect(throws: UploadResumptionError(.conflictingOffsets)) {
+            for try await _ in execution.response {}
+        }
+
+        let recorded = instants.withLockedValue { $0 }
+        #expect(recorded.count == 4)
+
+        for (previous, next) in zip(recorded, recorded.dropFirst()).prefix(2) {
+            #expect(next - previous >= 80_000_000)
+        }
+    }
+
+    @Test
+    func aTusUploadWithAContentEncodingOnAnyLine_isRefused() async throws {
+        var configuration = RequestConfiguration()
+        configuration.headers.set(name: "Content-Encoding", value: "identity")
+        configuration.headers.add(name: "Content-Encoding", value: "gzip")
+
+        #expect(throws: UploadResumptionError(.contentEncodingNotSupported)) {
+            try TUSResumableUploadDialect().validate(configuration)
+        }
+
+        configuration.headers.set(name: "Content-Encoding", value: "identity")
+        #expect(throws: Never.self) {
+            try TUSResumableUploadDialect().validate(configuration)
+        }
     }
 
     // MARK: - Where the upload lives
