@@ -256,7 +256,8 @@ extension Internals.Session.Configuration {
     ///
     /// Deliberately not extended to `SecureConnection`'s `===`-compared hooks (`keyLogger`,
     /// `pskIdentityResolver`, `trustDecisionObserver`): an instance held once and reused *does*
-    /// match, so those aren't statically unpoolable, only frequently so in practice.
+    /// match, so those aren't statically unpoolable, only frequently so in practice. Those are
+    /// stored, and bounded by `Internals.ClientManager.maximumCount`, for either backend.
     package var isPoolable: Bool {
         if case .strategy = redirectConfiguration {
             return false

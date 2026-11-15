@@ -129,7 +129,7 @@ extension Internals.ClientManager {
         }
 
         // Pooled clients are also owned by the table, which is what keeps one alive between requests.
-        tableLock.withLock {
+        let evicted = tableLock.withLock {
             var items = _table[id] ?? []
 
             items.append(
@@ -141,8 +141,11 @@ extension Internals.ClientManager {
 
             _table[id] = items
 
-            _evictIfNeeded(protecting: .nio(client))
+            return _evictIfNeeded(protecting: .nio(client))
         }
+
+        // Dropped off `tableLock`, see `_evictIfNeeded(protecting:)`.
+        withExtendedLifetime(evicted) {}
 
         return client
     }

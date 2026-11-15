@@ -32,8 +32,8 @@ extension Internals {
         }
 
         /// Mirrors `Internals.ClientOperationQueue.generation`, read by
-        /// `Internals.ClientManager`'s idle-cleanup sweep and ceiling eviction alongside
-        /// `isRunning`, see that property's own doc comment.
+        /// `Internals.ClientManager`'s idle-cleanup sweep alongside `isRunning`, see that
+        /// property's own doc comment.
         package var operationGeneration: UInt64 {
             operationQueue.generation
         }
@@ -104,13 +104,17 @@ extension Internals {
             configuration.httpShouldSetCookies = false
             configuration.httpCookieStorage = nil
 
+            // Before the session exists: this can throw, and a client whose `init` throws never
+            // gets as far as `deinit`, so a session created first would be left running for ever.
+            let identityPolicy = try secureConnection.map(Internals.URLSessionIdentityPolicy.init)
+
             session = URLSession(configuration: configuration)
             throttledExecutor = Internals.ThrottledExecutor(
                 maximumConcurrentConnections: maximumConcurrentConnections
             )
             self.redirectConfiguration = redirectConfiguration
             self.proxyAuthorization = proxy?.authorization
-            self.identityPolicy = try secureConnection.map(Internals.URLSessionIdentityPolicy.init)
+            self.identityPolicy = identityPolicy
         }
 
         // MARK: - Internal methods
@@ -169,11 +173,10 @@ extension Internals {
         ) async throws -> (head: Internals.ResponseHead, body: Data) {
             // Registered before the throttle wait below, not after: `Internals.ClientManager`'s
             // idle-cleanup sweep and its ceiling eviction path both treat `isRunning == false` as
-            // "safe to shut down," and this client has no ARC-based fallback the way `.nio`'s
-            // pooled entry does (its `shutdown()` invalidates the live `URLSession` outright). A
-            // caller queued behind `throttledExecutor.acquire()` for longer than the pool's
-            // lifetime must still count as busy, or the sweep can invalidate the session out from
-            // under it the moment it's finally let through.
+            // "idle," which decides whether the entry can be un-pooled and, with it, whether a
+            // later lookup can still reuse this client. A caller queued behind
+            // `throttledExecutor.acquire()` for longer than the pool's lifetime must still count
+            // as busy, or the entry can be dropped from under it while it waits.
             let operation = try beginOperation()
             defer { operation.complete() }
 

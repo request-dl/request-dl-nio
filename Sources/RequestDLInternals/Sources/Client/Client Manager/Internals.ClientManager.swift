@@ -39,11 +39,10 @@ extension Internals {
         // MARK: - Private static properties
 
         /// Flags a `client(provider:sessionConfiguration:)` or `cleanupIfNeeded()` that is still
-        /// running after 45s. Set higher than the other `AsyncLock`s in `Internals`:
-        /// `cleanupIfNeeded()` shares this lock and can shut down several expired clients in one
-        /// sweep, each a real network drain. They run concurrently, so the sweep costs the longest
-        /// of them rather than their sum, but a wide margin is still needed to avoid flagging a
-        /// legitimately busy one. Development builds only. See `AsyncLock.Watchdog`.
+        /// running after 45s. Set higher than the other `AsyncLock`s in `Internals`: a client
+        /// resolution can build an HTTP client, read a TLS identity off disk and, for mTLS, make
+        /// synchronous Keychain calls, so a wide margin is needed to avoid flagging a legitimately
+        /// busy one. Development builds only. See `AsyncLock.Watchdog`.
         #if DEBUG
         private static let watchdog: AsyncLock.Watchdog? = .init(seconds: 45) {
             Internals.assertionFailure($0)
@@ -223,7 +222,12 @@ extension Internals {
             await lock.withLock {
                 let now = Self.monotonicNow()
 
-                tableLock.withLock {
+                // Dropped off `tableLock`, below: a client that nobody else holds retires itself
+                // when its last reference goes, which can mean a Keychain delete for one with a
+                // client identity, and that does not belong under a mutex every lookup also takes.
+                let expired = tableLock.withLock { () -> [Item] in
+                    var expired = [Item]()
+
                     for (key, items) in _table {
                         var surviving = [Item]()
 
@@ -247,14 +251,20 @@ extension Internals {
                                 continue
                             }
 
-                            if !isExpired(item, at: now) {
+                            if isExpired(item, at: now) {
+                                expired.append(item)
+                            } else {
                                 surviving.append(item)
                             }
                         }
 
                         _table[key] = surviving.isEmpty ? nil : surviving
                     }
+
+                    return expired
                 }
+
+                withExtendedLifetime(expired) {}
             }
         }
 
@@ -330,11 +340,18 @@ extension Internals {
         /// idle by definition (nothing has been asked of it yet) and its entry is the newest in
         /// the table, so without this it is the *first* thing an at-capacity insert evicts, and
         /// the table is what lets the next caller with the same configuration find it.
-        func _evictIfNeeded(protecting protectedClient: Internals.ClientManager.Client? = nil) {
+        ///
+        /// - Returns: The clients that were un-pooled, so the caller can let go of them *after*
+        ///   releasing ``tableLock``: one that nobody else holds retires itself the moment its last
+        ///   reference goes, and that can mean a Keychain delete for a client identity.
+        @discardableResult
+        func _evictIfNeeded(
+            protecting protectedClient: Internals.ClientManager.Client? = nil
+        ) -> [Internals.ClientManager.Client] {
             let count = _table.values.reduce(0) { $0 + $1.count }
 
             guard count > maximumCount else {
-                return
+                return []
             }
 
             let target = max(maximumCount - (maximumCount / 4), 1)
@@ -369,6 +386,8 @@ extension Internals {
 
                 _table[key] = items.isEmpty ? nil : items
             }
+
+            return evictable.map(\.item.client)
         }
 
         #if canImport(Darwin)
@@ -415,7 +434,7 @@ extension Internals {
 
             // Pooled clients are also owned by the table, which is what keeps one alive between
             // requests.
-            tableLock.withLock {
+            let evicted = tableLock.withLock {
                 var items = _table[id] ?? []
 
                 items.append(
@@ -427,8 +446,10 @@ extension Internals {
 
                 _table[id] = items
 
-                _evictIfNeeded(protecting: .urlSession(client))
+                return _evictIfNeeded(protecting: .urlSession(client))
             }
+
+            withExtendedLifetime(evicted) {}
 
             return client
         }
