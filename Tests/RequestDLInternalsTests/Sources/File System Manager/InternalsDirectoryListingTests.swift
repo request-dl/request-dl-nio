@@ -72,6 +72,71 @@ struct InternalsDirectoryListingTests {
         }
     }
 
+    #if canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android)
+
+    /// `readdir` answers `NULL` for the end of the directory and for a failure alike, and only
+    /// `errno` tells them apart. A failure partway through must not look like the end.
+    @Test
+    func entryNames_whenAReadFailsPartway_throwsInsteadOfReturningAShortListing() throws {
+        let entries = ["one", "two", "three"].map { name -> UnsafeMutablePointer<dirent> in
+            let entry = UnsafeMutablePointer<dirent>.allocate(capacity: 1)
+            entry.initialize(to: dirent())
+            withUnsafeMutablePointer(to: &entry.pointee.d_name) { pointer in
+                pointer.withMemoryRebound(to: CChar.self, capacity: 8) {
+                    _ = strlcpy($0, name, 8)
+                }
+            }
+            return entry
+        }
+        defer {
+            for entry in entries {
+                entry.deallocate()
+            }
+        }
+
+        var reads = 0
+
+        #expect(throws: Internals.DirectoryListingError(code: EIO)) {
+            try Internals.entryNames(of: 0) { _ in
+                defer { reads += 1 }
+
+                guard reads < 2 else {
+                    errno = EIO
+                    return nil
+                }
+
+                return entries[reads]
+            }
+        }
+
+        #expect(reads == 3)
+    }
+
+    @Test
+    func entryNames_whenTheEndComesWithAStaleErrno_stillReturnsTheListing() throws {
+        let entry = UnsafeMutablePointer<dirent>.allocate(capacity: 1)
+        entry.initialize(to: dirent())
+        withUnsafeMutablePointer(to: &entry.pointee.d_name) { pointer in
+            pointer.withMemoryRebound(to: CChar.self, capacity: 8) {
+                _ = strlcpy($0, "only", 8)
+            }
+        }
+        defer { entry.deallocate() }
+
+        // An earlier, unrelated failure left `errno` set.
+        errno = ENOENT
+        var reads = 0
+
+        let names = try Internals.entryNames(of: 0) { _ in
+            defer { reads += 1 }
+            return reads == 0 ? entry : nil
+        }
+
+        #expect(names == ["only"])
+    }
+
+    #endif
+
     @Test
     func modificationDate_ofADirectory_movesWhenAnEntryIsCreatedInIt() async throws {
         try await withTemporaryFileURL(createPath: false) { directoryURL in
