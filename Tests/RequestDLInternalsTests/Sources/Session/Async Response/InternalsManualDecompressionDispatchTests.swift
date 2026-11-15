@@ -488,6 +488,106 @@ struct InternalsManualDecompressionDispatchTests {
         #expect(!dispatch.requiresManualDecoding(for: responseHead(contentEncoding: "gzip")))
     }
 
+    // MARK: - What the transport decoded is its first encoding
+
+    private struct TagAlgorithm: Internals.DecompressionAlgorithm {
+        var contentEncodingValue: String { "tag" }
+
+        func callAsFunction() throws -> any Internals.DecompressorStream {
+            MockIdentityDecompressorStream()
+        }
+    }
+
+    private func collect(_ stream: Internals.AsyncStream<Internals.DataBuffer>) async throws -> Data {
+        var iterator = stream.makeAsyncIterator()
+        var collected = Data()
+
+        while var chunk = try await iterator.next() {
+            collected += await chunk.readData(chunk.readableBytes) ?? Data()
+        }
+
+        return collected
+    }
+
+    private func source(_ string: String) async -> Internals.AsyncStream<Internals.DataBuffer> {
+        let source = Internals.AsyncStream<Internals.DataBuffer>()
+        source.append(.success(await Internals.DataBuffer(Array(string.utf8))))
+        source.close()
+        return source
+    }
+
+    /// What the transport decodes is what it says it does, not what was configured: an encoding it
+    /// took without being asked is handed over as the plain body it now is.
+    @Test
+    func resolvedStream_whenTheTransportDecodedTheFirstEncoding_handsItOverUntouched() async throws {
+        // Given
+        let dispatch = Internals.ManualDecompressionDispatch.dispatch(
+            algorithms: [TagAlgorithm()],
+            nativelyDecoded: ["gzip", "deflate"]
+        )
+
+        // When
+        let output = try dispatch.resolvedStream(
+            for: responseHead(contentEncoding: "deflate"),
+            source: await source("plain"),
+            readingMode: .passthrough
+        )
+
+        // Then
+        #expect(try await collect(output) == Data("plain".utf8))
+    }
+
+    /// The transport looks at the first encoding only. Behind an `identity` that comes first, a
+    /// `gzip` was not decoded, and is not this package's to decode either.
+    @Test
+    func resolvedStream_whenTheTransportLeftAnEncodingBehindIdentity_throws() async throws {
+        // Given
+        let dispatch = Internals.ManualDecompressionDispatch.dispatch(
+            algorithms: [TagAlgorithm()],
+            nativelyDecoded: ["gzip", "deflate"]
+        )
+
+        // Then
+        #expect(throws: Internals.UnsupportedContentEncodingError.self) {
+            _ = try dispatch.resolvedStream(
+                for: responseHead(contentEncoding: "identity, gzip"),
+                source: Internals.AsyncStream<Internals.DataBuffer>(),
+                readingMode: .passthrough
+            )
+        }
+    }
+
+    /// What follows the one the transport decoded is still this package's.
+    @Test
+    func resolvedStream_whenACustomEncodingFollowsTheOneTheTransportDecoded_decodesIt() async throws {
+        // Given
+        let dispatch = Internals.ManualDecompressionDispatch.dispatch(
+            algorithms: [TagAlgorithm()],
+            nativelyDecoded: ["gzip", "deflate"]
+        )
+
+        // When
+        let output = try dispatch.resolvedStream(
+            for: responseHead(contentEncoding: "gzip, tag"),
+            source: await source("tagged"),
+            readingMode: .passthrough
+        )
+
+        // Then
+        #expect(try await collect(output) == Data("tagged".utf8))
+    }
+
+    @Test
+    func requiresManualDecoding_whenTheTransportLeftAnEncodingBehindIdentity_isTrue() {
+        let dispatch = Internals.ManualDecompressionDispatch.dispatch(
+            algorithms: [TagAlgorithm()],
+            nativelyDecoded: ["gzip", "deflate"]
+        )
+
+        #expect(dispatch.requiresManualDecoding(for: responseHead(contentEncoding: "identity, gzip")))
+        #expect(!dispatch.requiresManualDecoding(for: responseHead(contentEncoding: "deflate")))
+    }
+
     // MARK: - Reading mode of the decoded body
 
     private func decodedChunks(

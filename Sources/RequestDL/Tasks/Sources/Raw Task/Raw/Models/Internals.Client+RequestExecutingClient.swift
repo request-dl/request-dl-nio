@@ -24,7 +24,9 @@ extension Internals.Client: RequestExecutingClient {
         transferControl: Internals.TransferControl?
     ) async throws -> SessionTask {
         try await execute(
-            request: try configuration.build(
+            request: try announcingAcceptEncoding(
+                in: configuration
+            ).build(
                 eventLoop: eventLoopGroup.any(),
                 uploadGate: transferControl?.uploadGate
             ),
@@ -38,6 +40,21 @@ extension Internals.Client: RequestExecutingClient {
         )
     }
 
+    /// `configuration` saying what this client's session was configured to decode, unless it
+    /// already says what it accepts.
+    ///
+    /// The conditional request of a revalidation says it too, so the server answers it for the
+    /// same representation it sends the response in.
+    private func announcingAcceptEncoding(in configuration: RequestConfiguration) -> RequestConfiguration {
+        guard let acceptEncoding, !configuration.headers.contains(name: "Accept-Encoding") else {
+            return configuration
+        }
+
+        var configuration = configuration
+        configuration.headers.add(name: "Accept-Encoding", value: acceptEncoding)
+        return configuration
+    }
+
     /// - Note: `isKeepAlive` has no equivalent on `HTTPClient.Response` and this method's own
     /// caller (`Internals.CacheControl`'s conditional-revalidation check) never reads it either
     /// way: `true` is an inert default, matching the same call `Internals.ResponseHead.init(_
@@ -47,7 +64,7 @@ extension Internals.Client: RequestExecutingClient {
         logger: Internals.TaskLogger?,
         metrics: Internals.RequestMetricsCollector?
     ) async throws -> Internals.ResponseHead {
-        let request = try configuration.build(eventLoop: eventLoopGroup.any())
+        let request = try announcingAcceptEncoding(in: configuration).build(eventLoop: eventLoopGroup.any())
 
         // A request that nobody collects metrics for still goes through the wrapper, into a collector
         // of its own that is dropped: one path to maintain and to test, instead of two.

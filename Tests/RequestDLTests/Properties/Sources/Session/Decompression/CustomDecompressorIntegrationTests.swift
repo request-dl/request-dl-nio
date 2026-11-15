@@ -6,6 +6,7 @@ import Dispatch
 import Testing
 
 @testable import RequestDL
+@testable import RequestDLTestSupport
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -83,6 +84,12 @@ struct CustomDecompressorIntegrationTests {
     final class RawHTTPServer: @unchecked Sendable {
         let port: UInt16
         private let listenSocket: Int32
+        private let received = LockedValueBox("")
+
+        /// The request the server read, as text; empty until there was one.
+        var request: String {
+            received.withLockedValue { $0 }
+        }
 
         init() throws {
             // `SOCK_STREAM` is a plain `Int32` constant on Darwin, but Glibc types it as
@@ -133,13 +140,15 @@ struct CustomDecompressorIntegrationTests {
         /// either way.
         func respondOnce(headers: String, body: [UInt8]) {
             let listenSocket = listenSocket
+            let received = received
             DispatchQueue.global(qos: .userInitiated).async {
                 let client = accept(listenSocket, nil, nil)
                 guard client >= 0 else { return }
                 defer { close(client) }
 
                 var requestBuffer = [UInt8](repeating: 0, count: 65_536)
-                _ = requestBuffer.withUnsafeMutableBytes { read(client, $0.baseAddress, $0.count) }
+                let count = requestBuffer.withUnsafeMutableBytes { read(client, $0.baseAddress, $0.count) }
+                received.withLockedValue { $0 = String(decoding: requestBuffer.prefix(max(count, 0)), as: UTF8.self) }
 
                 let head = Array(headers.utf8)
                 head.withUnsafeBufferPointer { _ = write(client, $0.baseAddress, $0.count) }
