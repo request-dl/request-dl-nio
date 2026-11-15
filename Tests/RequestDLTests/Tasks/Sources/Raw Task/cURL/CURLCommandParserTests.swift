@@ -326,6 +326,15 @@ struct CURLCommandParserTests {
         }
     }
 
+    /// What comes before a `:` is a scheme only when it is shaped like one, and a bare host is left
+    /// to the executor.
+    @Test(arguments: ["[::1]:8080/x", "1abc:80/x", "a_b:80/x", "example.com", "é:80/x"])
+    func urlWithNoSchemeShapedPrefixIsNotRefusedAsAScheme(_ url: String) async throws {
+        let configuration = try await CURLCommandParser.parseCommand("curl '\(url)'", allowing: []).requestConfiguration
+
+        #expect(configuration.baseURL == url)
+    }
+
     /// In `alice:secret@host` the text before the colon is a user name, and an error is logged.
     @Test func schemeErrorDoesNotEchoAUserName() async {
         let error = await #expect(throws: CURLParsingError.self) {
