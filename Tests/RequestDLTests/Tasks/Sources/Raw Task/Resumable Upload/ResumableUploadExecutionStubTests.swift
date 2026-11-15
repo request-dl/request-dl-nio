@@ -661,6 +661,69 @@ struct ResumableUploadExecutionStubTests {
         #expect(head.status.code == 304)
     }
 
+    @Test
+    func theClient_refusesABodyWhoseEncodingTheProtocolCannotCarry() async throws {
+        // Given: a body that was compressed, which says so in `Content-Encoding`, for a protocol that
+        // sends the request that carries the bytes without it.
+        let sent = LockedValueBox(false)
+
+        let client = ResumableUploadClient(
+            base: ScriptedClient { _ in
+                sent.withLockedValue { $0 = true }
+                throw StubError()
+            },
+            setup: ResumableUploadSetup(dialect: TUSResumableUploadDialect())
+        )
+
+        var configuration = RequestConfiguration()
+        configuration.baseURL = "https://example.com"
+        configuration.method = "PUT"
+        configuration.headers.set(name: "Content-Encoding", value: "gzip")
+        configuration.body = await RequestBody(buffers: [Internals.DataBuffer(Data(repeating: 1, count: 100))])
+
+        // Then: nothing was sent, and the caller is told why.
+        await #expect(throws: UploadResumptionError(.contentEncodingNotSupported)) {
+            _ = try await client.execute(
+                configuration: configuration,
+                decompression: .disabled,
+                cache: nil,
+                logger: nil,
+                transferControl: nil
+            )
+        }
+
+        #expect(!sent.withLockedValue { $0 })
+    }
+
+    @Test
+    func theClient_doesNotRefuseAnEncodedBodyWhereTheProtocolCarriesTheEncoding() async throws {
+        // Given: the IETF protocol creates the upload with the request that was written.
+        let client = ResumableUploadClient(
+            base: ScriptedClient { _ in throw StubError() },
+            setup: ResumableUploadSetup(dialect: IETFResumableUploadDialect())
+        )
+
+        var configuration = RequestConfiguration()
+        configuration.baseURL = "https://example.com"
+        configuration.method = "PUT"
+        configuration.headers.set(name: "Content-Encoding", value: "gzip")
+        configuration.body = await RequestBody(buffers: [Internals.DataBuffer(Data(repeating: 1, count: 100))])
+
+        // When
+        let task = try await client.execute(
+            configuration: configuration,
+            decompression: .disabled,
+            cache: nil,
+            logger: nil,
+            transferControl: nil
+        )
+
+        // Then: it ran, and failed only because the executor did.
+        await #expect(throws: StubError.self) {
+            for try await _ in task.response {}
+        }
+    }
+
     // MARK: - Helpers
 
     private final class WeakReference<Object: AnyObject>: @unchecked Sendable {

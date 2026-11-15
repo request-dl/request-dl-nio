@@ -84,6 +84,10 @@ public protocol ResumableUploadDialect: Sendable {
     /// Whether the length of the body has to be declared before its first byte.
     var requiresKnownLength: Bool { get }
 
+    /// Whether the protocol can carry `request` as it was written, before anything is sent. Throws
+    /// when it cannot, rather than carry something other than what the caller asked for.
+    func validate(_ request: RequestConfiguration) throws
+
     /// The request that creates the upload, with no body.
     func creation(for request: RequestConfiguration, length: Int64?) -> RequestConfiguration
 
@@ -116,4 +120,10 @@ public protocol ResumableUploadDialect: Sendable {
 
     /// The request that tells the server the upload is abandoned, if the protocol has one.
     func cancellation(of resource: UploadResource, like request: RequestConfiguration) -> RequestConfiguration?
+}
+
+extension ResumableUploadDialect {
+
+    /// Nothing is refused unless a dialect says it has to be.
+    public func validate(_ request: RequestConfiguration) throws {}
 }
