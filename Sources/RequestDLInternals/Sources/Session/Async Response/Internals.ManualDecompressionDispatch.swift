@@ -177,7 +177,7 @@ extension Internals.AsyncStream where Element == Internals.DataBuffer {
     /// is explicitly allowed to buffer internally and emit nothing for a given call.
     ///
     /// `finish()` runs once `source` ends, flushing whatever the decoder is still holding before
-    /// this stream itself closes.
+    /// this stream itself closes, unless `source` had no bytes at all: there is nothing held.
     ///
     /// The reading mode applies to the decoded bytes, the ones the reader gets. Cutting the input
     /// as well, as happened when the wire bytes went through `Internals.DownloadBuffer` first, cost
@@ -226,6 +226,7 @@ extension Internals.AsyncStream where Element == Internals.DataBuffer {
         let task = _Concurrency.Task {
             do {
                 var stream = try algorithm()
+                var hasInput = false
 
                 // `source`'s own iterator (`SubjectAsyncIterator.next()`) already ends the
                 // sequence once this task is cancelled, so no separate `Task.isCancelled` check
@@ -233,6 +234,7 @@ extension Internals.AsyncStream where Element == Internals.DataBuffer {
                 for try await chunk in source {
                     var chunk = chunk
                     let data = await chunk.readData(chunk.readableBytes) ?? Data()
+                    hasInput = hasInput || !data.isEmpty
                     let decoded = try stream(decompressing: data)
 
                     if !decoded.isEmpty {
@@ -256,10 +258,15 @@ extension Internals.AsyncStream where Element == Internals.DataBuffer {
                     }
                 }
 
-                let tail = try stream.finish()
+                // A body that never had a byte is no stream to finish: it is what a `HEAD`, a `304`
+                // or a `204` says `Content-Encoding` over, and a decoder that is asked for the end
+                // of something it never began reports it as truncated.
+                if hasInput {
+                    let tail = try stream.finish()
 
-                if !tail.isEmpty {
-                    output.append(await Internals.DataBuffer(tail))
+                    if !tail.isEmpty {
+                        output.append(await Internals.DataBuffer(tail))
+                    }
                 }
 
                 output.close()

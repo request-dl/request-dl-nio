@@ -386,6 +386,7 @@ extension Internals {
                 download: download,
                 cache: cache,
                 decompressionDispatch: decompressionDispatch,
+                requestMethod: request.method,
                 logger: logger,
                 transferControl: transferControl,
                 reconnection: reconnection,

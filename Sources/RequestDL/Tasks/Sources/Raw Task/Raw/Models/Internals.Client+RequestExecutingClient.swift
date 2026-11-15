@@ -51,12 +51,22 @@ extension Internals.Client: RequestExecutingClient {
 
         // A request that nobody collects metrics for still goes through the wrapper, into a collector
         // of its own that is dropped: one path to maintain and to test, instead of two.
-        let response = try await execute(
+        let accumulator = Internals.MetricsCollectingAccumulator(
             request: request,
-            logger: logger,
             metrics: metrics ?? Internals.RequestMetricsCollector(),
             source: .revalidation
-        ).response()
+        )
+
+        let task = try await execute(request: request, delegate: accumulator, logger: logger)
+        let response: HTTPClient.Response
+
+        do {
+            response = try await task.response()
+        } catch {
+            // A `HEAD` is answered without a body, which is not a reason for it to fail when it
+            // says `Content-Encoding: gzip`.
+            response = try accumulator.recovering(from: error)
+        }
 
         return Internals.ResponseHead(
             url: configuration.url,

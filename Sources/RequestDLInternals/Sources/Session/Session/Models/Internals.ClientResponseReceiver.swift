@@ -31,6 +31,9 @@ extension Internals {
         private let cache: ((ResponseHead) -> Internals.AsyncStream<DataBuffer>?)?
         private let decompressionDispatch: Internals.ManualDecompressionDispatch
 
+        /// What tells a response with no body, to tell its end from a truncated one.
+        private let bodyless: Internals.BodylessResponse
+
         private let logger: Internals.TaskLogger?
 
         /// Released, like `download`'s window, once this exchange has ended for good; see
@@ -58,6 +61,9 @@ extension Internals {
         /// Set once `reconnection` took the rest of the body over from this exchange.
         private var _isHandedOver = false
 
+        /// Set by the head: the response is one that cannot have a body.
+        private var _isBodyless = false
+
         // MARK: - Inits
 
         package init(
@@ -67,6 +73,7 @@ extension Internals {
             download: DownloadBuffer,
             cache: ((ResponseHead) -> Internals.AsyncStream<DataBuffer>?)?,
             decompressionDispatch: Internals.ManualDecompressionDispatch,
+            requestMethod: NIOHTTP1.HTTPMethod = .GET,
             logger: Internals.TaskLogger?,
             transferControl: Internals.TransferControl? = nil,
             reconnection: Internals.NIODownloadReconnection? = nil,
@@ -78,6 +85,7 @@ extension Internals {
             self.download = download
             self.cache = cache
             self.decompressionDispatch = decompressionDispatch
+            self.bodyless = Internals.BodylessResponse(method: requestMethod)
             self.logger = logger
             self.transferControl = transferControl
             self.reconnection = reconnection
@@ -154,6 +162,7 @@ extension Internals {
                 _state = .head
                 _phase = .download
                 _reference = .download
+                _isBodyless = bodyless.isBodyless(head)
 
                 return [
                     // First, so whether this download can be resumed is settled before any part
@@ -283,6 +292,17 @@ extension Internals {
         }
 
         package func didReceiveError(task: HTTPClient.Task<Response>, _ error: Error) {
+            // The decompressor reporting that a response with no body had nothing to decode is the
+            // end of that response, not a failure of it. See `Internals.BodylessResponse`.
+            let isEndOfBodylessResponse = lock.withLock {
+                _state == .head && _isBodyless && bodyless.isTruncatedDecoder(error)
+            }
+
+            if isEndOfBodylessResponse {
+                try? didFinishRequest(task: task)
+                return
+            }
+
             // A connection lost mid-body that a continuation can recover from ends only this
             // exchange, not the body: nothing below applies, the window in particular, which
             // the continuation goes on using.

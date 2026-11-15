@@ -80,7 +80,7 @@ struct CustomDecompressorIntegrationTests {
 
     /// A one-shot raw HTTP/1.1 server: accepts a single connection, ignores the request, and
     /// writes back exactly the bytes given; no framework in the middle re-encoding anything.
-    private final class RawHTTPServer: @unchecked Sendable {
+    final class RawHTTPServer: @unchecked Sendable {
         let port: UInt16
         private let listenSocket: Int32
 
@@ -154,6 +154,10 @@ struct CustomDecompressorIntegrationTests {
 
     /// Real gzip-compressed bytes, via the same `GzipAlgorithm` `Compressor` a real upload would
     /// use: not a fixture, so this stays correct if the codec's own output ever changes shape.
+    static func gzipCompressed(_ string: String) throws -> [UInt8] {
+        try gzipCompress(string)
+    }
+
     private static func gzipCompress(_ string: String) throws -> [UInt8] {
         let compressor: any Compressor = GzipAlgorithm()
         var stream = try compressor()
