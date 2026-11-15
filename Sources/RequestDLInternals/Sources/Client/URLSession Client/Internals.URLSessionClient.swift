@@ -726,6 +726,12 @@ extension Internals {
                 if case .file(let bufferURL) = uploadBody {
                     await bufferURL.removeIfTemporary()
                 }
+
+                // Held for as long as the exchange runs, not only for the call that started it: it
+                // is the one thing keeping this client's session valid for a download that
+                // reconnects onto a new exchange, and a client nothing else refers to invalidates
+                // its session when it goes (see `deinit`).
+                withExtendedLifetime(self) {}
             }
 
             let response = Internals.AsyncResponse(
@@ -1130,9 +1136,14 @@ extension Internals {
             return fileURL
         }
 
-        /// Invalidates the underlying `URLSession`. Mirrors `Internals.Client.shutdown()`, read
-        /// by `Internals.ClientManager`'s idle-cleanup sweep. Idempotent and a no-op while a
-        /// request is still in flight, same guard as the NIO counterpart.
+        /// Invalidates the underlying `URLSession`, immediately. Mirrors
+        /// `Internals.Client.shutdown()`. Idempotent and a no-op while a request is still in
+        /// flight, same guard as the NIO counterpart.
+        ///
+        /// `Internals.ClientManager` no longer calls this: a client it stops tracking retires
+        /// itself in `deinit`, once nothing refers to it, which cannot close it out from under a
+        /// caller that was handed it and has not started its request yet. It is for whoever owns a
+        /// client outright and wants it gone now.
         ///
         /// - Returns: `true` if this call actually invalidated the session, `false` if it was
         /// already closed or is still busy.
@@ -1158,6 +1169,22 @@ extension Internals {
             // Unlike `HTTPClient.shutdown()`, invalidation here is immediate, not awaited.
             session.invalidateAndCancel()
             return true
+        }
+
+        deinit {
+            // The client owns its session, and nothing else invalidates one that is never told to:
+            // an `URLSession` stays alive for as long as it hasn't been. `Internals.ClientManager`
+            // relies on this to retire a client simply by letting go of it (an unpooled one, an
+            // evicted one, an expired one), the same way `Internals.Client.deinit` does for `.nio`.
+            //
+            // `finishTasksAndInvalidate()`, not `invalidateAndCancel()`: a response that is still
+            // arriving when the last reference goes (see the one `executeSessionTask` holds for as
+            // long as its exchange runs) is not this client's to cut short.
+            guard !_isClosed else {
+                return
+            }
+
+            session.finishTasksAndInvalidate()
         }
     }
 }

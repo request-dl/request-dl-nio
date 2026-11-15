@@ -249,11 +249,10 @@ extension Internals.Session.Configuration {
     /// no notion of equality, so `Internals.RedirectConfiguration.==` answers `false` for it
     /// against everything (see that type's own doc comment).
     ///
-    /// - Important: For a `.nio` client this also decides whether it is *stored*: an unpoolable one
-    /// is not, since nothing could ever be handed it again. The caller owns it, `Internals.Client`
-    /// keeps itself alive while a request is using it, and shuts down once none is. A `.urlSession`
-    /// client is still stored regardless: `URLSession` retains its delegate, so only the table's
-    /// sweep ever invalidates it.
+    /// - Important: For a client of either backend this also decides whether it is *stored*: an
+    /// unpoolable one is not, since nothing could ever be handed it again. The caller owns it,
+    /// `Internals.Client` / `Internals.URLSessionClient` keeps itself alive while a request is
+    /// using it, and shuts down (invalidates its session) once none is.
     ///
     /// Deliberately not extended to `SecureConnection`'s `===`-compared hooks (`keyLogger`,
     /// `pskIdentityResolver`, `trustDecisionObserver`): an instance held once and reused *does*
