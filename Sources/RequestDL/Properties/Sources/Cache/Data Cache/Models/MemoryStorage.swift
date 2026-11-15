@@ -121,7 +121,14 @@ struct MemoryStorage: Sendable {
         expecting expected: CachedResponse,
         maximumCapacity: Int64
     ) {
-        guard let record = records[key], record.cachedResponse == expected else {
+        guard
+            let record = records[key],
+            record.cachedResponse.isSameEntry(as: expected),
+            // Not rewritten when it was already renewed after `expected` was read: by a revalidation
+            // that ran alongside this one, and just as good. Writing this one's older date over it
+            // would only take the entry back in time.
+            record.cachedResponse.date <= expected.date
+        else {
             return
         }
 
@@ -158,7 +165,10 @@ struct MemoryStorage: Sendable {
         maximumCapacity: Int64,
         knownUsage: Int64? = nil
     ) -> (dataURL: Internals.ByteURL?, usage: Int64?) {
-        guard contentLength <= maximumCapacity else {
+        // `contentLength` comes from a response's `Content-Length`, which a server controls.
+        // A negative one is no size at all, and `Int64.min` would overflow the subtraction below
+        // and trap, so it is turned down like an entry that does not fit, as `DiskStorage` does.
+        guard contentLength >= 0, contentLength <= maximumCapacity else {
             return (nil, nil)
         }
 

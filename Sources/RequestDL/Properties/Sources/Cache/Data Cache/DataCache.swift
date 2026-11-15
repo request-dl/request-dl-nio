@@ -78,6 +78,10 @@ public struct DataCache: Sendable, Equatable {
         /// Cache writes started and not yet finished.
         let pendingWrites = Internals.PendingTasks(priority: .background)
 
+        /// Held while a revalidated entry is rewritten and read back, one at a time: see
+        /// ``DataCache/renewCached(key:cachedResponse:expecting:policy:)``.
+        let revalidationLock = AsyncLock()
+
         var memoryCapacity: Int64 {
             get { lock.withLock { _memoryCapacity } }
             set {
@@ -774,6 +778,39 @@ public struct DataCache: Sendable, Equatable {
                 expecting: expected,
                 maximumCapacity: diskCapacity
             )
+        }
+    }
+
+    /// Rewrites the entry at `key` as `cachedResponse`, the revalidated form of `expected`, and
+    /// reads back what is stored.
+    ///
+    /// Revalidations of one entry run side by side, each with its own 304 and its own date, and
+    /// rewriting a disk entry moves its body to a new directory. Run together, one of them reads
+    /// the entry while another has the body in transit, and the lookup waits out its retry budget
+    /// for a file that is on its way, or finds nothing. They take turns instead, and the ones
+    /// that come after the first find the entry already renewed (see
+    /// ``CachedResponse/isSameEntry(as:)``), which is all they wanted, and leave it where it is.
+    ///
+    /// - Returns: The entry, `nil` when what is stored is not (any more) the entry that was
+    /// revalidated: it was removed, or replaced by a response of its own, which a revalidation of
+    /// something else says nothing about.
+    func renewCached(
+        key: String,
+        cachedResponse: CachedResponse,
+        expecting expected: CachedResponse,
+        policy: DataCache.Policy.Set
+    ) async -> CachedData? {
+        await storage.revalidationLock.withLock {
+            await updateCached(key: key, cachedResponse: cachedResponse, expecting: expected)
+
+            guard
+                let updated = await getCachedData(forKey: key, policy: policy),
+                updated.cachedResponse.isSameEntry(as: cachedResponse)
+            else {
+                return nil
+            }
+
+            return updated
         }
     }
 
