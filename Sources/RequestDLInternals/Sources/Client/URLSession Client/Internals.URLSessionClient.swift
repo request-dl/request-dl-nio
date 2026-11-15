@@ -1616,7 +1616,8 @@ extension Internals.URLSessionClient {
             totalBytesSent: Int64,
             totalBytesExpectedToSend: Int64
         ) {
-            onUploadProgress?(Int(bytesSent), Int(totalBytesExpectedToSend))
+            // `Int64` counts, and `Int` is 32 bits on watchOS arm64_32: clamped instead of trapping past 2 GiB.
+            onUploadProgress?(Int(clamping: bytesSent), Int(clamping: totalBytesExpectedToSend))
         }
 
         /// Reports every transaction of the task, one per redirect hop and one per retry on a fresh

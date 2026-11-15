@@ -60,7 +60,7 @@ extension Internals {
                         return .zero
                     }
 
-                    return Int(info.size)
+                    return Int(clamping: info.size)
                 } catch {
                     return .zero
                 }

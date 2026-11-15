@@ -143,6 +143,23 @@ struct InternalsRawBytesIdentityBuilderTests {
         }
     }
 
+    /// A four byte DER length can declare up to 4 GiB. Where `Int` is 32 bits (watchOS arm64_32) the
+    /// old reader turned the high ones into a negative length that passed the bounds check and
+    /// trapped on slicing; on 64-bit it already failed cleanly. Either way, it must be an error.
+    @Test(
+        arguments: [
+            [0x30, 0x84, 0xFF, 0xFF, 0xFF, 0xFF, 0x02, 0x01, 0x00],
+            [0x30, 0x84, 0x80, 0x00, 0x00, 0x00, 0x02, 0x01, 0x00],
+            [0x30, 0x84, 0x7F, 0xFF, 0xFF, 0xFF, 0x02, 0x01, 0x00],
+            [0x30, 0x84, 0x00, 0x00, 0x00, 0x10, 0x02, 0x01, 0x00],
+        ] as [[UInt8]]
+    )
+    func secKey_whenGivenDERWithADeclaredLengthPastTheInput_throwsInsteadOfTrapping(_ der: [UInt8]) {
+        #expect(throws: Internals.RawBytesIdentityBuilder.Error.self) {
+            try Internals.RawBytesIdentityBuilder.secKey(fromDER: Data(der))
+        }
+    }
+
     // MARK: - EC
 
     @Test(arguments: [Self.Curve.p256, .p384, .p521])
