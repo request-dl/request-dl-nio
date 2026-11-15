@@ -174,7 +174,7 @@ extension Internals {
             // caller queued behind `throttledExecutor.acquire()` for longer than the pool's
             // lifetime must still count as busy, or the sweep can invalidate the session out from
             // under it the moment it's finally let through.
-            let operation = operationQueue.operation()
+            let operation = try beginOperation()
             defer { operation.complete() }
 
             // Waited on before anything else, mirroring `Internals.Client.execute`: a session
@@ -253,7 +253,7 @@ extension Internals {
             // See the equivalent comment in `execute(request:delegate:)`: registered before the
             // throttle wait so this client counts as busy for as long as a caller is queued on
             // it, not just once it starts sending.
-            let operation = operationQueue.operation()
+            let operation = try beginOperation()
             defer { operation.complete() }
 
             let release = await throttledExecutor.acquire()
@@ -344,7 +344,7 @@ extension Internals {
             // See the equivalent comment in `execute(request:delegate:)`: registered before the
             // throttle wait so this client counts as busy for as long as a caller is queued on
             // it, not just once it starts sending.
-            let operation = operationQueue.operation()
+            let operation = try beginOperation()
             let release = await throttledExecutor.acquire()
 
             // See the equivalent comment in `execute(request:delegate:)`: a cancelled caller
@@ -557,7 +557,7 @@ extension Internals {
             // See the equivalent comment in `execute(request:delegate:)`: registered before the
             // throttle wait so this client counts as busy for as long as a caller is queued on
             // it, not just once it starts sending.
-            let operation = operationQueue.operation()
+            let operation = try beginOperation()
             let release = await throttledExecutor.acquire()
 
             // See the equivalent comment in `execute(request:delegate:)`: a cancelled caller must
@@ -1145,15 +1145,16 @@ extension Internals {
         /// caller that was handed it and has not started its request yet. It is for whoever owns a
         /// client outright and wants it gone now.
         ///
+        /// Whether the client is idle and closing it are decided under one lock, the same one
+        /// `beginOperation()` takes: a request either registered first, and this finds the client
+        /// busy, or finds the client closed and throws, instead of creating a task on a session
+        /// that is about to be, or already is, invalidated.
+        ///
         /// - Returns: `true` if this call actually invalidated the session, `false` if it was
         /// already closed or is still busy.
         package func shutdown() async throws -> Bool {
-            guard !isRunning else {
-                return false
-            }
-
             let shouldShutdown = lock.withLock { () -> Bool in
-                guard !_isClosed else {
+                guard !_isClosed, !operationQueue.isRunning else {
                     return false
                 }
 
@@ -1165,10 +1166,26 @@ extension Internals {
                 return false
             }
 
-            // No outstanding tasks per the `isRunning` guard above, so there is nothing to drain.
-            // Unlike `HTTPClient.shutdown()`, invalidation here is immediate, not awaited.
+            // No outstanding tasks per the check above, and none can start since: nothing to
+            // drain. Unlike `HTTPClient.shutdown()`, invalidation here is immediate, not awaited.
             session.invalidateAndCancel()
             return true
+        }
+
+        /// Registers a request on this client, unless it has already been shut down.
+        ///
+        /// Taken before anything else a request does, and under the same lock `shutdown()` decides
+        /// under, so "is this client closed" and "this client is now busy" cannot disagree.
+        /// Creating a `URLSessionTask` on an invalidated session raises an Objective-C exception
+        /// (`NSGenericException`), which Swift cannot catch and which ends the process.
+        private func beginOperation() throws -> Internals.ClientOperation {
+            try lock.withLock {
+                guard !_isClosed else {
+                    throw ClientClosedError()
+                }
+
+                return operationQueue.operation()
+            }
         }
 
         deinit {
@@ -1202,6 +1219,11 @@ extension Internals.URLSessionClient {
     /// Should be unreachable given `URLSession`'s own contract (every task either fails or
     /// eventually receives a response), kept as a named error rather than force-unwrapping.
     package struct MissingURLResponseError: Error, Sendable {}
+
+    /// A request was made on a client that had already been shut down. Raised instead of creating a
+    /// task on its invalidated session, which `URLSession` answers with an uncatchable
+    /// `NSGenericException`.
+    package struct ClientClosedError: Error, Sendable {}
 
     /// The proxy rejected the configured `Internals.Proxy.Authorization` credentials. Mirrors
     /// `HTTPClientError.proxyAuthenticationRequired` from the NIO executor.
