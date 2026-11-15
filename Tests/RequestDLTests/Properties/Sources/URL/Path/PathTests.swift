@@ -165,6 +165,42 @@ struct PathTests {
         #expect(resolved.requestConfiguration.url == "https://google.com/search?q=a%26b&n=1%2B1")
     }
 
+    /// `?uploads` is a flag, and a signed URL signs it as it is written: `?uploads=` is another
+    /// query to a server that checks the flag by its presence, and to a signature.
+    @Test(arguments: [
+        ("bucket/key?uploads", "https://google.com/bucket/key?uploads"),
+        ("bucket/key?uploads&partNumber=2", "https://google.com/bucket/key?uploads&partNumber=2"),
+        ("bucket/key?partNumber=2&uploadId", "https://google.com/bucket/key?partNumber=2&uploadId"),
+        ("bucket/key?versioning=", "https://google.com/bucket/key?versioning="),
+    ])
+    func pathWithEmbeddedQuery_keepsAnItemWithoutValueAsWritten(_ path: String, _ expected: String) async throws {
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL("google.com")
+                Path(path)
+            }
+        )
+
+        // Then
+        #expect(resolved.requestConfiguration.url == expected)
+    }
+
+    @Test
+    func explicitQueryWithAnEmptyValue_keepsItsEqualSign() async throws {
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL("google.com")
+                Path("bucket/key?uploads")
+                Query(name: "flag", value: "")
+            }
+        )
+
+        // Then
+        #expect(resolved.requestConfiguration.url == "https://google.com/bucket/key?uploads&flag=")
+    }
+
     @Test
     func pathWithEmbeddedQueryCombinedWithExplicitQuery() async throws {
         // Given

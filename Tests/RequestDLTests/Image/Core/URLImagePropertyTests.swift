@@ -83,6 +83,35 @@ struct URLImagePropertyTests {
     }
 
     @Test
+    func queryItemWithoutValue_isKeptAsWritten() async throws {
+        // Given
+        let url = URL(string: "https://example.com/avatar.png?thumbnail&sig=abc&empty=")!
+
+        // When
+        let resolved = try await resolve(URLImageProperty(url: url))
+
+        // Then
+        #expect(resolved.requestConfiguration.url == "https://example.com/avatar.png?thumbnail&sig=abc&empty=")
+    }
+
+    /// `URL.host` gives an IPv6 literal without its brackets, and `::1:8080` is not an authority.
+    @Test(arguments: [
+        ("http://[::1]:8080/avatar.png", "http://[::1]:8080/avatar.png"),
+        ("http://[::1]/avatar.png", "http://[::1]/avatar.png"),
+        ("https://[2001:db8::7]:8443/a.png?x=1", "https://[2001:db8::7]:8443/a.png?x=1"),
+    ])
+    func ipv6Host_keepsItsBrackets(_ string: String, _ expected: String) async throws {
+        // Given
+        let url = URL(string: string)!
+
+        // When
+        let resolved = try await resolve(URLImageProperty(url: url))
+
+        // Then
+        #expect(resolved.requestConfiguration.url == expected)
+    }
+
+    @Test
     func queryValuesAreNotDoubleEncoded() async throws {
         // Given
         // RequestConfiguration.queries is documented as expecting values that are already

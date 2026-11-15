@@ -91,6 +91,29 @@ struct QueryGroupTests {
         #expect(queryItems.contains("page=1"))
     }
 
+    /// A dictionary iterates in an order that changes from one launch to the next, and the URL is
+    /// the key of the data cache and what a signed URL signs. Sixteen entries make an accidental
+    /// match with the sorted order a one in 2 * 10^13 chance.
+    @Test
+    func queries_whenInitWithDictionary_areSortedByName() async throws {
+        // Given
+        let names = "pnbkgjedhamficlo".map(String.init)
+        let queries = Dictionary(uniqueKeysWithValues: names.enumerated().map { ($0.element, $0.offset) })
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL("127.0.0.1")
+                QueryGroup(queries.mapValues { $0 as Sendable })
+            }
+        )
+
+        // Then
+        let expected = names.sorted().map { "\($0)=\(queries[$0]!)" }.joined(separator: "&")
+
+        #expect(resolved.requestConfiguration.url == "https://127.0.0.1?\(expected)")
+    }
+
     @Test
     func groupOfQueriesFromNestedQueryGroup() async throws {
         // Given A nested `QueryGroup`'s resolved queries must stay visible to the outer

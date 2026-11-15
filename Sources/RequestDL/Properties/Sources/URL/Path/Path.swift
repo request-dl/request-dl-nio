@@ -70,10 +70,11 @@ public struct Path: Property {
         }
 
         /// `percentEncodedQueryItems`, not `queryItems`: `RequestConfiguration.url` joins queries
-        /// as-is, so decoding here turned an escaped `%26` back into a live `&`.
+        /// as-is, so decoding here turned an escaped `%26` back into a live `&`. An item with no `=`
+        /// (`?uploads`) stays a bare name: it is a different query from `uploads=`.
         private static func queryItems(from queryString: String) -> [QueryItem] {
-            URLComponents(string: "?\(queryString)")?.percentEncodedQueryItems?.map {
-                QueryItem(name: $0.name, value: $0.value ?? "")
+            URLComponents(string: "?\(queryString)")?.percentEncodedQueryItems?.map { item in
+                item.value.map { QueryItem(name: item.name, value: $0) } ?? QueryItem(name: item.name)
             } ?? []
         }
     }
