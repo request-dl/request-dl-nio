@@ -7,6 +7,7 @@ import RequestDLInternals
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
+import struct Foundation.Data
 import struct Foundation.URL
 #endif
 
@@ -43,10 +44,12 @@ extension DataCache {
         /// the write is finished or discarded. See ``DataCache/WriteToken``.
         let writeToken: DataCache.WriteToken?
 
-        /// Whether the memory tier was given up on because the body outgrew its capacity.
+        /// Whether the memory tier was given up on: the body outgrew its capacity, or a write to it
+        /// did not go through.
         private(set) var memoryOverflowed = false
 
-        /// Whether the disk tier was given up on because the body outgrew its capacity.
+        /// Whether the disk tier was given up on: the body outgrew its capacity, or a write to it
+        /// did not go through.
         private(set) var diskOverflowed = false
 
         /// Whether no tier is left for the rest of the body to go to: it was never allocated one,
@@ -112,8 +115,12 @@ extension DataCache {
                     memoryBuffer = nil
                     memoryOverflowed = true
                     await onOverflow?(.memory)
+                } else if let tier = memoryBuffer, let written = await Self.write(bytes, to: tier) {
+                    memoryBuffer = written
                 } else {
-                    await memoryBuffer?.writeData(bytes)
+                    memoryBuffer = nil
+                    memoryOverflowed = true
+                    await onOverflow?(.memory)
                 }
             }
 
@@ -124,10 +131,31 @@ extension DataCache {
                     diskBuffer = nil
                     diskOverflowed = true
                     await onOverflow?(.disk)
+                } else if let tier = diskBuffer, let written = await Self.write(bytes, to: tier) {
+                    diskBuffer = written
                 } else {
-                    await diskBuffer?.writeData(bytes)
+                    diskBuffer = nil
+                    diskOverflowed = true
+                    await onOverflow?(.disk)
                 }
             }
+        }
+
+        /// Writes `bytes` at the end of `buffer`.
+        ///
+        /// - Returns: The buffer after the write, or `nil` when the write did not go through. A
+        /// buffer reports a failed write by its writer not moving, and goes on to the next one
+        /// from where it was, so a body whose middle chunk failed is stored with that chunk
+        /// missing and nothing to say so: it passes for whole whenever there is no
+        /// `Content-Length` to count against (a chunked response, or a compressed one). A tier
+        /// that missed a write cannot be completed afterwards, so the caller gives up on it.
+        private static func write(_ bytes: Data, to buffer: Internals.AnyBuffer) async -> Internals.AnyBuffer? {
+            var buffer = buffer
+            let before = buffer.readableBytes
+
+            await buffer.writeData(bytes)
+
+            return buffer.readableBytes - before == bytes.count ? buffer : nil
         }
 
         /// Closes the disk buffer, so everything written through it is on disk and, with an

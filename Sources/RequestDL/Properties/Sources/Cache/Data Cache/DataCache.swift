@@ -737,9 +737,12 @@ public struct DataCache: Sendable, Equatable {
 
     // MARK: - Internal methods
 
+    /// Replaces the response stored at `key` with `cachedResponse`, keeping its body, in each tier
+    /// whose record is still `expected`: the one that was revalidated.
     func updateCached(
         key: String,
-        cachedResponse: CachedResponse
+        cachedResponse: CachedResponse,
+        expecting expected: CachedResponse
     ) async {
         guard !cachedResponse.policy.isEmpty else {
             return
@@ -758,6 +761,7 @@ public struct DataCache: Sendable, Equatable {
                 $0.updateCached(
                     key: key,
                     cachedResponse: cachedResponse,
+                    expecting: expected,
                     maximumCapacity: memoryCapacity
                 )
             }
@@ -767,6 +771,7 @@ public struct DataCache: Sendable, Equatable {
             await storage.diskStorage.updateCached(
                 key: key,
                 cachedResponse: cachedResponse,
+                expecting: expected,
                 maximumCapacity: diskCapacity
             )
         }

@@ -584,7 +584,7 @@ struct DataCacheTests {
         ).cachedResponse
 
         // When
-        await dataCache.updateCached(key: key, cachedResponse: newCachedResponse)
+        await dataCache.updateCached(key: key, cachedResponse: newCachedResponse, expecting: cachedData.cachedResponse)
 
         // Then
         let cachedMemory = await dataCache.getCachedData(forKey: key, policy: .memory)
@@ -610,7 +610,7 @@ struct DataCacheTests {
         ).cachedResponse
 
         // When
-        await dataCache.updateCached(key: key, cachedResponse: newCachedResponse)
+        await dataCache.updateCached(key: key, cachedResponse: newCachedResponse, expecting: cachedData.cachedResponse)
 
         // Then
         let cachedDisk = await dataCache.getCachedData(forKey: key, policy: .disk)
@@ -633,7 +633,7 @@ struct DataCacheTests {
         ).cachedResponse
 
         // When
-        await dataCache.updateCached(key: key, cachedResponse: cachedResponse)
+        await dataCache.updateCached(key: key, cachedResponse: cachedResponse, expecting: cachedResponse)
 
         // Then
         let cachedDisk = await dataCache.getCachedData(forKey: key, policy: .disk)
@@ -655,7 +655,7 @@ struct DataCacheTests {
         ).cachedResponse
 
         // When
-        await dataCache.updateCached(key: key, cachedResponse: cachedResponse)
+        await dataCache.updateCached(key: key, cachedResponse: cachedResponse, expecting: cachedResponse)
 
         // Then
         let cachedMemory = await dataCache.getCachedData(forKey: key, policy: .memory)
