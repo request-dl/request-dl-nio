@@ -502,6 +502,33 @@ struct ResumableUploadExecutionStubTests {
 
     // MARK: - Where the upload lives
 
+    @Test
+    func anUploadURLThatEndsInASlash_isSentToWithTheSlash() async throws {
+        // Given
+        let urls = LockedValueBox<[String: String]>([:])
+
+        let execution = try await Self.execution(
+            client: ScriptedClient { configuration in
+                urls.withLockedValue { $0[configuration.method ?? ""] = configuration.url }
+
+                if configuration.method == "PATCH" {
+                    return await Self.sessionTask(head: Self.head(status: 200))
+                }
+
+                return await Self.sessionTask(
+                    head: Self.head(status: 201, headers: [("Location", "https://example.com/files/abc/")])
+                )
+            }
+        )
+
+        // When
+        execution.start()
+        for try await _ in execution.response {}
+
+        // Then
+        #expect(urls.withLockedValue { $0["PATCH"] } == "https://example.com/files/abc/")
+    }
+
     // MARK: - Cancelling, again
 
     @Test

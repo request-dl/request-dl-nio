@@ -28,6 +28,10 @@ public struct RequestConfiguration: Sendable {
     /// expected to be percent encoded already, which is what ``URLEncoder`` produces. Encoding
     /// again here would turn every `%20` into `%2520`.
     public var url: String {
+        if let exactURL {
+            return exactURL
+        }
+
         let cleanBaseURL = baseURL.trimmingURLBoundaryCharacters()
         let pathComponents = pathComponents.joinedAsPath()
         let queries = queries.joined()
@@ -129,6 +133,11 @@ public struct RequestConfiguration: Sendable {
     /// the server sent them, keep the headers that identify the caller. Set by the upload itself
     /// from `forwardsCredentialsToOtherOrigins`, never by a node.
     var forwardsCredentialsToOtherOrigins = false
+
+    /// A URL that is ``url`` exactly as it is, with none of the trimming and joining that builds
+    /// it from ``baseURL``, ``pathComponents`` and ``queries``. Only a resumable upload sets it,
+    /// for the URL a server gave it, where a trailing slash is part of the resource's name.
+    var exactURL: String?
 
     // MARK: - Inits
 
