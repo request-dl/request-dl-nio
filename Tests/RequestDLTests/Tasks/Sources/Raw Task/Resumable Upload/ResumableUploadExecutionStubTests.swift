@@ -2,7 +2,6 @@
 // See LICENSE for this package's licensing information.
 //
 
-import Dispatch
 import SwiftAsyncStream
 import Testing
 
@@ -429,17 +428,20 @@ struct ResumableUploadExecutionStubTests {
 
     @Test
     func attemptsThatMoveNothingNew_waitBeforeTheNextOne() async throws {
-        // Given: a server that disagrees, and says it holds nothing, every time.
-        let instants = LockedValueBox<[UInt64]>([])
+        // Given: a server that disagrees, and says it holds nothing, every time. The wait is recorded
+        // among the requests instead of being waited for, so what is asserted is the order of what
+        // happened, and not how long it took.
+        let events = LockedValueBox<[String]>([])
 
         let execution = try await Self.execution(
-            delay: 100_000_000,
+            delay: 7,
+            sleep: { delay in events.withLockedValue { $0.append("wait \(delay)") } },
             client: ScriptedClient { configuration in
                 guard configuration.method == "PATCH" else {
                     return await Self.sessionTask(head: Self.head(status: 201, headers: [("Location", "/uploads/1")]))
                 }
 
-                instants.withLockedValue { $0.append(DispatchTime.now().uptimeNanoseconds) }
+                events.withLockedValue { $0.append("PATCH") }
                 return await Self.sessionTask(head: Self.head(status: 409, headers: [("Upload-Offset", "0")]))
             }
         )
@@ -451,13 +453,9 @@ struct ResumableUploadExecutionStubTests {
             for try await _ in execution.response {}
         }
 
-        // Then: each attempt after the first waited, instead of asking again right away.
-        let recorded = instants.withLockedValue { $0 }
-        #expect(recorded.count >= 3)
-
-        for (previous, next) in zip(recorded, recorded.dropFirst()) {
-            #expect(next - previous >= 80_000_000)
-        }
+        // Then: each attempt after the first waited, instead of asking again right away, and the one
+        // that ends it did not wait for a failure that was already decided.
+        #expect(events.withLockedValue { $0 } == ["PATCH", "wait 7", "PATCH", "wait 7", "PATCH", "wait 7", "PATCH"])
     }
 
     @Test
@@ -465,9 +463,11 @@ struct ResumableUploadExecutionStubTests {
         // Given: each `PATCH` is answered with a conflict that is further along than the last, which is
         // progress, and no reason to wait.
         let patches = LockedValueBox(0)
+        let waits = LockedValueBox<[UInt64]>([])
 
         let execution = try await Self.execution(
             delay: 5_000_000_000,
+            sleep: { delay in waits.withLockedValue { $0.append(delay) } },
             client: ScriptedClient { configuration in
                 guard configuration.method == "PATCH" else {
                     return await Self.sessionTask(head: Self.head(status: 201, headers: [("Location", "/uploads/1")]))
@@ -490,14 +490,11 @@ struct ResumableUploadExecutionStubTests {
 
         // When
         execution.start()
-
-        // Then: far sooner than a single delay.
-        let start = DispatchTime.now().uptimeNanoseconds
         for try await _ in execution.response {}
-        let elapsed = DispatchTime.now().uptimeNanoseconds - start
 
-        #expect(elapsed < 3_000_000_000)
+        // Then: it never waited.
         #expect(patches.withLockedValue { $0 } == 5)
+        #expect(waits.withLockedValue { $0 }.isEmpty)
     }
 
     /// tus: the server keeps part of every `PATCH`, loses data once (it held 600, and says 100 when
@@ -550,17 +547,18 @@ struct ResumableUploadExecutionStubTests {
     /// tus: a partial answer that holds nothing new waits like any other attempt that moved nothing.
     @Test
     func aPartialAnswerThatHoldsNothingNew_waitsBeforeTheNextAttempt() async throws {
-        let instants = LockedValueBox<[UInt64]>([])
+        let events = LockedValueBox<[String]>([])
 
         let execution = try await Self.execution(
             dialect: TUSResumableUploadDialect(),
-            delay: 100_000_000,
+            delay: 7,
+            sleep: { delay in events.withLockedValue { $0.append("wait \(delay)") } },
             client: ScriptedClient { configuration in
                 guard configuration.method == "PATCH" else {
                     return await Self.sessionTask(head: Self.head(status: 201, headers: [("Location", "/uploads/1")]))
                 }
 
-                instants.withLockedValue { $0.append(DispatchTime.now().uptimeNanoseconds) }
+                events.withLockedValue { $0.append("PATCH") }
                 return await Self.sessionTask(head: Self.head(status: 204, headers: [("Upload-Offset", "0")]))
             }
         )
@@ -571,12 +569,7 @@ struct ResumableUploadExecutionStubTests {
             for try await _ in execution.response {}
         }
 
-        let recorded = instants.withLockedValue { $0 }
-        #expect(recorded.count == 4)
-
-        for (previous, next) in zip(recorded, recorded.dropFirst()).prefix(2) {
-            #expect(next - previous >= 80_000_000)
-        }
+        #expect(events.withLockedValue { $0 } == ["PATCH", "wait 7", "PATCH", "wait 7", "PATCH", "wait 7", "PATCH"])
     }
 
     @Test
@@ -927,6 +920,7 @@ struct ResumableUploadExecutionStubTests {
         cancellation: UploadCancellation = .terminate,
         forwardsCredentialsToOtherOrigins: Bool = false,
         delay: UInt64 = 1_000_000,
+        sleep: (@Sendable (UInt64) async throws -> Void)? = nil,
         client: ScriptedClient
     ) async throws -> ResumableUploadExecution {
         var request = RequestConfiguration()
@@ -945,7 +939,8 @@ struct ResumableUploadExecutionStubTests {
                 dialect: dialect,
                 delay: delay,
                 cancellation: cancellation,
-                forwardsCredentialsToOtherOrigins: forwardsCredentialsToOtherOrigins
+                forwardsCredentialsToOtherOrigins: forwardsCredentialsToOtherOrigins,
+                sleep: sleep ?? { try await Task.sleep(nanoseconds: $0) }
             ),
             request: request,
             source: source,

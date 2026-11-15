@@ -409,7 +409,7 @@ final class ResumableUploadExecution: @unchecked Sendable {
     /// mind from being asked again as fast as it answers.
     private func pause() async throws {
         if setup.delay > .zero {
-            try await Task.sleep(nanoseconds: setup.delay)
+            try await setup.sleep(setup.delay)
         }
 
         try checkNotCancelled()

@@ -24,6 +24,10 @@ struct ResumableUploadSetup: Sendable {
     /// another origin.
     let forwardsCredentialsToOtherOrigins: Bool
 
+    /// How the execution waits ``delay``, given in nanoseconds. Always `Task.sleep`; a test replaces
+    /// it to see how often the execution waits, and for how long, without waiting for it.
+    let sleep: @Sendable (UInt64) async throws -> Void
+
     // MARK: - Inits
 
     init(
@@ -31,7 +35,8 @@ struct ResumableUploadSetup: Sendable {
         maximumAttemptsWithoutProgress: Int = 3,
         delay: UInt64 = 1_000_000_000,
         cancellation: UploadCancellation = .terminate,
-        forwardsCredentialsToOtherOrigins: Bool = false
+        forwardsCredentialsToOtherOrigins: Bool = false,
+        sleep: @escaping @Sendable (UInt64) async throws -> Void = { try await Task.sleep(nanoseconds: $0) }
     ) {
         precondition(maximumAttemptsWithoutProgress > .zero, "A resumable upload allows at least one attempt")
 
@@ -40,6 +45,7 @@ struct ResumableUploadSetup: Sendable {
         self.delay = delay
         self.cancellation = cancellation
         self.forwardsCredentialsToOtherOrigins = forwardsCredentialsToOtherOrigins
+        self.sleep = sleep
     }
 }
 
