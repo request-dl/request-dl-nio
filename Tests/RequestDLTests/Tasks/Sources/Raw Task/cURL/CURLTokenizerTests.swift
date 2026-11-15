@@ -107,8 +107,8 @@ struct CURLTokenizerTests {
         #expect(tokens == ["curl", "-d", "axZb"])
     }
 
-    /// `UInt8(_:radix:)` takes a sign: `\x+1` was the byte `0x01`, which bash prints as the literal
-    /// `\x+1`. Only hex digits are part of the escape.
+    /// `UInt8(_:radix:)` takes a sign: `\x+1` was the byte `0x01`. Only hex digits are part of the
+    /// escape; what is left is the literal text, with the backslash dropped as for any unknown escape.
     @Test(arguments: [
         (#"curl -d $'a\x+1b'"#, "ax+1b"),
         (#"curl -d $'a\x-1b'"#, "ax-1b"),

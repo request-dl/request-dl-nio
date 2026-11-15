@@ -533,7 +533,12 @@ enum CURLCommandParser {
     /// `http+unix://` and `https+unix://`, so a pasted command (`curl unix:///var/run/docker.sock/...`)
     /// would otherwise reach a local socket. A URL with no scheme is left to the executor: it
     /// fails there, as it always did. The token is the scheme, not the URL, which may carry credentials.
-    private static func requireHTTPScheme(of url: String) throws {
+    private static func requireHTTPScheme(of rawURL: String) throws {
+        // What is looked at is what goes out: `RequestConfiguration.url` trims whitespace and
+        // slashes off both ends of the base URL, so `" unix:///x"` and `"/unix:///x"` reach the
+        // executor as `unix:///x`.
+        let url = rawURL.trimmingURLBoundaryCharacters()
+
         guard let colon = url.firstIndex(of: ":") else {
             return
         }
@@ -553,7 +558,11 @@ enum CURLCommandParser {
         let normalized = scheme.lowercased()
 
         guard normalized == "http" || normalized == "https" else {
-            throw CURLParsingError(.unsupportedFlag, token: "\(scheme):")
+            // The scheme only when the URL really has one (`scheme://`): in `alice:secret@host`
+            // the text before the colon is a user name.
+            let hasAuthority = url[url.index(after: colon)...].hasPrefix("//")
+
+            throw CURLParsingError(.unsupportedFlag, token: hasAuthority ? "\(scheme)://" : "URL scheme")
         }
     }
 

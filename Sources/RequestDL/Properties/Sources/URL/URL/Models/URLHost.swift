@@ -30,14 +30,51 @@ enum URLHost {
         host.contains("@")
     }
 
-    /// Whether `host`, as `URLComponents.host` gives it back, can be put after `"scheme://"`.
+    /// Whether `host`, as `URLComponents.host` gives it back (the port is not in it), can be put
+    /// after `"scheme://"`.
     ///
     /// `URLComponents.host` is percent-decoded: `"attacker.com%23.good.com"` is
     /// `"attacker.com#.good.com"` in it, a `#` that was not one in the string the caller wrote and
-    /// validated. So, on top of ``isWellFormed(_:)``, it has no `@` (see ``hasUserInfo(decoded:)``)
-    /// and no `%`: the base URL is parsed again, and `"%2523"` decoded once would be a `"%23"`
-    /// that the second parse decodes into a `#`.
+    /// validated. So, on top of ``isWellFormed(_:)``, it has no `@` (see ``hasUserInfo(decoded:)``),
+    /// and:
+    ///
+    /// - no `:`, `[`, `]` or `%` unless it is an IPv6 literal between brackets. A `:` here was
+    ///   `%3A` (or an IPv6 address), and `"127.0.0.1%3A6379"` would otherwise be a host with no
+    ///   port to the caller and a port to the request. A `%` would be decoded a second time, when
+    ///   the base URL is parsed again: `"%2523"` decoded once is `"%23"`.
+    /// - in an IPv6 literal: hex digits, `:` and `.`, and optionally a zone (`%en0`) of
+    ///   unreserved characters that does not start with something the second parse reads as an
+    ///   escape.
     static func isWellFormed(decoded host: String) -> Bool {
-        isWellFormed(host) && !hasUserInfo(decoded: host) && !host.contains("%")
+        guard isWellFormed(host), !hasUserInfo(decoded: host) else {
+            return false
+        }
+
+        guard host.hasPrefix("[") || host.hasSuffix("]") else {
+            return !host.contains(where: { $0 == ":" || $0 == "[" || $0 == "]" || $0 == "%" })
+        }
+
+        guard host.hasPrefix("["), host.hasSuffix("]"), host.count > 2 else {
+            return false
+        }
+
+        let literal = host.dropFirst().dropLast()
+        let address = literal.prefix { $0 != "%" }
+
+        guard !address.isEmpty, address.allSatisfy({ $0 == ":" || $0 == "." || $0.isHexDigit && $0.isASCII }) else {
+            return false
+        }
+
+        guard address.count < literal.count else {
+            return true
+        }
+
+        let zone = literal.dropFirst(address.count + 1)
+
+        return !zone.isEmpty
+            && zone.allSatisfy {
+                $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "." || $0 == "_" || $0 == "-" || $0 == "~")
+            }
+            && !zone.prefix(2).allSatisfy { $0.isHexDigit && $0.isASCII }
     }
 }

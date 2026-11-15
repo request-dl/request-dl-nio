@@ -68,6 +68,7 @@ struct URLOverrideEndpointTests {
         "https://attacker.com%5C.good.com/v1",
         "https://attacker.com%20.good.com/v1",
         "https://attacker.com%2523.good.com/v1",
+        "https://127.0.0.1%3A6379/v1",
     ])
     func parsing_anEncodedDelimiterInTheHost_throws(_ url: String) {
         let error = #expect(throws: URLOverrideError.self) {

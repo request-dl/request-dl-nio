@@ -310,6 +310,10 @@ struct CURLCommandParserTests {
         "file:///etc/passwd",
         "ws://example.com",
         "localhost:8080/x",
+        " http+unix://%2Fvar%2Frun%2Fdocker.sock/containers/json",
+        "/unix:///var/run/docker.sock/",
+        "\t unix:///var/run/docker.sock/",
+        " / https+unix://%2Fvar%2Frun%2Fdocker.sock/x",
     ])
     func urlWithASchemeOtherThanHTTPThrows(_ url: String) async {
         for command in ["curl '\(url)'", "curl --url '\(url)'"] {
@@ -320,6 +324,17 @@ struct CURLCommandParserTests {
             #expect(error?.context == .unsupportedFlag)
             #expect(error?.token?.contains("/var/run") != true)
         }
+    }
+
+    /// In `alice:secret@host` the text before the colon is a user name, and an error is logged.
+    @Test func schemeErrorDoesNotEchoAUserName() async {
+        let error = await #expect(throws: CURLParsingError.self) {
+            try await CURLCommandParser.parseCommand("curl 'alice:s3cret@example.com/x'", allowing: [])
+        }
+
+        #expect(error?.context == .unsupportedFlag)
+        #expect(error?.token?.contains("alice") != true)
+        #expect(error?.token?.contains("s3cret") != true)
     }
 
     @Test(arguments: [

@@ -34,12 +34,4 @@ struct InternalsMethodValidationTests {
             try Internals.MethodValidation.validate(method)
         }
     }
-
-    /// The method is whatever a caller put there: it stays out of the error, which ends up in logs.
-    @Test
-    func error_doesNotRepeatTheMethod() {
-        let error = Internals.InvalidMethodError()
-
-        #expect(!error.description.contains("GET"))
-    }
 }

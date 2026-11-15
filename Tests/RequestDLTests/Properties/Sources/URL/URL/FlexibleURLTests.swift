@@ -494,6 +494,9 @@ struct FlexibleURLTests {
         "https://attacker.com%0D%0A.good.com/v1/users",
         "https://attacker.com%20.good.com/v1/users",
         "https://attacker.com%2523.good.com/v1/users",
+        "https://127.0.0.1%3A6379/x",
+        "https://attacker.com%3A80.good.com/x",
+        "https://[::1%2523]/x",
     ])
     func completeURLWithAnEncodedDelimiterInTheHost_throwsInvalidHost(_ url: String) async {
         // When
@@ -521,6 +524,7 @@ struct FlexibleURLTests {
         ("https://[::1]:8443/a", "https://[::1]:8443/a"),
         ("https://[2001:db8::1]/a", "https://[2001:db8::1]/a"),
         ("http://192.168.0.1:8080/a?b=1", "http://192.168.0.1:8080/a?b=1"),
+        ("https://[fe80::1%25en0]:8443/a", "https://[fe80::1%en0]:8443/a"),
     ])
     func completeURLWithALegitimateHost_isAccepted(_ url: String, _ expected: String) async throws {
         // When

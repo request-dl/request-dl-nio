@@ -179,7 +179,8 @@ enum CURLTokenizer {
 
             if escape == "x" {
                 // One or two hex digits, as in bash: `UInt8(_:radix:)` alone also takes a sign, so
-                // `\x+1` was the byte `0x01` where bash keeps it as the text `\x+1`.
+                // `\x+1` was the byte `0x01`. Without digits it is not an escape (the default
+                // branch below, which, unlike bash, drops the backslash and keeps the `x`).
                 let hexStart = index + 2
                 var hexEnd = hexStart
 
