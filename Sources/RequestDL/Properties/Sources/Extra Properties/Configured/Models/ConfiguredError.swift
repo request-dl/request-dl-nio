@@ -18,6 +18,7 @@ public struct ConfiguredError: Error {
         /// (`username`/`password` or `credentials` for `"basic"`, `token` for `"bearer"`).
         case invalidAuthorizationConfiguration
 
+        /// A `proxy` key holds a value of the wrong type (`proxy.enabled` as a string, say), or
         /// `proxy.enabled` is `true` but `proxy.host` is missing, `proxy.type` is neither
         /// `"http"` nor `"socks"`, `proxy.port` is missing for an `"http"` proxy, or
         /// `proxy.authorization`/`proxy.connectHeaders` is specified for a `"socks"` proxy.
@@ -29,6 +30,8 @@ public struct ConfiguredError: Error {
         /// `cacheStrategy` was specified but is none of the ``CacheStrategy`` case names.
         case invalidCacheStrategy
 
+        /// A `secureConnection` key (`trustRoots`, `certificates`, `privateKey.file`,
+        /// `tlsMinimumVersion`, `spkiPinning.pins`, ...) holds a value of the wrong type,
         /// `secureConnection.privateKey.format` was specified but is neither `"pem"` nor
         /// `"der"`, `secureConnection.tlsMinimumVersion`/`secureConnection.tlsMaximumVersion`
         /// was specified but is none of `"1.0"`, `"1.1"`, `"1.2"`, `"1.3"`,
@@ -47,6 +50,13 @@ public struct ConfiguredError: Error {
         /// Credentials do not belong in a URL: they would end up in logs, and the request does
         /// not send them. Use ``Authorization`` instead.
         case invalidBaseURLConfiguration
+
+        /// A key that has no context of its own (`method`, `headers`, `queries`, `dnsOverrides`,
+        /// `urlOverrides`, `systemProxy`, `maximumConnectionsPerHost`,
+        /// `maximumConcurrentConnections`) holds a value of the wrong type, or an entry of one of
+        /// the pair lists (`headers`, `queries`, `dnsOverrides`, `urlOverrides`) has no separator
+        /// or an empty name.
+        case invalidConfigurationValue
     }
 
     // MARK: - Public properties
