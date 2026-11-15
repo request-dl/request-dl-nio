@@ -55,9 +55,28 @@ import struct Foundation.URL
 /// - ``Session/disableRedirect()``, ``Session/enableRedirectFollow(max:allowCycles:)`` and
 ///   ``Session/redirectStrategy(_:)`` have no effect.
 ///
+/// ## Request body
+///
+/// The request body is not sent. A background download is handed to the system as a download
+/// task, which has no body to send, so whatever `content` declares as one (``Payload`` and the
+/// like) is dropped without an error or a warning. The method, the URL, the query and the headers
+/// do go out as written, so a request that needs a body, such as a `POST` that answers with the
+/// file, cannot be a background download: use ``DownloadTask`` for it, in the foreground.
+///
+/// ## Client certificates
+///
 /// A client certificate (mTLS) works too, as long as both ``Certificate`` and ``PrivateKey`` come
 /// from a **file path**, not in-memory bytes. See ``BackgroundDownloadUnsupportedConfigurationError``
 /// for the specific cases that still aren't supported.
+///
+/// What is saved with the download is the path of each file, never the key's bytes, and the
+/// identity is rebuilt from those files every time the server asks for it, in a later launch
+/// too. A path that stops pointing at the file makes that fail, and the download then goes on
+/// without a client certificate, which a server that requires one refuses. The app bundle's path
+/// is not stable: it changes when the app is updated, so a certificate or key read from the
+/// bundle is not found by a download that was scheduled before the update. Copy the files
+/// somewhere that outlives an update, such as Application Support, and point `content` at the
+/// copies.
 public struct BackgroundDownloadTask<Content: Property> {
 
     // MARK: - Private properties
