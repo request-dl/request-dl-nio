@@ -31,6 +31,11 @@
 /// never be sent, and a URL ends up in logs. It throws ``FlexibleURLError`` with the context
 /// ``FlexibleURLError/Context-swift.enum/userInfoNotAllowed``. Use ``Authorization``.
 ///
+/// > Important: The host of a complete URL is read percent-decoded, so one that decodes to a
+/// delimiter (`https://attacker.com%23.good.com`: `%23`, `%2F`, `%3F`, `%5C`, or a space) is
+/// rejected with ``FlexibleURLError/Context-swift.enum/invalidHost``, and one that decodes to an
+/// `@` with ``FlexibleURLError/Context-swift.enum/userInfoNotAllowed``, the same as ``BaseURL``.
+///
 /// ### Supported Formats
 ///
 /// The `FlexibleURL` accepts:

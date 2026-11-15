@@ -92,6 +92,13 @@ extension URLOverrideEndpoint {
             throw URLOverrideError(context: .missingHost, url: url)
         }
 
+        // `components.host` is percent-decoded: `"attacker.com%23.good.com"` is
+        // `"attacker.com#.good.com"` in it, and `Resolve` writes it as is in the base URL of a
+        // request it rewrites. Same check as `BaseURL`.
+        guard URLHost.isWellFormed(decoded: host) else {
+            throw URLOverrideError(context: .invalidURL, url: url)
+        }
+
         self.scheme = scheme
         self.host = host
         self.port = components.port

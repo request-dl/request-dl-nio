@@ -65,14 +65,8 @@ public struct BaseURL: Property {
             // as a `.good.com` host in the caller, then send the request to `attacker.com`, with
             // whatever `Path`/`Query` follows silently dropped or shifted into the fragment or
             // query), a backslash (read as `/` by some parsers), and whitespace or control
-            // characters.
-            guard
-                !host.isEmpty,
-                !host.contains(where: { $0 == "/" || $0 == "?" || $0 == "#" || $0 == "\\" }),
-                !host.unicodeScalars.contains(where: {
-                    $0.properties.isWhitespace || $0.value < 0x20 || $0.value == 0x7F
-                })
-            else {
+            // characters. `FlexibleURL` and `URLOverride` share this check, see `URLHost`.
+            guard URLHost.isWellFormed(host) else {
                 throw BaseURLError(
                     context: .unexpectedHost,
                     baseURL: URLUserInfo.redacting(host: host)

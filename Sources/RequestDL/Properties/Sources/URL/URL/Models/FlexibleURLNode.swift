@@ -96,7 +96,16 @@ struct FlexibleURLNode: PropertyNode {
 extension FlexibleURLNode {
 
     fileprivate func constructBaseURLString(from components: URLComponents, host: String) throws -> String {
-        guard !host.isEmpty else {
+        // `components.host` is percent-decoded: `"attacker.com%23.good.com"` is
+        // `"attacker.com#.good.com"` in it. Put as is in the base URL, which is parsed again when
+        // the request is built, that `#` (or `/`, `?`, `@` from `%2F`, `%3F`, `%40`) would end the
+        // host and send the request to `attacker.com`, whatever a caller that validated the host
+        // of `URL(string:)` saw. Same check as `BaseURL`.
+        guard !URLHost.hasUserInfo(decoded: host) else {
+            throw FlexibleURLError(context: .userInfoNotAllowed, url: redactedURL)
+        }
+
+        guard URLHost.isWellFormed(decoded: host) else {
             throw FlexibleURLError(context: .invalidHost, url: redactedURL)
         }
 

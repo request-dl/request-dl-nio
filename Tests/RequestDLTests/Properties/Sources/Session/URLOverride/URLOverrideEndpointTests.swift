@@ -55,4 +55,37 @@ struct URLOverrideEndpointTests {
         #expect(rule.isSameOrigin(as: request))
         #expect(rule.isSameOrigin(as: withPort))
     }
+
+    // MARK: - Percent-encoded delimiters in the host
+
+    /// `URLComponents.host` is percent-decoded: an `%23`, `%2F`, `%3F` or `%40` in the host of a
+    /// rule would end up as a real delimiter in the base URL it rewrites a request to.
+    @Test(arguments: [
+        "https://attacker.com%23.good.com/v1",
+        "https://attacker.com%2F.good.com/v1",
+        "https://attacker.com%3F.good.com/v1",
+        "https://attacker.com%40good.com/v1",
+        "https://attacker.com%5C.good.com/v1",
+        "https://attacker.com%20.good.com/v1",
+        "https://attacker.com%2523.good.com/v1",
+    ])
+    func parsing_anEncodedDelimiterInTheHost_throws(_ url: String) {
+        let error = #expect(throws: URLOverrideError.self) {
+            try URLOverrideEndpoint(parsing: url)
+        }
+
+        #expect(error?.context == .invalidURL)
+        #expect(error?.url == url)
+    }
+
+    @Test(arguments: [
+        ("https://example.com:8443/a", "example.com", 8443),
+        ("https://[::1]:8443/a", "[::1]", 8443),
+    ])
+    func parsing_aLegitimateHost_isAccepted(_ url: String, _ host: String, _ port: Int?) throws {
+        let parsed = try endpoint(url)
+
+        #expect(parsed.host.lowercased() == host)
+        #expect(parsed.port == port)
+    }
 }

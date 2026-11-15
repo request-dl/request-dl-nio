@@ -480,4 +480,74 @@ struct FlexibleURLTests {
         // Then
         #expect(resolved.requestConfiguration.url == "https://example.com/a%20b/c")
     }
+
+    // MARK: - Percent-encoded delimiters in the host
+
+    /// `URLComponents.host` is already percent-decoded, so an `%23`, `%2F`, `%3F` or `%40` in the
+    /// host became a real `#`, `/`, `?` or `@` in the base URL: the request then went to a
+    /// different host than the one a caller validated on `URL(string:)?.host`.
+    @Test(arguments: [
+        "https://attacker.com%23.good.com/v1/users",
+        "https://attacker.com%2F.good.com/v1/users",
+        "https://attacker.com%3F.good.com/v1/users",
+        "https://attacker.com%5C.good.com/v1/users",
+        "https://attacker.com%0D%0A.good.com/v1/users",
+        "https://attacker.com%20.good.com/v1/users",
+        "https://attacker.com%2523.good.com/v1/users",
+    ])
+    func completeURLWithAnEncodedDelimiterInTheHost_throwsInvalidHost(_ url: String) async {
+        // When
+        let error = await #expect(throws: FlexibleURLError.self) {
+            try await resolve(FlexibleURL(url))
+        }
+
+        // Then
+        #expect(error?.context == .invalidHost)
+        #expect(error?.url == url)
+    }
+
+    @Test func completeURLWithAnEncodedAtSignInTheHost_throwsUserInfoNotAllowed() async {
+        // When
+        let error = await #expect(throws: FlexibleURLError.self) {
+            try await resolve(FlexibleURL("https://attacker.com%40good.com/v1/users"))
+        }
+
+        // Then
+        #expect(error?.context == .userInfoNotAllowed)
+    }
+
+    @Test(arguments: [
+        ("https://example.com:8443/a", "https://example.com:8443/a"),
+        ("https://[::1]:8443/a", "https://[::1]:8443/a"),
+        ("https://[2001:db8::1]/a", "https://[2001:db8::1]/a"),
+        ("http://192.168.0.1:8080/a?b=1", "http://192.168.0.1:8080/a?b=1"),
+    ])
+    func completeURLWithALegitimateHost_isAccepted(_ url: String, _ expected: String) async throws {
+        // When
+        let resolved = try await resolve(FlexibleURL(url))
+
+        // Then
+        #expect(resolved.requestConfiguration.url == expected)
+    }
+
+    /// Foundation hands back an IDN host the way it prefers (Unicode on Darwin), so only that it
+    /// resolves, and under which host, is the point here.
+    @Test(arguments: ["https://xn--mnchen-3ya.de/a", "https://münchen.de/a"])
+    func completeURLWithAnInternationalizedHost_isAccepted(_ url: String) async throws {
+        // When
+        let resolved = try await resolve(FlexibleURL(url))
+
+        // Then
+        #expect(resolved.requestConfiguration.url.hasPrefix("https://"))
+        #expect(resolved.requestConfiguration.url.hasSuffix(".de/a"))
+    }
+
+    /// The escapes that are not delimiters stay what they were before the check.
+    @Test func completeURLWithAnEncodedDelimiterOutsideTheHost_isStillAccepted() async throws {
+        // When
+        let resolved = try await resolve(FlexibleURL("https://example.com/a%23b%3Fc%40d?q=%23"))
+
+        // Then
+        #expect(resolved.requestConfiguration.url == "https://example.com/a%23b%3Fc%40d?q=%23")
+    }
 }
