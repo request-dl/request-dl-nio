@@ -90,6 +90,32 @@ struct InternalsIdleDeadlineTests {
         deadline.finish()
     }
 
+    /// Whoever is waiting cancelling what is being bounded cancels it, and is not the budget.
+    @Test
+    func aCancellationOfTheCaller_cancelsWhatIsRunningWithoutSpendingTheBudget() async throws {
+        // Given
+        let clock = FakeIdleClock()
+        let deadline = clock.makeDeadline(nanoseconds: Self.budget)
+        deadline.start()
+
+        let outcome = _Concurrency.Task {
+            try await deadline.bounding {
+                try await _Concurrency.Task.sleep(nanoseconds: 120_000_000_000)
+            }
+        }
+
+        await clock.waitForASleeper()
+
+        // When
+        outcome.cancel()
+
+        // Then
+        await #expect(throws: CancellationError.self) { try await outcome.value }
+        #expect(!deadline.isExpired)
+
+        deadline.finish()
+    }
+
     /// A budget that ran out before what is about to run was handed over ends it at once.
     @Test
     func aBudgetAlreadySpent_cancelsWhatIsHandedOverAfterwards() async throws {

@@ -498,6 +498,41 @@ struct InternalsManualDecompressionDispatchTests {
         }
     }
 
+    private struct TailAlgorithm: Internals.DecompressionAlgorithm {
+        struct Stream: Internals.DecompressorStream {
+            mutating func callAsFunction(decompressing bytes: Data) throws -> Data {
+                bytes
+            }
+
+            mutating func finish() throws -> Data {
+                Data("-tail".utf8)
+            }
+        }
+
+        var contentEncodingValue: String { "tail" }
+
+        func callAsFunction() throws -> any Internals.DecompressorStream {
+            Stream()
+        }
+    }
+
+    /// What a decoder is still holding when its input ends is handed over after the rest.
+    @Test
+    func resolvedStream_whenTheDecoderHoldsABytesTail_handsItOverAtTheEnd() async throws {
+        // Given
+        let dispatch = Internals.ManualDecompressionDispatch.dispatch(algorithms: [TailAlgorithm()])
+
+        // When
+        let output = try dispatch.resolvedStream(
+            for: responseHead(contentEncoding: "tail"),
+            source: await source("body"),
+            readingMode: .passthrough
+        )
+
+        // Then
+        #expect(try await collect(output) == Data("body-tail".utf8))
+    }
+
     private func collect(_ stream: Internals.AsyncStream<Internals.DataBuffer>) async throws -> Data {
         var iterator = stream.makeAsyncIterator()
         var collected = Data()

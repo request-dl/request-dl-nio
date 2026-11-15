@@ -10,6 +10,8 @@ import Testing
 
 struct IdleBoundedClientTests {
 
+    private struct Refused: Error {}
+
     /// Never answers the conditional request.
     private struct SilentClient: RequestExecutingClient {
 
@@ -20,7 +22,7 @@ struct IdleBoundedClientTests {
             logger: Internals.TaskLogger?,
             transferControl: Internals.TransferControl?
         ) async throws -> SessionTask {
-            fatalError("Only the conditional request is looked at")
+            throw Refused()
         }
 
         func revalidationHead(
@@ -52,5 +54,24 @@ struct IdleBoundedClientTests {
         // Then
         await #expect(throws: CancellationError.self) { try await outcome.value }
         #expect(deadline.isExpired)
+    }
+
+    /// What is not the conditional request is the client's own, and is not bounded.
+    @Test
+    func everythingElse_goesStraightToTheClient() async throws {
+        // Given
+        let clock = FakeIdleClock()
+        let client = IdleBoundedClient(SilentClient(), idle: clock.makeDeadline(nanoseconds: 1_000))
+
+        // Then
+        await #expect(throws: Refused.self) {
+            _ = try await client.execute(
+                configuration: RequestConfiguration(),
+                decompression: .disabled,
+                cache: nil,
+                logger: nil,
+                transferControl: nil
+            )
+        }
     }
 }
