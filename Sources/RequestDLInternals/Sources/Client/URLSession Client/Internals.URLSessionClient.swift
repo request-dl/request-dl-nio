@@ -826,6 +826,12 @@ extension Internals {
                             return (bytes, response)
                         }
 
+                        // `bytes(for:)` only returns once the 3xx hop's body has been received, so this
+                        // hop has nothing left to deliver. Dropping `bytes` cancels its task as well,
+                        // but that is `AsyncBytes`' own undocumented teardown: `box.task` is about to
+                        // point at the next hop, so nothing else could cancel this one afterwards.
+                        bytes.task.cancel()
+
                         currentRequest = manualRedirect
                     }
                 }

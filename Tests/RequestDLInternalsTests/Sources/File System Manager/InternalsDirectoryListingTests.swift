@@ -78,16 +78,7 @@ struct InternalsDirectoryListingTests {
     /// `errno` tells them apart. A failure partway through must not look like the end.
     @Test
     func entryNames_whenAReadFailsPartway_throwsInsteadOfReturningAShortListing() throws {
-        let entries = ["one", "two", "three"].map { name -> UnsafeMutablePointer<dirent> in
-            let entry = UnsafeMutablePointer<dirent>.allocate(capacity: 1)
-            entry.initialize(to: dirent())
-            withUnsafeMutablePointer(to: &entry.pointee.d_name) { pointer in
-                pointer.withMemoryRebound(to: CChar.self, capacity: 8) {
-                    _ = strlcpy($0, name, 8)
-                }
-            }
-            return entry
-        }
+        let entries = ["one", "two", "three"].map { Self.makeEntry(named: $0) }
         defer {
             for entry in entries {
                 entry.deallocate()
@@ -114,13 +105,7 @@ struct InternalsDirectoryListingTests {
 
     @Test
     func entryNames_whenTheEndComesWithAStaleErrno_stillReturnsTheListing() throws {
-        let entry = UnsafeMutablePointer<dirent>.allocate(capacity: 1)
-        entry.initialize(to: dirent())
-        withUnsafeMutablePointer(to: &entry.pointee.d_name) { pointer in
-            pointer.withMemoryRebound(to: CChar.self, capacity: 8) {
-                _ = strlcpy($0, "only", 8)
-            }
-        }
+        let entry = Self.makeEntry(named: "only")
         defer { entry.deallocate() }
 
         // An earlier, unrelated failure left `errno` set.
@@ -133,6 +118,20 @@ struct InternalsDirectoryListingTests {
         }
 
         #expect(names == ["only"])
+    }
+
+    /// Copied byte by byte: `strlcpy` is missing from older Glibc versions.
+    private static func makeEntry(named name: String) -> UnsafeMutablePointer<dirent> {
+        let entry = UnsafeMutablePointer<dirent>.allocate(capacity: 1)
+        entry.initialize(to: dirent())
+
+        withUnsafeMutableBytes(of: &entry.pointee.d_name) { bytes in
+            for (index, byte) in name.utf8.enumerated() {
+                bytes[index] = byte
+            }
+        }
+
+        return entry
     }
 
     #endif

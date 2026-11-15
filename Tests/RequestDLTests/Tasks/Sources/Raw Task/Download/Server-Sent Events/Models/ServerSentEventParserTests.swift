@@ -263,7 +263,7 @@ struct ServerSentEventParserTests {
     }
 
     @Test
-    func feed_whenRetryOverflowsInt_shouldKeepThePreviousValue() {
+    func feed_whenRetryOverflowsInt_shouldSaturate() {
         // Given
         var parser = ServerSentEventParser()
 
@@ -273,7 +273,7 @@ struct ServerSentEventParserTests {
         )
 
         // Then
-        #expect(events.map(\.retry) == [3000])
+        #expect(events.map(\.retry) == [Int.max])
     }
 
     @Test

@@ -124,11 +124,10 @@ struct ServerSentEventParser {
             }
         case "retry":
             if !value.isEmpty, value.allSatisfy({ (Self.zero...Self.nine).contains($0) }) {
-                // A value too large for `Int` is ignored, like any other invalid one, instead of
-                // wiping out the reconnection time the stream set before.
-                if let retry = Int(String(decoding: value, as: UTF8.self)) {
-                    pendingRetry = retry
-                }
+                // Digits only, so the one way this fails is a value too large for `Int`: the
+                // specification takes any such value as the reconnection time, and the largest
+                // one is the closest this can come to it.
+                pendingRetry = Int(String(decoding: value, as: UTF8.self)) ?? .max
             }
         default:
             break
