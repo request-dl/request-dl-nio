@@ -21,6 +21,10 @@ public struct URLEncoderError: Error, Sendable, Hashable {
 
         /// A whitespace strategy finished without setting a representation to substitute.
         case unsetWhitespaceRepresentable
+
+        /// A `Date` could not be encoded with the chosen strategy: it is NaN, infinite or so far
+        /// from 1970 that its seconds (or milliseconds) do not fit in a 64-bit integer.
+        case invalidDate
     }
 
     /// The type of the error.
@@ -48,6 +52,8 @@ extension URLEncoderError: CustomStringConvertible {
             return "The URL encoding container was written to more than once"
         case .unsetWhitespaceRepresentable:
             return "The whitespace strategy did not set a representation for the space character"
+        case .invalidDate:
+            return "The date is not finite or is too far from 1970 to be encoded with the chosen strategy"
         }
     }
 }

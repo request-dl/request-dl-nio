@@ -114,14 +114,20 @@ extension Date {
     /// Matches `ISO8601DateFormatter` with `.withInternetDateTime`: no fractional seconds,
     /// always `Z`.
     ///
+    /// - Returns: `nil` when the date is NaN, infinite or so far from 1970 that its seconds do
+    /// not fit in an `Int64`. `Int64(_:)` traps on those, and a date read from a server and sent
+    /// back as a cursor must not be able to take the process down.
+    ///
     /// - Note: The previous implementation was wrong for every date before 1970. Swift's `/`
     /// and `%` truncate toward zero, so a negative timestamp produced a negative
     /// seconds-of-day, and the year search only ever counted forward from 1970. One second
     /// before the epoch came out as `1970-01-01T00:00:-1Z`.
-    package func toISO8601String() -> String {
+    package func toISO8601String() -> String? {
         // Floored, not truncated. A fractional timestamp of -0.5 is half a second *before* the
         // epoch, so it belongs to 1969-12-31T23:59:59Z, not to 1970.
-        let timestamp = Int64(timeIntervalSince1970.rounded(.down))
+        guard let timestamp = Int64(exactly: timeIntervalSince1970.rounded(.down)) else {
+            return nil
+        }
 
         let days = Internals.GregorianCalendar.floorDivide(timestamp, by: 86_400)
         let secondsOfDay = timestamp - days * 86_400
