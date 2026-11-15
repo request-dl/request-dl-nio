@@ -86,6 +86,7 @@ Request-level — these shape the `RequestDL/RequestConfiguration` itself:
 - `-H` / `--header` (repeatable) — `-H 'Name:'` with no value removes the header, as in curl
 - `-d` / `--data` / `--data-raw` / `--data-binary` — a value that starts with `@` (a file, or `@-` for stdin) is rejected, except for `--data-raw`, which sends it as text
 - `-F` / `--form` (repeatable) — `name=value`, or `name=@path;type=mime` for a file; `name=<path` is rejected
+- `--form-string` (repeatable) — `name=value`, the value as text: it is never read as a file, and `;type=` is not a parameter
 - `-u` / `--user` (basic auth)
 - `--url`, or a bare trailing URL
 - `-G` / `--get` — moves accumulated `-d` data onto the URL as a query string instead of a body
@@ -106,7 +107,7 @@ Session-level — these configure the same `Session`-level settings a declared `
 
 ### What isn't supported, and why
 
-Everything else — cookie jars, `--cert-type`/`--key-type` (PEM is assumed), `--proxy-user`, HTTP/3, and non-`http(s)` schemes — throws ``RequestDL/CURLParsingError`` rather than being silently accepted. These aren't just unimplemented conveniences: silently accepting one of them would make the request actually performed diverge from what the command says.
+Everything else — cookie jars, `--cert-type`/`--key-type` (PEM is assumed), `--proxy-user`, HTTP/3, and any scheme other than `http` or `https` (`unix://`, `http+unix://`, `ftp://`, …) — throws ``RequestDL/CURLParsingError`` rather than being silently accepted. These aren't just unimplemented conveniences: silently accepting one of them would make the request actually performed diverge from what the command says.
 
 ## Topics
 

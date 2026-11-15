@@ -16,7 +16,7 @@ import struct Foundation.URL
 /// Builds the configuration directly rather than composing a `@PropertyBuilder` tree, since
 /// there is no per-flag `Property` to declare: the flags are only known at runtime. Scoped to a
 /// documented subset of curl's flags: `-X`/`--request`, `-H`/`--header`, `-d`/`--data`/
-/// `--data-raw`/`--data-binary`, `-F`/`--form`, `-u`/`--user`, `--url` (plus a bare trailing
+/// `--data-raw`/`--data-binary`, `-F`/`--form`, `--form-string`, `-u`/`--user`, `--url` (plus a bare trailing
 /// URL), `-G`/`--get`, `-L`/`--location` (with `--max-redirs`), `-k`/`--insecure`, `-x`/`--proxy`,
 /// `--resolve`, `--compressed`, `--cacert`, and `--cert`/`-E`/`--key`. Anything else is rejected
 /// with ``CURLParsingError/Context/unsupportedFlag`` rather than silently ignored.
@@ -139,6 +139,13 @@ enum CURLCommandParser {
 
                 formItems.append(try makeFormItem(field))
 
+            // Text only: curl reads no `@file`, no `<file` and no `;type=` here, so the value is
+            // what it says. It is what the descriptor writes for a text field, and what keeps one
+            // that starts with `@` or `<` from being read as a file.
+            case "--form-string":
+                let field = try value(for: token)
+                formItems.append(try makeFormString(field))
+
             case "-u", "--user":
                 let (username, password) = try splitOnce(try value(for: token), separator: ":")
                 let credentialToken = Data("\(username):\(password)".utf8).base64EncodedString()
@@ -233,6 +240,8 @@ enum CURLCommandParser {
         guard let url else {
             throw CURLParsingError(.missingURL)
         }
+
+        try requireHTTPScheme(of: url)
 
         try await apply(
             url: url,
@@ -516,6 +525,56 @@ enum CURLCommandParser {
         }
 
         return field[field.index(after: separator)...].trimming(where: \.isWhitespace).hasPrefix("<")
+    }
+
+    /// Throws for a URL that names a scheme other than `http` or `https`.
+    ///
+    /// The documented rule, and a security one: AsyncHTTPClient also takes `unix://`,
+    /// `http+unix://` and `https+unix://`, so a pasted command (`curl unix:///var/run/docker.sock/...`)
+    /// would otherwise reach a local socket. A URL with no scheme is left to the executor: it
+    /// fails there, as it always did. The token is the scheme, not the URL, which may carry credentials.
+    private static func requireHTTPScheme(of url: String) throws {
+        guard let colon = url.firstIndex(of: ":") else {
+            return
+        }
+
+        let scheme = url[..<colon]
+
+        // RFC 3986 §3.1: `ALPHA *( ALPHA / DIGIT / "+" / "-" / "." )`. Anything else before a `:`
+        // (`[::1]`, a path) is not a scheme.
+        guard
+            let first = scheme.first,
+            first.isASCII, first.isLetter,
+            scheme.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "+" || $0 == "-" || $0 == ".") })
+        else {
+            return
+        }
+
+        let normalized = scheme.lowercased()
+
+        guard normalized == "http" || normalized == "https" else {
+            throw CURLParsingError(.unsupportedFlag, token: "\(scheme):")
+        }
+    }
+
+    /// Parses one `--form-string` field: `name=value`, the value as it is.
+    private static func makeFormString(_ field: String) throws -> FormItem {
+        // Not `splitOnce`: it trims the value, and this one is taken literally.
+        guard let separator = field.firstIndex(of: "=") else {
+            throw CURLParsingError(.malformedArgument, token: field)
+        }
+
+        return FormItem(
+            name: String(field[..<separator]),
+            filename: nil,
+            additionalHeaders: nil,
+            charset: RequestEnvironmentValues().charset,
+            urlEncoder: RequestEnvironmentValues().urlEncoder,
+            factory: StringPayloadFactory(
+                verbatim: String(field[field.index(after: separator)...]),
+                contentType: .text
+            )
+        )
     }
 
     /// Parses one `-F`/`--form` field: `name=value`, or `name=@path;type=mime` for a file.

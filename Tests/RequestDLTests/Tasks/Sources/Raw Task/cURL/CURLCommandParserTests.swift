@@ -267,6 +267,74 @@ struct CURLCommandParserTests {
         #expect(bodyText.contains("30"))
     }
 
+    // MARK: - --form-string
+
+    /// `--form-string` is `-F` with no `@file`, no `<file` and no `;type=`: the value is the text
+    /// it says, so it is what a description writes for a field that has to stay text.
+    @Test
+    func formStringKeepsAFileLookingValueAsText() async throws {
+        // Given / When: no capability, since nothing is read from the machine.
+        let configuration = try await CURLCommandParser.parseCommand(
+            "curl --form-string 'a=@/etc/hosts' --form-string 'b=<secret.txt' --form-string 'c=x;type=text/html' "
+                + "https://example.com/upload",
+            allowing: []
+        ).requestConfiguration
+
+        // Then
+        let bodyText = try await bodyString(configuration)
+
+        #expect(configuration.method == "POST")
+        #expect(bodyText.contains("@/etc/hosts"))
+        #expect(bodyText.contains("<secret.txt"))
+        #expect(bodyText.contains("x;type=text/html"))
+        #expect(!bodyText.contains("filename="))
+    }
+
+    @Test
+    func formStringWithoutAnEqualsSignThrows() async throws {
+        await #expect(throws: CURLParsingError.self) {
+            try await CURLCommandParser.parse("curl --form-string noequals https://example.com")
+        }
+    }
+
+    // MARK: - URL scheme
+
+    /// A pasted command must not reach what `http(s)` cannot: AsyncHTTPClient also takes `unix://`,
+    /// `http+unix://` and `https+unix://`, a local socket such as `docker.sock`.
+    @Test(arguments: [
+        "unix:///var/run/docker.sock/v1.41/containers/json",
+        "http+unix://%2Fvar%2Frun%2Fdocker.sock/containers/json",
+        "https+unix://%2Fvar%2Frun%2Fdocker.sock/containers/json",
+        "UNIX:///var/run/docker.sock/",
+        "ftp://example.com/file",
+        "file:///etc/passwd",
+        "ws://example.com",
+        "localhost:8080/x",
+    ])
+    func urlWithASchemeOtherThanHTTPThrows(_ url: String) async {
+        for command in ["curl '\(url)'", "curl --url '\(url)'"] {
+            let error = await #expect(throws: CURLParsingError.self) {
+                try await CURLCommandParser.parseCommand(command, allowing: [])
+            }
+
+            #expect(error?.context == .unsupportedFlag)
+            #expect(error?.token?.contains("/var/run") != true)
+        }
+    }
+
+    @Test(arguments: [
+        "http://example.com/a",
+        "https://example.com:8443/a?b=1",
+        "HTTPS://Example.com/a",
+        "Http://example.com",
+        "http://[::1]:8080/a",
+    ])
+    func urlWithAnHTTPSchemeIsAccepted(_ url: String) async throws {
+        let configuration = try await CURLCommandParser.parseCommand("curl '\(url)'", allowing: []).requestConfiguration
+
+        #expect(configuration.url == url)
+    }
+
     // MARK: - Unsupported flags
 
     @Test
