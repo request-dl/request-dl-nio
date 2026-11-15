@@ -4,6 +4,7 @@
 
 #if canImport(Darwin)
 
+import Dispatch
 import Testing
 
 @testable import RequestDLInternals
@@ -332,6 +333,72 @@ extension InternalsIdentityManagerTests {
         #endif
     }
 }
+
+#if os(macOS)
+
+extension InternalsIdentityManagerTests {
+
+    /// `release(...)` looks at the handle registered for its label while holding the lock. That
+    /// look takes a strong reference, and if another thread drops the last outside reference to
+    /// that handle meanwhile, the look is the last one: the handle is deallocated there, under the
+    /// lock, its `deinit` calls `release(...)`, and the non-reentrant lock aborts the process
+    /// (`_os_unfair_lock_recursive_abort`). A handle must only ever be deallocated outside it.
+    ///
+    /// Several threads keep calling `release` for the label, so that one of them is almost always
+    /// inside the lock looking at the registered handle, while this thread drops the handle again
+    /// and again. Before the fix, sooner or later a drop lands in a look and kills the process.
+    @Test
+    func release_whenTheHandleRegisteredForTheLabelIsDroppedMeanwhile_neverDeallocatesItUnderTheLock() throws {
+        // Given
+        let fixture = try InternalsRawBytesIdentityBuilderKeychainTests.Fixture()
+        defer { fixture.cleanUp() }
+
+        let source = try Internals.RawBytesIdentityBuilder.makeIdentity(
+            certificateDER: fixture.certificateDER,
+            privateKeyDER: fixture.pkcs1
+        )
+
+        let manager = Internals.IdentityManager { _, _, _ in }
+        let isRunning = LockedValueBox(true)
+        let releasers = DispatchGroup()
+
+        for _ in 0..<4 {
+            DispatchQueue.global().async(group: releasers) {
+                while isRunning.withLockedValue({ $0 }) {
+                    manager.release(
+                        label: "race",
+                        keyLabel: "race",
+                        ownedCertificate: nil,
+                        useDataProtectionKeychain: false
+                    )
+                }
+            }
+        }
+
+        // When
+        var failure: (any Error)?
+        for _ in 0..<5_000 {
+            do {
+                var registered: Internals.IdentityHandle? = try manager.handle(for: "race") {
+                    (source.identity, false, nil)
+                }
+                registered = nil
+                _ = registered
+            } catch {
+                failure = error
+                break
+            }
+        }
+
+        isRunning.withLockedValue { $0 = false }
+        releasers.wait()
+
+        // Then: still here.
+        #expect(failure == nil)
+    }
+}
+
+#endif
 
 extension Internals.SecureConnection {
 

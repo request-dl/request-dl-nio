@@ -270,7 +270,7 @@ extension InternalsRawBytesIdentityBuilderKeychainTests {
 
     /// A certificate, its key in the two encodings the builder is given, and what is needed to
     /// look for those items in the Keychain and to remove them.
-    fileprivate struct Fixture {
+    struct Fixture {
 
         let commonName: String
         let certificateDER: Data
@@ -284,7 +284,9 @@ extension InternalsRawBytesIdentityBuilderKeychainTests {
         }
 
         private init(key: _RSA.Signing.PrivateKey) throws {
-            let commonName = "request-dl-test-\(UUID().uuidString)"
+            _ = Self.sweptStaleItems
+
+            let commonName = "\(Self.commonNamePrefix)\(Int(Date().timeIntervalSince1970))-\(UUID().uuidString)"
             let name = try DistinguishedName { CommonName(commonName) }
             let now = Date()
 
@@ -317,6 +319,63 @@ extension InternalsRawBytesIdentityBuilderKeychainTests {
         static func makeKeyDER() throws -> Data {
             try _RSA.Signing.PrivateKey(keySize: .bits2048).derRepresentation
         }
+
+        // MARK: - Stale items
+
+        private static let commonNamePrefix = "request-dl-test-"
+
+        /// Runs once per process, before the first fixture: removes what an earlier run that died
+        /// before its `defer` (a crash, a kill) left in the keychain. Only fixtures more than ten
+        /// minutes old, so a fixture another test of this run is using is never taken.
+        private static let sweptStaleItems: Void = {
+            let query: [CFString: Any] = [
+                kSecClass: kSecClassCertificate,
+                kSecMatchSubjectContains: commonNamePrefix,
+                kSecMatchLimit: kSecMatchLimitAll,
+                kSecReturnRef: true,
+                kSecUseDataProtectionKeychain: false,
+            ]
+
+            var result: CFTypeRef?
+            guard
+                SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
+                let certificates = result as? [SecCertificate]
+            else {
+                return
+            }
+
+            let now = Date().timeIntervalSince1970
+
+            for certificate in certificates {
+                guard
+                    let summary = SecCertificateCopySubjectSummary(certificate) as String?,
+                    summary.hasPrefix(commonNamePrefix),
+                    let created = TimeInterval(summary.dropFirst(commonNamePrefix.count).prefix { $0 != "-" }),
+                    now - created > 600
+                else {
+                    continue
+                }
+
+                if let publicKey = SecCertificateCopyKey(certificate),
+                    let representation = SecKeyCopyExternalRepresentation(publicKey, nil) as Data?
+                {
+                    let applicationLabel = Data(Insecure.SHA1.hash(data: representation))
+                    for _ in 0..<5 {
+                        guard SecItemDelete(privateKeyQuery(applicationLabel) as CFDictionary) == errSecSuccess else {
+                            break
+                        }
+                    }
+                }
+
+                SecItemDelete(
+                    [
+                        kSecClass: kSecClassCertificate,
+                        kSecValueRef: certificate,
+                        kSecUseDataProtectionKeychain: false,
+                    ] as CFDictionary
+                )
+            }
+        }()
 
         // MARK: - Looking
 

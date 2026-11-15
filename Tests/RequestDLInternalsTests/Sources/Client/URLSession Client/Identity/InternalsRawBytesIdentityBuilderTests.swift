@@ -376,13 +376,18 @@ struct InternalsRawBytesIdentityBuilderTests {
     /// `useDataProtectionKeychain: false` storage. macOS only; see that test's own doc comment.
     @Test
     func store_whenGivenAnRSAKeyOnTheLegacyKeychain_succeeds() throws {
-        // Given
-        let client = Certificates().client()
-        let certificate = try Self.certificate(fromPEMFile: client.certificateURL)
-        let secKey = try Self.secKey(fromPrivateKeyPEMFile: client.privateKeyURL)
+        // Given: a pair of its own. With the pair the handshake tests share, another test
+        // releasing its handle for it deletes the key or the certificate between this test's add
+        // and its look for the identity, and the look fails with `errSecItemNotFound` (-25300).
+        let fixture = try InternalsRawBytesIdentityBuilderKeychainTests.Fixture()
+        let certificate = try Internals.RawBytesIdentityBuilder.certificate(fromDER: fixture.certificateDER)
+        let secKey = try Internals.RawBytesIdentityBuilder.secKey(fromDER: fixture.pkcs1)
 
         let label = "InternalsRawBytesIdentityBuilderTests.rsaLegacyKeychain." + UUID().uuidString
-        defer { Self.deleteKeychainItems(labelled: label) }
+        defer {
+            Self.deleteKeychainItems(labelled: label)
+            fixture.cleanUp()
+        }
 
         // When / Then
         _ = try Internals.RawBytesIdentityBuilder.store(

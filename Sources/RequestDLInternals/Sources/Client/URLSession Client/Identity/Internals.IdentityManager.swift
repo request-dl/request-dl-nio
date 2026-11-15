@@ -138,6 +138,8 @@ extension Internals {
             )
         ) throws -> IdentityHandle {
             try lock.withLock {
+                // Handed to the caller, who owns it from here on: it is never the last reference
+                // dropped under the lock (see `release`).
                 if let existing = live[label]?.value {
                     return existing
                 }
@@ -171,25 +173,33 @@ extension Internals {
         /// The deletion targets the Keychain the releasing handle was built in, not a fixed one:
         /// a signed macOS app stores in the data-protection Keychain, and deleting from the
         /// legacy one would leave the imported private key behind for good.
+        ///
+        /// No `IdentityHandle` may be deallocated while `lock` is held: its `deinit` calls this
+        /// method, and the lock is not reentrant (it aborts the process). Looking at the handle
+        /// registered for `label` takes a strong reference, and when another thread drops the
+        /// last outside one meanwhile, that look is the last reference. So the look is returned
+        /// out of the critical section and only dropped after the lock is released.
         func release(
             label: String,
             keyLabel: String,
             ownedCertificate: SecCertificate?,
             useDataProtectionKeychain: Bool
         ) {
-            lock.withLock {
+            let registered: IdentityHandle? = lock.withLock {
                 let remainingKeyUsers = (keyUsers[keyLabel] ?? 1) - 1
                 keyUsers[keyLabel] = remainingKeyUsers > 0 ? remainingKeyUsers : nil
 
-                guard live[label]?.value == nil else {
+                let registered = live[label]?.value
+
+                guard registered == nil else {
                     // The newer handle for this label was built while this one was dying, so it
                     // found the certificate this handle had added "already there" and does not
                     // own it. This is the last reference to it that can delete it: pass it on, or
                     // the certificate stays in the (legacy) keychain for good.
-                    if let ownedCertificate, let newer = live[label]?.value, newer.ownedCertificate == nil {
-                        newer.ownedCertificate = ownedCertificate
+                    if let ownedCertificate, let registered, registered.ownedCertificate == nil {
+                        registered.ownedCertificate = ownedCertificate
                     }
-                    return
+                    return registered
                 }
 
                 live[label] = nil
@@ -198,7 +208,12 @@ extension Internals {
                 if remainingKeyUsers <= 0, keyLabel != label {
                     deleteItems(keyLabel, nil, useDataProtectionKeychain)
                 }
+
+                return nil
             }
+
+            // Dropped here, outside the lock, if it turned out to be the last reference.
+            withExtendedLifetime(registered) {}
         }
 
         private static func deleteKeychainItems(
