@@ -7,6 +7,7 @@ import Crypto
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
+import struct Foundation.Data
 import struct Foundation.URL
 #endif
 
@@ -62,6 +63,11 @@ extension Internals {
         let inner: Internals.FileBufferURL
         let key: SymmetricKey
 
+        /// What every chunk of the file is authenticated against besides its contents and its
+        /// position: whatever ties the file to the place it belongs, so that it does not open
+        /// when found somewhere else. Empty when the file stands on its own.
+        let associatedData: Data
+
         /// The logical plaintext size, derived from the real on-disk (ciphertext) size. See the
         /// type-level note above for why this must not simply delegate to `inner.writtenBytes`.
         package var writtenBytes: Int {
@@ -72,9 +78,10 @@ extension Internals {
 
         // MARK: - Inits
 
-        package init(inner: Internals.FileBufferURL, key: SymmetricKey) {
+        package init(inner: Internals.FileBufferURL, key: SymmetricKey, associatedData: Data = Data()) {
             self.inner = inner
             self.key = key
+            self.associatedData = associatedData
         }
 
         // MARK: - Internal static methods

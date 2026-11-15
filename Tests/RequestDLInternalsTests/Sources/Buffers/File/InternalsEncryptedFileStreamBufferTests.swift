@@ -218,6 +218,57 @@ struct InternalsEncryptedFileStreamBufferTests {
         }
     }
 
+    @Test(arguments: [
+        (Data("a".utf8), Data("a".utf8), true),
+        (Data("a".utf8), Data("b".utf8), false),
+        (Data("a".utf8), Data(), false),
+        (Data(), Data("a".utf8), false),
+        (Data(), Data(), true),
+    ])
+    func read_whenOpenedWithAnotherAssociatedData_shouldOnlyOpenWithTheOneItWasWrittenWith(
+        _ written: Data,
+        _ read: Data,
+        _ opens: Bool
+    ) async throws {
+        try await withTemporaryFileURL("encrypted.bin") { fileURL in
+            let key = SymmetricKey(size: .bits256)
+            let expected = Data((0..<(chunkPlaintextSize + 1_234)).map { UInt8($0 % 256) })
+
+            var writer = await Internals.Buffer<Internals.EncryptedFileStreamBuffer>(
+                addressing: .init(inner: .init(fileURL), key: key, associatedData: written)
+            )
+            await writer.writeData(expected)
+            try await writer.close()
+
+            let reader = await Internals.Buffer<Internals.EncryptedFileStreamBuffer>(
+                addressing: .init(inner: .init(fileURL), key: key, associatedData: read)
+            )
+
+            #expect(await reader.getData() == (opens ? expected : nil))
+        }
+    }
+
+    /// A file of another version is refused by its header, not left to fail a tag check, which a
+    /// file of the previous version could not be told apart from by anything but luck.
+    @Test(arguments: [UInt8(0x00), 0x01, 0x03, 0xFF])
+    func read_whenHeaderVersionIsNotTheCurrentOne_shouldFailAsMissNotCrash(_ version: UInt8) async throws {
+        try await withTemporaryFileURL("encrypted.bin") { fileURL in
+            let url = makeURL(fileURL)
+
+            var writer = await Internals.Buffer<Internals.EncryptedFileStreamBuffer>(addressing: url)
+            await writer.writeData(Data("Hello, encrypted world!".utf8))
+            try await writer.close()
+
+            var raw = try Data(contentsOf: fileURL)
+            raw[0] = version
+            try raw.write(to: fileURL)
+
+            let reader = await Internals.Buffer<Internals.EncryptedFileStreamBuffer>(addressing: url)
+
+            #expect(await reader.getData() == nil)
+        }
+    }
+
     @Test
     func read_whenOpenedWithWrongKey_shouldFailAsDecryptionMissNotCrash() async throws {
         try await withTemporaryFileURL("encrypted.bin") { fileURL in

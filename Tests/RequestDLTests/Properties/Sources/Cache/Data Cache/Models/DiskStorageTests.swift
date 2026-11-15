@@ -724,7 +724,11 @@ struct DiskStorageTests {
 
             // Replace the body with what a closed writer that was never given a byte writes.
             try Data().write(to: dataURL)
-            let url = Internals.EncryptedFileBufferURL(inner: .init(dataURL), key: key.symmetricKey)
+            let url = Internals.EncryptedFileBufferURL(
+                inner: .init(dataURL),
+                key: key.symmetricKey,
+                associatedData: DiskStorage.associatedData(forBodyOf: "k1")
+            )
             let writer = try await Internals.EncryptedFileStreamBuffer(writingTo: url)
             try await writer.close()
             #expect(try Data(contentsOf: dataURL).count == 13 + 16)
@@ -762,6 +766,85 @@ struct DiskStorageTests {
             try? await buffer?.close()
 
             #expect((await storage["k1"] != nil) == isHit)
+        }
+    }
+
+    /// Anyone who can write the cache directory can move the `data.record` of one URL under
+    /// another's name. The `response.record` there is bound to its own key, so what would be served
+    /// is the second URL's head with the first one's body, every part of it authentic, unless the
+    /// body is bound to its key as well.
+    @Test
+    func subscript_whenEncryptedBodyIsMovedToAnotherKey_shouldNotOpen() async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            var storage = DiskStorage(directory: directoryURL)
+            storage.encryptionKey = .init(Data(repeating: 0x02, count: 32))
+
+            let bodyOfA = Data("the body of A, which B must never be given".utf8)
+            let bodyOfB = Data("the body of B".utf8)
+
+            try await storeEncryptedEntry(in: storage, directoryURL: directoryURL, key: "a", plaintext: bodyOfA)
+            let dataURLOfA = try await encryptedRecordDirectoryURL(in: directoryURL)
+                .appendingPathComponent("data.record")
+            let rawOfA = try Data(contentsOf: dataURLOfA)
+            await storage.remove("a")
+
+            try await storeEncryptedEntry(in: storage, directoryURL: directoryURL, key: "b", plaintext: bodyOfB)
+            let dataURLOfB = try await encryptedRecordDirectoryURL(in: directoryURL)
+                .appendingPathComponent("data.record")
+
+            // Given: B's own entry reads back as it was written.
+            var intact = try #require(await storage["b"]).buffer
+            #expect(await Internals.CacheControl.readPiece(of: &intact) == [UInt8](bodyOfB))
+
+            // When: A's body takes the place of B's.
+            try rawOfA.write(to: dataURLOfB)
+
+            // Then: it does not open, however well formed it is.
+            let swapped = try #require(await storage["b"])
+            var body = swapped.buffer
+            #expect(await Internals.CacheControl.readPiece(of: &body) == nil)
+            #expect(await swapped.buffer.getData() == nil)
+        }
+    }
+
+    /// A body written before it was bound to its key is a file in another format, and has to be a
+    /// miss: opened without the binding, it would be the same hole for as long as it stays on disk.
+    @Test
+    func subscript_whenEncryptedBodyWasWrittenInThePreviousFormat_shouldNotOpen() async throws {
+        try await withTemporaryFileURL(createPath: false) { directoryURL in
+            var storage = DiskStorage(directory: directoryURL)
+            let encryptionKey = DataCache.EncryptionKey(Data(repeating: 0x02, count: 32))
+            storage.encryptionKey = encryptionKey
+
+            let plaintext = Data("written by the previous format".utf8)
+            try await storeEncryptedEntry(in: storage, directoryURL: directoryURL, plaintext: plaintext)
+
+            let dataURL = try await encryptedRecordDirectoryURL(in: directoryURL)
+                .appendingPathComponent("data.record")
+
+            // Given: the file as that format laid it out: version 1, and a chunk authenticated by
+            // its index and finality alone.
+            let baseNonce = Data((0..<12).map { UInt8($0) })
+            let nonce = try AES.GCM.Nonce(data: baseNonce)
+            var associatedData = Data(repeating: 0, count: 8)
+            associatedData.append(0x01)
+            let sealed = try AES.GCM.seal(
+                plaintext,
+                using: encryptionKey.symmetricKey,
+                nonce: nonce,
+                authenticating: associatedData
+            )
+
+            var legacy = Data([0x01])
+            legacy.append(baseNonce)
+            legacy.append(sealed.ciphertext)
+            legacy.append(sealed.tag)
+            try legacy.write(to: dataURL)
+
+            // Then: it is a miss, not a body, and not a crash.
+            let cached = try #require(await storage["k1"])
+            var body = cached.buffer
+            #expect(await Internals.CacheControl.readPiece(of: &body) == nil)
         }
     }
 
