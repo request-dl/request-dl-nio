@@ -28,6 +28,84 @@ import Foundation
 /// assertions never race another test's.
 struct BackgroundDownloadsSessionDelegateTests {
 
+    // MARK: - didReceive challenge
+
+    /// A task whose description does not decode has pins nobody can know, so a server-trust
+    /// challenge is refused rather than answered with the system's default handling.
+    @Test(arguments: [nil, "not a descriptor", "{\"id\": 1}"] as [String?])
+    func didReceiveChallenge_whenServerTrustAndTheDescriptionDoesNotDecode_cancelsIt(_ description: String?) {
+        let disposition = Self.disposition(for: Self.serverTrustChallenge(), taskDescription: description)
+
+        #expect(disposition == .cancelAuthenticationChallenge)
+    }
+
+    @Test
+    func didReceiveChallenge_whenServerTrustAndTheDescriptionDecodesWithoutPins_usesDefaultHandling() throws {
+        let description = BackgroundDownloads.Session.encode(
+            id: "episode-42",
+            destination: URL(fileURLWithPath: "/tmp/episode-42.mp3")
+        )
+
+        let disposition = Self.disposition(for: Self.serverTrustChallenge(), taskDescription: description)
+
+        #expect(disposition == .performDefaultHandling)
+    }
+
+    @Test
+    func didReceiveChallenge_whenItIsNotServerTrustAndTheDescriptionDoesNotDecode_usesDefaultHandling() {
+        let challenge = Self.challenge(authenticationMethod: NSURLAuthenticationMethodHTTPBasic)
+
+        let disposition = Self.disposition(for: challenge, taskDescription: nil)
+
+        #expect(disposition == .performDefaultHandling)
+    }
+
+    private static func serverTrustChallenge() -> URLAuthenticationChallenge {
+        challenge(authenticationMethod: NSURLAuthenticationMethodServerTrust)
+    }
+
+    private static func challenge(authenticationMethod: String) -> URLAuthenticationChallenge {
+        URLAuthenticationChallenge(
+            protectionSpace: URLProtectionSpace(
+                host: "example.com",
+                port: 443,
+                protocol: "https",
+                realm: nil,
+                authenticationMethod: authenticationMethod
+            ),
+            proposedCredential: nil,
+            previousFailureCount: 0,
+            failureResponse: nil,
+            error: nil,
+            sender: ChallengeSender()
+        )
+    }
+
+    private static func disposition(
+        for challenge: URLAuthenticationChallenge,
+        taskDescription: String?
+    ) -> URLSession.AuthChallengeDisposition? {
+        let session = BackgroundDownloads.Session()
+        let task = URLSession.shared.downloadTask(with: URL(string: "https://example.com")!)
+        task.taskDescription = taskDescription
+
+        var result: URLSession.AuthChallengeDisposition?
+
+        session.urlSession(.shared, task: task, didReceive: challenge) { disposition, _ in
+            result = disposition
+        }
+
+        return result
+    }
+
+    private final class ChallengeSender: NSObject, URLAuthenticationChallengeSender {
+        func use(_ credential: URLCredential, for challenge: URLAuthenticationChallenge) {}
+        func continueWithoutCredential(for challenge: URLAuthenticationChallenge) {}
+        func cancel(_ challenge: URLAuthenticationChallenge) {}
+        func performDefaultHandling(for challenge: URLAuthenticationChallenge) {}
+        func rejectProtectionSpaceAndContinue(with challenge: URLAuthenticationChallenge) {}
+    }
+
     // MARK: - didFinishDownloadingTo
 
     @Test

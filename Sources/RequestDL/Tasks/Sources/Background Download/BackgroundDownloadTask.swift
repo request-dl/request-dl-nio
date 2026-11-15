@@ -59,9 +59,11 @@ import struct Foundation.URL
 ///
 /// The request body is not sent. A background download is handed to the system as a download
 /// task, which has no body to send, so whatever `content` declares as one (``Payload`` and the
-/// like) is dropped without an error or a warning. The method, the URL, the query and the headers
-/// do go out as written, so a request that needs a body, such as a `POST` that answers with the
-/// file, cannot be a background download: use ``DownloadTask`` for it, in the foreground.
+/// like) is dropped without an error or a warning. The rest of the request is built as usual,
+/// and that includes what a ``Payload`` sets on it besides the body: the method becomes `POST`
+/// when none was declared, and its `Content-Type` is sent. A request that needs a body, such as
+/// a `POST` that answers with the file, cannot be a background download: use ``DownloadTask``
+/// for it, in the foreground.
 ///
 /// ## Client certificates
 ///
@@ -72,11 +74,11 @@ import struct Foundation.URL
 /// What is saved with the download is the path of each file, never the key's bytes, and the
 /// identity is rebuilt from those files every time the server asks for it, in a later launch
 /// too. A path that stops pointing at the file makes that fail, and the download then goes on
-/// without a client certificate, which a server that requires one refuses. The app bundle's path
-/// is not stable: it changes when the app is updated, so a certificate or key read from the
-/// bundle is not found by a download that was scheduled before the update. Copy the files
-/// somewhere that outlives an update, such as Application Support, and point `content` at the
-/// copies.
+/// without a client certificate, which a server that requires one refuses. Do not count on an
+/// absolute path inside the app's own container staying valid: the system may change it when
+/// the app is updated or restored, and the app bundle's path in particular is not stable. A
+/// download that is still running across such a change is the one at risk, so schedule it again
+/// afterwards if its certificate files are in the container.
 public struct BackgroundDownloadTask<Content: Property> {
 
     // MARK: - Private properties
