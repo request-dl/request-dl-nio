@@ -102,7 +102,13 @@ import Crypto
 /// minimum TLS version or the proxy without a word. This holds for every key, and so does the
 /// entry check of the pair lists (`headers`, `queries`, `dnsOverrides`, `urlOverrides`,
 /// `proxy.connectHeaders`): an entry with no separator or with an empty name is an error, not
-/// dropped. An explicit property declared after `Configured` in the same
+/// dropped, and a blank entry (what an empty environment variable, or one ending in a comma, reads
+/// as) is skipped. A key defined with an empty value (`TIMEOUT=`) is not a missing key either: it
+/// does not convert to a number, and is an error.
+///
+/// Each key is read with the provider's `fetch` accessors, which is what tells a missing key from
+/// one of the wrong type. A provider that does I/O on `fetch` (a remote one, or a reloading file)
+/// is asked once per key on every resolve. An explicit property declared after `Configured` in the same
 /// `@PropertyBuilder` block still wins, following the same "last one wins" precedent already
 /// established by ``BaseURL`` and ``DNSOverride``.
 ///
@@ -679,13 +685,22 @@ public struct Configured: Property {
 
     /// Splits each entry on its first `separator`. An entry with no separator, or with an empty
     /// name, is an error: it used to be dropped without a word, so a typo in a header or a query
-    /// disappeared from the request. Repeated names are kept, in order.
+    /// disappeared from the request. Repeated names are kept, in order. A flag with no value
+    /// (`?uploads`) has no way through `Query`, so it is an error here too: write it in `baseURL`.
+    ///
+    /// A blank entry is skipped: an environment variable defined and left empty (`HEADERS=`) or
+    /// with a trailing comma (`QUERIES=a=1,`) is read by the provider as a list with an empty
+    /// element, and it says nothing.
     private static func pairs(
         _ entries: [String],
         separatedBy separator: Character,
         context: ConfiguredError.Context = .invalidConfigurationValue
     ) throws -> [Pair] {
-        try entries.enumerated().map { index, entry in
+        try entries.enumerated().compactMap { index, entry in
+            guard !entry.trimmingASCIIWhitespace().isEmpty else {
+                return nil
+            }
+
             guard let (key, value) = entry.splitOnFirst(separator), !key.isEmpty else {
                 throw ConfiguredError(context: context)
             }

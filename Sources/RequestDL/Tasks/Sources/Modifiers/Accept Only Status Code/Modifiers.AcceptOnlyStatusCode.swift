@@ -40,8 +40,11 @@ extension RequestTask where Element: TaskResultPrimitive {
     ///
     /// Returns a modified task that accepts only the specified status codes.
     ///
-    /// - Parameter statusCodes: The set of status codes to accept.
+    /// - Parameter statusCodes: The set of status codes to accept. An empty set (an
+    /// intersection with nothing in common, a list read from a configuration with nothing in it)
+    /// accepts no status code at all, so every response throws.
     /// - Returns: A modified task that accepts only the specified status codes.
+    /// - Throws: An `InvalidStatusCodeError` when the response's status code is not in the set.
     ///
     public func acceptOnlyStatusCode(
         _ statusCodes: StatusCodeSet

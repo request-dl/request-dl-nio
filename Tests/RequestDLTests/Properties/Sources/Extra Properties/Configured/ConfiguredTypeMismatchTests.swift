@@ -286,6 +286,32 @@ struct ConfiguredTypeMismatchTests {
         #expect(error?.context == .invalidProxyConfiguration)
     }
 
+    /// An environment variable that is defined and empty, or that ends in a comma, is read as a
+    /// list with an empty element: it says nothing, and is not an error.
+    @Test(arguments: [
+        ([""], 0),
+        (["  ", "\t"], 0),
+        (["a=1", ""], 1),
+    ])
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func pairList_whenAnEntryIsBlank_isSkipped(_ entries: [String], _ count: Int) async throws {
+        // Given
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: ["queries": .init(.stringArray(entries), isSecret: false)])
+        )
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL("127.0.0.1")
+                Configured(reader)
+            }
+        )
+
+        // Then
+        #expect(resolved.requestConfiguration.queries.count == count)
+    }
+
     /// A value with a separator in it, or an empty value, is still a pair.
     @Test
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)

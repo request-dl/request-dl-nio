@@ -16,6 +16,8 @@ import struct Foundation.Date
 import Darwin
 #elseif canImport(Glibc)
 import Glibc
+#elseif canImport(Musl)
+import Musl
 #endif
 
 /// A `Date` that does not fit the strategy is an error of the encoder, not a crash: `Int64(_:)`
@@ -112,6 +114,19 @@ struct URLEncoderDateRangeTests {
 
         // Then
         #expect(sut == "since=9000000000000000000")
+    }
+
+    @Test
+    func iso8601_whenTheDateIsFarButRepresentable_isEncoded() throws {
+        // Given
+        let encoder = URLEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+
+        // When
+        let sut = try encoder.encode(Date(timeIntervalSince1970: 9e18), forKey: "since")
+
+        // Then
+        #expect(!sut.isEmpty)
     }
 
     @Test

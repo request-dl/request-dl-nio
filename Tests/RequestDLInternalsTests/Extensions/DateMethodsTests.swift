@@ -198,7 +198,6 @@ struct DateMethodsTests {
     /// A recipient MUST accept the two obsolete formats, RFC 850 and asctime, next to the
     /// IMF-fixdate one.
     @Test(arguments: [
-        "Sunday, 06-Nov-94 08:49:37 GMT",
         "Sunday, 06-Nov-1994 08:49:37 GMT",
         "Sun Nov  6 08:49:37 1994",
         "Sun Nov 06 08:49:37 1994",
@@ -207,11 +206,26 @@ struct DateMethodsTests {
         #expect(Date(httpDate: value) == Self.sixthOfNovember1994)
     }
 
+    /// Read against a fixed now: against the clock, a test of "94" would start reading 2094 in 2044.
+    @Test
+    func httpDateParsesRFC850WithATwoDigitYear() {
+        // 2026-11-15
+        let now = Date(timeIntervalSince1970: 1_794_700_800)
+
+        #expect(Date(httpDate: "Sunday, 06-Nov-94 08:49:37 GMT", relativeTo: now) == Self.sixthOfNovember1994)
+    }
+
+    @Test
+    func httpDateAppliesANumericZoneWithoutADayName() {
+        #expect(Date(httpDate: "06 Nov 1994 09:49:37 +0100") == Self.sixthOfNovember1994)
+    }
+
     /// The two digit year of RFC 850 reads as the closest year with those digits that is not
     /// more than 50 years ahead of now.
     @Test(arguments: [
         ("Sunday, 06-Nov-26 08:49:37 GMT", "Fri, 06 Nov 2026 08:49:37 GMT"),
         ("Sunday, 06-Nov-75 08:49:37 GMT", "Wed, 06 Nov 2075 08:49:37 GMT"),
+        ("Sunday, 06-Nov-76 08:49:37 GMT", "Fri, 06 Nov 2076 08:49:37 GMT"),
         ("Sunday, 06-Nov-77 08:49:37 GMT", "Sun, 06 Nov 1977 08:49:37 GMT"),
         ("Sunday, 06-Nov-94 08:49:37 GMT", "Sun, 06 Nov 1994 08:49:37 GMT"),
         ("Sunday, 06-Nov-00 08:49:37 GMT", "Mon, 06 Nov 2000 08:49:37 GMT"),
