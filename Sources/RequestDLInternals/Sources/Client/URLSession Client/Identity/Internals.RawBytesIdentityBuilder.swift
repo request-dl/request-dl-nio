@@ -312,6 +312,22 @@ extension Internals {
             let certificate = try certificate(fromDER: certificateDER)
             let secKey = try Self.secKey(fromDER: privateKeyDER)
 
+            // The Keychain stores one item per key and one per certificate, whatever bytes they
+            // arrived as: the same RSA key as PKCS#1 and as PKCS#8, or decrypted from a protected
+            // PEM, is still one key item. So what names the items, and what the handles are
+            // counted by, is the key's own identity (the hash of its public key, what the
+            // Keychain pairs a certificate with), not a hash of the encoding it was given in.
+            // Counting by encoding gave one key item two owners that did not know about each
+            // other, and the first to go away deleted what the second was built on.
+            let applicationLabel = try Self.applicationLabel(of: secKey)
+
+            // A key that is not the certificate's can never form an identity. Found out here,
+            // before anything is stored, instead of after: it leaves nothing behind to clean up,
+            // and cannot be paired by mistake with another key's identity for the same
+            // certificate that is already in the Keychain (an identity is looked up by
+            // certificate alone).
+            try Self.validate(certificate: certificate, pairsWith: applicationLabel)
+
             // Deterministic (content-derived, not random) so that rebuilding an identity for the
             // same certificate+key reliably finds and reuses (or, on a fresh process, clears) its
             // own leftovers below instead of hitting errSecDuplicateItem. That covers a repeated
@@ -319,17 +335,17 @@ extension Internals {
             // previous run's Keychain items never got cleaned up, and a second
             // `Internals.IdentityHandle` for the same pair sharing this one.
             //
-            // Folds in the private key, not just the certificate, so two different keys
-            // accidentally paired with the same certificate never collide under one Keychain item.
-            // `kSecValueRef`-based matching (delete "whatever item has this exact key/certificate
-            // value") looks like the more direct way to express that, but empirically does not
-            // reliably match an existing item across process runs; label-based matching does.
-            let label = "RequestDL.mtls." + Self.hexDigest(certificateDER) + "." + Self.hexDigest(privateKeyDER)
+            // Folds in the key, not just the certificate, so two different keys never collide
+            // under one Keychain item. `kSecValueRef`-based matching (delete "whatever item has
+            // this exact key/certificate value") looks like the more direct way to express that,
+            // but empirically does not reliably match an existing item across process runs;
+            // label-based matching does (for keys: see `store(...)` for certificates).
+            let label = "RequestDL.mtls." + Self.hexDigest(certificateDER) + "." + Self.hex(applicationLabel)
 
             // The Keychain stores one item per key, whatever certificate it is paired with, so
             // the key gets a label of its own and outlives every identity built from it (see
             // `store(...)`).
-            let keyLabel = "RequestDL.mtls.key." + Self.hexDigest(privateKeyDER)
+            let keyLabel = "RequestDL.mtls.key." + Self.hex(applicationLabel)
 
             return try Internals.IdentityManager.shared.handle(for: label, keyLabel: keyLabel) {
                 #if os(macOS)
@@ -345,37 +361,37 @@ extension Internals {
                 // *imported* EC key (see `store(...)`'s own doc comment), so this only widens which
                 // *signed* macOS apps get a working path.
                 do {
-                    let identity = try Self.store(
+                    let stored = try Self.store(
                         certificate: certificate,
                         secKey: secKey,
                         label: label,
                         keyLabel: keyLabel,
                         useDataProtectionKeychain: true
                     )
-                    return (identity, true)
+                    return (stored.identity, true, stored.addedCertificate)
                 } catch Error.missingKeychainSharingEntitlement {
                     Self.removeExistingKeychainItems(label: label, useDataProtectionKeychain: true)
-                    let identity = try Self.store(
+                    let stored = try Self.store(
                         certificate: certificate,
                         secKey: secKey,
                         label: label,
                         keyLabel: keyLabel,
                         useDataProtectionKeychain: false
                     )
-                    return (identity, false)
+                    return (stored.identity, false, stored.addedCertificate)
                 }
                 #else
                 // Not present on iOS/tvOS/watchOS, where there is only the data-protection
                 // keychain and a properly signed/provisioned app already carries the entitlement
                 // it needs.
-                let identity = try Self.store(
+                let stored = try Self.store(
                     certificate: certificate,
                     secKey: secKey,
                     label: label,
                     keyLabel: keyLabel,
                     useDataProtectionKeychain: true
                 )
-                return (identity, true)
+                return (stored.identity, true, stored.addedCertificate)
                 #endif
             }
         }
@@ -405,7 +421,7 @@ extension Internals {
             label: String,
             keyLabel: String? = nil,
             useDataProtectionKeychain: Bool
-        ) throws -> SecIdentity {
+        ) throws -> StoredIdentity {
             Self.removeExistingKeychainItems(
                 label: label,
                 itemClasses: [kSecClassCertificate],
@@ -421,26 +437,7 @@ extension Internals {
             // `kSecAttrPublicKeyHash`, so no identity is ever synthesized and `kSecClassIdentity`
             // queries return zero results, regardless of Keychain state, entitlement, or process
             // signing.
-            //
-            // SHA-1 of the public key's external representation (X9.63 for EC, PKCS#1
-            // `RSAPublicKey` for RSA; `SecKeyCopyExternalRepresentation` already returns whichever
-            // shape matches `secKey`'s own key type) is the OS's own convention for this hash,
-            // confirmed byte for byte against `openssl`'s equivalent computation.
-            guard let publicKey = SecKeyCopyPublicKey(secKey) else {
-                throw Error.secKeyCreationFailed("SecKeyCopyPublicKey returned nil")
-            }
-            var publicKeyRepresentationError: Unmanaged<CFError>?
-            guard
-                let publicKeyRepresentation = SecKeyCopyExternalRepresentation(
-                    publicKey,
-                    &publicKeyRepresentationError
-                ) as Data?
-            else {
-                let message =
-                    publicKeyRepresentationError.map { String(describing: $0.takeRetainedValue()) } ?? "unknown"
-                throw Error.secKeyCreationFailed("SecKeyCopyExternalRepresentation failed: \(message)")
-            }
-            let applicationLabel = Data(Insecure.SHA1.hash(data: publicKeyRepresentation))
+            let applicationLabel = try Self.applicationLabel(of: secKey)
 
             // The file keychain answers a second `SecItemAdd` of the same key with
             // `errSecDuplicateItem` but still stores an extra copy of it, with no label, no tag
@@ -448,81 +445,154 @@ extension Internals {
             // again. Only a key that is not stored yet is added: one that is already there, left
             // by another identity or by a process that never got to delete it, pairs with this
             // certificate by its application label all the same.
-            if !isPrivateKeyStored(
-                applicationLabel: applicationLabel,
-                useDataProtectionKeychain: useDataProtectionKeychain
-            ) {
-                try addToKeychain(
-                    query: [
-                        kSecClass: kSecClassKey,
-                        kSecValueRef: secKey,
-                        kSecAttrLabel: keyLabel ?? label,
-                        kSecAttrApplicationLabel: applicationLabel,
-                        // This device only, not iCloud Keychain: the key only needs to survive
-                        // this process's lifetime, not sync anywhere.
-                        kSecAttrAccessible: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
-                        kSecUseDataProtectionKeychain: useDataProtectionKeychain,
-                    ],
-                    operation: "SecItemAdd(key)"
-                )
-            }
+            // What this call added, and only that: another live identity may be using the key
+            // that is already stored, and a certificate that is already stored was not put there
+            // by this call. A build that fails below takes back its own additions, because no
+            // handle exists whose release would.
+            var addedKey = false
+            var addedCertificate = false
 
-            try addToKeychain(
-                query: [
-                    kSecClass: kSecClassCertificate,
-                    kSecValueRef: certificate,
-                    kSecAttrLabel: label,
-                    kSecUseDataProtectionKeychain: useDataProtectionKeychain,
-                ],
-                operation: "SecItemAdd(certificate)"
-            )
-
-            // `kSecClassIdentity` queries do not reliably honor `kSecAttrLabel` as a filter:
-            // an identity is a synthetic pairing of a certificate and a key by matching
-            // public key, not an item with its own attributes, so the label set on the
-            // certificate/key above isn't necessarily inherited by it. Fetching every
-            // identity currently in this keychain and matching by certificate bytes is the
-            // approach that reliably works in practice.
-            let identityQuery: [CFString: Any] = [
-                kSecClass: kSecClassIdentity,
-                kSecMatchLimit: kSecMatchLimitAll,
-                kSecReturnRef: true,
-                kSecUseDataProtectionKeychain: useDataProtectionKeychain,
-            ]
-
-            var identitiesResult: CFTypeRef?
-            let identityStatus = SecItemCopyMatching(identityQuery as CFDictionary, &identitiesResult)
-
-            guard identityStatus == errSecSuccess else {
-                throw Error.keychainOperationFailed(identityStatus, operation: "SecItemCopyMatching(identity)")
-            }
-
-            guard let identities = identitiesResult as? [SecIdentity] else {
-                throw Error.identityLookupReturnedWrongType
-            }
-
-            let wantedCertificateData = SecCertificateCopyData(certificate) as Data
-
-            let matchingIdentity = identities.first { identity in
-                var identityCertificate: SecCertificate?
-                guard
-                    SecIdentityCopyCertificate(identity, &identityCertificate) == errSecSuccess,
-                    let identityCertificate
-                else {
-                    return false
+            do {
+                if !isPrivateKeyStored(
+                    applicationLabel: applicationLabel,
+                    useDataProtectionKeychain: useDataProtectionKeychain
+                ) {
+                    addedKey = try addToKeychain(
+                        query: [
+                            kSecClass: kSecClassKey,
+                            kSecValueRef: secKey,
+                            kSecAttrLabel: keyLabel ?? label,
+                            kSecAttrApplicationLabel: applicationLabel,
+                            // This device only, not iCloud Keychain: the key only needs to survive
+                            // this process's lifetime, not sync anywhere.
+                            kSecAttrAccessible: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+                            kSecUseDataProtectionKeychain: useDataProtectionKeychain,
+                        ],
+                        operation: "SecItemAdd(key)"
+                    )
                 }
 
-                return (SecCertificateCopyData(identityCertificate) as Data) == wantedCertificateData
-            }
+                addedCertificate = try addToKeychain(
+                    query: [
+                        kSecClass: kSecClassCertificate,
+                        kSecValueRef: certificate,
+                        kSecAttrLabel: label,
+                        kSecUseDataProtectionKeychain: useDataProtectionKeychain,
+                    ],
+                    operation: "SecItemAdd(certificate)"
+                )
 
-            guard let matchingIdentity else {
-                throw Error.keychainOperationFailed(
-                    errSecItemNotFound,
-                    operation: "matching identity by certificate"
+                // `kSecClassIdentity` queries do not reliably honor `kSecAttrLabel` as a filter:
+                // an identity is a synthetic pairing of a certificate and a key by matching
+                // public key, not an item with its own attributes, so the label set on the
+                // certificate/key above isn't necessarily inherited by it. Fetching every
+                // identity currently in this keychain and matching by certificate bytes is the
+                // approach that reliably works in practice.
+                let identityQuery: [CFString: Any] = [
+                    kSecClass: kSecClassIdentity,
+                    kSecMatchLimit: kSecMatchLimitAll,
+                    kSecReturnRef: true,
+                    kSecUseDataProtectionKeychain: useDataProtectionKeychain,
+                ]
+
+                var identitiesResult: CFTypeRef?
+                let identityStatus = SecItemCopyMatching(identityQuery as CFDictionary, &identitiesResult)
+
+                guard identityStatus == errSecSuccess else {
+                    throw Error.keychainOperationFailed(identityStatus, operation: "SecItemCopyMatching(identity)")
+                }
+
+                guard let identities = identitiesResult as? [SecIdentity] else {
+                    throw Error.identityLookupReturnedWrongType
+                }
+
+                let wantedCertificateData = SecCertificateCopyData(certificate) as Data
+
+                let matchingIdentity = identities.first { identity in
+                    var identityCertificate: SecCertificate?
+                    guard
+                        SecIdentityCopyCertificate(identity, &identityCertificate) == errSecSuccess,
+                        let identityCertificate
+                    else {
+                        return false
+                    }
+
+                    return (SecCertificateCopyData(identityCertificate) as Data) == wantedCertificateData
+                }
+
+                guard let matchingIdentity else {
+                    throw Error.keychainOperationFailed(
+                        errSecItemNotFound,
+                        operation: "matching identity by certificate"
+                    )
+                }
+
+                return StoredIdentity(
+                    identity: matchingIdentity,
+                    addedCertificate: addedCertificate ? certificate : nil
+                )
+            } catch {
+                deleteKeychainItems(
+                    label: keyLabel ?? label,
+                    certificate: nil,
+                    itemClasses: addedKey ? [kSecClassKey] : [],
+                    useDataProtectionKeychain: useDataProtectionKeychain
+                )
+                if addedCertificate {
+                    deleteKeychainItems(
+                        label: label,
+                        certificate: certificate,
+                        itemClasses: [kSecClassCertificate],
+                        useDataProtectionKeychain: useDataProtectionKeychain
+                    )
+                }
+                throw error
+            }
+        }
+
+        /// What `store(...)` ends up with.
+        package struct StoredIdentity {
+
+            package let identity: SecIdentity
+
+            /// The certificate, when `store(...)` is what put it in the Keychain. Nil when an
+            /// item for it was already there (left by another identity, another process, or a
+            /// run that never cleaned up): that one is not this identity's to remove.
+            ///
+            /// It is the very object handed to `SecItemAdd`: that is what makes it a reference to
+            /// the stored item, the only thing the legacy keychain deletes a certificate by (it
+            /// does not keep a certificate's `kSecAttrLabel`).
+            package let addedCertificate: SecCertificate?
+        }
+
+        /// Removes the items of the given classes with `label`, and `certificate`'s own item.
+        ///
+        /// The legacy macOS keychain does not store a certificate's label, so a delete by label
+        /// cannot find one there. The reference can, which is why the certificate is deleted by
+        /// it too. Only pass the certificate that was added by the identity being removed: a
+        /// delete by reference does not look at the label, and an equal certificate that someone
+        /// else stored would go with it.
+        package static func deleteKeychainItems(
+            label: String,
+            certificate: SecCertificate?,
+            itemClasses: [CFString] = [kSecClassKey, kSecClassCertificate],
+            useDataProtectionKeychain: Bool
+        ) {
+            removeExistingKeychainItems(
+                label: label,
+                itemClasses: itemClasses,
+                useDataProtectionKeychain: useDataProtectionKeychain
+            )
+
+            if let certificate {
+                SecItemDelete(
+                    [
+                        kSecClass: kSecClassCertificate,
+                        kSecValueRef: certificate,
+                        kSecUseDataProtectionKeychain: useDataProtectionKeychain,
+                    ] as CFDictionary
                 )
             }
-
-            return matchingIdentity
         }
 
         private static func removeExistingKeychainItems(
@@ -558,7 +628,9 @@ extension Internals {
             ) == errSecSuccess
         }
 
-        private static func addToKeychain(query: [CFString: Any], operation: String) throws {
+        /// - Returns: Whether the item was added; `false` when an equal one was already there.
+        @discardableResult
+        private static func addToKeychain(query: [CFString: Any], operation: String) throws -> Bool {
             var result: CFTypeRef?
             let status = SecItemAdd(query as CFDictionary, &result)
 
@@ -573,23 +645,67 @@ extension Internals {
                 // is exactly the state this call was trying to reach, so this is success, not
                 // failure.
                 if status == errSecDuplicateItem {
-                    return
+                    return false
                 }
                 if status == errSecMissingEntitlement {
                     throw Error.missingKeychainSharingEntitlement(operation: operation)
                 }
                 throw Error.keychainOperationFailed(status, operation: operation)
             }
+
+            return true
+        }
+
+        /// SHA-1 of the public key's external representation (X9.63 for EC, PKCS#1
+        /// `RSAPublicKey` for RSA; `SecKeyCopyExternalRepresentation` already returns whichever
+        /// shape matches the key's own type): the OS's own convention for a key's
+        /// `kSecAttrApplicationLabel`, confirmed byte for byte against `openssl`'s equivalent
+        /// computation. Two encodings of one private key give the same value.
+        package static func applicationLabel(of secKey: SecKey) throws -> Data {
+            guard let publicKey = SecKeyCopyPublicKey(secKey) else {
+                throw Error.secKeyCreationFailed("SecKeyCopyPublicKey returned nil")
+            }
+
+            var error: Unmanaged<CFError>?
+            guard let representation = SecKeyCopyExternalRepresentation(publicKey, &error) as Data? else {
+                let message = error.map { String(describing: $0.takeRetainedValue()) } ?? "unknown"
+                throw Error.secKeyCreationFailed("SecKeyCopyExternalRepresentation failed: \(message)")
+            }
+
+            return Data(Insecure.SHA1.hash(data: representation))
+        }
+
+        /// Throws when `certificate`'s public key is not the one `applicationLabel` is the hash
+        /// of. When the certificate's key cannot be read back, there is nothing to compare, and
+        /// `store(...)` still finds out whether an identity forms.
+        private static func validate(certificate: SecCertificate, pairsWith applicationLabel: Data) throws {
+            guard
+                let certificateKey = SecCertificateCopyKey(certificate),
+                let representation = SecKeyCopyExternalRepresentation(certificateKey, nil) as Data?
+            else {
+                return
+            }
+
+            guard Data(Insecure.SHA1.hash(data: representation)) == applicationLabel else {
+                throw Error.keychainOperationFailed(
+                    errSecItemNotFound,
+                    operation: "matching identity by certificate (the private key is not the certificate's)"
+                )
+            }
+        }
+
+        private static func hex(_ data: Data) -> String {
+            data.map {
+                let hex = String($0, radix: 16)
+                return hex.count == 1 ? "0" + hex : hex
+            }.joined()
         }
 
         /// Lowercase hex SHA-256 of `data`, for deterministic Keychain item labeling only, not a
         /// security boundary, so `CryptoKit` (always available on Darwin) is enough; no need for
         /// a constant-time comparison anywhere this is used.
         private static func hexDigest(_ data: Data) -> String {
-            SHA256.hash(data: data).map {
-                let hex = String($0, radix: 16)
-                return hex.count == 1 ? "0" + hex : hex
-            }.joined()
+            hex(Data(SHA256.hash(data: data)))
         }
     }
 }

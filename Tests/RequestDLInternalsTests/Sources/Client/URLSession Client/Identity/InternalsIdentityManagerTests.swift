@@ -118,7 +118,7 @@ extension InternalsIdentityManagerTests {
             )
 
             let deletions = LockedValueBox<[Deletion]>([])
-            let manager = Internals.IdentityManager { label, useDataProtectionKeychain in
+            let manager = Internals.IdentityManager { label, _, useDataProtectionKeychain in
                 deletions.withLockedValue {
                     $0.append(Deletion(label: label, useDataProtectionKeychain: useDataProtectionKeychain))
                 }
@@ -126,7 +126,7 @@ extension InternalsIdentityManagerTests {
 
             // When
             var handle: Internals.IdentityHandle? = try manager.handle(for: "test.label") {
-                (source.identity, useDataProtectionKeychain)
+                (source.identity, useDataProtectionKeychain, nil)
             }
 
             // Then: nothing is deleted while the handle is alive.
@@ -177,15 +177,15 @@ extension InternalsIdentityManagerTests {
             )
 
             let deletions = LockedValueBox<[String]>([])
-            let manager = Internals.IdentityManager { label, _ in
+            let manager = Internals.IdentityManager { label, _, _ in
                 deletions.withLockedValue { $0.append(label) }
             }
 
             var first: Internals.IdentityHandle? = try manager.handle(for: "cert.first", keyLabel: "key") {
-                (source.identity, false)
+                (source.identity, false, nil)
             }
             var second: Internals.IdentityHandle? = try manager.handle(for: "cert.second", keyLabel: "key") {
-                (source.identity, false)
+                (source.identity, false, nil)
             }
 
             // When / Then
@@ -196,6 +196,64 @@ extension InternalsIdentityManagerTests {
             #expect(deletions.withLockedValue { $0 } == ["cert.first", "cert.second", "key"])
 
             _ = (first, second)
+        }
+
+        #if os(macOS)
+        try run()
+        #else
+        await withKnownIssue(
+            "no Keychain Sharing entitlement on this platform's SwiftPM-generated Xcode scheme; see RequestConfigurationURLSessionClientMTLSTests's own doc comment"
+        ) {
+            try run()
+        }
+        #endif
+    }
+}
+
+extension InternalsIdentityManagerTests {
+
+    /// The legacy macOS keychain does not keep a certificate's label, so the certificate the
+    /// handle's build added is deleted by reference. A handle whose build found it already stored
+    /// has none to give, and must not delete one that someone else stored.
+    @Test
+    func release_whenTheHandleOwnsItsCertificate_deletesItByReferenceAndNotTheKey() async throws {
+        func run() throws {
+            // Given
+            let client = Certificates().client()
+            let secureConnection = Internals.SecureConnection.testMTLSConnection(client: client)
+
+            let certificateChain = try #require(secureConnection.certificateChain)
+            let certificateDER = try #require(
+                try Internals.RawBytesIdentityBuilder.certificateDERs(from: certificateChain).first
+            )
+            let privateKeySource = try #require(secureConnection.privateKey)
+            let privateKeyDER = try Internals.RawBytesIdentityBuilder.privateKeyDER(from: privateKeySource)
+
+            let source = try Internals.RawBytesIdentityBuilder.makeIdentity(
+                certificateDER: certificateDER,
+                privateKeyDER: privateKeyDER
+            )
+            let certificate = try Internals.RawBytesIdentityBuilder.certificate(fromDER: certificateDER)
+
+            let deletions = LockedValueBox<[String]>([])
+            let manager = Internals.IdentityManager { label, certificate, _ in
+                deletions.withLockedValue { $0.append("\(label):\(certificate == nil ? "label" : "reference")") }
+            }
+
+            var owning: Internals.IdentityHandle? = try manager.handle(for: "cert.owned", keyLabel: "key") {
+                (source.identity, false, certificate)
+            }
+            var notOwning: Internals.IdentityHandle? = try manager.handle(for: "cert.found", keyLabel: "key") {
+                (source.identity, false, nil)
+            }
+
+            // When / Then
+            owning = nil
+            notOwning = nil
+
+            #expect(deletions.withLockedValue { $0 } == ["cert.owned:reference", "cert.found:label", "key:label"])
+
+            _ = (owning, notOwning)
         }
 
         #if os(macOS)
