@@ -502,23 +502,19 @@ extension Internals {
                 with: modifiedHeaders
             )
 
-            await dataCache.updateCached(
-                key: requestConfiguration.url,
-                cachedResponse: cachedResponse,
-                expecting: cachedData.cachedResponse
-            )
-
-            // What is stored now has to be what was just written. The conditional request is a
-            // round trip, and the key can be written meanwhile by a request that did not match
-            // this entry (another account, a different `Vary`): that record is not what was
-            // confirmed, and is handed to no one on the strength of this response. It is checked
-            // against this request again for the same reason, since nothing above did.
+            // What is stored afterwards has to be this entry. The conditional request is a round
+            // trip, and the key can be written meanwhile by a request that did not match it
+            // (another account, a different `Vary`): that record is not what was confirmed, and
+            // is handed to no one on the strength of this response. Another revalidation of the
+            // same entry may have got there first, and what it left is just as good. The entry
+            // is checked against this request again for the same reason, since nothing above did.
             guard
-                let updated = await dataCache.getCachedData(
-                    forKey: requestConfiguration.url,
+                let updated = await dataCache.renewCached(
+                    key: requestConfiguration.url,
+                    cachedResponse: cachedResponse,
+                    expecting: cachedData.cachedResponse,
                     policy: requestConfiguration.cachePolicy
                 ),
-                updated.cachedResponse == cachedResponse,
                 matchesVary(of: updated.cachedResponse)
             else {
                 return nil
@@ -884,15 +880,24 @@ extension Internals {
             // missing value (RFC 9111 §4.2.1, §5.3): ignoring it kept the entry fresh for as long
             // as the other directive said, or for ever when there was none, and `Expires: 0` is
             // what servers send to say "already expired".
-            let expires = headers["Expires"] ?? []
+            //
+            // `Expires` only counts when there is no `max-age` at all (RFC 9111 §5.3), however the
+            // `max-age` reads: a response that carries both, `max-age=3600` with the `Expires: 0`
+            // a legacy stack adds next to it, is fresh for an hour. A `max-age` that is there and
+            // cannot be read is stale on its own account, below.
+            let maxAge = maxAgeSeconds(headers: headers["Cache-Control"] ?? [])
 
-            if !expires.isEmpty {
-                guard let expiresDate = expiresDate(headers: expires), expiresDate >= Date() else {
-                    return false
+            if case .absent = maxAge {
+                let expires = headers["Expires"] ?? []
+
+                if !expires.isEmpty {
+                    guard let expiresDate = expiresDate(headers: expires), expiresDate >= Date() else {
+                        return false
+                    }
                 }
             }
 
-            switch maxAgeSeconds(headers: headers["Cache-Control"] ?? []) {
+            switch maxAge {
             case .absent:
                 break
 

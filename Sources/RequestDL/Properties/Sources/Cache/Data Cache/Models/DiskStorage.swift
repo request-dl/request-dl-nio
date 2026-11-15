@@ -679,7 +679,11 @@ struct DiskStorage: Sendable {
             let response = try? JSONEncoder().encode(cachedResponse),
             let storedData = await readResponseData(at: record.responseURL, key: key),
             let stored = try? JSONDecoder().decode(CachedResponse.self, from: storedData),
-            stored == expected
+            stored.isSameEntry(as: expected),
+            // Not rewritten when it was already renewed after `expected` was read: by a revalidation
+            // that ran alongside this one, and just as good. Rewriting it moves the body to a new
+            // directory, under whoever was about to read it from the one that renewal left.
+            stored.date <= expected.date
         else { return }
 
         let responseInfo = try? await Internals.fileSystem.info(forFileAt: record.responseURL.filePath)
@@ -695,10 +699,15 @@ struct DiskStorage: Sendable {
             let newRecord = await self.record(key, createdAt: cachedResponse.date)
         else { return }
 
+        // Whether the body is in `newRecord` yet. Until it is, `record` is untouched, or its body
+        // was taken by another update of the same entry, which is the one that removes it.
+        var moved = false
+
         do {
             let oldDataPath = record.dataURL.filePath
             let newDataPath = newRecord.dataURL.filePath
             try await Internals.fileSystem.moveItem(at: oldDataPath, to: newDataPath)
+            moved = true
 
             try await writeAndClose(response, to: newRecord.responseURL, key: key)
 
@@ -713,20 +722,27 @@ struct DiskStorage: Sendable {
             // Only if `key` still points at the record that was revalidated. A write that
             // landed during the awaits above owns the key now, and what was moved here is the
             // body of a record it replaced.
-            if !index.replace(key, ifLocation: record.url, with: newRecord.url) {
-                await Self.removeItem(at: newRecord.url.filePath)
-                index.remove(key, ifLocation: newRecord.url)
+            if index.replace(key, ifLocation: record.url, with: newRecord.url) {
+                await Self.removeItem(at: record.url.filePath)
+                return
             }
-        } catch {
-            await Self.removeItem(at: newRecord.url.filePath)
-            index.remove(key, ifLocation: newRecord.url)
+        } catch {}
+
+        await Self.removeItem(at: newRecord.url.filePath)
+        index.remove(key, ifLocation: newRecord.url)
+
+        // The body never left `record`, or something else took it: either way there is nothing of
+        // this update to undo there. Removing it, and the index entry that points at it, ahead of
+        // the update that did move the body made that update's `replace` fail and take the entry
+        // down with it.
+        guard moved else {
+            return
         }
 
+        // The body was moved and the entry could not be completed, so there is nothing left on
+        // disk for this key. See the comment on `Record.init(directory:key:at:)` for why a failed
+        // revalidation loses the entry outright rather than leaving `record`'s directory in place.
         await Self.removeItem(at: record.url.filePath)
-        // A no-op when the `do` branch above already repointed `key` at `newRecord.url`; clears
-        // it when the move failed and there is nothing left on disk for this key at all. See
-        // the comment on `Record.init(directory:key:at:)` for why a failed revalidation loses
-        // the entry outright rather than leaving `record`'s directory in place.
         index.remove(key, ifLocation: record.url)
     }
 

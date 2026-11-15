@@ -51,6 +51,31 @@ struct CacheRevalidationTests {
         }
     }
 
+    /// Holds everyone who arrives until `count` of them have: the revalidations below are all
+    /// in flight before any of them gets its answer, whatever the scheduler does.
+    private actor Barrier {
+
+        private let count: Int
+        private var waiters: [CheckedContinuation<Void, Never>] = []
+
+        init(count: Int) {
+            self.count = count
+        }
+
+        func arrive() async {
+            if waiters.count + 1 == count {
+                for waiter in waiters {
+                    waiter.resume()
+                }
+
+                waiters = []
+                return
+            }
+
+            await withCheckedContinuation { waiters.append($0) }
+        }
+    }
+
     /// Answers the conditional request with `head`, after `onRequest` has run (and, with it, after
     /// whatever the test does at that point), and counts them.
     private final class Client: RequestExecutingClient, @unchecked Sendable {
@@ -287,6 +312,49 @@ struct CacheRevalidationTests {
         let output = await decide(configuration, in: dataCache)
 
         // Then: not served, and the request goes out.
+        #expect(isServed(output) == false)
+    }
+
+    /// RFC 9111 §5.3: with a `max-age` there is no `Expires` to read. Stacks that add the one for
+    /// old clients next to the other (`Expires: 0`, `-1`) are common, and they are not asking for
+    /// a request per use.
+    @Test(arguments: ["0", "-1", "Thu, 01 Jan 1970 00:00:00 GMT"])
+    func freshness_whenMaxAgeIsValid_expiresIsNotRead(_ expires: String) async throws {
+        // Given
+        let dataCache = makeCache()
+        let configuration = makeConfiguration(strategy: .returnCachedDataElseLoad)
+
+        await store(
+            response([("Cache-Control", "max-age=3600"), ("Expires", expires)]),
+            key: configuration.url,
+            in: dataCache
+        )
+
+        // When
+        let output = await decide(configuration, in: dataCache)
+
+        // Then
+        #expect(isServed(output))
+    }
+
+    /// The `max-age` that is there and cannot be read is a stale response on its own account,
+    /// whatever `Expires` says.
+    @Test
+    func freshness_whenMaxAgeIsNotANumber_aFutureExpiresDoesNotMakeItFresh() async throws {
+        // Given
+        let dataCache = makeCache()
+        let configuration = makeConfiguration(strategy: .returnCachedDataElseLoad)
+
+        await store(
+            response([("Cache-Control", "max-age=abc"), ("Expires", httpDate(3_600))]),
+            key: configuration.url,
+            in: dataCache
+        )
+
+        // When
+        let output = await decide(configuration, in: dataCache)
+
+        // Then
         #expect(isServed(output) == false)
     }
 
@@ -549,6 +617,54 @@ struct CacheRevalidationTests {
         #expect(await stored.data == Data("user2's body".utf8))
         #expect(stored.cachedResponse.varyRequestHeaders == credentials("Bearer user2"))
         #expect(stored.response.headers.first(name: "Cache-Control") == "max-age=3600")
+    }
+
+    /// Several requests revalidate the same entry together, each with a 304 of its own, and the one
+    /// the others find rewritten is as good as the one they would have written: all of them are
+    /// served from the cache, and the entry is still there afterwards. On disk each rewrite moves
+    /// the body to a new directory, so a repeated run is what would catch an update that takes the
+    /// entry down with it.
+    @Test(arguments: [DataCache.Policy.Set.memory, .disk, .all])
+    func revalidation_whenTheSameEntryIsRevalidatedConcurrently_everyRequestIsServedFromTheCache(
+        _ policy: DataCache.Policy.Set
+    ) async throws {
+        let revalidations = 4
+
+        for _ in 0..<12 {
+            // Given
+            let dataCache = makeCache()
+            let configuration = makeConfiguration(strategy: .reloadAndValidateCachedData, policy: policy)
+
+            await store(
+                response([("ETag", "\"v1\""), ("Cache-Control", "max-age=5")], policy: policy, age: 10),
+                body: "the body",
+                key: configuration.url,
+                in: dataCache
+            )
+
+            let barrier = Barrier(count: revalidations)
+            let client = Client(
+                head: head(status: 304, [("Cache-Control", "max-age=7200")]),
+                onRequest: { await barrier.arrive() }
+            )
+
+            // When: all of them have sent their conditional request before any gets an answer.
+            let outputs = await withTaskGroup(of: Internals.CacheControl.Output.self) { group in
+                for _ in 0..<revalidations {
+                    group.addTask { await decide(configuration, in: dataCache, client: client) }
+                }
+
+                return await group.reduce(into: []) { $0.append($1) }
+            }
+
+            // Then
+            #expect(outputs.count == revalidations)
+            #expect(outputs.allSatisfy { sources($0) == [.revalidation, .cache] })
+
+            let stored = try #require(await dataCache.getCachedData(forKey: configuration.url, policy: policy))
+            #expect(await stored.data == Data("the body".utf8))
+            #expect(stored.response.headers.first(name: "Cache-Control") == "max-age=7200")
+        }
     }
 
     @Test(arguments: [DataCache.Policy.Set.memory, .disk, .all])

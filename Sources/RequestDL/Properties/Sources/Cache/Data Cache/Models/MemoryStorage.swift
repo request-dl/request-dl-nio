@@ -121,7 +121,14 @@ struct MemoryStorage: Sendable {
         expecting expected: CachedResponse,
         maximumCapacity: Int64
     ) {
-        guard let record = records[key], record.cachedResponse == expected else {
+        guard
+            let record = records[key],
+            record.cachedResponse.isSameEntry(as: expected),
+            // Not rewritten when it was already renewed after `expected` was read: by a revalidation
+            // that ran alongside this one, and just as good. Writing this one's older date over it
+            // would only take the entry back in time.
+            record.cachedResponse.date <= expected.date
+        else {
             return
         }
 
