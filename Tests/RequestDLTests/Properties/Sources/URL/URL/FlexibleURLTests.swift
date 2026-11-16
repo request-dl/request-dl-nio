@@ -49,6 +49,39 @@ struct FlexibleURLTests {
         #expect(resolved.requestConfiguration.url == endpointString)
     }
 
+    /// A bare `name` is a different query from `name=`: a server can read the flag by its
+    /// presence alone, and a presigned URL signs the exact bytes (S3 sub-resources such as
+    /// `?uploads`). `URLComponents` hands a bare name back with a `nil` value, and reading that as
+    /// an empty string rendered `?uploads` as `?uploads=`.
+    @Test(
+        arguments: [
+            "https://api.example.com/bucket/key?uploads",
+            "https://api.example.com/bucket/key?uploads=",
+            "https://api.example.com/search?a=1&flag&b=",
+            "https://api.example.com/search?thumbnail&sig=abc",
+        ]
+    )
+    func completeURLKeepsValuelessAndEmptyValuedQueriesAsWritten(_ endpointString: String) async throws {
+        // When
+        let resolved = try await resolve(FlexibleURL(endpointString))
+
+        // Then
+        #expect(resolved.requestConfiguration.url == endpointString)
+    }
+
+    @Test func relativeURLKeepsAValuelessQueryAsWritten() async throws {
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                BaseURL("api.example.com")
+                FlexibleURL("/bucket/key?uploads")
+            }
+        )
+
+        // Then
+        #expect(resolved.requestConfiguration.url == "https://api.example.com/bucket/key?uploads")
+    }
+
     @Test func relativeURLKeepsPercentEscapedDelimitersEscaped() async throws {
         // When
         let resolved = try await resolve(
