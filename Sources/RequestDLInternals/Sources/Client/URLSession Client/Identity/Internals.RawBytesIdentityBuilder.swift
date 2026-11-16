@@ -681,17 +681,24 @@ extension Internals {
         }
 
         /// Throws when `certificate`'s public key is not the one `applicationLabel` is the hash
-        /// of. When the certificate's key cannot be read back, there is nothing to compare, and
-        /// `store(...)` still finds out whether an identity forms.
+        /// of.
         private static func validate(certificate: SecCertificate, pairsWith applicationLabel: Data) throws {
-            guard
-                let certificateKey = SecCertificateCopyKey(certificate),
-                let representation = SecKeyCopyExternalRepresentation(certificateKey, nil) as Data?
-            else {
+            let representation = SecCertificateCopyKey(certificate).flatMap {
+                SecKeyCopyExternalRepresentation($0, nil) as Data?
+            }
+
+            try validate(certificatePublicKey: representation, pairsWith: applicationLabel)
+        }
+
+        /// - Parameter certificatePublicKey: The external representation of the certificate's
+        ///   public key, or `nil` when it cannot be read back. There is nothing to compare then,
+        ///   and `store(...)` still finds out whether an identity forms.
+        package static func validate(certificatePublicKey: Data?, pairsWith applicationLabel: Data) throws {
+            guard let certificatePublicKey else {
                 return
             }
 
-            guard Data(Insecure.SHA1.hash(data: representation)) == applicationLabel else {
+            guard Data(Insecure.SHA1.hash(data: certificatePublicKey)) == applicationLabel else {
                 throw Error.privateKeyDoesNotMatchCertificate
             }
         }

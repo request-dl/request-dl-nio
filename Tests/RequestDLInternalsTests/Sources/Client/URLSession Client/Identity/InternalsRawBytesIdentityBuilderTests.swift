@@ -462,6 +462,57 @@ struct InternalsRawBytesIdentityBuilderTests {
     }
     #endif
 
+    // MARK: - Pairing a private key with a certificate
+
+    /// None of these touch the Keychain: the pair is checked before anything is stored.
+    @Test
+    func validate_whenTheCertificatesPublicKeyIsTheKeys_passes() throws {
+        // Given
+        let secKey = try Internals.RawBytesIdentityBuilder.secKey(fromDER: Self.makeRSAPKCS1DER())
+        let publicKey = try #require(SecKeyCopyPublicKey(secKey))
+        let representation = try #require(SecKeyCopyExternalRepresentation(publicKey, nil) as Data?)
+        let applicationLabel = try Internals.RawBytesIdentityBuilder.applicationLabel(of: secKey)
+
+        // Then
+        try Internals.RawBytesIdentityBuilder.validate(
+            certificatePublicKey: representation,
+            pairsWith: applicationLabel
+        )
+    }
+
+    @Test
+    func validate_whenTheCertificatesPublicKeyIsAnotherKeys_throwsPrivateKeyDoesNotMatchCertificate() throws {
+        // Given
+        let secKey = try Internals.RawBytesIdentityBuilder.secKey(fromDER: Self.makeRSAPKCS1DER())
+        let other = try Internals.RawBytesIdentityBuilder.secKey(fromDER: Self.makeRSAPKCS1DER())
+        let otherPublicKey = try #require(SecKeyCopyPublicKey(other))
+        let otherRepresentation = try #require(SecKeyCopyExternalRepresentation(otherPublicKey, nil) as Data?)
+        let applicationLabel = try Internals.RawBytesIdentityBuilder.applicationLabel(of: secKey)
+
+        // Then
+        do {
+            try Internals.RawBytesIdentityBuilder.validate(
+                certificatePublicKey: otherRepresentation,
+                pairsWith: applicationLabel
+            )
+            Issue.record("Not expecting success")
+        } catch Internals.RawBytesIdentityBuilder.Error.privateKeyDoesNotMatchCertificate {
+            // Expected.
+        }
+    }
+
+    /// Nothing to compare, so nothing is refused: `store(...)` is what finds out whether an
+    /// identity forms.
+    @Test
+    func validate_whenTheCertificatesPublicKeyCannotBeRead_passes() throws {
+        // Given
+        let secKey = try Internals.RawBytesIdentityBuilder.secKey(fromDER: Self.makeRSAPKCS1DER())
+        let applicationLabel = try Internals.RawBytesIdentityBuilder.applicationLabel(of: secKey)
+
+        // Then
+        try Internals.RawBytesIdentityBuilder.validate(certificatePublicKey: nil, pairsWith: applicationLabel)
+    }
+
     // MARK: - Unsupported formats
 
     @Test
