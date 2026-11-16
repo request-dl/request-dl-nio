@@ -43,6 +43,17 @@ extension Internals {
             }
         }
 
+        /// The `Accept-Encoding` value that says what is configured, in the order it was configured;
+        /// `nil` for `.disabled`, which says nothing.
+        package var acceptEncoding: String? {
+            switch self {
+            case .disabled:
+                return nil
+            case .enabled(let algorithms, _):
+                return algorithms.map(\.contentEncodingValue).joined(separator: ", ")
+            }
+        }
+
         // MARK: - Internal methods
 
         /// `NIOHTTPResponseDecompressor` only ever reacts to a `Content-Encoding: gzip`/`deflate`

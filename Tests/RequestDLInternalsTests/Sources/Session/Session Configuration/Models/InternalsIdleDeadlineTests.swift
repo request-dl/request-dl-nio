@@ -40,6 +40,103 @@ struct InternalsIdleDeadlineTests {
         #expect(seed.cancellations == 1)
     }
 
+    // MARK: - Before there is a request
+
+    /// What runs before there is a request to attach (a revalidation of the cache) is cancelled
+    /// when the budget is spent on it, which is what makes the request fail and not wait for it.
+    @Test
+    func aBudgetSpentBeforeAnyRequestExists_cancelsWhatIsRunning() async throws {
+        // Given
+        let clock = FakeIdleClock()
+        let deadline = clock.makeDeadline(nanoseconds: Self.budget)
+        deadline.start()
+
+        // When
+        let outcome = _Concurrency.Task {
+            try await clock.bind {
+                try await deadline.bounding {
+                    try await _Concurrency.Task.sleep(nanoseconds: 120_000_000_000)
+                }
+            }
+        }
+
+        await clock.advanceUntilDone(deadline, by: Self.budget)
+
+        // Then
+        await #expect(throws: CancellationError.self) { try await outcome.value }
+        #expect(deadline.isExpired)
+    }
+
+    /// What finishes within the budget is none the worse for being watched, and is activity: the
+    /// request that follows it gets the whole budget.
+    @Test
+    func whatFinishesInTime_isLeftAloneAndStartsTheBudgetOver() async throws {
+        // Given
+        let clock = FakeIdleClock()
+        let deadline = clock.makeDeadline(nanoseconds: Self.budget)
+        deadline.start()
+
+        await clock.advance(by: Self.budget - 1)
+
+        // When
+        let value = try await deadline.bounding { 42 }
+
+        // Then: nearly a budget before it, and nearly another after it, without running out.
+        await clock.advance(by: Self.budget - 1)
+
+        #expect(value == 42)
+        #expect(!deadline.isExpired)
+
+        deadline.finish()
+    }
+
+    /// Whoever is waiting cancelling what is being bounded cancels it, and is not the budget.
+    @Test
+    func aCancellationOfTheCaller_cancelsWhatIsRunningWithoutSpendingTheBudget() async throws {
+        // Given
+        let clock = FakeIdleClock()
+        let deadline = clock.makeDeadline(nanoseconds: Self.budget)
+        deadline.start()
+
+        let outcome = _Concurrency.Task {
+            try await deadline.bounding {
+                try await _Concurrency.Task.sleep(nanoseconds: 120_000_000_000)
+            }
+        }
+
+        await clock.waitForASleeper()
+
+        // When
+        outcome.cancel()
+
+        // Then
+        await #expect(throws: CancellationError.self) { try await outcome.value }
+        #expect(!deadline.isExpired)
+
+        deadline.finish()
+    }
+
+    /// A budget that ran out before what is about to run was handed over ends it at once.
+    @Test
+    func aBudgetAlreadySpent_cancelsWhatIsHandedOverAfterwards() async throws {
+        // Given
+        let clock = FakeIdleClock()
+        let deadline = clock.makeDeadline(nanoseconds: Self.budget)
+        deadline.start()
+
+        await clock.advanceUntilDone(deadline, by: Self.budget)
+
+        // When
+        let outcome = _Concurrency.Task {
+            try await deadline.bounding {
+                try await _Concurrency.Task.sleep(nanoseconds: 120_000_000_000)
+            }
+        }
+
+        // Then
+        await #expect(throws: CancellationError.self) { try await outcome.value }
+    }
+
     /// One nanosecond short of the budget is still within it.
     @Test
     func aBudgetNotQuiteSpent_leavesTheRequestAlone() async throws {

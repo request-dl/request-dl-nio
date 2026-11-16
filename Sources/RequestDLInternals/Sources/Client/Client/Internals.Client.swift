@@ -91,6 +91,15 @@ extension Internals {
         /// may answer for. Every request made through `execute` records its origin here.
         private let identityOrigins: Internals.IdentityOrigins?
 
+        /// What requests through this client announce in `Accept-Encoding` when they set none of
+        /// their own: the algorithms its session was configured with.
+        ///
+        /// The decompressor in the client's pipeline would announce `deflate, gzip` instead, and
+        /// only when one of those is configured: a custom algorithm never reached the server, and
+        /// `gzip` alone was announced together with `deflate`. `nil` leaves it to whatever the
+        /// pipeline does (nothing, with decompression off).
+        package let acceptEncoding: String?
+
         // MARK: - Unsafe properties
 
         private var _isClosed: Bool
@@ -107,9 +116,11 @@ extension Internals {
             localIdentityHandle: Internals.IdentityHandle? = nil,
             identityOrigins: Internals.IdentityOrigins? = nil,
             maximumConcurrentConnections: Int? = nil,
-            eventLoopGroupToken: Internals.EventLoopGroupToken? = nil
+            eventLoopGroupToken: Internals.EventLoopGroupToken? = nil,
+            acceptEncoding: String? = nil
         ) {
             _isClosed = false
+            self.acceptEncoding = acceptEncoding
             _client = .init(
                 eventLoopGroupProvider: eventLoopGroupProvider,
                 configuration: configuration
@@ -127,9 +138,11 @@ extension Internals {
             configuration: HTTPClient.Configuration,
             identityOrigins: Internals.IdentityOrigins? = nil,
             maximumConcurrentConnections: Int? = nil,
-            eventLoopGroupToken: Internals.EventLoopGroupToken? = nil
+            eventLoopGroupToken: Internals.EventLoopGroupToken? = nil,
+            acceptEncoding: String? = nil
         ) {
             _isClosed = false
+            self.acceptEncoding = acceptEncoding
             _client = .init(
                 eventLoopGroupProvider: eventLoopGroupProvider,
                 configuration: configuration
@@ -361,6 +374,11 @@ extension Internals {
             // the double decode into an `UnsupportedContentEncodingError` for a response that was
             // decoded correctly. Manual dispatch needs to know which encodings to leave alone, not
             // merely which algorithms it owns.
+            //
+            // - Important: Which ones are the handler's, not the list's: it decodes `gzip` and
+            // `deflate` alike whichever of them was configured (a server that sends `deflate` to a
+            // list with only `gzip` in it is decoded all the same), and none of them when no
+            // natively decoded algorithm is configured, as it is not enabled then.
             let decompressionDispatch: Internals.ManualDecompressionDispatch = {
                 switch decompression {
                 case .disabled:
@@ -368,11 +386,9 @@ extension Internals {
                 case .enabled(let algorithms, _) where !algorithms.allSatisfy(\.isNativelyDecodedByNIO):
                     return .dispatch(
                         algorithms: algorithms.filter { !$0.isNativelyDecodedByNIO },
-                        nativelyDecoded: Set(
-                            algorithms
-                                .filter(\.isNativelyDecodedByNIO)
-                                .map { $0.contentEncodingValue.lowercased() }
-                        )
+                        nativelyDecoded: algorithms.contains(where: \.isNativelyDecodedByNIO)
+                            ? ["gzip", "deflate"]
+                            : []
                     )
                 case .enabled:
                     return .skip
@@ -386,6 +402,7 @@ extension Internals {
                 download: download,
                 cache: cache,
                 decompressionDispatch: decompressionDispatch,
+                requestMethod: request.method,
                 logger: logger,
                 transferControl: transferControl,
                 reconnection: reconnection,

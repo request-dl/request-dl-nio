@@ -510,7 +510,23 @@ struct RawTask<Content: Property>: RequestTask {
         // in this task; otherwise the race is a plain `await` with no isolation change at all.
         @Sendable
         func executeSessionTask() async throws -> (task: SessionTask, onResponseHead: OnResponseHead?) {
-            switch await cacheControl(client) {
+            // The conditional request of a revalidation goes out before there is a request for the
+            // idle deadline to cancel, so that request is bounded by it: a server that takes it and
+            // never answers ends the execution like one that goes quiet later. Only that request,
+            // and not the cache's own reads and writes around it.
+            let output: Internals.CacheControl.Output
+
+            if let idle = transferControl?.observer?.idle {
+                output = await cacheControl(IdleBoundedClient(client, idle: idle))
+
+                if idle.isExpired {
+                    throw Internals.ReadTimeoutError()
+                }
+            } else {
+                output = await cacheControl(client)
+            }
+
+            switch output {
             case .task(let task):
                 // Served from the cache, so no executor is there to say what was measured: the
                 // revalidation that confirmed it, when there was one, and the cache's own.

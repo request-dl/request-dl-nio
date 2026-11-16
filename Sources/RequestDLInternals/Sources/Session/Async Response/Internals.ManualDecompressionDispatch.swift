@@ -88,7 +88,7 @@ extension Internals.ManualDecompressionDispatch {
             return source
         }
 
-        let encodings = Self.normalizedContentEncodings(for: head)
+        let encodings = remainingContentEncodings(for: head)
 
         guard let normalized = encodings.first else {
             return source
@@ -100,12 +100,6 @@ extension Internals.ManualDecompressionDispatch {
         // mismatch instead, the same way an unrecognised single encoding already does.
         guard encodings.count == 1 else {
             throw Internals.UnsupportedContentEncodingError(value: encodings.joined(separator: ", "))
-        }
-
-        // Already decoded on the way in; the transport simply didn't strip the header on its way
-        // back out. Decoding again here is how a perfectly good response gets corrupted.
-        guard !nativelyDecoded.contains(normalized) else {
-            return source
         }
 
         guard
@@ -134,17 +128,28 @@ extension Internals.ManualDecompressionDispatch {
     /// decompression) would need. Callers use this to skip caching such a response outright
     /// rather than silently persisting the still-compressed body as if it were already decoded.
     package func requiresManualDecoding(for head: Internals.ResponseHead) -> Bool {
-        guard case .dispatch(_, let nativelyDecoded) = self else {
+        guard case .dispatch = self else {
             return false
         }
 
-        let encodings = Self.normalizedContentEncodings(for: head)
+        return !remainingContentEncodings(for: head).isEmpty
+    }
 
-        guard let normalized = encodings.first else {
-            return false
+    /// What is left to undo once the transport has done what it does: `Content-Encoding`, less
+    /// `identity`, and less the first encoding when the transport decodes that one.
+    ///
+    /// The first, and only the first: the decompressor of `.nio` decides from the first token and
+    /// decodes that one alone, so `identity, gzip` is not decoded at all, and the `gzip` there is
+    /// still to be undone (by an algorithm that can, which there is none for it to be: it is
+    /// reported as unsupported, and not handed over as if it were plain).
+    private func remainingContentEncodings(for head: Internals.ResponseHead) -> [String] {
+        var encodings = Self.contentEncodings(for: head)
+
+        if case .dispatch(_, let nativelyDecoded) = self, let first = encodings.first, nativelyDecoded.contains(first) {
+            encodings.removeFirst()
         }
 
-        return !nativelyDecoded.contains(normalized)
+        return encodings.filter { $0 != "identity" }
     }
 
     /// Every `Content-Encoding` field line, comma-split and joined into one list. RFC 9110 §5.2
@@ -153,18 +158,18 @@ extension Internals.ManualDecompressionDispatch {
     /// compressed twice is decoded once and handed back still compressed, with
     /// `Internals.CacheControl` storing those wrong bytes on the way past.
     ///
-    /// `identity` is dropped rather than counted: it stands for "no transformation", so it never
-    /// changes what has to be undone.
+    /// `identity` is kept here, so the first of them is the one the transport saw first; it never
+    /// changes what has to be undone, and is dropped where that is worked out.
     ///
     /// Trimming goes through the package's own `trimming(where:)`, not
     /// `trimmingCharacters(in: .whitespaces)`: that needs `Foundation.CharacterSet`, which this
     /// file has no import for. Same as `Internals.CacheControl.directives(_:)`.
-    private static func normalizedContentEncodings(for head: Internals.ResponseHead) -> [String] {
+    private static func contentEncodings(for head: Internals.ResponseHead) -> [String] {
         head
             .headerValues(named: "Content-Encoding")
             .flatMap { $0.split(separator: ",") }
             .map { $0.trimming(where: \.isWhitespace).lowercased() }
-            .filter { !$0.isEmpty && $0 != "identity" }
+            .filter { !$0.isEmpty }
     }
 }
 
@@ -177,7 +182,7 @@ extension Internals.AsyncStream where Element == Internals.DataBuffer {
     /// is explicitly allowed to buffer internally and emit nothing for a given call.
     ///
     /// `finish()` runs once `source` ends, flushing whatever the decoder is still holding before
-    /// this stream itself closes.
+    /// this stream itself closes, unless `source` had no bytes at all: there is nothing held.
     ///
     /// The reading mode applies to the decoded bytes, the ones the reader gets. Cutting the input
     /// as well, as happened when the wire bytes went through `Internals.DownloadBuffer` first, cost
@@ -226,6 +231,7 @@ extension Internals.AsyncStream where Element == Internals.DataBuffer {
         let task = _Concurrency.Task {
             do {
                 var stream = try algorithm()
+                var hasInput = false
 
                 // `source`'s own iterator (`SubjectAsyncIterator.next()`) already ends the
                 // sequence once this task is cancelled, so no separate `Task.isCancelled` check
@@ -233,6 +239,7 @@ extension Internals.AsyncStream where Element == Internals.DataBuffer {
                 for try await chunk in source {
                     var chunk = chunk
                     let data = await chunk.readData(chunk.readableBytes) ?? Data()
+                    hasInput = hasInput || !data.isEmpty
                     let decoded = try stream(decompressing: data)
 
                     if !decoded.isEmpty {
@@ -256,10 +263,15 @@ extension Internals.AsyncStream where Element == Internals.DataBuffer {
                     }
                 }
 
-                let tail = try stream.finish()
+                // A body that never had a byte is no stream to finish: it is what a `HEAD`, a `304`
+                // or a `204` says `Content-Encoding` over, and a decoder that is asked for the end
+                // of something it never began reports it as truncated.
+                if hasInput {
+                    let tail = try stream.finish()
 
-                if !tail.isEmpty {
-                    output.append(await Internals.DataBuffer(tail))
+                    if !tail.isEmpty {
+                        output.append(await Internals.DataBuffer(tail))
+                    }
                 }
 
                 output.close()

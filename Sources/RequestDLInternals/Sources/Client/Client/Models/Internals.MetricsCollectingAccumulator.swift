@@ -5,6 +5,7 @@
 #if canImport(NIOCore)
 
 import AsyncHTTPClient
+import NIOConcurrencyHelpers
 import NIOCore
 import NIOHTTP1
 
@@ -26,6 +27,15 @@ extension Internals {
         private let accumulator: ResponseAccumulator
         private let metrics: Internals.RequestMetricsCollector
         private let source: Internals.TransactionMetrics.Source
+        private let bodyless: Internals.BodylessResponse
+        private let host: String
+        private let lock = NIOLock()
+
+        // MARK: - Unsafe properties
+
+        private var _head: HTTPResponseHead?
+        private var _hasBody = false
+        private var _bodylessResponse: HTTPClient.Response?
 
         // MARK: - Inits
 
@@ -37,6 +47,21 @@ extension Internals {
             self.accumulator = ResponseAccumulator(request: request)
             self.metrics = metrics
             self.source = source
+            self.bodyless = Internals.BodylessResponse(method: request.method)
+            self.host = request.host
+        }
+
+        // MARK: - Package methods
+
+        /// The response, for a request that failed only because the decompressor found nothing to
+        /// decode in one that has no body (see `Internals.BodylessResponse`). Reading `error` as
+        /// the failure of the request is for the caller to do when this has nothing to return.
+        package func recovering(from error: any Error) throws -> HTTPClient.Response {
+            guard let response = lock.withLock({ _bodylessResponse }) else {
+                throw error
+            }
+
+            return response
         }
 
         // MARK: - Internal methods
@@ -53,17 +78,46 @@ extension Internals {
             task: HTTPClient.Task<HTTPClient.Response>,
             _ head: HTTPResponseHead
         ) -> EventLoopFuture<Void> {
-            accumulator.didReceiveHead(task: task, head)
+            lock.withLock {
+                _head = head
+            }
+
+            return accumulator.didReceiveHead(task: task, head)
         }
 
         package func didReceiveBodyPart(
             task: HTTPClient.Task<HTTPClient.Response>,
             _ buffer: ByteBuffer
         ) -> EventLoopFuture<Void> {
-            accumulator.didReceiveBodyPart(task: task, buffer)
+            lock.withLock {
+                _hasBody = true
+            }
+
+            return accumulator.didReceiveBodyPart(task: task, buffer)
         }
 
         package func didReceiveError(task: HTTPClient.Task<HTTPClient.Response>, _ error: Error) {
+            let response = lock.withLock { () -> HTTPClient.Response? in
+                guard let head = _head, !_hasBody, bodyless.isBodyless(head), bodyless.isTruncatedDecoder(error) else {
+                    return nil
+                }
+
+                let response = HTTPClient.Response(
+                    host: host,
+                    status: head.status,
+                    version: head.version,
+                    headers: head.headers,
+                    body: nil
+                )
+
+                _bodylessResponse = response
+                return response
+            }
+
+            guard response == nil else {
+                return
+            }
+
             accumulator.didReceiveError(task: task, error)
         }
 
@@ -75,7 +129,18 @@ extension Internals {
             task: HTTPClient.Task<HTTPClient.Response>,
             _ metrics: HTTPClientTransactionMetrics
         ) {
-            var transaction = Internals.TransactionMetrics(metrics)
+            let isBodylessResponse = lock.withLock { () -> Bool in
+                guard let head = _head, !_hasBody else {
+                    return false
+                }
+
+                return bodyless.isBodyless(head)
+            }
+
+            var transaction = bodyless.reporting(
+                Internals.TransactionMetrics(metrics),
+                isBodylessResponse: isBodylessResponse
+            )
             transaction.source = source
 
             self.metrics.append(transaction)

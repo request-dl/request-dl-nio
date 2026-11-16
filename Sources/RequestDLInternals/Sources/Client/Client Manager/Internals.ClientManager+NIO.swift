@@ -105,7 +105,8 @@ extension Internals.ClientManager {
             localIdentityHandle: output.localIdentityHandle,
             identityOrigins: output.identityOrigins,
             maximumConcurrentConnections: sessionConfiguration.maximumConcurrentConnections,
-            eventLoopGroupToken: eventLoopGroupToken
+            eventLoopGroupToken: eventLoopGroupToken,
+            acceptEncoding: sessionConfiguration.decompression.acceptEncoding
         )
         #else
         let client = Internals.Client(
@@ -113,7 +114,8 @@ extension Internals.ClientManager {
             configuration: output.httpClientConfiguration,
             identityOrigins: output.identityOrigins,
             maximumConcurrentConnections: sessionConfiguration.maximumConcurrentConnections,
-            eventLoopGroupToken: eventLoopGroupToken
+            eventLoopGroupToken: eventLoopGroupToken,
+            acceptEncoding: sessionConfiguration.decompression.acceptEncoding
         )
         #endif
 

@@ -6,6 +6,7 @@ import Dispatch
 import Testing
 
 @testable import RequestDL
+@testable import RequestDLTestSupport
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -80,9 +81,15 @@ struct CustomDecompressorIntegrationTests {
 
     /// A one-shot raw HTTP/1.1 server: accepts a single connection, ignores the request, and
     /// writes back exactly the bytes given; no framework in the middle re-encoding anything.
-    private final class RawHTTPServer: @unchecked Sendable {
+    final class RawHTTPServer: @unchecked Sendable {
         let port: UInt16
         private let listenSocket: Int32
+        private let received = LockedValueBox("")
+
+        /// The request the server read, as text; empty until there was one.
+        var request: String {
+            received.withLockedValue { $0 }
+        }
 
         init() throws {
             // `SOCK_STREAM` is a plain `Int32` constant on Darwin, but Glibc types it as
@@ -133,13 +140,31 @@ struct CustomDecompressorIntegrationTests {
         /// either way.
         func respondOnce(headers: String, body: [UInt8]) {
             let listenSocket = listenSocket
+            let received = received
             DispatchQueue.global(qos: .userInitiated).async {
                 let client = accept(listenSocket, nil, nil)
                 guard client >= 0 else { return }
                 defer { close(client) }
 
-                var requestBuffer = [UInt8](repeating: 0, count: 65_536)
-                _ = requestBuffer.withUnsafeMutableBytes { read(client, $0.baseAddress, $0.count) }
+                // Up to the end of the request head: it can arrive in more than one segment.
+                var requestBytes: [UInt8] = []
+                var chunk = [UInt8](repeating: 0, count: 65_536)
+
+                while true {
+                    let count = chunk.withUnsafeMutableBytes { read(client, $0.baseAddress, $0.count) }
+
+                    guard count > 0 else {
+                        break
+                    }
+
+                    requestBytes += chunk.prefix(count)
+
+                    if String(decoding: requestBytes, as: UTF8.self).contains("\r\n\r\n") {
+                        break
+                    }
+                }
+
+                received.withLockedValue { $0 = String(decoding: requestBytes, as: UTF8.self) }
 
                 let head = Array(headers.utf8)
                 head.withUnsafeBufferPointer { _ = write(client, $0.baseAddress, $0.count) }
@@ -154,6 +179,10 @@ struct CustomDecompressorIntegrationTests {
 
     /// Real gzip-compressed bytes, via the same `GzipAlgorithm` `Compressor` a real upload would
     /// use: not a fixture, so this stays correct if the codec's own output ever changes shape.
+    static func gzipCompressed(_ string: String) throws -> [UInt8] {
+        try gzipCompress(string)
+    }
+
     private static func gzipCompress(_ string: String) throws -> [UInt8] {
         let compressor: any Compressor = GzipAlgorithm()
         var stream = try compressor()

@@ -73,6 +73,7 @@ extension Internals {
         private var _isFinished = false
         private var _isHeld: (@Sendable () -> Bool)?
         private weak var _seed: Internals.TaskSeed?
+        private var _pending: Internals.TaskSeed?
         private var _wasAttached = false
         private var _watcher: Task<Void, Never>?
 
@@ -193,6 +194,43 @@ extension Internals {
             }
         }
 
+        /// Runs `operation` as something the deadline ends once the budget is spent, for the stretch
+        /// of an execution that comes before there is a request to attach: a conditional
+        /// revalidation of the cache, say, whose server takes the connection and stays silent.
+        ///
+        /// `operation` is cancelled when the budget runs out, and ``isExpired`` is `true` from then
+        /// on, so whoever called this reads it to tell this ending from a cancellation of their own.
+        /// When it finishes, whichever way, that is something that moved: the budget starts over.
+        package func bounding<T: Sendable>(
+            _ operation: @escaping @Sendable () async throws -> T
+        ) async throws -> T {
+            let task = Task { try await operation() }
+            let pending = Internals.TaskSeed { task.cancel() }
+
+            let expired = lock.withLock { () -> Bool in
+                _pending = pending
+                return _isExpired
+            }
+
+            if expired {
+                pending()
+            }
+
+            defer {
+                lock.withLock {
+                    _pending = nil
+                }
+
+                touch()
+            }
+
+            return try await withTaskCancellationHandler {
+                try await task.value
+            } onCancel: {
+                task.cancel()
+            }
+        }
+
         /// Starts counting, from now.
         package func start() {
             lock.withLock {
@@ -269,8 +307,9 @@ extension Internals {
         }
 
         private func expire() {
-            let seed = lock.withLock { _seed }
+            let (seed, pending) = lock.withLock { (_seed, _pending) }
             seed?()
+            pending?()
         }
     }
 }
