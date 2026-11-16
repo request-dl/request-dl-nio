@@ -124,7 +124,10 @@ struct ServerSentEventParser {
             }
         case "retry":
             if !value.isEmpty, value.allSatisfy({ (Self.zero...Self.nine).contains($0) }) {
-                pendingRetry = Int(String(decoding: value, as: UTF8.self))
+                // Digits only, so the one way this fails is a value too large for `Int`: the
+                // specification takes any such value as the reconnection time, and the largest
+                // one is the closest this can come to it.
+                pendingRetry = Int(String(decoding: value, as: UTF8.self)) ?? .max
             }
         default:
             break
@@ -149,9 +152,12 @@ struct ServerSentEventParser {
             return nil
         }
 
+        // An empty type buffer means the default type, as with no `event:` line at all.
+        let eventType = pendingEventType.flatMap { $0.isEmpty ? nil : $0 } ?? "message"
+
         return ServerSentEvent(
             id: lastEventId,
-            event: pendingEventType ?? "message",
+            event: eventType,
             data: pendingDataLines.joined(separator: "\n"),
             retry: pendingRetry
         )

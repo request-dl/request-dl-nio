@@ -60,12 +60,12 @@ extension Internals.TransactionMetrics {
             requestEnd: transaction.requestEndDate,
             responseStart: transaction.responseStartDate,
             responseEnd: transaction.responseEndDate,
-            requestHeaderBytesSent: Int(transaction.countOfRequestHeaderBytesSent),
-            requestBodyBytesSent: Int(transaction.countOfRequestBodyBytesSent),
-            requestBodyBytesBeforeEncoding: Int(transaction.countOfRequestBodyBytesBeforeEncoding),
-            responseHeaderBytesReceived: Int(transaction.countOfResponseHeaderBytesReceived),
-            responseBodyBytesReceived: Int(transaction.countOfResponseBodyBytesReceived),
-            responseBodyBytesAfterDecoding: Int(transaction.countOfResponseBodyBytesAfterDecoding),
+            requestHeaderBytesSent: Int(clamping: transaction.countOfRequestHeaderBytesSent),
+            requestBodyBytesSent: Int(clamping: transaction.countOfRequestBodyBytesSent),
+            requestBodyBytesBeforeEncoding: Int(clamping: transaction.countOfRequestBodyBytesBeforeEncoding),
+            responseHeaderBytesReceived: Int(clamping: transaction.countOfResponseHeaderBytesReceived),
+            responseBodyBytesReceived: Int(clamping: transaction.countOfResponseBodyBytesReceived),
+            responseBodyBytesAfterDecoding: Int(clamping: transaction.countOfResponseBodyBytesAfterDecoding),
             connection: connection
         )
     }

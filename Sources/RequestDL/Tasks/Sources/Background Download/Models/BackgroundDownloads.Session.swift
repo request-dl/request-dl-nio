@@ -292,6 +292,19 @@ extension BackgroundDownloads {
                 return
             }
 
+            // Every task on this session was scheduled by this type, so one whose description does
+            // not decode (a format from another version, or none at all) is one whose pins are
+            // unknown, not one that has none. It could not report anything either, since its
+            // events and its file are tied to that same description. Answering with the system's
+            // default handling would silently drop the pins, so the server-trust challenge is
+            // refused instead.
+            if challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
+                Self.decode(task.taskDescription) == nil
+            {
+                completionHandler(.cancelAuthenticationChallenge, nil)
+                return
+            }
+
             guard let descriptor = Self.decodeServerTrust(task.taskDescription) else {
                 completionHandler(.performDefaultHandling, nil)
                 return

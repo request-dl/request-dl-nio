@@ -37,7 +37,8 @@ extension Internals {
     /// (4.5 s for 2500, against 1 ms for the same names read directly), which the cache paid on
     /// the first lookup after a launch, and nothing here needs more than the names.
     ///
-    /// - Throws: ``DirectoryListingError`` if the directory cannot be opened.
+    /// - Throws: ``DirectoryListingError`` if the directory cannot be opened or a read of it fails.
+    /// A listing that would stop short is an error, never a shorter list.
     package static func directoryEntryNames(atPath path: String) async throws -> [String] {
         try await FileSystemManager.run { try readDirectoryEntryNames(atPath: path) }
     }
@@ -75,9 +76,35 @@ extension Internals {
 
         defer { closedir(directory) }
 
+        return try entryNames(of: directory, reading: readdir)
+    }
+
+    /// The names `next` hands back for `directory`, until it says there are no more.
+    ///
+    /// `readdir` returns `NULL` both at the end of the directory and on an error, and only `errno`
+    /// tells them apart: it is not touched at the end and set on an error. So it is cleared before
+    /// each call, and a `NULL` with it set is an error, not the end. Reading it as the end would
+    /// hand back a listing that stops short, as if the rest of the directory were not there.
+    ///
+    /// `next` is a parameter, and `Directory` is left open, so a test can make the read fail and
+    /// no platform's `DIR` type has to be spelled out.
+    package static func entryNames<Directory>(
+        of directory: Directory,
+        reading next: (Directory) -> UnsafeMutablePointer<dirent>?
+    ) throws -> [String] {
         var names: [String] = []
 
-        while let entry = readdir(directory) {
+        while true {
+            errno = 0
+
+            guard let entry = next(directory) else {
+                guard errno == 0 else {
+                    throw DirectoryListingError(code: errno)
+                }
+
+                return names
+            }
+
             let name = withUnsafePointer(to: &entry.pointee.d_name) { pointer in
                 pointer.withMemoryRebound(to: CChar.self, capacity: MemoryLayout.size(ofValue: pointer.pointee)) {
                     String(cString: $0)
@@ -88,8 +115,6 @@ extension Internals {
                 names.append(name)
             }
         }
-
-        return names
     }
 
     #else

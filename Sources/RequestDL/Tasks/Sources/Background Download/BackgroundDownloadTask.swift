@@ -55,9 +55,30 @@ import struct Foundation.URL
 /// - ``Session/disableRedirect()``, ``Session/enableRedirectFollow(max:allowCycles:)`` and
 ///   ``Session/redirectStrategy(_:)`` have no effect.
 ///
+/// ## Request body
+///
+/// The request body is not sent. A background download is handed to the system as a download
+/// task, which has no body to send, so whatever `content` declares as one (``Payload`` and the
+/// like) is dropped without an error or a warning. The rest of the request is built as usual,
+/// and that includes what a ``Payload`` sets on it besides the body: the method becomes `POST`
+/// when none was declared, and its `Content-Type` is sent. A request that needs a body, such as
+/// a `POST` that answers with the file, cannot be a background download: use ``DownloadTask``
+/// for it, in the foreground.
+///
+/// ## Client certificates
+///
 /// A client certificate (mTLS) works too, as long as both ``Certificate`` and ``PrivateKey`` come
 /// from a **file path**, not in-memory bytes. See ``BackgroundDownloadUnsupportedConfigurationError``
 /// for the specific cases that still aren't supported.
+///
+/// What is saved with the download is the path of each file, never the key's bytes, and the
+/// identity is rebuilt from those files every time the server asks for it, in a later launch
+/// too. A path that stops pointing at the file makes that fail, and the download then goes on
+/// without a client certificate, which a server that requires one refuses. Do not count on an
+/// absolute path inside the app's own container staying valid: the system may change it when
+/// the app is updated or restored, and the app bundle's path in particular is not stable. A
+/// download that is still running across such a change is the one at risk, so schedule it again
+/// afterwards if its certificate files are in the container.
 public struct BackgroundDownloadTask<Content: Property> {
 
     // MARK: - Private properties

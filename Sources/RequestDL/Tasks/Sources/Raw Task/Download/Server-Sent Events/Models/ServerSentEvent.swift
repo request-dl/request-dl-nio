@@ -19,7 +19,7 @@ public struct ServerSentEvent: Sendable, Hashable {
     /// mirroring the "last event ID" behavior of the specification.
     public let id: String?
 
-    /// The event's `event:` field, defaulting to `"message"` when the stream omits it.
+    /// The event's `event:` field, defaulting to `"message"` when the stream omits it or leaves it empty.
     public let event: String
 
     /// The event's payload, formed by joining every `data:` line in the frame with `"\n"`.

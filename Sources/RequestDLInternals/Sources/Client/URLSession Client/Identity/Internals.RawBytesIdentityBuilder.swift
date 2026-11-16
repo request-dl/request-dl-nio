@@ -754,14 +754,26 @@ private struct DERReader {
             guard lengthByteCount > 0, lengthByteCount <= 4, offset + lengthByteCount <= bytes.count else {
                 throw MalformedDERError()
             }
-            length = 0
+
+            // Accumulated in `UInt64`: four bytes can reach `0xFFFF_FFFF`, which `Int` cannot hold
+            // where it is 32 bits (watchOS arm64_32), and shifting into the sign bit would turn
+            // a malformed length into a negative one that slips past the bounds check below.
+            var wideLength: UInt64 = 0
             for _ in 0..<lengthByteCount {
-                length = (length << 8) | Int(bytes[offset])
+                wideLength = (wideLength << 8) | UInt64(bytes[offset])
                 offset += 1
             }
+
+            // Not clamped: a length that does not fit is a malformed envelope, and clamping it
+            // would only hide that behind a confusing failure further down.
+            guard let exactLength = Int(exactly: wideLength) else {
+                throw MalformedDERError()
+            }
+            length = exactLength
         }
 
-        guard offset + length <= bytes.count else { throw MalformedDERError() }
+        // Compared by subtraction: `offset + length` could overflow a 32-bit `Int`.
+        guard length <= bytes.count - offset else { throw MalformedDERError() }
         defer { offset += length }
         return Array(bytes[offset..<(offset + length)])
     }
