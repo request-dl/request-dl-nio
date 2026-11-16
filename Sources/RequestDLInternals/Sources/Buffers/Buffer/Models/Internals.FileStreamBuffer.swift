@@ -184,13 +184,18 @@ extension Internals {
                 var data = Data()
                 var read = 0
 
-                while read < Int(length) {
+                // Clamped: this is "up to", and the loop ends at EOF. `Int` is 32 bits on watchOS
+                // arm64_32, where a `UInt64` past 2 GiB would trap. The request below is derived
+                // from this same value, so the two never disagree about how much is wanted.
+                let wanted = Int(clamping: length)
+
+                while read < wanted {
                     // Same reasoning as `writeData`: checked per retry, not only on entry.
                     try Task.checkCancellation()
 
                     let chunk = try await readHandle.readChunk(
                         fromAbsoluteOffset: Int64(_offset) + Int64(read),
-                        length: .bytes(Int64(length) - Int64(read))
+                        length: .bytes(Int64(wanted - read))
                     )
 
                     guard chunk.readableBytes > .zero else {

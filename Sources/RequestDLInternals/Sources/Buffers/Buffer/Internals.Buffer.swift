@@ -204,7 +204,16 @@ extension Internals {
             /// Failure is silent by design, matching every other operation here, so a caller
             /// that needs to know detects it by the offset not having moved.
             package func write<Bytes: DataProtocol & Sendable>(at index: UInt64, data: Bytes) async -> UInt64 {
-                await lock.withLock { () async -> UInt64 in
+                // Refused before anything is written. A write that ends past `Int.max` (2 GiB on
+                // watchOS arm64_32) would land in the resource, and the `Int` cursor that has to
+                // account for it, and `_writtenBytesFloor`, could not hold where it ended: the
+                // conversion traps, or a clamp leaves the cursor behind the data. Failing here is
+                // what every other failed write does, and leaves both where they were.
+                guard Internals.BufferBounds.end(ofWritingAt: index, count: data.count, as: Int.self) != nil else {
+                    return index
+                }
+
+                return await lock.withLock { () async -> UInt64 in
                     await _createResourceIfNeeded()
 
                     do {
@@ -214,7 +223,9 @@ extension Internals {
                         try await stream.writeData(data)
 
                         let offset = try await stream.offset
-                        _writtenBytesFloor = Swift.max(_writtenBytesFloor, Int(offset))
+                        // Never saturates here, since the check above bounds `offset` by `Int.max`.
+                        // The clamp is for a stream that reports an offset it was not asked to reach.
+                        _writtenBytesFloor = Swift.max(_writtenBytesFloor, Int(clamping: offset))
                         return offset
                     } catch {
                         return index

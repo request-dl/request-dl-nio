@@ -127,9 +127,13 @@ extension Internals {
 
                     var data = Data()
 
-                    while data.count < requested {
+                    // Clamped: this is "up to", and the loop ends at EOF. `Int` is 32 bits on watchOS
+                    // arm64_32, where an `Int64` past 2 GiB would trap.
+                    let wanted = Int(clamping: requested)
+
+                    while data.count < wanted {
                         guard
-                            let next = try fileHandle.read(upToCount: Int(requested) - data.count),
+                            let next = try fileHandle.read(upToCount: wanted - data.count),
                             !next.isEmpty
                         else {
                             break
