@@ -39,11 +39,10 @@ extension Internals {
         // MARK: - Private static properties
 
         /// Flags a `client(provider:sessionConfiguration:)` or `cleanupIfNeeded()` that is still
-        /// running after 45s. Set higher than the other `AsyncLock`s in `Internals`:
-        /// `cleanupIfNeeded()` shares this lock and can shut down several expired clients in one
-        /// sweep, each a real network drain. They run concurrently, so the sweep costs the longest
-        /// of them rather than their sum, but a wide margin is still needed to avoid flagging a
-        /// legitimately busy one. Development builds only. See `AsyncLock.Watchdog`.
+        /// running after 45s. Set higher than the other `AsyncLock`s in `Internals`: a client
+        /// resolution can build an HTTP client, read a TLS identity off disk and, for mTLS, make
+        /// synchronous Keychain calls, so a wide margin is needed to avoid flagging a legitimately
+        /// busy one. Development builds only. See `AsyncLock.Watchdog`.
         #if DEBUG
         private static let watchdog: AsyncLock.Watchdog? = .init(seconds: 45) {
             Internals.assertionFailure($0)
@@ -209,38 +208,26 @@ extension Internals {
         }
         #endif
 
-        /// Whether dropping the last reference to `client` retires it on its own.
+        /// Un-pools every client that has been idle for longer than `lifetime`.
         ///
-        /// `.nio` does: `Internals.Client.deinit` shuts its `HTTPClient` down. `.urlSession` does
-        /// not: `URLSession` retains its delegate, so the client is never released and has to be
-        /// invalidated explicitly. See `_evictIfNeeded(protecting:)` for what that difference
-        /// decides.
-        static func retiresOnRelease(_ client: Internals.ClientManager.Client) -> Bool {
-            switch client {
-            #if canImport(NIOCore)
-            case .nio:
-                return true
-            #endif
-            #if canImport(Darwin)
-            case .urlSession:
-                return false
-            #endif
-            }
-        }
-
-        /// Retires every client that has been idle for longer than `lifetime`.
-        ///
-        /// Decides first, shuts down after, so the `lock` every client resolution in the process
-        /// also has to take is not held across one `await` per expired client. Otherwise a sweep
-        /// over a large backlog would stall every request that needs a client for the sum of every
-        /// drain rather than the longest one.
+        /// Only un-pools, for both backends: a client retires itself once the last reference to it
+        /// goes (`Internals.Client.deinit`, `Internals.URLSessionClient.deinit`), including one a
+        /// caller was handed just before this sweep ran and has not started using yet. `isRunning`
+        /// only flips once `execute()` registers an operation, *after* it clears
+        /// `throttledExecutor.acquire()`, so a client stuck on that wait, or one that has not been
+        /// asked anything yet, still reads as idle here. Shutting it down explicitly from here
+        /// would close it out from under that caller instead of merely un-pooling it, which is the
+        /// same hazard `_evictIfNeeded(protecting:)`'s doc comment describes for the ceiling path.
         private func cleanupIfNeeded() async {
             await lock.withLock {
                 let now = Self.monotonicNow()
 
-                var expired = [(key: String, item: Item)]()
+                // Dropped off `tableLock`, below: a client that nobody else holds retires itself
+                // when its last reference goes, which can mean a Keychain delete for one with a
+                // client identity, and that does not belong under a mutex every lookup also takes.
+                let expired = tableLock.withLock { () -> [Item] in
+                    var expired = [Item]()
 
-                tableLock.withLock {
                     for (key, items) in _table {
                         var surviving = [Item]()
 
@@ -255,16 +242,17 @@ extension Internals {
                             // revalidation's `HEAD` followed by the real `GET`), so this client was
                             // active more recently than `readAt` alone suggests, even though
                             // `isRunning` just read `false` above. Refreshing `readAt` here stops a
-                            // caller mid-way through such a sequence from having its client retired
-                            // in the gap between the two calls. See
-                            // `Internals.ClientOperationQueue.generation`'s own doc comment.
+                            // caller mid-way through such a sequence from having its client un-pooled
+                            // in the gap between the two calls, and so from losing the reuse it
+                            // expects. See `Internals.ClientOperationQueue.generation`'s own doc
+                            // comment.
                             if item.client.operationGeneration != item.lastKnownOperationGeneration {
                                 surviving.append(item.updatingReadAt())
                                 continue
                             }
 
                             if isExpired(item, at: now) {
-                                expired.append((key, item))
+                                expired.append(item)
                             } else {
                                 surviving.append(item)
                             }
@@ -272,77 +260,11 @@ extension Internals {
 
                         _table[key] = surviving.isEmpty ? nil : surviving
                     }
+
+                    return expired
                 }
 
-                guard !expired.isEmpty else {
-                    return
-                }
-
-                // A `.nio` client that's merely un-cached above (removed from `surviving`) still
-                // shuts itself down once the last reference to it goes, including one a caller was
-                // handed just before this sweep ran and has not started using yet: `isRunning` only
-                // flips once `execute()` registers an operation, *after* it clears
-                // `throttledExecutor.acquire()`, so a client stuck on that wait still reads as idle
-                // here. Calling `shutdown()` on it directly, the way `.urlSession` needs (its
-                // session is retained by the OS and never torn down on its own), would close it out
-                // from under that caller instead of merely un-pooling it. This is the same hazard
-                // `_evictIfNeeded(protecting:)`'s doc comment describes for the ceiling path.
-                let needsExplicitShutdown = expired.filter { !Self.retiresOnRelease($0.item.client) }
-
-                guard !needsExplicitShutdown.isEmpty else {
-                    return
-                }
-
-                let failed = await withTaskGroup(of: (String, Item)?.self) { group in
-                    for (key, item) in needsExplicitShutdown {
-                        group.addTask {
-                            (try? await item.client.shutdown()) == true ? nil : (key, item)
-                        }
-                    }
-
-                    var failed = [(String, Item)]()
-
-                    for await result in group {
-                        if let result {
-                            failed.append(result)
-                        }
-                    }
-
-                    return failed
-                }
-
-                // A client that refused to shut down is put back rather than dropped: it still
-                // owns live resources, so losing the only reference to it would leak them. The
-                // next sweep tries again.
-                guard !failed.isEmpty else {
-                    return
-                }
-
-                tableLock.withLock {
-                    for (key, item) in failed {
-                        _table[key, default: []].append(item)
-                    }
-                }
-            }
-        }
-
-        /// Shuts `clients` down off `tableLock` and off the caller's own path.
-        ///
-        /// An eviction is bookkeeping the caller didn't ask for (it is in the middle of handing out
-        /// a brand-new client), so it shouldn't wait on a drain, and `tableLock` is a plain mutex
-        /// that must never be held across one. Concurrent within the detached task, for the same
-        /// reason `cleanupIfNeeded()`'s own shutdowns are.
-        static func shutdownDetached(_ clients: [Internals.ClientManager.Client]) {
-            guard !clients.isEmpty else {
-                return
-            }
-
-            _Concurrency.Task.detached(priority: .utility) {
-                await withTaskGroup(of: Void.self) { group in
-                    for client in clients {
-                        group.addTask { _ = try? await client.shutdown() }
-                    }
-                }
+                withExtendedLifetime(expired) {}
             }
         }
 
@@ -398,9 +320,7 @@ extension Internals {
         ///
         /// Brings `_table` back under ``maximumCount``, oldest first, dropping to three quarters
         /// of it in one pass so a table sitting exactly at the ceiling doesn't evict on every
-        /// single insert that follows. Same shape as `Internals.Storage._evictIfNeeded()`, except
-        /// that what is evicted here owns a connection pool, so it has to be shut down rather
-        /// than merely forgotten.
+        /// single insert that follows. Same shape as `Internals.Storage._evictIfNeeded()`.
         ///
         /// The ceiling never gates service. Only clients with nothing in flight are candidates,
         /// and a caller is never made to wait for one to free up or turned away because there is
@@ -409,27 +329,22 @@ extension Internals {
         /// Delaying a request, or tearing connections down out from under live ones, would trade a
         /// caller's latency for a bookkeeping limit, which is the wrong way round.
         ///
-        /// Evicting a `.nio` client is only ever *un-caching*, never shutting down.
-        /// `Internals.Client.deinit` retires it once the last reference goes, so a caller that was
-        /// handed one and has not started its request yet (where `isRunning` is still `false`)
-        /// keeps it alive by holding it. Shutting it down here would race that gap and fail with
-        /// `HTTPClientError.alreadyShutdown`.
-        ///
-        /// `.urlSession` has no such fallback (`URLSession` retains its delegate, so the client
-        /// is never released on its own) and so has to be invalidated explicitly. That cannot be
-        /// made race free the same way, so an entry is only evicted *with* a shutdown once it is
-        /// already past `lifetime`, i.e. only when the periodic sweep would have retired it
-        /// anyway. The ceiling brings that forward; it never retires anything the sweep wouldn't.
+        /// Evicting is only ever *un-caching*, never shutting down, for both backends. A client
+        /// retires itself once the last reference goes (`Internals.Client.deinit`,
+        /// `Internals.URLSessionClient.deinit`), so a caller that was handed one and has not
+        /// started its request yet (where `isRunning` is still `false`) keeps it alive by holding
+        /// it. Shutting it down here would race that gap: `HTTPClientError.alreadyShutdown` for
+        /// `.nio`, a task created on an invalidated session for `.urlSession`.
         ///
         /// - Parameter protecting: The client the caller is in the middle of handing out. It is
         /// idle by definition (nothing has been asked of it yet) and its entry is the newest in
         /// the table, so without this it is the *first* thing an at-capacity insert evicts, and
-        /// since the table is also what owns a client's lifetime, evicting it would shut down the
-        /// very client being returned.
+        /// the table is what lets the next caller with the same configuration find it.
         ///
-        /// - Returns: The evicted clients that need an explicit shutdown, which the caller must
-        ///   hand to ``shutdownDetached(_:)``. Returning them rather than shutting them down here
-        ///   is what keeps a network drain off ``tableLock``.
+        /// - Returns: The clients that were un-pooled, so the caller can let go of them *after*
+        ///   releasing ``tableLock``: one that nobody else holds retires itself the moment its last
+        ///   reference goes, and that can mean a Keychain delete for a client identity.
+        @discardableResult
         func _evictIfNeeded(
             protecting protectedClient: Internals.ClientManager.Client? = nil
         ) -> [Internals.ClientManager.Client] {
@@ -441,7 +356,6 @@ extension Internals {
 
             let target = max(maximumCount - (maximumCount / 4), 1)
             let protectedIdentifier = protectedClient?.objectIdentifier
-            let now = Self.monotonicNow()
 
             let evictable =
                 _table
@@ -449,26 +363,7 @@ extension Internals {
                     items.enumerated().map { (key: key, offset: $0.offset, item: $0.element) }
                 }
                 .filter {
-                    guard
-                        !$0.item.client.isRunning,
-                        $0.item.client.objectIdentifier != protectedIdentifier
-                    else {
-                        return false
-                    }
-
-                    if Self.retiresOnRelease($0.item.client) {
-                        return true
-                    }
-
-                    // A client that doesn't retire on release (`.urlSession`) is only evictable
-                    // once it is both past `lifetime` *and* hasn't completed an operation since
-                    // this item was last touched. Without the second half, a caller mid-way through
-                    // two sequential calls on the same resolved client (e.g. cache revalidation's
-                    // `HEAD` followed by the real `GET`) could have it invalidated in the gap
-                    // between the two. See `Internals.ClientOperationQueue.generation`'s own doc
-                    // comment.
-                    return isExpired($0.item, at: now)
-                        && $0.item.client.operationGeneration == $0.item.lastKnownOperationGeneration
+                    !$0.item.client.isRunning && $0.item.client.objectIdentifier != protectedIdentifier
                 }
                 .sorted { $0.item.readAt < $1.item.readAt }
                 .prefix(count - target)
@@ -492,9 +387,7 @@ extension Internals {
                 _table[key] = items.isEmpty ? nil : items
             }
 
-            // Only what cannot retire itself. Handing a `.nio` client here would reintroduce
-            // exactly the race this method's doc describes.
-            return evictable.map(\.item.client).filter { !Self.retiresOnRelease($0) }
+            return evictable.map(\.item.client)
         }
 
         #if canImport(Darwin)
@@ -528,13 +421,19 @@ extension Internals {
                 )
             }
 
-            // Still pooled even when `!sessionConfiguration.isPoolable`, same as the `.nio` side:
-            // this table is what owns a client's lifetime, not merely a reuse cache. Doubly so
-            // here, since an `Internals.URLSessionClient` has no `deinit` fallback to shut itself
-            // down (`URLSession` retains its delegate, so the client is never released on its own),
-            // which makes this table the only thing that invalidates it. An entry nobody can reuse
-            // is still worth keeping for the sweep to find; `_evictIfNeeded` keeps that from
-            // growing without bound.
+            // A configuration that can never be pooled (`isPoolable == false`) is not tracked,
+            // same as the `.nio` side: nothing could ever be handed this entry again, so it would
+            // only sit in the table, with its whole `URLSession`, until the sweep or the
+            // `maximumCount` ceiling got to it. The caller owns that client instead, and
+            // `Internals.URLSessionClient` is what keeps it alive for as long as a request is
+            // using it and invalidates its session in `deinit` once nothing is, whether the
+            // request completed, failed or was cancelled, or never got as far as being sent.
+            guard sessionConfiguration.isPoolable else {
+                return client
+            }
+
+            // Pooled clients are also owned by the table, which is what keeps one alive between
+            // requests.
             let evicted = tableLock.withLock {
                 var items = _table[id] ?? []
 
@@ -550,7 +449,7 @@ extension Internals {
                 return _evictIfNeeded(protecting: .urlSession(client))
             }
 
-            Self.shutdownDetached(evicted)
+            withExtendedLifetime(evicted) {}
 
             return client
         }

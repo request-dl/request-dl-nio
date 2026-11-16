@@ -631,7 +631,7 @@ struct InternalsClientManagerTests {
 /// A request sent here stays genuinely in flight (`Internals.Client.isRunning` stays `true`)
 /// for as long as the test needs, instead of racing it to completion the way a request to a
 /// real or an unreachable endpoint would.
-private func withHangingTCPServer<Result>(
+func withHangingTCPServer<Result>(
     _ body: (Int) async throws -> Result
 ) async throws -> Result {
     let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)

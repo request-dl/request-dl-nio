@@ -26,13 +26,13 @@ extension Internals {
         }
 
         /// Bumped every time an operation finishes. Purely a counter, with no notion of a clock of
-        /// its own on purpose: `Internals.ClientManager`'s idle-cleanup sweep and ceiling eviction
-        /// need to tell "genuinely idle" apart from "nothing in flight *right now*, but an
+        /// its own on purpose: `Internals.ClientManager`'s idle-cleanup sweep needs to tell
+        /// "genuinely idle" apart from "nothing in flight *right now*, but an
         /// operation completed a moment ago" (e.g. between two sequential calls on the same
         /// resolved client, such as `Internals.CacheControl`'s conditional-revalidation `HEAD`
         /// followed by the real `GET`). `isRunning` alone reads `false` for the whole gap between
-        /// the two, which is the window a sweep or an at-capacity insert could otherwise retire
-        /// this client in, out from under a caller who intends to use it again. Comparing this
+        /// the two, which is the window a sweep could otherwise un-pool this client in, so that
+        /// a caller who intends to use it again no longer finds it there. Comparing this
         /// against the value `Internals.ClientManager` last recorded lets it recognize "active
         /// since I last looked" without this type having to know what a monotonic clock is.
         package var generation: UInt64 {

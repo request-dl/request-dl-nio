@@ -28,7 +28,7 @@ extension Internals.ClientManager {
         #endif
 
         /// `client.operationGeneration` as of `readAt`. Compared back against the client's
-        /// *current* generation by the idle-cleanup sweep and ceiling eviction: a mismatch means an
+        /// *current* generation by the idle-cleanup sweep: a mismatch means an
         /// operation has completed since this item was last touched (e.g. between two sequential
         /// calls on the same resolved client), so the client was active more recently than `readAt`
         /// alone suggests, even though nothing is running on it at this instant. See

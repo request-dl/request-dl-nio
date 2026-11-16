@@ -32,8 +32,8 @@ extension Internals {
         }
 
         /// Mirrors `Internals.ClientOperationQueue.generation`, read by
-        /// `Internals.ClientManager`'s idle-cleanup sweep and ceiling eviction alongside
-        /// `isRunning`, see that property's own doc comment.
+        /// `Internals.ClientManager`'s idle-cleanup sweep alongside `isRunning`, see that
+        /// property's own doc comment.
         package var operationGeneration: UInt64 {
             operationQueue.generation
         }
@@ -104,13 +104,17 @@ extension Internals {
             configuration.httpShouldSetCookies = false
             configuration.httpCookieStorage = nil
 
+            // Before the session exists: this can throw, and a client whose `init` throws never
+            // gets as far as `deinit`, so a session created first would be left running for ever.
+            let identityPolicy = try secureConnection.map(Internals.URLSessionIdentityPolicy.init)
+
             session = URLSession(configuration: configuration)
             throttledExecutor = Internals.ThrottledExecutor(
                 maximumConcurrentConnections: maximumConcurrentConnections
             )
             self.redirectConfiguration = redirectConfiguration
             self.proxyAuthorization = proxy?.authorization
-            self.identityPolicy = try secureConnection.map(Internals.URLSessionIdentityPolicy.init)
+            self.identityPolicy = identityPolicy
         }
 
         // MARK: - Internal methods
@@ -169,12 +173,11 @@ extension Internals {
         ) async throws -> (head: Internals.ResponseHead, body: Data) {
             // Registered before the throttle wait below, not after: `Internals.ClientManager`'s
             // idle-cleanup sweep and its ceiling eviction path both treat `isRunning == false` as
-            // "safe to shut down," and this client has no ARC-based fallback the way `.nio`'s
-            // pooled entry does (its `shutdown()` invalidates the live `URLSession` outright). A
-            // caller queued behind `throttledExecutor.acquire()` for longer than the pool's
-            // lifetime must still count as busy, or the sweep can invalidate the session out from
-            // under it the moment it's finally let through.
-            let operation = operationQueue.operation()
+            // "idle," which decides whether the entry can be un-pooled and, with it, whether a
+            // later lookup can still reuse this client. A caller queued behind
+            // `throttledExecutor.acquire()` for longer than the pool's lifetime must still count
+            // as busy, or the entry can be dropped from under it while it waits.
+            let operation = try beginOperation()
             defer { operation.complete() }
 
             // Waited on before anything else, mirroring `Internals.Client.execute`: a session
@@ -253,7 +256,7 @@ extension Internals {
             // See the equivalent comment in `execute(request:delegate:)`: registered before the
             // throttle wait so this client counts as busy for as long as a caller is queued on
             // it, not just once it starts sending.
-            let operation = operationQueue.operation()
+            let operation = try beginOperation()
             defer { operation.complete() }
 
             let release = await throttledExecutor.acquire()
@@ -344,7 +347,7 @@ extension Internals {
             // See the equivalent comment in `execute(request:delegate:)`: registered before the
             // throttle wait so this client counts as busy for as long as a caller is queued on
             // it, not just once it starts sending.
-            let operation = operationQueue.operation()
+            let operation = try beginOperation()
             let release = await throttledExecutor.acquire()
 
             // See the equivalent comment in `execute(request:delegate:)`: a cancelled caller
@@ -557,7 +560,7 @@ extension Internals {
             // See the equivalent comment in `execute(request:delegate:)`: registered before the
             // throttle wait so this client counts as busy for as long as a caller is queued on
             // it, not just once it starts sending.
-            let operation = operationQueue.operation()
+            let operation = try beginOperation()
             let release = await throttledExecutor.acquire()
 
             // See the equivalent comment in `execute(request:delegate:)`: a cancelled caller must
@@ -726,6 +729,12 @@ extension Internals {
                 if case .file(let bufferURL) = uploadBody {
                     await bufferURL.removeIfTemporary()
                 }
+
+                // Held for as long as the exchange runs, not only for the call that started it: it
+                // is the one thing keeping this client's session valid for a download that
+                // reconnects onto a new exchange, and a client nothing else refers to invalidates
+                // its session when it goes (see `deinit`).
+                withExtendedLifetime(self) {}
             }
 
             let response = Internals.AsyncResponse(
@@ -1130,19 +1139,25 @@ extension Internals {
             return fileURL
         }
 
-        /// Invalidates the underlying `URLSession`. Mirrors `Internals.Client.shutdown()`, read
-        /// by `Internals.ClientManager`'s idle-cleanup sweep. Idempotent and a no-op while a
-        /// request is still in flight, same guard as the NIO counterpart.
+        /// Invalidates the underlying `URLSession`, immediately. Mirrors
+        /// `Internals.Client.shutdown()`. Idempotent and a no-op while a request is still in
+        /// flight, same guard as the NIO counterpart.
+        ///
+        /// `Internals.ClientManager` no longer calls this: a client it stops tracking retires
+        /// itself in `deinit`, once nothing refers to it, which cannot close it out from under a
+        /// caller that was handed it and has not started its request yet. It is for whoever owns a
+        /// client outright and wants it gone now.
+        ///
+        /// Whether the client is idle and closing it are decided under one lock, the same one
+        /// `beginOperation()` takes: a request either registered first, and this finds the client
+        /// busy, or finds the client closed and throws, instead of creating a task on a session
+        /// that is about to be, or already is, invalidated.
         ///
         /// - Returns: `true` if this call actually invalidated the session, `false` if it was
         /// already closed or is still busy.
         package func shutdown() async throws -> Bool {
-            guard !isRunning else {
-                return false
-            }
-
             let shouldShutdown = lock.withLock { () -> Bool in
-                guard !_isClosed else {
+                guard !_isClosed, !operationQueue.isRunning else {
                     return false
                 }
 
@@ -1154,10 +1169,42 @@ extension Internals {
                 return false
             }
 
-            // No outstanding tasks per the `isRunning` guard above, so there is nothing to drain.
-            // Unlike `HTTPClient.shutdown()`, invalidation here is immediate, not awaited.
+            // No outstanding tasks per the check above, and none can start since: nothing to
+            // drain. Unlike `HTTPClient.shutdown()`, invalidation here is immediate, not awaited.
             session.invalidateAndCancel()
             return true
+        }
+
+        /// Registers a request on this client, unless it has already been shut down.
+        ///
+        /// Taken before anything else a request does, and under the same lock `shutdown()` decides
+        /// under, so "is this client closed" and "this client is now busy" cannot disagree.
+        /// Creating a `URLSessionTask` on an invalidated session raises an Objective-C exception
+        /// (`NSGenericException`), which Swift cannot catch and which ends the process.
+        private func beginOperation() throws -> Internals.ClientOperation {
+            try lock.withLock {
+                guard !_isClosed else {
+                    throw ClientClosedError()
+                }
+
+                return operationQueue.operation()
+            }
+        }
+
+        deinit {
+            // The client owns its session, and nothing else invalidates one that is never told to:
+            // an `URLSession` stays alive for as long as it hasn't been. `Internals.ClientManager`
+            // relies on this to retire a client simply by letting go of it (an unpooled one, an
+            // evicted one, an expired one), the same way `Internals.Client.deinit` does for `.nio`.
+            //
+            // `finishTasksAndInvalidate()`, not `invalidateAndCancel()`: a response that is still
+            // arriving when the last reference goes (see the one `executeSessionTask` holds for as
+            // long as its exchange runs) is not this client's to cut short.
+            guard !_isClosed else {
+                return
+            }
+
+            session.finishTasksAndInvalidate()
         }
     }
 }
@@ -1175,6 +1222,11 @@ extension Internals.URLSessionClient {
     /// Should be unreachable given `URLSession`'s own contract (every task either fails or
     /// eventually receives a response), kept as a named error rather than force-unwrapping.
     package struct MissingURLResponseError: Error, Sendable {}
+
+    /// A request was made on a client that had already been shut down. Raised instead of creating a
+    /// task on its invalidated session, which `URLSession` answers with an uncatchable
+    /// `NSGenericException`.
+    package struct ClientClosedError: Error, Sendable {}
 
     /// The proxy rejected the configured `Internals.Proxy.Authorization` credentials. Mirrors
     /// `HTTPClientError.proxyAuthenticationRequired` from the NIO executor.

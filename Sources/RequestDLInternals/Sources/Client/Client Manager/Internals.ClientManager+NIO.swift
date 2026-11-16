@@ -144,7 +144,8 @@ extension Internals.ClientManager {
             return _evictIfNeeded(protecting: .nio(client))
         }
 
-        Internals.ClientManager.shutdownDetached(evicted)
+        // Dropped off `tableLock`, see `_evictIfNeeded(protecting:)`.
+        withExtendedLifetime(evicted) {}
 
         return client
     }
