@@ -35,7 +35,7 @@ extension URLRequest {
     ///   doesn't parse. Keeping the request's own URL instead would follow the `Location` the
     ///   server sent, a destination the strategy had just decided against. The error
     ///   ``Internals/HeaderValidation/validate(_:)`` throws if one of the decision's headers is not a
-    ///   valid HTTP header.
+    ///   valid HTTP header, and ``Internals/MethodValidation/validate(_:)`` if its method is not a token.
     func applyingRedirectDecision(_ redirectRequest: Internals.RedirectRequest) throws -> URLRequest {
         var request = self
 
@@ -46,6 +46,9 @@ extension URLRequest {
         // The NIO executor validates the headers of every request it sends, a redirect's
         // included, and these come from a strategy: no more trusted than the caller's own.
         try Internals.HeaderValidation.validate(redirectRequest.headers)
+
+        // The method is written on the request line as it is, and it too comes from a strategy.
+        try Internals.MethodValidation.validate(redirectRequest.method)
 
         request.url = url
 

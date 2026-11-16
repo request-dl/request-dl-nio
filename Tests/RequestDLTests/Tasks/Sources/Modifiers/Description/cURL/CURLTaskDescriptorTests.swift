@@ -87,7 +87,7 @@ struct CURLTaskDescriptorTests {
         .description(.cURL)
 
         // Then: one `-F` per field, not a flattened blob.
-        #expect(command.contains(#"-F 'name=John Doe'"#))
+        #expect(command.contains(#"--form-string 'name=John Doe'"#))
         #expect(command.contains("-F 'avatar=@avatar.png;type=image/png'"))
 
         // The multipart body's own `Content-Type` (with its now-irrelevant boundary) must not
@@ -181,5 +181,95 @@ struct CURLTaskDescriptorTests {
         // Then
         #expect(downloadCommand.contains("'https://example.com'"))
         #expect(uploadCommand.contains("'https://example.com'"))
+    }
+
+    // MARK: - Method
+
+    private func describe(method: String) async throws -> String {
+        var configuration = RequestConfiguration()
+        configuration.baseURL = "https://example.com"
+        configuration.method = method
+
+        return try await CURLTaskDescriptor().describe(
+            TaskDescriptorContext(requestConfiguration: configuration, formFields: [])
+        )
+    }
+
+    /// `-X` takes the method as the shell reads it: one with a space, a `;` or a newline in it is
+    /// another argument, another command, or two lines, and was written as it was.
+    @Test(arguments: [
+        ("GET / HTTP/1.1\r\nX: y\r\n\r\nPOST", #"-X $'\x47\x45\x54"#),
+        ("GET; touch /tmp/x", "-X 'GET; touch /tmp/x'"),
+        ("GET $(id)", "-X 'GET $(id)'"),
+        ("GE'T", #"-X $'\x47\x45\x27\x54'"#),
+        ("", "-X ''"),
+    ])
+    func methodThatIsNotAPlainWordIsQuoted(_ method: String, _ expected: String) async throws {
+        let command = try await describe(method: method)
+
+        #expect(command.contains(expected))
+        #expect(!command.contains("\r"))
+        #expect(!command.contains("HTTP/1.1"))
+        #expect(command.split(separator: "\n", omittingEmptySubsequences: false).count == 3)
+    }
+
+    @Test(arguments: ["GET", "POST", "PATCH", "M-SEARCH", "X_CUSTOM"])
+    func plainMethodStaysBare(_ method: String) async throws {
+        let command = try await describe(method: method)
+
+        #expect(command.contains("-X \(method) \\\n"))
+    }
+
+    // MARK: - Form fields
+
+    /// `-F 'name=@path'` reads a file and `-F 'name=<path'` its content, and `;type=` is a
+    /// parameter: a text field that starts with `@` or `<`, or has one, was a different field once
+    /// the description was pasted.
+    @Test(arguments: [
+        "@/etc/passwd",
+        "<secret.txt",
+        "x;type=text/html",
+        "plain",
+    ])
+    func textFormFieldIsWrittenAsFormString(_ value: String) async throws {
+        var configuration = RequestConfiguration()
+        configuration.baseURL = "https://example.com"
+
+        let field = FormFieldDescriptor(
+            name: "note",
+            filename: nil,
+            contentType: "text/plain",
+            content: Data(value.utf8)
+        )
+
+        let command = try await CURLTaskDescriptor().describe(
+            TaskDescriptorContext(requestConfiguration: configuration, formFields: [field])
+        )
+
+        #expect(command.contains("--form-string " + curlShellQuote("note=\(value)")))
+        #expect(!command.contains("-F "))
+    }
+
+    @Test
+    func formFieldDescriptionRoundTripsAsTextThroughCURLCommandParser() async throws {
+        let command = try await DataTask {
+            BaseURL("example.com")
+            Form(name: "note", verbatim: "@/etc/passwd")
+        }
+        .description(.cURL)
+
+        // `allowing: []`: nothing here reads a file.
+        let parsed = try await CURLCommandParser.parseCommand(command, allowing: []).requestConfiguration
+        let body = try #require(parsed.body)
+        var data = Data()
+
+        for try await chunk in body {
+            data.append(chunk)
+        }
+
+        let text = String(decoding: data, as: UTF8.self)
+
+        #expect(text.contains("@/etc/passwd"))
+        #expect(!text.contains("filename="))
     }
 }

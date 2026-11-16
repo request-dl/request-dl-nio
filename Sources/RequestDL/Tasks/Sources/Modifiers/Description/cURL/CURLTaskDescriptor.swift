@@ -55,7 +55,7 @@ public struct CURLTaskDescriptor: TaskDescriptor {
         var fragments = ["curl"]
 
         if let method = configuration.method {
-            fragments.append("-X \(method)")
+            fragments.append("-X \(methodFragment(method))")
         }
 
         fragments.append(curlShellQuote(configuration.url))
@@ -96,7 +96,11 @@ public struct CURLTaskDescriptor: TaskDescriptor {
 
         if hasFormFields {
             for field in context.formFields {
-                fragments.append("-F " + curlShellQuote(formFragmentBytes(field)))
+                // `--form-string` for a text field: `-F 'name=@x'` reads a file, `-F 'name=<x'` the
+                // content of one, and `;type=` is a parameter, so a text value that starts with
+                // `@` or `<` or has one was another field once pasted. A file is the one thing `-F` is for.
+                let flag = field.filename == nil ? "--form-string " : "-F "
+                fragments.append(flag + curlShellQuote(formFragmentBytes(field)))
             }
         } else if let body = configuration.body {
             var data = Data()
@@ -113,6 +117,22 @@ public struct CURLTaskDescriptor: TaskDescriptor {
     }
 
     // MARK: - Private methods
+
+    /// `method` as the shell must read it: bare when it is made of letters, digits, `-` and `_` (the
+    /// usual `POST`), quoted otherwise. A method is whatever `-X` of a parsed command, or a caller,
+    /// put there: a space or a `;` in it would end the argument, and a newline would end the command.
+    private func methodFragment(_ method: String) -> String {
+        let isPlain =
+            !method.isEmpty
+            && method.utf8.allSatisfy {
+                ($0 >= UInt8(ascii: "a") && $0 <= UInt8(ascii: "z"))
+                    || ($0 >= UInt8(ascii: "A") && $0 <= UInt8(ascii: "Z"))
+                    || ($0 >= UInt8(ascii: "0") && $0 <= UInt8(ascii: "9"))
+                    || $0 == UInt8(ascii: "-") || $0 == UInt8(ascii: "_")
+            }
+
+        return isPlain ? method : curlShellQuote(method)
+    }
 
     /// - Note: The original source path isn't recoverable once a field has already gone through
     /// its `PayloadFactory`: `filename` here is the name curl would show a server, not

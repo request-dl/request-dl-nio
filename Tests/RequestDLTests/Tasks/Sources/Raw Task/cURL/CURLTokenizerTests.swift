@@ -107,6 +107,33 @@ struct CURLTokenizerTests {
         #expect(tokens == ["curl", "-d", "axZb"])
     }
 
+    /// `UInt8(_:radix:)` takes a sign: `\x+1` was the byte `0x01`. Only hex digits are part of the
+    /// escape; what is left is the literal text, with the backslash dropped as for any unknown escape.
+    @Test(arguments: [
+        (#"curl -d $'a\x+1b'"#, "ax+1b"),
+        (#"curl -d $'a\x-1b'"#, "ax-1b"),
+        (#"curl -d $'a\x+'"#, "ax+"),
+        (#"curl -d $'a\x +b'"#, "ax +b"),
+    ])
+    func tokenize_whenAHexEscapeHasASignInsteadOfDigits_keepsItLiteral(_ command: String, _ expected: String) throws {
+        let tokens = try CURLTokenizer.tokenize(command)
+
+        #expect(tokens == ["curl", "-d", expected])
+    }
+
+    /// Up to two hex digits, as in bash: what follows them is not part of the escape.
+    @Test(arguments: [
+        (#"curl -d $'a\x41b'"#, "aAb"),
+        (#"curl -d $'a\x4'"#, "a\u{04}"),
+        (#"curl -d $'a\x4Zb'"#, "a\u{04}Zb"),
+        (#"curl -d $'a\xFFb'"#, "a\u{FFFD}b"),
+    ])
+    func tokenize_whenAHexEscapeHasDigits_decodesAtMostTwo(_ command: String, _ expected: String) throws {
+        let tokens = try CURLTokenizer.tokenize(command)
+
+        #expect(tokens == ["curl", "-d", expected])
+    }
+
     @Test
     func tokenize_whenADoubleQuotedStringHasAnEscape_keepsTheEscapedCharacter() throws {
         let tokens = try CURLTokenizer.tokenize(#"curl -d "a\"b""#)

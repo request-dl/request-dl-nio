@@ -270,6 +270,37 @@ struct InternalsNIORedirectStrategyAdapterTests {
 
 // MARK: - Test doubles
 
+extension InternalsNIORedirectStrategyAdapterTests {
+
+    /// A strategy's method is written on the request line as it is (`.RAW(value:)`).
+    @Test
+    func redirectDecision_whenFollowingWithAMethodThatIsNotAToken_throws() throws {
+        let strategy = RecordingStrategy { context in
+            var request = context.redirectRequest
+            request.method = "GET / HTTP/1.1\r\nX: y\r\n\r\nPOST"
+            return .follow(request)
+        }
+
+        let adapter = Internals.NIORedirectStrategyAdapter(strategy: strategy)
+
+        let context = HTTPClientRedirectContext(
+            redirectRequest: HTTPClientRequest(url: "https://example.com/redirected"),
+            response: .init(version: .http1_1, status: .found),
+            history: [
+                HTTPClientRequestResponse(
+                    request: HTTPClientRequest(url: "https://example.com/original"),
+                    responseHead: .init(version: .http1_1, status: .found)
+                )
+            ],
+            redirectCount: 0
+        )
+
+        #expect(throws: Internals.InvalidMethodError.self) {
+            try adapter.redirectDecision(for: context)
+        }
+    }
+}
+
 private final class RecordingStrategy: Internals.RedirectStrategy, @unchecked Sendable {
 
     let handler: (Internals.RedirectContext) throws -> Internals.RedirectDecision

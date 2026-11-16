@@ -22,6 +22,7 @@ import struct Foundation.Data
 ///
 /// Only a documented subset of curl's flags is understood: `-X`/`--request`, `-H`/`--header`
 /// (repeatable), `-d`/`--data`/`--data-raw`/`--data-binary`, `-F`/`--form` (repeatable),
+/// `--form-string` (repeatable),
 /// `-u`/`--user`, `--url` (or a bare trailing URL), `-G`/`--get`, `-L`/`--location` (with
 /// `--max-redirs`), `-k`/`--insecure`, `-x`/`--proxy`, `--resolve`, `--compressed`, `--cacert`,
 /// and `--cert`/`-E`/`--key`. A small set of flags that only shape curl's own CLI output

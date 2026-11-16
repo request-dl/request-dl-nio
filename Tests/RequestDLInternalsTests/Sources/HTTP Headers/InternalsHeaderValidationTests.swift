@@ -28,6 +28,16 @@ struct InternalsHeaderValidationTests {
         }
     }
 
+    /// A token has at least one `tchar`: an empty name goes out as the line `: value`.
+    @Test
+    func validate_whenNameIsEmpty_rejects() {
+        #expect(!Internals.HeaderValidation.isValid(name: ""))
+
+        #expect(throws: (any Error).self) {
+            try Internals.HeaderValidation.validate([(name: "", value: "v")])
+        }
+    }
+
     // MARK: - Values
 
     /// Non-ASCII is legitimate: `.nio` sends it as UTF-8, so it must not be refused here.

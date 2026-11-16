@@ -330,6 +330,40 @@ private struct RecordingRedirectStrategy: Internals.RedirectStrategy {
     }
 }
 
+/// `applyingRedirectDecision(_:)` alone: the method of a strategy's decision reaches the request
+/// line as it is, so one that is not a token is refused, as `.nio` does.
+struct InternalsURLSessionClientRedirectMethodTests {
+
+    @Test(arguments: ["GET / HTTP/1.1\r\nX: y\r\n\r\nPOST", "GE T", ""])
+    func applyingRedirectDecision_whenMethodIsNotAToken_throws(_ method: String) {
+        let redirect = Internals.RedirectRequest(
+            url: "https://example.com/next",
+            method: method,
+            headers: Internals.HTTPHeaders(),
+            hasBody: false
+        )
+
+        #expect(throws: Internals.InvalidMethodError.self) {
+            try URLRequest(url: URL(string: "https://example.com")!).applyingRedirectDecision(redirect)
+        }
+    }
+
+    @Test
+    func applyingRedirectDecision_whenMethodIsAToken_keepsIt() throws {
+        let redirect = Internals.RedirectRequest(
+            url: "https://example.com/next",
+            method: "GET",
+            headers: Internals.HTTPHeaders(),
+            hasBody: false
+        )
+
+        let request = try URLRequest(url: URL(string: "https://example.com")!).applyingRedirectDecision(redirect)
+
+        #expect(request.httpMethod == "GET")
+        #expect(request.url?.absoluteString == "https://example.com/next")
+    }
+}
+
 private struct DoNotFollowRedirectStrategy: Internals.RedirectStrategy {
 
     func redirectDecision(for context: Internals.RedirectContext) throws -> Internals.RedirectDecision {

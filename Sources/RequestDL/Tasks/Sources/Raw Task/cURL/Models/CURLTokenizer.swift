@@ -178,15 +178,25 @@ enum CURLTokenizer {
             let escape = characters[index + 1]
 
             if escape == "x" {
+                // One or two hex digits, as in bash: `UInt8(_:radix:)` alone also takes a sign, so
+                // `\x+1` was the byte `0x01`. Without digits it is not an escape (the default
+                // branch below, which, unlike bash, drops the backslash and keeps the `x`).
                 let hexStart = index + 2
-                let hexEnd = min(hexStart + 2, characters.endIndex)
-                var hex = ""
-                hex.unicodeScalars.append(contentsOf: characters[hexStart..<hexEnd])
+                var hexEnd = hexStart
 
-                if !hex.isEmpty, let byte = UInt8(hex, radix: 16) {
-                    pendingBytes.append(byte)
-                    index = hexEnd
-                    continue
+                while hexEnd < characters.endIndex, hexEnd - hexStart < 2, characters[hexEnd].isASCIIHexDigit {
+                    hexEnd += 1
+                }
+
+                if hexEnd > hexStart {
+                    var hex = ""
+                    hex.unicodeScalars.append(contentsOf: characters[hexStart..<hexEnd])
+
+                    if let byte = UInt8(hex, radix: 16) {
+                        pendingBytes.append(byte)
+                        index = hexEnd
+                        continue
+                    }
                 }
             }
 
@@ -232,5 +242,21 @@ extension Array where Element == Unicode.Scalar {
 
     fileprivate subscript(safe index: Int) -> Unicode.Scalar? {
         indices.contains(index) ? self[index] : nil
+    }
+}
+
+// MARK: - Unicode.Scalar extension
+
+extension Unicode.Scalar {
+
+    /// `0-9`, `a-f` and `A-F` only. `Unicode.Scalar.properties.isASCIIHexDigit` is not used: it is
+    /// the same set, but `UInt8(_:radix:)` is what reads it next, and this is what it accepts.
+    fileprivate var isASCIIHexDigit: Bool {
+        switch value {
+        case 0x30...0x39, 0x41...0x46, 0x61...0x66:
+            return true
+        default:
+            return false
+        }
     }
 }

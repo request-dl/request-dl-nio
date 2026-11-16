@@ -59,6 +59,10 @@ extension Internals {
                 // headers has been checked against the origin it is now going to.
                 Self.sanitize(&redirectRequest, from: previousURL)
 
+                // `.RAW(value:)` is written on the request line as it is, and this method comes from
+                // a strategy: no more trusted than the caller's own.
+                try Internals.MethodValidation.validate(redirectRequest.method)
+
                 var request = context.redirectRequest
                 request.url = redirectRequest.url
                 request.method = .init(rawValue: redirectRequest.method)

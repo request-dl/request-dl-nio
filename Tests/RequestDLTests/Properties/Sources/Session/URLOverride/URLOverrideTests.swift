@@ -448,4 +448,39 @@ struct URLOverrideTests {
         // Then
         #expect(resolved.requestConfiguration.url == "https://apple.com/v2/report")
     }
+
+    /// The destination is written as is in the base URL of the request it rewrites: an escaped
+    /// delimiter in its host would send the request somewhere else than the rule says.
+    @Test(arguments: [
+        "https://attacker.com%23.good.com/v1",
+        "https://attacker.com%2F.good.com/v1",
+        "https://attacker.com%3F.good.com/v1",
+        "https://attacker.com%40good.com/v1",
+    ])
+    func destinationWithAnEncodedDelimiterInTheHost_throws(_ destination: String) async {
+        let error = await #expect(throws: URLOverrideError.self) {
+            try await resolve(
+                TestProperty {
+                    BaseURL("google.com")
+                    URLOverride(destination, from: "https://google.com")
+                }
+            )
+        }
+
+        #expect(error?.context == .invalidURL)
+        #expect(error?.url == destination)
+    }
+
+    @Test func originWithAnEncodedDelimiterInTheHost_throws() async {
+        let error = await #expect(throws: URLOverrideError.self) {
+            try await resolve(
+                TestProperty {
+                    BaseURL("google.com")
+                    URLOverride("https://apple.com", from: "https://attacker.com%23.good.com")
+                }
+            )
+        }
+
+        #expect(error?.context == .invalidURL)
+    }
 }
