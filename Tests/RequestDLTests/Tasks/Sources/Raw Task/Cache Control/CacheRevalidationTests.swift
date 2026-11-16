@@ -358,6 +358,62 @@ struct CacheRevalidationTests {
         #expect(isServed(output) == false)
     }
 
+    /// RFC 9110 §5.6.7: the obsolete RFC 850 and asctime formats are dates too, so an `Expires`
+    /// in one of them is read, not taken for an unreadable one (which is stale).
+    @Test(arguments: ["Sunday, 06-Nov-2999 08:49:37 GMT", "Sun Nov  6 08:49:37 2999"])
+    func freshness_whenExpiresIsInAnObsoleteDateFormat_isRead(_ expires: String) async throws {
+        // Given
+        let dataCache = makeCache()
+        let configuration = makeConfiguration(strategy: .returnCachedDataElseLoad)
+
+        await store(response([("Expires", expires)]), key: configuration.url, in: dataCache)
+
+        // When
+        let output = await decide(configuration, in: dataCache)
+
+        // Then
+        #expect(isServed(output))
+    }
+
+    /// The zone was never looked at, so a far future `Expires` in `PST` was read as GMT. An
+    /// abbreviation names more than one offset: unreadable, hence stale.
+    @Test
+    func freshness_whenExpiresHasAZoneAbbreviation_isStale() async throws {
+        // Given
+        let dataCache = makeCache()
+        let configuration = makeConfiguration(strategy: .returnCachedDataElseLoad)
+
+        await store(
+            response([("Expires", "Sun, 06 Nov 2999 08:49:37 PST")]),
+            key: configuration.url,
+            in: dataCache
+        )
+
+        // When
+        let output = await decide(configuration, in: dataCache)
+
+        // Then
+        #expect(isServed(output) == false)
+    }
+
+    /// A numeric zone shifts the instant. The wall clock of half an hour from now, written in
+    /// `+0100`, is half an hour ago: it used to be read as GMT and served.
+    @Test
+    func freshness_whenExpiresHasANumericZone_itShiftsTheInstant() async throws {
+        // Given
+        let dataCache = makeCache()
+        let configuration = makeConfiguration(strategy: .returnCachedDataElseLoad)
+        let wallClock = httpDate(1_800).replacing(" GMT", with: " +0100")
+
+        await store(response([("Expires", wallClock)]), key: configuration.url, in: dataCache)
+
+        // When
+        let output = await decide(configuration, in: dataCache)
+
+        // Then
+        #expect(isServed(output) == false)
+    }
+
     @Test
     func freshness_whenExpiresIsInTheFuture_isStillServed() async throws {
         // Given

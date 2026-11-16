@@ -43,8 +43,8 @@ import Crypto
 ///   to one, the later entry winning, so a repeated header name (e.g. two `Accept` values) isn't
 ///   preserved; declare it directly with ``HeaderGroup/init(content:)`` instead if that matters.
 /// - `queries` (string array, optional): each entry is an equals-separated `"name=value"` pair,
-///   collected into a ``QueryGroup``. Same one-value-per-key limitation as `headers` above: two
-///   entries sharing a key collapse to the later one.
+///   collected into a ``QueryGroup``. Every entry is kept, in order, so a repeated name
+///   (`["tag=a", "tag=b"]`) is sent as `?tag=a&tag=b`.
 /// - `authorization` (scoped, optional): passed to ``Authorization``. Reads `authorization.scheme`
 ///   (`"basic"` or `"bearer"`); `"basic"` additionally reads `authorization.username` and
 ///   `authorization.password` (or, absent those, a pre-encoded `authorization.credentials`), while
@@ -96,7 +96,19 @@ import Crypto
 ///   `Session().maximumConnectionsPerHost(x).maximumConcurrentConnections(y)` directly.
 ///
 /// Every key is read independently and is optional: a missing key simply contributes nothing, the
-/// same as any other absent property. An explicit property declared after `Configured` in the same
+/// same as any other absent property. A key that is present with a value of the wrong type (`pins`
+/// written as one string, `tlsMinimumVersion` as a number, `proxy.enabled` as `"true"`, `timeout`
+/// as `"30"`) is an error, never a missing key: reading it as one would turn off pinning, the
+/// minimum TLS version or the proxy without a word. This holds for every key, and so does the
+/// entry check of the pair lists (`headers`, `queries`, `dnsOverrides`, `urlOverrides`,
+/// `proxy.connectHeaders`): an entry with no separator or with an empty name is an error, not
+/// dropped, and a blank entry (what an empty environment variable, or one ending in a comma, reads
+/// as) is skipped. A key defined with an empty value (`TIMEOUT=`) is not a missing key either: it
+/// does not convert to a number, and is an error.
+///
+/// Each key is read with the provider's `fetch` accessors, which is what tells a missing key from
+/// one of the wrong type. A provider that does I/O on `fetch` (a remote one, or a reloading file)
+/// is asked once per key on every resolve. An explicit property declared after `Configured` in the same
 /// `@PropertyBuilder` block still wins, following the same "last one wins" precedent already
 /// established by ``BaseURL`` and ``DNSOverride``.
 ///
@@ -113,7 +125,8 @@ import Crypto
 /// a password in it is an error. The error comes after the read, so the reporter has already
 /// seen that value: keep credentials out of it from the start.
 ///
-/// - Throws: ``ConfiguredError`` if `authorization.scheme` or `proxy.authorization.scheme` is
+/// - Throws: ``ConfiguredError`` if any key holds a value of the wrong type, if an entry of a pair
+///   list has no separator or an empty name, if `authorization.scheme` or `proxy.authorization.scheme` is
 ///   specified but invalid, if the fields the specified scheme requires are missing, if
 ///   `proxy.enabled` is `true`
 ///   but `proxy.host` is missing or `proxy.type` is unknown, if `proxy.port` is missing for an
@@ -149,85 +162,103 @@ public struct Configured: Property {
         let reader = reader
 
         return AsyncProperty {
-            if let baseURL = reader.string(forKey: "baseURL") {
+            if let baseURL = try await Self.string(reader, "baseURL", context: .invalidBaseURLConfiguration) {
                 try Self.baseURL(baseURL)
             }
 
-            if let method = reader.string(forKey: "method") {
+            if let method = try await Self.string(reader, "method") {
                 RequestMethod(HTTPMethod(method.uppercased()))
             }
 
-            if let timeout = reader.int(forKey: "timeout") {
+            if let timeout = try await Self.int(reader, "timeout", context: .invalidTimeoutConfiguration) {
                 try Self.timeout(seconds: timeout)
             }
 
-            if let headerPairs = reader.stringArray(forKey: "headers", isSecret: true) {
-                HeaderGroup(Self.pairs(headerPairs, separatedBy: ":"))
+            if let headerPairs = try await Self.stringArray(reader, "headers", isSecret: true) {
+                HeaderGroup(Self.dictionary(try Self.pairs(headerPairs, separatedBy: ":")))
             }
 
-            if let queryPairs = reader.stringArray(forKey: "queries", isSecret: true) {
-                QueryGroup(Self.pairs(queryPairs, separatedBy: "="))
+            if let queryPairs = try await Self.stringArray(reader, "queries", isSecret: true) {
+                let queries = try Self.pairs(queryPairs, separatedBy: "=")
+
+                QueryGroup {
+                    PropertyForEach(queries) {
+                        Query(name: $0.key, value: $0.value)
+                    }
+                }
             }
 
-            if let authorization = try Self.authorization(reader.scoped(to: "authorization")) {
+            if let authorization = try await Self.authorization(reader.scoped(to: "authorization")) {
                 authorization
             }
 
-            if let dnsOverridePairs = reader.stringArray(forKey: "dnsOverrides") {
-                PropertyForEach(Self.pairs(dnsOverridePairs, separatedBy: ":"), id: \.key) {
+            if let dnsOverridePairs = try await Self.stringArray(reader, "dnsOverrides") {
+                PropertyForEach(Self.dictionary(try Self.pairs(dnsOverridePairs, separatedBy: ":")), id: \.key) {
                     DNSOverride($0.value, from: $0.key)
                 }
             }
 
-            if let urlOverridePairs = reader.stringArray(forKey: "urlOverrides") {
-                URLOverride(Self.pairs(urlOverridePairs, separatedBy: "|"))
+            if let urlOverridePairs = try await Self.stringArray(reader, "urlOverrides") {
+                URLOverride(Self.dictionary(try Self.pairs(urlOverridePairs, separatedBy: "|")))
             }
 
-            if reader.bool(forKey: "systemProxy", default: false) {
+            if try await Self.bool(reader, "systemProxy") ?? false {
                 SystemProxy()
             }
 
-            try Self.proxy(reader.scoped(to: "proxy"))
+            try await Self.proxy(reader.scoped(to: "proxy"))
 
-            if let cachePolicy = reader.string(forKey: "cachePolicy") {
+            if let cachePolicy = try await Self.string(reader, "cachePolicy", context: .invalidCachePolicy) {
                 EmptyProperty().cachePolicy(try Self.cachePolicy(cachePolicy))
             }
 
-            if let cacheStrategy = reader.string(forKey: "cacheStrategy") {
+            if let cacheStrategy = try await Self.string(reader, "cacheStrategy", context: .invalidCacheStrategy) {
                 EmptyProperty().cacheStrategy(try Self.cacheStrategy(cacheStrategy))
             }
 
             let secureConnectionReader = reader.scoped(to: "secureConnection")
 
-            if let trustRootsFile = secureConnectionReader.string(forKey: "trustRoots") {
+            if let trustRootsFile = try await Self.string(
+                secureConnectionReader,
+                "trustRoots",
+                context: .invalidSecureConnectionConfiguration
+            ) {
                 TrustRoots(trustRootsFile)
             }
 
-            if let additionalTrustRootsFile = secureConnectionReader.string(forKey: "additionalTrustRoots") {
+            if let additionalTrustRootsFile = try await Self.string(
+                secureConnectionReader,
+                "additionalTrustRoots",
+                context: .invalidSecureConnectionConfiguration
+            ) {
                 AdditionalTrustRoots(additionalTrustRootsFile)
             }
 
-            if let certificatesFile = secureConnectionReader.string(forKey: "certificates") {
+            if let certificatesFile = try await Self.string(
+                secureConnectionReader,
+                "certificates",
+                context: .invalidSecureConnectionConfiguration
+            ) {
                 Certificates(certificatesFile)
             }
 
-            if let spkiPinning = try Self.spkiPinning(secureConnectionReader.scoped(to: "spkiPinning")) {
+            if let spkiPinning = try await Self.spkiPinning(secureConnectionReader.scoped(to: "spkiPinning")) {
                 spkiPinning
             }
 
-            if let privateKey = try Self.privateKey(secureConnectionReader.scoped(to: "privateKey")) {
+            if let privateKey = try await Self.privateKey(secureConnectionReader.scoped(to: "privateKey")) {
                 privateKey
             }
 
-            if let secureConnection = try Self.secureConnectionVersion(secureConnectionReader) {
+            if let secureConnection = try await Self.secureConnectionVersion(secureConnectionReader) {
                 secureConnection
             }
 
-            if let redirect = try Self.redirect(reader.scoped(to: "redirect")) {
+            if let redirect = try await Self.redirect(reader.scoped(to: "redirect")) {
                 redirect
             }
 
-            if let connectionLimits = Self.connectionLimits(reader) {
+            if let connectionLimits = try await Self.connectionLimits(reader) {
                 connectionLimits
             }
         }
@@ -235,9 +266,71 @@ public struct Configured: Property {
 
     // MARK: - Private static methods
 
-    private static func connectionLimits(_ reader: ConfigReader) -> Session? {
-        let maximumConnectionsPerHost = reader.int(forKey: "maximumConnectionsPerHost")
-        let maximumConcurrentConnections = reader.int(forKey: "maximumConcurrentConnections")
+    // MARK: Typed reads
+    //
+    // The non-throwing `ConfigReader` getters (`string(forKey:)`, `bool(forKey:default:)`, ...)
+    // return `nil` (or the default) for a key that is present with a value of the wrong type, so a
+    // `tlsMinimumVersion: 1.3` written as a number, or `pins` written as one string, was read as
+    // "not configured" and the request went out without the protection the file asked for. The
+    // `fetch` getters throw on a value that cannot be converted and return `nil` only when the key
+    // is absent. Every error is reported as a `ConfiguredError`, and none of the errors carries the
+    // value, which can be a secret.
+
+    private static func string(
+        _ reader: ConfigReader,
+        _ key: ConfigKey,
+        isSecret: Bool = false,
+        context: ConfiguredError.Context = .invalidConfigurationValue
+    ) async throws -> String? {
+        do {
+            return try await reader.fetchString(forKey: key, isSecret: isSecret)
+        } catch {
+            throw ConfiguredError(context: context)
+        }
+    }
+
+    private static func stringArray(
+        _ reader: ConfigReader,
+        _ key: ConfigKey,
+        isSecret: Bool = false,
+        context: ConfiguredError.Context = .invalidConfigurationValue
+    ) async throws -> [String]? {
+        do {
+            return try await reader.fetchStringArray(forKey: key, isSecret: isSecret)
+        } catch {
+            throw ConfiguredError(context: context)
+        }
+    }
+
+    private static func int(
+        _ reader: ConfigReader,
+        _ key: ConfigKey,
+        context: ConfiguredError.Context = .invalidConfigurationValue
+    ) async throws -> Int? {
+        do {
+            return try await reader.fetchInt(forKey: key)
+        } catch {
+            throw ConfiguredError(context: context)
+        }
+    }
+
+    private static func bool(
+        _ reader: ConfigReader,
+        _ key: ConfigKey,
+        context: ConfiguredError.Context = .invalidConfigurationValue
+    ) async throws -> Bool? {
+        do {
+            return try await reader.fetchBool(forKey: key)
+        } catch {
+            throw ConfiguredError(context: context)
+        }
+    }
+
+    // MARK: Builders
+
+    private static func connectionLimits(_ reader: ConfigReader) async throws -> Session? {
+        let maximumConnectionsPerHost = try await Self.int(reader, "maximumConnectionsPerHost")
+        let maximumConcurrentConnections = try await Self.int(reader, "maximumConcurrentConnections")
 
         guard maximumConnectionsPerHost != nil || maximumConcurrentConnections != nil else {
             return nil
@@ -272,16 +365,17 @@ public struct Configured: Property {
         return Timeout(.seconds(Int64(seconds)))
     }
 
-    private static func redirect(_ reader: ConfigReader) throws -> Session? {
-        guard let mode = reader.string(forKey: "mode") else {
+    private static func redirect(_ reader: ConfigReader) async throws -> Session? {
+        guard let mode = try await Self.string(reader, "mode", context: .invalidRedirectConfiguration) else {
             return nil
         }
 
         switch mode {
         case "follow":
             return Session().enableRedirectFollow(
-                max: reader.int(forKey: "maxRedirects", default: 5),
-                allowCycles: reader.bool(forKey: "allowCycles", default: false)
+                max: try await Self.int(reader, "maxRedirects", context: .invalidRedirectConfiguration) ?? 5,
+                allowCycles: try await Self.bool(reader, "allowCycles", context: .invalidRedirectConfiguration)
+                    ?? false
             )
         case "disallow":
             return Session().disableRedirect()
@@ -292,8 +386,14 @@ public struct Configured: Property {
 
     private static func spkiPinning(
         _ reader: ConfigReader
-    ) throws -> SPKIPinning<PropertyForEach<[String], String, SPKIHash<SHA256>>>? {
-        guard let pins = reader.stringArray(forKey: "pins") else {
+    ) async throws -> SPKIPinning<PropertyForEach<[String], String, SPKIHash<SHA256>>>? {
+        guard
+            let pins = try await Self.stringArray(
+                reader,
+                "pins",
+                context: .invalidSecureConnectionConfiguration
+            )
+        else {
             return nil
         }
 
@@ -301,7 +401,9 @@ public struct Configured: Property {
             throw ConfiguredError(context: .invalidSecureConnectionConfiguration)
         }
 
-        let policy = try Self.spkiPinningPolicy(reader.string(forKey: "policy", default: "strict"))
+        let policy = try Self.spkiPinningPolicy(
+            try await Self.string(reader, "policy", context: .invalidSecureConnectionConfiguration) ?? "strict"
+        )
 
         return SPKIPinning(policy: policy) {
             PropertyForEach(pins, id: \.self) {
@@ -321,14 +423,21 @@ public struct Configured: Property {
         }
     }
 
-    private static func privateKey(_ reader: ConfigReader) throws -> PrivateKey? {
-        guard let file = reader.string(forKey: "file") else {
+    private static func privateKey(_ reader: ConfigReader) async throws -> PrivateKey? {
+        guard let file = try await Self.string(reader, "file", context: .invalidSecureConnectionConfiguration) else {
             return nil
         }
 
-        let format = try Self.certificateFormat(reader.string(forKey: "format", default: "pem"))
+        let format = try Self.certificateFormat(
+            try await Self.string(reader, "format", context: .invalidSecureConnectionConfiguration) ?? "pem"
+        )
 
-        if let password = reader.string(forKey: "password", isSecret: true) {
+        if let password = try await Self.string(
+            reader,
+            "password",
+            isSecret: true,
+            context: .invalidSecureConnectionConfiguration
+        ) {
             return PrivateKey(file, format: format, password: SecureBytes(password.utf8))
         }
 
@@ -337,9 +446,20 @@ public struct Configured: Property {
 
     private static func secureConnectionVersion(
         _ reader: ConfigReader
-    ) throws -> SecureConnection<EmptyProperty>? {
-        let minimum = try reader.string(forKey: "tlsMinimumVersion").map(Self.tlsVersion)
-        let maximum = try reader.string(forKey: "tlsMaximumVersion").map(Self.tlsVersion)
+    ) async throws -> SecureConnection<EmptyProperty>? {
+        let minimum = try await Self.string(
+            reader,
+            "tlsMinimumVersion",
+            context: .invalidSecureConnectionConfiguration
+        )
+        .map(Self.tlsVersion)
+
+        let maximum = try await Self.string(
+            reader,
+            "tlsMaximumVersion",
+            context: .invalidSecureConnectionConfiguration
+        )
+        .map(Self.tlsVersion)
 
         guard minimum != nil || maximum != nil else {
             return nil
@@ -425,23 +545,33 @@ public struct Configured: Property {
     // asking the compiler to unify those through nested result-builder inference (`some Property`
     // over an `if`/`switch` mixing several `Proxy<Headers>` specializations) runs into a type
     // checker limitation. A plain throwing function returning one concrete type sidesteps it.
-    private static func proxy(_ reader: ConfigReader) throws -> AnyProperty {
-        guard reader.bool(forKey: "enabled", default: false) else {
+    private static func proxy(_ reader: ConfigReader) async throws -> AnyProperty {
+        guard try await Self.bool(reader, "enabled", context: .invalidProxyConfiguration) ?? false else {
             return AnyProperty(EmptyProperty())
         }
 
-        guard let host = reader.string(forKey: "host") else {
+        guard let host = try await Self.string(reader, "host", context: .invalidProxyConfiguration) else {
             throw ConfiguredError(context: .invalidProxyConfiguration)
         }
 
-        let authorization = try Self.proxyAuthorization(reader.scoped(to: "authorization"))
-        let connectHeaderPairs = reader.stringArray(forKey: "connectHeaders", isSecret: true)
+        let authorization = try await Self.proxyAuthorization(reader.scoped(to: "authorization"))
+        let connectHeaderPairs = try await Self.stringArray(
+            reader,
+            "connectHeaders",
+            isSecret: true,
+            context: .invalidProxyConfiguration
+        )
 
-        switch reader.string(forKey: "type", default: "http") {
+        switch try await Self.string(reader, "type", context: .invalidProxyConfiguration) ?? "http" {
         case "http":
-            guard let port = reader.int(forKey: "port") else {
+            guard let port = try await Self.int(reader, "port", context: .invalidProxyConfiguration) else {
                 throw ConfiguredError(context: .invalidProxyConfiguration)
             }
+
+            let connectHeaders =
+                try connectHeaderPairs.map {
+                    Self.dictionary(try Self.pairs($0, separatedBy: ":", context: .invalidProxyConfiguration))
+                } ?? [:]
 
             return AnyProperty(
                 Proxy(host: host, port: port, authorization: authorization) { () -> ProxyConnectHeaders in
@@ -450,10 +580,7 @@ public struct Configured: Property {
                     // `HeaderNode` leaves, but `HeaderGroup` wraps its headers into its own
                     // opaque leaf node first, so nesting it here would silently resolve to no
                     // headers at all.
-                    PropertyForEach(
-                        connectHeaderPairs.map { Self.pairs($0, separatedBy: ":") } ?? [:],
-                        id: \.key
-                    ) {
+                    PropertyForEach(connectHeaders, id: \.key) {
                         CustomHeader(name: $0.key, value: $0.value)
                     }
                 }
@@ -466,7 +593,7 @@ public struct Configured: Property {
             return AnyProperty(
                 Proxy(
                     host: host,
-                    port: reader.int(forKey: "port", default: 1080),
+                    port: try await Self.int(reader, "port", context: .invalidProxyConfiguration) ?? 1080,
                     connection: .socks
                 )
             )
@@ -479,71 +606,113 @@ public struct Configured: Property {
 
     private static func proxyAuthorization(
         _ reader: ConfigReader
-    ) throws -> ProxyAuthorization? {
-        guard let scheme = reader.string(forKey: "scheme") else {
+    ) async throws -> ProxyAuthorization? {
+        guard let credentials = try await Self.credentials(reader) else {
+            return nil
+        }
+
+        switch credentials {
+        case .basic(let username, let password):
+            return .basic(username: username, password: password)
+        case .encodedBasic(let credentials):
+            return .basic(credentials: credentials)
+        case .bearer(let token):
+            return .bearer(tokens: token)
+        }
+    }
+
+    private static func authorization(_ reader: ConfigReader) async throws -> Authorization? {
+        guard let credentials = try await Self.credentials(reader) else {
+            return nil
+        }
+
+        switch credentials {
+        case .basic(let username, let password):
+            return Authorization(username: username, password: password)
+        case .encodedBasic(let credentials):
+            return Authorization(.basic, token: credentials)
+        case .bearer(let token):
+            return Authorization(.bearer, token: token)
+        }
+    }
+
+    private enum Credentials {
+        case basic(username: String, password: String)
+        case encodedBasic(String)
+        case bearer(String)
+    }
+
+    /// Reads `scheme` and the fields the scheme needs. A missing or mistyped field is reported as
+    /// `invalidAuthorizationConfiguration`, for the proxy's authorization too.
+    private static func credentials(_ reader: ConfigReader) async throws -> Credentials? {
+        let invalid = ConfiguredError.Context.invalidAuthorizationConfiguration
+
+        guard let scheme = try await Self.string(reader, "scheme", context: invalid) else {
             return nil
         }
 
         switch scheme {
         case "basic":
-            if let username = reader.string(forKey: "username", isSecret: true),
-                let password = reader.string(forKey: "password", isSecret: true)
+            if let username = try await Self.string(reader, "username", isSecret: true, context: invalid),
+                let password = try await Self.string(reader, "password", isSecret: true, context: invalid)
             {
                 return .basic(username: username, password: password)
-            } else if let credentials = reader.string(forKey: "credentials", isSecret: true) {
-                return .basic(credentials: credentials)
+            } else if let credentials = try await Self.string(
+                reader,
+                "credentials",
+                isSecret: true,
+                context: invalid
+            ) {
+                return .encodedBasic(credentials)
             } else {
-                throw ConfiguredError(context: .invalidAuthorizationConfiguration)
+                throw ConfiguredError(context: invalid)
             }
         case "bearer":
-            guard let token = reader.string(forKey: "token", isSecret: true) else {
-                throw ConfiguredError(context: .invalidAuthorizationConfiguration)
+            guard let token = try await Self.string(reader, "token", isSecret: true, context: invalid) else {
+                throw ConfiguredError(context: invalid)
             }
-            return .bearer(tokens: token)
+            return .bearer(token)
         default:
-            throw ConfiguredError(context: .invalidAuthorizationConfiguration)
+            throw ConfiguredError(context: invalid)
         }
     }
 
-    private static func authorization(_ reader: ConfigReader) throws -> Authorization? {
-        guard let scheme = reader.string(forKey: "scheme") else {
-            return nil
-        }
-
-        switch scheme {
-        case "basic":
-            if let username = reader.string(forKey: "username", isSecret: true),
-                let password = reader.string(forKey: "password", isSecret: true)
-            {
-                return Authorization(username: username, password: password)
-            } else if let credentials = reader.string(forKey: "credentials", isSecret: true) {
-                return Authorization(.basic, token: credentials)
-            } else {
-                throw ConfiguredError(context: .invalidAuthorizationConfiguration)
-            }
-        case "bearer":
-            guard let token = reader.string(forKey: "token", isSecret: true) else {
-                throw ConfiguredError(context: .invalidAuthorizationConfiguration)
-            }
-            return Authorization(.bearer, token: token)
-        default:
-            throw ConfiguredError(context: .invalidAuthorizationConfiguration)
-        }
+    private struct Pair: Sendable, Identifiable {
+        let id: Int
+        let key: String
+        let value: String
     }
 
+    /// Splits each entry on its first `separator`. An entry with no separator, or with an empty
+    /// name, is an error: it used to be dropped without a word, so a typo in a header or a query
+    /// disappeared from the request. Repeated names are kept, in order. A flag with no value
+    /// (`?uploads`) has no way through `Query`, so it is an error here too: write it in `baseURL`.
+    ///
+    /// A blank entry is skipped: an environment variable defined and left empty (`HEADERS=`) or
+    /// with a trailing comma (`QUERIES=a=1,`) is read by the provider as a list with an empty
+    /// element, and it says nothing.
     private static func pairs(
         _ entries: [String],
-        separatedBy separator: Character
-    ) -> [String: String] {
-        entries.reduce(into: [String: String]()) { result, entry in
-            guard let (key, value) = entry.splitOnFirst(separator) else {
-                return
+        separatedBy separator: Character,
+        context: ConfiguredError.Context = .invalidConfigurationValue
+    ) throws -> [Pair] {
+        try entries.enumerated().compactMap { index, entry in
+            guard !entry.trimmingASCIIWhitespace().isEmpty else {
+                return nil
             }
 
-            if !key.isEmpty {
-                result[key] = value
+            guard let (key, value) = entry.splitOnFirst(separator), !key.isEmpty else {
+                throw ConfiguredError(context: context)
             }
+
+            return Pair(id: index, key: key, value: value)
         }
+    }
+
+    /// For the properties that have one value per name (headers, DNS and URL overrides): the later
+    /// entry wins, same as when the property is declared directly.
+    private static func dictionary(_ pairs: [Pair]) -> [String: String] {
+        pairs.reduce(into: [:]) { $0[$1.key] = $1.value }
     }
 }
 

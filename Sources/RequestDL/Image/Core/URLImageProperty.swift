@@ -22,9 +22,15 @@ struct URLImageProperty: Property {
         QueryItemsProperty(items: percentEncodedQueryItems)
     }
 
+    /// `URL.host` hands an IPv6 literal back without its brackets (`::1`), and `::1:8080` is not
+    /// an authority anyone can read, so the brackets go back on.
     private var hostWithPort: String {
-        guard let host = url.host else {
+        guard var host = url.host else {
             return ""
+        }
+
+        if host.contains(":") && !host.hasPrefix("[") {
+            host = "[\(host)]"
         }
 
         guard let port = url.port else {
@@ -64,7 +70,7 @@ private struct QueryItemsProperty: Property {
         func make(_ make: inout Make) async throws {
             for item in items {
                 make.requestConfiguration.queries.append(
-                    QueryItem(name: item.name, value: item.value ?? "")
+                    item.value.map { QueryItem(name: item.name, value: $0) } ?? QueryItem(name: item.name)
                 )
             }
         }

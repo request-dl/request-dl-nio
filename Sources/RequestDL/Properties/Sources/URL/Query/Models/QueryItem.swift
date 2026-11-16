@@ -2,7 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
-/// A single `name=value` pair in a URL query.
+/// A single `name=value` pair in a URL query, or a bare `name`.
 public struct QueryItem: Sendable, Hashable {
 
     // MARK: - Public properties
@@ -18,14 +18,32 @@ public struct QueryItem: Sendable, Hashable {
     /// - Important: Same encoding caveat as ``name``.
     public let value: String
 
+    /// Whether the item was written with a value, as in `name=value` or `name=`, and not as a
+    /// bare `name`.
+    ///
+    /// A bare name (`?uploads`, `?thumbnail&sig=abc`) is a different query from `name=`: a
+    /// server can read the flag by its presence alone, and a signed URL signs the exact bytes.
+    /// ``value`` is empty for a bare name.
+    public let hasValue: Bool
+
     // MARK: - Inits
 
     /// - Note: New in 4.0. The implicit memberwise initializer of a public struct is internal,
     /// so nothing outside the package could construct one of these, despite the type and both
     /// of its properties being public.
     public init(name: String, value: String) {
+        self.init(name: name, value: value, hasValue: true)
+    }
+
+    /// Creates a bare `name`, rendered without `=`.
+    public init(name: String) {
+        self.init(name: name, value: "", hasValue: false)
+    }
+
+    init(name: String, value: String, hasValue: Bool) {
         self.name = name
         self.value = value
+        self.hasValue = hasValue
     }
 }
 
@@ -41,7 +59,8 @@ extension [QueryItem] {
         map {
             .init(
                 name: key + $0.name,
-                value: $0.value
+                value: $0.value,
+                hasValue: $0.hasValue
             )
         }
     }
@@ -58,7 +77,8 @@ extension [QueryItem] {
         map {
             .init(
                 name: $0.name.addingRFC3986PercentEncoding(withAllowedCharacters: allowedCharacters),
-                value: $0.value.addingRFC3986PercentEncoding(withAllowedCharacters: allowedCharacters)
+                value: $0.value.addingRFC3986PercentEncoding(withAllowedCharacters: allowedCharacters),
+                hasValue: $0.hasValue
             )
         }
     }
@@ -77,14 +97,15 @@ extension [QueryItem] {
         map {
             .init(
                 name: $0.name.replacingWhitespace(with: representable),
-                value: $0.value.replacingWhitespace(with: representable)
+                value: $0.value.replacingWhitespace(with: representable),
+                hasValue: $0.hasValue
             )
         }
     }
 
     /// Renders as a query string, without the leading `?`.
     func joined() -> String {
-        map { "\($0.name)=\($0.value)" }
+        map { $0.hasValue ? "\($0.name)=\($0.value)" : $0.name }
             .joined(separator: "&")
     }
 }

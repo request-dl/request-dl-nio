@@ -65,11 +65,16 @@ public struct QueryGroup<Content: Property>: Property {
     }
 }
 
-extension QueryGroup where Content == PropertyForEach<[String: Sendable], String, Query<Sendable>> {
+extension QueryGroup where Content == PropertyForEach<[(key: String, value: Sendable)], String, Query<Sendable>> {
 
+    /// Creates a group with one query per entry, ordered by name.
+    ///
+    /// A dictionary has no order of its own, and the one it iterates in changes from one launch to
+    /// the next. The URL is the key of the data cache and what a signed URL signs, so the entries
+    /// are sorted by name, the way ``URLEncoder`` sorts a dictionary value.
     public init(_ dictionary: [String: Sendable]) {
         self.init {
-            PropertyForEach(dictionary, id: \.key) {
+            PropertyForEach(dictionary.sorted { $0.key < $1.key }, id: \.key) {
                 Query(name: $0.key, value: $0.value)
             }
         }

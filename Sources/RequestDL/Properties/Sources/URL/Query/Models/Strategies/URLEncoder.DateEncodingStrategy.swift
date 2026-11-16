@@ -50,23 +50,38 @@ extension URLEncoder {
 
         /// - Note: Floors rather than truncating. `Int64(-0.5)` is zero, which places a moment
         /// just before the epoch on the wrong side of it.
+        ///
+        /// - Throws: ``URLEncoderError`` when the date is NaN, infinite or too far from 1970 for
+        /// its seconds to fit in an `Int64`, which `Int64(_:)` would trap on.
         private func encodeSecondsSince1970(_ date: Date, in encoder: URLEncoder.Encoder) throws {
+            guard let seconds = Int64(exactly: date.timeIntervalSince1970.rounded(.down)) else {
+                throw URLEncoderError(.invalidDate)
+            }
+
             var container = encoder.valueContainer()
-            try container.encode("\(Int64(date.timeIntervalSince1970.rounded(.down)))")
+            try container.encode("\(seconds)")
         }
 
-        /// - Note: Same flooring caveat as ``encodeSecondsSince1970(_:in:)``.
+        /// - Note: Same flooring and range caveats as ``encodeSecondsSince1970(_:in:)``.
         private func encodeMillisecondsSince1970(_ date: Date, in encoder: URLEncoder.Encoder) throws {
+            guard let milliseconds = Int64(exactly: (date.timeIntervalSince1970 * 1000).rounded(.down)) else {
+                throw URLEncoderError(.invalidDate)
+            }
+
             var container = encoder.valueContainer()
-            try container.encode("\(Int64((date.timeIntervalSince1970 * 1000).rounded(.down)))")
+            try container.encode("\(milliseconds)")
         }
 
         /// - Important: Formatting must go through ``Internals/GregorianCalendar``, shared with the
         /// HTTP date parsing the cache layer needs, rather than a private copy in this file, since
         /// a year count done by looping is wrong for anything before 1970.
         private func encodeISO8601(_ date: Date, in encoder: URLEncoder.Encoder) throws {
+            guard let string = date.toISO8601String() else {
+                throw URLEncoderError(.invalidDate)
+            }
+
             var container = encoder.valueContainer()
-            try container.encode(date.toISO8601String())
+            try container.encode(string)
         }
     }
 }
