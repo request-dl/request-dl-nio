@@ -4,6 +4,7 @@
 
 #if canImport(Darwin)
 
+import Dispatch
 import Testing
 
 @testable import RequestDLInternals
@@ -118,7 +119,7 @@ extension InternalsIdentityManagerTests {
             )
 
             let deletions = LockedValueBox<[Deletion]>([])
-            let manager = Internals.IdentityManager { label, useDataProtectionKeychain in
+            let manager = Internals.IdentityManager { label, _, useDataProtectionKeychain in
                 deletions.withLockedValue {
                     $0.append(Deletion(label: label, useDataProtectionKeychain: useDataProtectionKeychain))
                 }
@@ -126,7 +127,7 @@ extension InternalsIdentityManagerTests {
 
             // When
             var handle: Internals.IdentityHandle? = try manager.handle(for: "test.label") {
-                (source.identity, useDataProtectionKeychain)
+                (source.identity, useDataProtectionKeychain, nil)
             }
 
             // Then: nothing is deleted while the handle is alive.
@@ -177,15 +178,15 @@ extension InternalsIdentityManagerTests {
             )
 
             let deletions = LockedValueBox<[String]>([])
-            let manager = Internals.IdentityManager { label, _ in
+            let manager = Internals.IdentityManager { label, _, _ in
                 deletions.withLockedValue { $0.append(label) }
             }
 
             var first: Internals.IdentityHandle? = try manager.handle(for: "cert.first", keyLabel: "key") {
-                (source.identity, false)
+                (source.identity, false, nil)
             }
             var second: Internals.IdentityHandle? = try manager.handle(for: "cert.second", keyLabel: "key") {
-                (source.identity, false)
+                (source.identity, false, nil)
             }
 
             // When / Then
@@ -209,6 +210,195 @@ extension InternalsIdentityManagerTests {
         #endif
     }
 }
+
+extension InternalsIdentityManagerTests {
+
+    /// The legacy macOS keychain does not keep a certificate's label, so the certificate the
+    /// handle's build added is deleted by reference. A handle whose build found it already stored
+    /// has none to give, and must not delete one that someone else stored.
+    @Test
+    func release_whenTheHandleOwnsItsCertificate_deletesItByReferenceAndNotTheKey() async throws {
+        func run() throws {
+            // Given
+            let client = Certificates().client()
+            let secureConnection = Internals.SecureConnection.testMTLSConnection(client: client)
+
+            let certificateChain = try #require(secureConnection.certificateChain)
+            let certificateDER = try #require(
+                try Internals.RawBytesIdentityBuilder.certificateDERs(from: certificateChain).first
+            )
+            let privateKeySource = try #require(secureConnection.privateKey)
+            let privateKeyDER = try Internals.RawBytesIdentityBuilder.privateKeyDER(from: privateKeySource)
+
+            let source = try Internals.RawBytesIdentityBuilder.makeIdentity(
+                certificateDER: certificateDER,
+                privateKeyDER: privateKeyDER
+            )
+            let certificate = try Internals.RawBytesIdentityBuilder.certificate(fromDER: certificateDER)
+
+            let deletions = LockedValueBox<[String]>([])
+            let manager = Internals.IdentityManager { label, certificate, _ in
+                deletions.withLockedValue { $0.append("\(label):\(certificate == nil ? "label" : "reference")") }
+            }
+
+            var owning: Internals.IdentityHandle? = try manager.handle(for: "cert.owned", keyLabel: "key") {
+                (source.identity, false, certificate)
+            }
+            var notOwning: Internals.IdentityHandle? = try manager.handle(for: "cert.found", keyLabel: "key") {
+                (source.identity, false, nil)
+            }
+
+            // When / Then
+            owning = nil
+            notOwning = nil
+
+            #expect(deletions.withLockedValue { $0 } == ["cert.owned:reference", "cert.found:label", "key:label"])
+
+            _ = (owning, notOwning)
+        }
+
+        #if os(macOS)
+        try run()
+        #else
+        await withKnownIssue(
+            "no Keychain Sharing entitlement on this platform's SwiftPM-generated Xcode scheme; see RequestConfigurationURLSessionClientMTLSTests's own doc comment"
+        ) {
+            try run()
+        }
+        #endif
+    }
+}
+
+extension InternalsIdentityManagerTests {
+
+    /// A new handle can be registered for a label while the old one is already dying (its weak
+    /// reference is zeroed before its `deinit` takes the lock). The new one found the old one's
+    /// certificate "already there" and does not own it, so the old one's release hands it over,
+    /// or nobody would ever delete it.
+    @Test
+    func release_whenANewerHandleIsAlreadyRegisteredForTheLabel_handsItTheCertificate() async throws {
+        func run() throws {
+            // Given
+            let client = Certificates().client()
+            let secureConnection = Internals.SecureConnection.testMTLSConnection(client: client)
+
+            let certificateChain = try #require(secureConnection.certificateChain)
+            let certificateDER = try #require(
+                try Internals.RawBytesIdentityBuilder.certificateDERs(from: certificateChain).first
+            )
+            let privateKeySource = try #require(secureConnection.privateKey)
+            let privateKeyDER = try Internals.RawBytesIdentityBuilder.privateKeyDER(from: privateKeySource)
+
+            let source = try Internals.RawBytesIdentityBuilder.makeIdentity(
+                certificateDER: certificateDER,
+                privateKeyDER: privateKeyDER
+            )
+            let certificate = try Internals.RawBytesIdentityBuilder.certificate(fromDER: certificateDER)
+
+            let deletions = LockedValueBox<[String]>([])
+            let manager = Internals.IdentityManager { label, certificate, _ in
+                deletions.withLockedValue { $0.append("\(label):\(certificate == nil ? "label" : "reference")") }
+            }
+
+            var newer: Internals.IdentityHandle? = try manager.handle(for: "cert") {
+                (source.identity, false, nil)
+            }
+
+            // When: the older handle's release runs while the newer one is registered.
+            manager.release(
+                label: "cert",
+                keyLabel: "cert",
+                ownedCertificate: certificate,
+                useDataProtectionKeychain: false
+            )
+
+            #expect(deletions.withLockedValue { $0 }.isEmpty)
+
+            // Then: the newer one deletes it with its own release.
+            newer = nil
+
+            #expect(deletions.withLockedValue { $0 } == ["cert:reference"])
+
+            _ = newer
+        }
+
+        #if os(macOS)
+        try run()
+        #else
+        await withKnownIssue(
+            "no Keychain Sharing entitlement on this platform's SwiftPM-generated Xcode scheme; see RequestConfigurationURLSessionClientMTLSTests's own doc comment"
+        ) {
+            try run()
+        }
+        #endif
+    }
+}
+
+#if os(macOS)
+
+extension InternalsIdentityManagerTests {
+
+    /// `release(...)` looks at the handle registered for its label while holding the lock. That
+    /// look takes a strong reference, and if another thread drops the last outside reference to
+    /// that handle meanwhile, the look is the last one: the handle is deallocated there, under the
+    /// lock, its `deinit` calls `release(...)`, and the non-reentrant lock aborts the process
+    /// (`_os_unfair_lock_recursive_abort`). A handle must only ever be deallocated outside it.
+    ///
+    /// Several threads keep calling `release` for the label, so that one of them is almost always
+    /// inside the lock looking at the registered handle, while this thread drops the handle again
+    /// and again. Before the fix, sooner or later a drop lands in a look and kills the process.
+    @Test
+    func release_whenTheHandleRegisteredForTheLabelIsDroppedMeanwhile_neverDeallocatesItUnderTheLock() throws {
+        // Given
+        let fixture = try InternalsRawBytesIdentityBuilderKeychainTests.Fixture()
+        defer { fixture.cleanUp() }
+
+        let source = try Internals.RawBytesIdentityBuilder.makeIdentity(
+            certificateDER: fixture.certificateDER,
+            privateKeyDER: fixture.pkcs1
+        )
+
+        let manager = Internals.IdentityManager { _, _, _ in }
+        let isRunning = LockedValueBox(true)
+        let releasers = DispatchGroup()
+
+        for _ in 0..<4 {
+            DispatchQueue.global().async(group: releasers) {
+                while isRunning.withLockedValue({ $0 }) {
+                    manager.release(
+                        label: "race",
+                        keyLabel: "race",
+                        ownedCertificate: nil,
+                        useDataProtectionKeychain: false
+                    )
+                }
+            }
+        }
+
+        // When
+        var failure: (any Error)?
+        for _ in 0..<5_000 {
+            do {
+                var registered: Internals.IdentityHandle? = try manager.handle(for: "race") {
+                    (source.identity, false, nil)
+                }
+                registered = nil
+                _ = registered
+            } catch {
+                failure = error
+                break
+            }
+        }
+
+        isRunning.withLockedValue { $0 = false }
+        releasers.wait()
+
+        // Then: still here.
+        #expect(failure == nil)
+    }
+}
+
+#endif
 
 extension Internals.SecureConnection {
 

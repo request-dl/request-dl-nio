@@ -121,6 +121,7 @@ struct ClientIdentityErrorTests {
             .keychainOperationFailed(errSecDuplicateItem, operation: "SecItemAdd(certificate)"),
             .missingKeychainSharingEntitlement(operation: "SecItemAdd(key)"),
             .identityLookupReturnedWrongType,
+            .privateKeyDoesNotMatchCertificate,
         ]
     )
     func error_whenEveryInternalCaseRewrapped_hasNonEmptyDescription(
@@ -131,6 +132,16 @@ struct ClientIdentityErrorTests {
 
         // Then
         #expect(!description.isEmpty)
+    }
+
+    @Test
+    func error_whenThePrivateKeyIsNotTheCertificates_saysSo() async throws {
+        // When
+        let error = ClientIdentityError(Internals.RawBytesIdentityBuilder.Error.privateKeyDoesNotMatchCertificate)
+
+        // Then
+        #expect(error.description.contains("not the private key of the configured certificate"))
+        #expect(!error.description.contains("Keychain Sharing"))
     }
 }
 

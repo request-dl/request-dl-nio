@@ -376,13 +376,18 @@ struct InternalsRawBytesIdentityBuilderTests {
     /// `useDataProtectionKeychain: false` storage. macOS only; see that test's own doc comment.
     @Test
     func store_whenGivenAnRSAKeyOnTheLegacyKeychain_succeeds() throws {
-        // Given
-        let client = Certificates().client()
-        let certificate = try Self.certificate(fromPEMFile: client.certificateURL)
-        let secKey = try Self.secKey(fromPrivateKeyPEMFile: client.privateKeyURL)
+        // Given: a pair of its own. With the pair the handshake tests share, another test
+        // releasing its handle for it deletes the key or the certificate between this test's add
+        // and its look for the identity, and the look fails with `errSecItemNotFound` (-25300).
+        let fixture = try InternalsRawBytesIdentityBuilderKeychainTests.Fixture()
+        let certificate = try Internals.RawBytesIdentityBuilder.certificate(fromDER: fixture.certificateDER)
+        let secKey = try Internals.RawBytesIdentityBuilder.secKey(fromDER: fixture.pkcs1)
 
         let label = "InternalsRawBytesIdentityBuilderTests.rsaLegacyKeychain." + UUID().uuidString
-        defer { Self.deleteKeychainItems(labelled: label) }
+        defer {
+            Self.deleteKeychainItems(labelled: label)
+            fixture.cleanUp()
+        }
 
         // When / Then
         _ = try Internals.RawBytesIdentityBuilder.store(
@@ -456,6 +461,57 @@ struct InternalsRawBytesIdentityBuilderTests {
         }
     }
     #endif
+
+    // MARK: - Pairing a private key with a certificate
+
+    /// None of these touch the Keychain: the pair is checked before anything is stored.
+    @Test
+    func validate_whenTheCertificatesPublicKeyIsTheKeys_passes() throws {
+        // Given
+        let secKey = try Internals.RawBytesIdentityBuilder.secKey(fromDER: Self.makeRSAPKCS1DER())
+        let publicKey = try #require(SecKeyCopyPublicKey(secKey))
+        let representation = try #require(SecKeyCopyExternalRepresentation(publicKey, nil) as Data?)
+        let applicationLabel = try Internals.RawBytesIdentityBuilder.applicationLabel(of: secKey)
+
+        // Then
+        try Internals.RawBytesIdentityBuilder.validate(
+            certificatePublicKey: representation,
+            pairsWith: applicationLabel
+        )
+    }
+
+    @Test
+    func validate_whenTheCertificatesPublicKeyIsAnotherKeys_throwsPrivateKeyDoesNotMatchCertificate() throws {
+        // Given
+        let secKey = try Internals.RawBytesIdentityBuilder.secKey(fromDER: Self.makeRSAPKCS1DER())
+        let other = try Internals.RawBytesIdentityBuilder.secKey(fromDER: Self.makeRSAPKCS1DER())
+        let otherPublicKey = try #require(SecKeyCopyPublicKey(other))
+        let otherRepresentation = try #require(SecKeyCopyExternalRepresentation(otherPublicKey, nil) as Data?)
+        let applicationLabel = try Internals.RawBytesIdentityBuilder.applicationLabel(of: secKey)
+
+        // Then
+        do {
+            try Internals.RawBytesIdentityBuilder.validate(
+                certificatePublicKey: otherRepresentation,
+                pairsWith: applicationLabel
+            )
+            Issue.record("Not expecting success")
+        } catch Internals.RawBytesIdentityBuilder.Error.privateKeyDoesNotMatchCertificate {
+            // Expected.
+        }
+    }
+
+    /// Nothing to compare, so nothing is refused: `store(...)` is what finds out whether an
+    /// identity forms.
+    @Test
+    func validate_whenTheCertificatesPublicKeyCannotBeRead_passes() throws {
+        // Given
+        let secKey = try Internals.RawBytesIdentityBuilder.secKey(fromDER: Self.makeRSAPKCS1DER())
+        let applicationLabel = try Internals.RawBytesIdentityBuilder.applicationLabel(of: secKey)
+
+        // Then
+        try Internals.RawBytesIdentityBuilder.validate(certificatePublicKey: nil, pairsWith: applicationLabel)
+    }
 
     // MARK: - Unsupported formats
 
