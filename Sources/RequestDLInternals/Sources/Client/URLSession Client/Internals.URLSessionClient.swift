@@ -76,12 +76,18 @@ extension Internals {
         /// .proxyBearerAuthorizationUnderURLSession`), so a well-formed caller never passes that
         /// here. See `Internals.Proxy.buildConnectionProxyDictionary()`'s doc comment for the
         /// per-platform status of this mapping.
+        /// - Parameter sessionDelegate: Handed to the `URLSession` itself, which holds on to it
+        /// until the session is invalidated. Every exchange answers through its own task delegate,
+        /// so production leaves this `nil`; it exists so a test can observe the session being
+        /// invalidated (`urlSession(_:didBecomeInvalidWithError:)`), the one thing the session
+        /// reports about its own end and that nothing else exposes once the client is gone.
         package init(
             configuration: URLSessionConfiguration,
             secureConnection: Internals.SecureConnection? = nil,
             redirectConfiguration: Internals.RedirectConfiguration = .follow(max: 5, allowCycles: false),
             proxy: Internals.Proxy? = nil,
-            maximumConcurrentConnections: Int? = nil
+            maximumConcurrentConnections: Int? = nil,
+            sessionDelegate: (any URLSessionDelegate)? = nil
         ) throws {
             let configuration = configuration
             // Explicitly `[:]`, not left untouched, when `proxy` is `nil`. `URLSession` treats an
@@ -108,7 +114,7 @@ extension Internals {
             // gets as far as `deinit`, so a session created first would be left running for ever.
             let identityPolicy = try secureConnection.map(Internals.URLSessionIdentityPolicy.init)
 
-            session = URLSession(configuration: configuration)
+            session = URLSession(configuration: configuration, delegate: sessionDelegate, delegateQueue: nil)
             throttledExecutor = Internals.ThrottledExecutor(
                 maximumConcurrentConnections: maximumConcurrentConnections
             )
