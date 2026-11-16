@@ -5,6 +5,13 @@
 import Testing
 
 @_spi(Private) @testable import RequestDL
+@testable import RequestDLInternals
+
+#if canImport(FoundationEssentials)
+import struct FoundationEssentials.URL
+#else
+import struct Foundation.URL
+#endif
 
 /// What holds for every dialect, since it is what a driver that doesn't know which one it has
 /// relies on.
@@ -82,6 +89,95 @@ struct ResumableUploadDialectContractTests {
 
         // Then
         #expect(resource.url == "https://example.com/uploads/42")
+    }
+
+    /// A creation that was redirected is answered by another URL than the one it was sent to, and a
+    /// relative `Location` is relative to the one that answered.
+    @Test(arguments: ResumableUploadDialectKind.allCases)
+    func resource_whenLocationIsRelative_isResolvedAgainstTheURLThatAnswered(
+        _ kind: ResumableUploadDialectKind
+    ) async throws {
+        // Given
+        let request = await Fixtures.request()
+        let head = Fixtures.head(
+            201,
+            [("Location", "created/42")],
+            url: URL(string: "https://cdn.example.net/v2/files/")
+        )
+
+        // When
+        let resource = try kind.dialect.resource(from: head, createdFor: request)
+
+        // Then
+        #expect(resource.url == "https://cdn.example.net/v2/files/created/42")
+    }
+
+    @Test(arguments: ResumableUploadDialectKind.allCases)
+    func resource_whenTheURLThatAnsweredIsUnknown_isResolvedAgainstTheRequest(
+        _ kind: ResumableUploadDialectKind
+    ) async throws {
+        // Given
+        let request = await Fixtures.request()
+        let head = Fixtures.head(201, [("Location", "/uploads/42")], url: nil)
+
+        // When
+        let resource = try kind.dialect.resource(from: head, createdFor: request)
+
+        // Then
+        #expect(resource.url == "https://example.com/uploads/42")
+    }
+
+    @Test(arguments: ResumableUploadDialectKind.allCases)
+    func resource_whenTheRedirectedCreationLeavesHTTPS_isNotAcceptedOverHTTP(
+        _ kind: ResumableUploadDialectKind
+    ) async throws {
+        // Given: the request went over `https`, and so does not take the rest of the upload to `http`
+        // whichever URL answered.
+        let request = await Fixtures.request()
+        let head = Fixtures.head(
+            201,
+            [("Location", "/uploads/42")],
+            url: URL(string: "http://cdn.example.net/files")
+        )
+
+        // Then
+        #expect(throws: ResumableUploadDialectError.self) {
+            try kind.dialect.resource(from: head, createdFor: request)
+        }
+    }
+
+    @Test(
+        arguments: ResumableUploadDialectKind.allCases,
+        ["https://example.com/uploads/42/", "https://example.com/u/1/?t=2"]
+    )
+    func requestsToTheUpload_keepTheURLExactlyAsTheServerSaidIt(
+        _ kind: ResumableUploadDialectKind,
+        _ url: String
+    ) async throws {
+        // Given: a server whose upload URL ends in a slash, which is a different resource than the
+        // one without it.
+        let request = await Fixtures.request()
+        let resource = UploadResource(url: url)
+        let dialect = kind.dialect
+
+        // Then
+        #expect(dialect.offsetQuery(for: resource, like: request).url == url)
+        #expect(dialect.append(to: resource, from: 5, like: request).url == url)
+        #expect(dialect.cancellation(of: resource, like: request)?.url == url)
+    }
+
+    @Test(arguments: ResumableUploadDialectKind.allCases)
+    func resource_whenLocationEndsInASlash_keepsIt(_ kind: ResumableUploadDialectKind) async throws {
+        // Given
+        let request = await Fixtures.request()
+        let head = Fixtures.head(201, [("Location", "https://example.com/files/abc/")])
+
+        // When
+        let resource = try kind.dialect.resource(from: head, createdFor: request)
+        let append = kind.dialect.append(to: resource, from: 0, like: request)
+
+        // Then
+        #expect(append.url == "https://example.com/files/abc/")
     }
 
     @Test(arguments: ResumableUploadDialectKind.allCases)
@@ -399,6 +495,62 @@ struct ResumableUploadDialectContractTests {
         for query in derived {
             #expect(query.headers.first(name: "Authorization") == nil)
             #expect(query.headers.first(name: "Cookie") == nil)
+        }
+    }
+
+    @Test(arguments: ResumableUploadDialectKind.allCases, [false, true])
+    func requestsToAnotherOrigin_doNotCarryAnExplicitHost(
+        _ kind: ResumableUploadDialectKind,
+        _ forwards: Bool
+    ) async throws {
+        // Given: `Host` names the virtual host of the origin the caller wrote the request for; at
+        // another origin it routes the request to whatever answers to that name there, so it stays
+        // behind even for a caller that forwards its credentials.
+        var request = await Fixtures.request()
+        request.headers.set(name: "Host", value: "internal.example.com")
+        request.forwardsCredentialsToOtherOrigins = forwards
+
+        // When
+        let derived = try requests(kind, to: Self.otherOrigin, like: request)
+
+        // Then
+        for query in derived {
+            #expect(query.headers.first(name: "Host") == nil)
+        }
+    }
+
+    @Test(arguments: ResumableUploadDialectKind.allCases)
+    func requestsToTheSameOrigin_keepAnExplicitHost(_ kind: ResumableUploadDialectKind) async throws {
+        // Given
+        var request = await Fixtures.request()
+        request.headers.set(name: "Host", value: "internal.example.com")
+
+        // When
+        let derived = try requests(kind, to: Fixtures.resource, like: request)
+
+        // Then
+        for query in derived {
+            #expect(query.headers.first(name: "Host") == "internal.example.com")
+        }
+    }
+
+    @Test
+    func theHeadersLeftBehindAtAnotherOrigin_areTheOnesARedirectLeavesBehind() async throws {
+        // Given: every header a redirect to another origin strips, set on the request.
+        var request = await Fixtures.request()
+
+        for name in Internals.RedirectSanitizer.crossOriginHeaders {
+            request.headers.set(name: name, value: "value")
+        }
+
+        // When
+        let derived = try requests(.ietf, to: Self.otherOrigin, like: request)
+
+        // Then
+        for query in derived {
+            for name in Internals.RedirectSanitizer.crossOriginHeaders {
+                #expect(query.headers.first(name: name) == nil, "\(name) followed the upload to another origin")
+            }
         }
     }
 }

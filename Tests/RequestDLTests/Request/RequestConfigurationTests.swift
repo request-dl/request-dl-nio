@@ -23,6 +23,38 @@ struct RequestConfigurationTests {
     }
 
     @Test
+    func request_whenBuiltFromBaseAndPath_stillTrimsTheSlashesAroundThem() async throws {
+        // Given
+        var request = RequestConfiguration()
+
+        // When
+        request.baseURL = " https://example.com/ "
+        request.pathComponents = ["/files/", "abc/"]
+
+        // Then: what an upload that keeps the exact URL of a server relies on is not what any other
+        // request gets.
+        #expect(request.url == "https://example.com/files/abc/")
+
+        request.pathComponents = []
+        #expect(request.url == "https://example.com")
+    }
+
+    @Test
+    func request_whenGivenAnExactURL_isThatURLToTheLastCharacter() async throws {
+        // Given
+        var request = RequestConfiguration()
+        request.baseURL = "https://example.com"
+        request.pathComponents = ["other"]
+        request.queries = [QueryItem(name: "a", value: "b")]
+
+        // When
+        request.exactURL = "https://example.com/files/abc/"
+
+        // Then
+        #expect(request.url == "https://example.com/files/abc/")
+    }
+
+    @Test
     func request_whenMethodIsAssign_shouldBeEqual() async throws {
         // Given
         var request = RequestConfiguration()

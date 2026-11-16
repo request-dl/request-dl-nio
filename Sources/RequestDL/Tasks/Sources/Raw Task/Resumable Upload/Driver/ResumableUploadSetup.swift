@@ -24,6 +24,10 @@ struct ResumableUploadSetup: Sendable {
     /// another origin.
     let forwardsCredentialsToOtherOrigins: Bool
 
+    /// How the execution waits ``delay``, given in nanoseconds. Always `Task.sleep`; a test replaces
+    /// it to see how often the execution waits, and for how long, without waiting for it.
+    let sleep: @Sendable (UInt64) async throws -> Void
+
     // MARK: - Inits
 
     init(
@@ -31,7 +35,8 @@ struct ResumableUploadSetup: Sendable {
         maximumAttemptsWithoutProgress: Int = 3,
         delay: UInt64 = 1_000_000_000,
         cancellation: UploadCancellation = .terminate,
-        forwardsCredentialsToOtherOrigins: Bool = false
+        forwardsCredentialsToOtherOrigins: Bool = false,
+        sleep: @escaping @Sendable (UInt64) async throws -> Void = { try await Task.sleep(nanoseconds: $0) }
     ) {
         precondition(maximumAttemptsWithoutProgress > .zero, "A resumable upload allows at least one attempt")
 
@@ -40,6 +45,7 @@ struct ResumableUploadSetup: Sendable {
         self.delay = delay
         self.cancellation = cancellation
         self.forwardsCredentialsToOtherOrigins = forwardsCredentialsToOtherOrigins
+        self.sleep = sleep
     }
 }
 
@@ -128,7 +134,8 @@ extension RequestTask {
     ///   `Authorization`, `Cookie`, `Proxy-Authorization` and `Origin`, and an upload is never
     ///   moved from `https` to `http` or to a scheme that is not `http`. Pass `true` when the
     ///   uploads of a server you trust are served from another origin that expects the same
-    ///   credentials.
+    ///   credentials. An explicit `Host` stays behind either way: it names the virtual host of the
+    ///   origin the request was written for.
     /// - Returns: A task that produces this task's actual result, exactly as ``result()`` would.
     ///
     /// - Important: Only a request with a body is an upload. A body that is compressed as it is
@@ -138,6 +145,12 @@ extension RequestTask {
     /// can pass the size of the body after a retry. Nothing is kept between launches of the
     /// application, and an upload that is abandoned (a request that is cancelled without the
     /// server being told, an application that is closed) is left to the server to expire.
+    ///
+    /// - Important: tus has no way to say how the bytes of an upload are encoded, so a request that
+    /// is sent with a `Content-Encoding` (a body compressed with `.compression(_:)`, or the header
+    /// set by hand) is refused with ``UploadResumptionError/Reason/contentEncodingNotSupported``
+    /// before anything is sent. The IETF protocol creates the upload with the request that was
+    /// written, so it carries the header.
     ///
     public func resumingUploads<Protocol: ResumableUploadProtocol>(
         _ protocol: Protocol,

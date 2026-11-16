@@ -35,6 +35,10 @@ struct ResumableUploadClient: RequestExecutingClient {
             )
         }
 
+        // Before any of it is produced: a protocol that cannot carry the request as it was written
+        // says so now, and nothing is compressed, created or sent for it.
+        try setup.dialect.validate(configuration)
+
         // A body that is compressed as it is sent is produced here, once, so that everything that
         // follows is about the same bytes; this is also where a failure to do so is reported, like
         // any other request that is rejected before it is sent.

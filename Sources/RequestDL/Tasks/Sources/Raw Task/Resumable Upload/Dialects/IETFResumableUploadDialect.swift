@@ -57,7 +57,7 @@ struct IETFResumableUploadDialect: ResumableUploadDialect {
 
         guard
             let location = head.headers.first(name: "Location"),
-            let url = request.resolving(location: location)
+            let url = request.resolving(location: location, answeredFrom: head.url?.absoluteString)
         else {
             throw ResumableUploadDialectError(reason: .missingLocation)
         }

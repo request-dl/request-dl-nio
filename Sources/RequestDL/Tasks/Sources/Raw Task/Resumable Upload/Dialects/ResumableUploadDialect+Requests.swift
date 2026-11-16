@@ -2,6 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
+import RequestDLInternals
+
 #if canImport(FoundationEssentials)
 import struct FoundationEssentials.URL
 import struct FoundationEssentials.URLComponents
@@ -33,25 +35,31 @@ extension RequestConfiguration {
         "upload-defer-length",
     ]
 
-    /// What identifies the caller to the server it wrote the request for, which another server has
-    /// no business receiving.
-    private static let headersIdentifyingTheCaller: Set<String> = [
-        "authorization",
-        "cookie",
-        "proxy-authorization",
-        "origin",
-    ]
+    /// What a request leaves behind when it goes to another origin than the one it was written for:
+    /// the very list a redirect to another origin applies, so the two never disagree about what
+    /// belongs to the origin it came from.
+    private static let headersLeftBehindAtAnotherOrigin = Set(
+        Internals.RedirectSanitizer.crossOriginHeaders.map { $0.lowercased() }
+    )
+
+    /// The one of those that is not a credential: it names the virtual host of the origin the
+    /// request was written for, which is wrong at any other, whoever is trusted with the rest.
+    private static let headersNeverSentToAnotherOrigin: Set<String> = ["host"]
 
     /// A request to `url` that keeps what the caller set up for the request it is built from, but
     /// not what described its body: the base, the headers about the body, the body itself.
     ///
     /// When `url` is not on the origin of this request, which only happens when the server chose
     /// it, the headers that identify the caller stay behind too, unless the caller asked for them
-    /// to be forwarded.
+    /// to be forwarded (`Host` stays behind regardless, see ``headersNeverSentToAnotherOrigin``).
+    ///
+    /// `url` is kept exactly as it is, to the last character: a server that answers with
+    /// `/files/abc/` has a resource at that URL, and not at `/files/abc`.
     func derived(method: String, url: String) -> RequestConfiguration {
         var configuration = self
 
         configuration.baseURL = url
+        configuration.exactURL = url
         configuration.pathComponents = []
         configuration.queries = []
         configuration.method = method
@@ -61,14 +69,20 @@ extension RequestConfiguration {
         configuration.compression = nil
         configuration.shouldCompressBodyData = nil
 
-        let keepsCredentials = forwardsCredentialsToOtherOrigins || Self.isSameOrigin(self.url, url)
+        let leftBehind: Set<String>
+
+        if Self.isSameOrigin(self.url, url) {
+            leftBehind = []
+        } else if forwardsCredentialsToOtherOrigins {
+            leftBehind = Self.headersNeverSentToAnotherOrigin
+        } else {
+            leftBehind = Self.headersLeftBehindAtAnotherOrigin
+        }
 
         for name in headers.names {
             let lowercased = name.lowercased()
 
-            if Self.headersDescribingTheBody.contains(lowercased)
-                || (!keepsCredentials && Self.headersIdentifyingTheCaller.contains(lowercased))
-            {
+            if Self.headersDescribingTheBody.contains(lowercased) || leftBehind.contains(lowercased) {
                 configuration.headers.remove(name: name)
             }
         }
@@ -77,11 +91,13 @@ extension RequestConfiguration {
     }
 
     /// `location` as an absolute URL, `location` being what a server answered with, which may be
-    /// relative to the URL the request went to.
+    /// relative to the URL that answered: `answeredFrom`, the URL the response reports, and the URL
+    /// of this request when it is not known. `.urlSession` reports the final URL of a request that
+    /// was redirected; `.nio` reports the one it was sent to, so there the two are the same.
     ///
     /// `nil` when it is not an `http` or `https` URL, or when it would take a request that went
     /// over `https` to `http`: the rest of the upload would then travel in the clear.
-    func resolving(location: String) -> String? {
+    func resolving(location: String, answeredFrom: String? = nil) -> String? {
         let trimmed = location.trimming(where: \.isWhitespace)
 
         guard !trimmed.isEmpty else {
@@ -90,9 +106,13 @@ extension RequestConfiguration {
 
         let resolved: String
 
+        // Relative to where the answer came from: a creation that was redirected is answered by
+        // another URL than the one it was sent to.
+        let answered = answeredFrom.flatMap { $0.isEmpty ? nil : $0 } ?? url
+
         if let absolute = URLComponents(string: trimmed), absolute.scheme != nil, absolute.host != nil {
             resolved = trimmed
-        } else if let base = URL(string: url), let relative = URL(string: trimmed, relativeTo: base) {
+        } else if let base = URL(string: answered), let relative = URL(string: trimmed, relativeTo: base) {
             resolved = relative.absoluteString
         } else {
             return nil
@@ -102,7 +122,9 @@ extension RequestConfiguration {
             return nil
         }
 
-        if URL(string: url)?.scheme?.lowercased() == "https", scheme != "https" {
+        let wentOverHTTPS = [url, answered].contains { URL(string: $0)?.scheme?.lowercased() == "https" }
+
+        if wentOverHTTPS, scheme != "https" {
             return nil
         }
 

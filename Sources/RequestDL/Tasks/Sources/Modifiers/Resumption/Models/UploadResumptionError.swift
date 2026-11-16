@@ -40,6 +40,12 @@ public struct UploadResumptionError: Error, Sendable, Hashable, CustomStringConv
         /// asked how much of the upload it holds, until the attempts ran out. The status is the
         /// last one it answered with.
         case serverUnavailable(status: UInt)
+
+        /// The body is sent with a `Content-Encoding` (it was compressed, or the request says so),
+        /// and the protocol has nowhere to say that to the server. Sent anyway, the server would
+        /// hold the encoded bytes with nothing to say they are encoded, so the upload is refused
+        /// before anything is sent. tus is the one that does this.
+        case contentEncodingNotSupported
     }
 
     /// What went wrong.

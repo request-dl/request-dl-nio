@@ -390,8 +390,10 @@ struct ResumableUploadExecutionTests {
 
     // MARK: - Compression
 
-    @Test(arguments: cases)
-    private func aCompressedBody_isSentAsTheBytesThatWereCompressedOnce(_ scenario: Case) async throws {
+    @Test(arguments: Executor.allCases)
+    private func aCompressedBody_isSentAsTheBytesThatWereCompressedOnce(_ executor: Executor) async throws {
+        let scenario = Case(executor: executor, kind: .ietf)
+
         try await Self.withUploadServer(scenario) { server in
             // Given: a body that compresses, so its length on the wire is not the one it was
             // written with.
@@ -407,19 +409,30 @@ struct ResumableUploadExecutionTests {
             #expect(server.heldUploads[1]?.data == Array(expected))
             #expect(expected.count < payload.count)
 
+            // The request that creates the upload is the one that was written.
             let requests = server.requests
+            #expect(requests.first?.header("Content-Encoding") == "gzip")
+            #expect(requests.filter { $0.method == "PATCH" }.allSatisfy { $0.header("Content-Encoding") == nil })
+        }
+    }
 
-            switch scenario.kind {
-            case .ietf:
-                // The request that creates the upload is the one that was written.
-                #expect(requests.first?.header("Content-Encoding") == "gzip")
-            case .tus:
-                // tus declares the length of what goes on the wire, and has nowhere to say how it
-                // is encoded.
-                #expect(requests.first?.header("Upload-Length") == String(expected.count))
+    /// tus has nowhere to say how the bytes of an upload are encoded: they would be stored as they
+    /// are, with nothing to tell them from the file that was meant, so the upload is refused.
+    @Test(arguments: Executor.allCases)
+    private func aCompressedBody_isRefusedByTUS_beforeAnythingIsSent(_ executor: Executor) async throws {
+        let scenario = Case(executor: executor, kind: .tus)
+
+        try await Self.withUploadServer(scenario) { server in
+            // Given
+            let payload = Data(String(repeating: "resumable ", count: 30_000).utf8)
+
+            // Then
+            await #expect(throws: UploadResumptionError(.contentEncodingNotSupported)) {
+                _ = try await Self.upload(to: server, scenario, payload: payload, compressed: true).result()
             }
 
-            #expect(requests.filter { $0.method == "PATCH" }.allSatisfy { $0.header("Content-Encoding") == nil })
+            #expect(server.requests.isEmpty)
+            #expect(server.heldUploads.isEmpty)
         }
     }
 

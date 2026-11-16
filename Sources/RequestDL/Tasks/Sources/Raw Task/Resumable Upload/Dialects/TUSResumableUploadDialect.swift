@@ -24,6 +24,12 @@ import struct Foundation.Data
 ///
 /// The length is always declared when the upload is created. The extension that defers it is not
 /// used.
+///
+/// A body that is sent with a `Content-Encoding` (compressed, say) is refused: the upload is created
+/// by a request of its own, which declares how long the bytes are, and tus has no field of its
+/// own to say how they are encoded (its metadata keys are the application's to define, and none
+/// of them means this). Carrying the bytes without saying so would leave the server holding an
+/// encoded stream that nothing identifies as one.
 struct TUSResumableUploadDialect: ResumableUploadDialect {
 
     // MARK: - Private static properties
@@ -37,6 +43,17 @@ struct TUSResumableUploadDialect: ResumableUploadDialect {
     }
 
     // MARK: - Internal methods
+
+    func validate(_ request: RequestConfiguration) throws {
+        let encodings = (request.headers["Content-Encoding"] ?? [])
+            .flatMap { $0.split(separator: ",") }
+            .map { $0.trimming(where: \.isWhitespace).lowercased() }
+            .filter { !$0.isEmpty && $0 != "identity" }
+
+        guard encodings.isEmpty else {
+            throw UploadResumptionError(.contentEncodingNotSupported)
+        }
+    }
 
     func creation(for request: RequestConfiguration, length: Int64?) -> RequestConfiguration {
         precondition(length != nil, "tus declares the length of the upload when it is created")
@@ -61,7 +78,7 @@ struct TUSResumableUploadDialect: ResumableUploadDialect {
 
         guard
             let location = head.headers.first(name: "Location"),
-            let url = request.resolving(location: location)
+            let url = request.resolving(location: location, answeredFrom: head.url?.absoluteString)
         else {
             throw ResumableUploadDialectError(reason: .missingLocation)
         }

@@ -11,6 +11,7 @@ import Testing
 import FoundationEssentials
 #else
 import struct Foundation.Data
+import struct Foundation.URL
 #endif
 
 /// The dialects, so a test that holds for every one of them is written once.
@@ -56,10 +57,11 @@ enum ResumableUploadDialectFixtures {
 
     static func head(
         _ code: UInt,
-        _ headers: [(String, String)] = []
+        _ headers: [(String, String)] = [],
+        url: URL? = nil
     ) -> ResponseHead {
         ResponseHead(
-            url: nil,
+            url: url,
             status: .init(code: code, reason: ""),
             version: .init(minor: 1, major: 1),
             headers: HTTPHeaders(headers),
