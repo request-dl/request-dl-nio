@@ -75,6 +75,57 @@ struct InternalsClientConcurrencyLimitTests {
             try await group.shutdownGracefully()
         }
     }
+
+    /// A request that is cancelled while it waits for a slot is over: it must not stay queued behind
+    /// requests that can be in flight for as long as the server cares to keep them, nor take a slot when
+    /// its turn comes.
+    @Test
+    func execute_whenCancelledWhileWaitingForASlot_throwsAtOnceAndKeepsTheSlotsIntact() async throws {
+        try await withHangingServer { port in
+            // Given: a limit of one, and a request holding it.
+            let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+            let client = Internals.Client(
+                eventLoopGroupProvider: .shared(group),
+                configuration: .init(),
+                maximumConcurrentConnections: 1
+            )
+
+            let semaphore = try #require(client.connectionSemaphoreForTesting)
+            let url = "http://127.0.0.1:\(port)/"
+
+            let holder = try await client.execute(request: try HTTPClient.Request(url: url), logger: nil)
+            #expect(semaphore.availablePermits == 0)
+
+            // And a second one, queued behind it.
+            let queued = _Concurrency.Task {
+                try await client.execute(request: try HTTPClient.Request(url: url), logger: nil)
+            }
+
+            try await semaphore.waitForWaiters(1, timeout: 30)
+
+            // When
+            queued.cancel()
+
+            // Then: it leaves the queue without the holder having had to finish.
+            try await semaphore.waitForWaiters(0, timeout: 30)
+
+            await #expect(throws: CancellationError.self) {
+                _ = try await queued.value
+            }
+
+            #expect(semaphore.availablePermits == 0)
+
+            // And the holder's slot is still the only one, and comes back when the holder is done.
+            let holderResponse = _Concurrency.Task { try? await holder.response() }
+            holderResponse.cancel()
+            _ = await holderResponse.value
+
+            #expect(semaphore.availablePermits == 1)
+
+            _ = try? await client.shutdown()
+            try await group.shutdownGracefully()
+        }
+    }
 }
 
 private actor StartedCounter {
