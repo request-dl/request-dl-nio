@@ -133,6 +133,47 @@ struct InternalsRawBytesIdentityBuilderKeychainTests {
         }
     }
 
+    /// The certificate of an identity is only its handle's to delete when its build is what put it
+    /// in the Keychain: one that was already there (an earlier run, another process, another
+    /// identity) is someone else's.
+    @Test
+    func store_whenTheCertificateIsAlreadyStored_doesNotClaimIt() throws {
+        // Given
+        let fixture = try Fixture()
+        let labels = (0..<2).map { _ in "InternalsRawBytesIdentityBuilderKeychainTests.store." + UUID().uuidString }
+        defer {
+            for label in labels {
+                Internals.RawBytesIdentityBuilder.deleteKeychainItems(
+                    label: label,
+                    certificate: nil,
+                    useDataProtectionKeychain: false
+                )
+            }
+            fixture.cleanUp()
+        }
+
+        let secKey = try Internals.RawBytesIdentityBuilder.secKey(fromDER: fixture.pkcs1)
+
+        // When
+        let first = try Internals.RawBytesIdentityBuilder.store(
+            certificate: try Internals.RawBytesIdentityBuilder.certificate(fromDER: fixture.certificateDER),
+            secKey: secKey,
+            label: labels[0],
+            useDataProtectionKeychain: false
+        )
+        let second = try Internals.RawBytesIdentityBuilder.store(
+            certificate: try Internals.RawBytesIdentityBuilder.certificate(fromDER: fixture.certificateDER),
+            secKey: secKey,
+            label: labels[1],
+            useDataProtectionKeychain: false
+        )
+
+        // Then
+        #expect(first.addedCertificate != nil)
+        #expect(second.addedCertificate == nil)
+        #expect(fixture.hasCertificate)
+    }
+
     // MARK: - Failed builds
 
     /// A key that is not the certificate's (a plain misconfiguration) never pairs into an

@@ -269,6 +269,39 @@ struct InternalsSecureConnectionClientIdentityTests {
     }
     #endif
 
+    @Test
+    func configurationError_whenIncompleteClientIdentity_describesItself() {
+        // Given
+        let error = Internals.SecureConnection.ConfigurationError.incompleteClientIdentity
+
+        // Then
+        #expect(error.errorDescription == error.description)
+        #expect(error.description.contains("certificateChain and a privateKey"))
+    }
+
+    /// More chains than the cache holds: the answer stays right when it starts over.
+    @Test
+    func networkFrameworkIncompatibilityReasons_whenMoreChainsThanTheCacheHolds_stillAnswersEachOne() throws {
+        // Given
+        let leaf = try Self.pem("client_chain_leaf")
+        let bundle = try Self.leafAndIntermediatePEM()
+
+        // Then
+        for index in 0..<80 {
+            var single = Internals.SecureConnection()
+            single.certificateChain = .bytes(leaf + [UInt8](repeating: 0x0A, count: index))
+
+            var chain = Internals.SecureConnection()
+            chain.certificateChain = .bytes(bundle + [UInt8](repeating: 0x0A, count: index))
+
+            #expect(single.networkFrameworkIncompatibilityReasons().isEmpty)
+            #expect(
+                chain.networkFrameworkIncompatibilityReasons()
+                    .contains(.multipleClientCertificatesUnderNetworkFramework)
+            )
+        }
+    }
+
     // MARK: - Helpers
 
     private static func pem(_ name: String) throws -> [UInt8] {
