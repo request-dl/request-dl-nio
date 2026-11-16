@@ -75,18 +75,47 @@ struct ModifiersAcceptOnlyContentTypeTests {
     }
 
     @Test
-    func emptyContentTypesAcceptsAnyResponse() async throws {
-        // Given / When
-        let result = try await MockedTask(
-            headers: ["Content-Type": "text/html"],
-            content: { BaseURL("localhost") }
-        )
-        .collectData()
-        .acceptOnlyContentType([])
-        .result()
+    func emptyContentTypesRejectsEveryResponse() async throws {
+        // Given
+        var thrown: UnacceptableContentTypeError<TaskResult<Data>>?
+
+        // When
+        do {
+            _ = try await MockedTask(
+                headers: ["Content-Type": "text/html"],
+                content: { BaseURL("localhost") }
+            )
+            .collectData()
+            .acceptOnlyContentType([])
+            .result()
+        } catch let error as UnacceptableContentTypeError<TaskResult<Data>> {
+            thrown = error
+        }
 
         // Then
-        #expect(result.head.headers.first(name: "Content-Type") == "text/html")
+        #expect(thrown?.data.head.headers.first(name: "Content-Type") == "text/html")
+    }
+
+    @Test
+    func emptyVariadicContentTypesRejectsEveryResponse() async throws {
+        // Given
+        var thrown: UnacceptableContentTypeError<TaskResult<Data>>?
+
+        // When
+        do {
+            _ = try await MockedTask(
+                headers: ["Content-Type": "application/json"],
+                content: { BaseURL("localhost") }
+            )
+            .collectData()
+            .acceptOnlyContentType()
+            .result()
+        } catch let error as UnacceptableContentTypeError<TaskResult<Data>> {
+            thrown = error
+        }
+
+        // Then
+        #expect(thrown != nil)
     }
 
     @Test

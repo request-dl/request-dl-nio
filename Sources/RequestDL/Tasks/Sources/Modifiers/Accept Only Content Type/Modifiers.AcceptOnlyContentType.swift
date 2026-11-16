@@ -29,14 +29,13 @@ extension Modifiers {
         /// - Parameter task: The task to modify.
         /// - Returns: The modified task that accepts only the specified content types.
         /// - Throws: An `UnacceptableContentTypeError` if the response has no `Content-Type`
-        /// header, or if it does not match any of the accepted content types.
+        /// header, or if it does not match any of the accepted content types. An empty list
+        /// accepts nothing.
         ///
         public func body(_ task: Content) async throws -> Input {
             let result = try await task.result()
 
-            guard
-                contentTypes.isEmpty || matches(result.head.headers.first(name: "Content-Type"))
-            else {
+            guard matches(result.head.headers.first(name: "Content-Type")) else {
                 throw UnacceptableContentTypeError<Content.Element>(data: result)
             }
 
@@ -67,8 +66,11 @@ extension RequestTask where Element: TaskResultPrimitive {
     /// Returns a modified task that accepts only a response whose `Content-Type` matches one of
     /// the specified content types.
     ///
-    /// - Parameter contentTypes: The content types to accept. An empty list accepts any response.
+    /// - Parameter contentTypes: The content types to accept. An empty list (calling this with no
+    /// arguments) accepts no response at all, so every response throws.
     /// - Returns: A modified task that accepts only the specified content types.
+    /// - Throws: An `UnacceptableContentTypeError` when the response's `Content-Type` is missing or
+    /// matches none of the content types.
     ///
     public func acceptOnlyContentType(
         _ contentTypes: ContentType...
@@ -80,8 +82,13 @@ extension RequestTask where Element: TaskResultPrimitive {
     /// Returns a modified task that accepts only a response whose `Content-Type` matches one of
     /// the specified content types.
     ///
-    /// - Parameter contentTypes: The content types to accept. An empty array accepts any response.
+    /// - Parameter contentTypes: The content types to accept. An empty array (an intersection with
+    /// nothing in common, a list read from a configuration with nothing in it) accepts no response at
+    /// all, so every response throws. To accept any response that declares a `Content-Type`, pass
+    /// `"*/*"`.
     /// - Returns: A modified task that accepts only the specified content types.
+    /// - Throws: An `UnacceptableContentTypeError` when the response's `Content-Type` is missing or
+    /// matches none of the content types.
     ///
     public func acceptOnlyContentType(
         _ contentTypes: [ContentType]
