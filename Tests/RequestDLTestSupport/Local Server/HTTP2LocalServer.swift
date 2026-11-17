@@ -16,7 +16,7 @@ import NIOSSL
 /// advertises *only* `h2`: a client that can't (or won't) speak HTTP/2 fails the handshake
 /// instead of silently falling back to HTTP/1.1, so a request that completes against it is
 /// itself proof of the negotiated protocol. It records what each stream actually carried on the
-/// wire and answers every request with an empty `200`.
+/// wire and answers every request with an empty `200`, or with what its `Responder` says.
 final class HTTP2LocalServer: @unchecked Sendable {
 
     struct Request: Sendable {
@@ -25,6 +25,9 @@ final class HTTP2LocalServer: @unchecked Sendable {
         let headers: HTTPHeaders
         let body: ByteBuffer
     }
+
+    /// The status and headers to answer a request for `path` with. The body is always empty.
+    typealias Responder = @Sendable (_ path: String) -> (status: HTTPResponseStatus, headers: [(String, String)])
 
     // MARK: - Private properties
 
@@ -46,7 +49,7 @@ final class HTTP2LocalServer: @unchecked Sendable {
 
     // MARK: - Internal static methods
 
-    static func start() async throws -> HTTP2LocalServer {
+    static func start(responder: Responder? = nil) async throws -> HTTP2LocalServer {
         var tlsConfiguration = try LocalServer.TLSOption.none.build()
         tlsConfiguration.applicationProtocols = ["h2"]
         let sslContext = try NIOSSLContext(configuration: tlsConfiguration)
@@ -58,7 +61,7 @@ final class HTTP2LocalServer: @unchecked Sendable {
             let channel = try await ServerBootstrap(group: group)
                 .serverChannelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
                 .childChannelInitializer { channel in
-                    initialize(channel, sslContext: sslContext, recorder: recorder)
+                    initialize(channel, sslContext: sslContext, recorder: recorder, responder: responder)
                 }
                 .bind(host: "localhost", port: .zero)
                 .get()
@@ -75,7 +78,8 @@ final class HTTP2LocalServer: @unchecked Sendable {
     private static func initialize(
         _ channel: Channel,
         sslContext: NIOSSLContext,
-        recorder: Recorder
+        recorder: Recorder,
+        responder: Responder?
     ) -> EventLoopFuture<Void> {
         // Runs on the channel's event loop, so the synchronous pipeline operations apply: they
         // take the (deliberately non-`Sendable`) handlers directly instead of sending them
@@ -92,7 +96,7 @@ final class HTTP2LocalServer: @unchecked Sendable {
                     stream.eventLoop.makeCompletedFuture {
                         try stream.pipeline.syncOperations.addHandlers([
                             HTTP2FramePayloadToHTTP1ServerCodec(),
-                            StreamHandler(recorder),
+                            StreamHandler(recorder, responder: responder),
                         ])
                     }
                 }
@@ -153,11 +157,13 @@ extension HTTP2LocalServer {
         typealias OutboundOut = HTTPServerResponsePart
 
         private let recorder: Recorder
+        private let responder: Responder?
         private var head: HTTPRequestHead?
         private var body = ByteBuffer()
 
-        init(_ recorder: Recorder) {
+        init(_ recorder: Recorder, responder: Responder?) {
             self.recorder = recorder
+            self.responder = responder
         }
 
         func channelRead(context: ChannelHandlerContext, data: NIOAny) {
@@ -173,11 +179,12 @@ extension HTTP2LocalServer {
                     )
                 }
 
-                var headers = HTTPHeaders()
+                let answer = responder?(head?.uri ?? "") ?? (status: .ok, headers: [])
+                var headers = HTTPHeaders(answer.headers)
                 headers.add(name: "content-length", value: "0")
 
                 context.write(
-                    wrapOutboundOut(.head(HTTPResponseHead(version: .http2, status: .ok, headers: headers))),
+                    wrapOutboundOut(.head(HTTPResponseHead(version: .http2, status: answer.status, headers: headers))),
                     promise: nil
                 )
                 context.writeAndFlush(wrapOutboundOut(.end(nil)), promise: nil)

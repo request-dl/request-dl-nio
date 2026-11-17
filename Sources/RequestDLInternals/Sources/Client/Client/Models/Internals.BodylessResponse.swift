@@ -23,6 +23,10 @@ extension Internals {
     /// The handler is part of the client's pipeline, and which pipeline a request travels is
     /// decided when its client is made, not per request, so this is recognised where the request
     /// ends and not where it starts.
+    ///
+    /// - Note: `Internals.NothingToDecode` now drops that complaint in the pipeline, before it
+    /// reaches AsyncHTTPClient, which also covers a redirect (this only ever sees the final
+    /// response). This stays as the delegate's own guard, for a pipeline it was not installed on.
     package struct BodylessResponse: Sendable {
 
         // MARK: - Private properties

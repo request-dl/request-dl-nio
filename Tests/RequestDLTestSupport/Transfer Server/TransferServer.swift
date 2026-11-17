@@ -222,6 +222,22 @@ package final class TransferServer: @unchecked Sendable {
         set { lock.withLock { _omitsLocationOnCreation = newValue } }
     }
 
+    /// Where the requests that create an upload are redirected, one per request and in order:
+    /// each is answered with a `307` to the next of these (a path on this server, or an absolute
+    /// URL), after its body is read. Once empty, creations are answered as usual.
+    package var creationRedirects: [String] {
+        get { lock.withLock { _creationRedirects } }
+        set { lock.withLock { _creationRedirects = newValue } }
+    }
+
+    /// Answer the requests that create an upload with `Location: uploads/<id>`, relative to the
+    /// URL the creation was sent to, instead of `/uploads/<id>`. Any path that has `/uploads/<id>`
+    /// in it is then that upload, so where the client resolved it is told by the path it used.
+    package var answersCreationWithRelativeLocation: Bool {
+        get { lock.withLock { _answersCreationWithRelativeLocation } }
+        set { lock.withLock { _answersCreationWithRelativeLocation = newValue } }
+    }
+
     /// Per `HEAD` of an upload, the status to answer with in place of the one that says where the
     /// upload stands (consumed in order; once empty the server answers properly again).
     package var headStatuses: [Int] {
@@ -313,6 +329,8 @@ package final class TransferServer: @unchecked Sendable {
     private var _expiresUploadsBeforeNextRequest = false
     private var _creationStatus: Int?
     private var _omitsLocationOnCreation = false
+    private var _creationRedirects: [String] = []
+    private var _answersCreationWithRelativeLocation = false
     private var _dropsFinalResponse = false
     private var _headStatuses: [Int] = []
     private var _headOverstatesOffsetBy = 0
@@ -765,7 +783,9 @@ package final class TransferServer: @unchecked Sendable {
             return nil
         }
 
-        if head.path.hasPrefix("/uploads/") {
+        let isRelative = lock.withLock { _answersCreationWithRelativeLocation }
+
+        if head.path.hasPrefix("/uploads/") || (isRelative && head.path.contains("/uploads/")) {
             return serveHeldUpload(head, dialect: dialect, io: &io)
         }
 
@@ -789,6 +809,19 @@ package final class TransferServer: @unchecked Sendable {
             return false
         }
 
+        let redirect = lock.withLock { _creationRedirects.isEmpty ? nil : _creationRedirects.removeFirst() }
+
+        if let redirect {
+            var headers = [("Location", redirect), ("Content-Length", "0")]
+
+            if dialect == .tus {
+                headers.append(("Tus-Resumable", "1.0.0"))
+            }
+
+            record(head, bodyLength: 0, isIntact: true, isComplete: true, status: 307)
+            return io.send(Self.head(status: 307, headers: headers), counted: false)
+        }
+
         let (id, status, omitsLocation) = lock.withLock { () -> (Int, Int, Bool) in
             let id = _nextUploadID
             _nextUploadID += 1
@@ -808,7 +841,7 @@ package final class TransferServer: @unchecked Sendable {
         var headers: [(String, String)] = [("Content-Length", "0")]
 
         if (200..<300).contains(status), !omitsLocation {
-            headers.append(("Location", "/uploads/\(id)"))
+            headers.append(("Location", isRelative ? "uploads/\(id)" : "/uploads/\(id)"))
         }
 
         if dialect == .tus {
