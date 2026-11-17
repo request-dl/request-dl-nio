@@ -45,9 +45,13 @@ struct ClientIdentityErrorTests {
         }
     }
 
-    /// The Keychain reasons are kept so existing `switch` statements over `Reason` keep compiling,
-    /// but nothing throws them any more. They still describe themselves without trapping, and the
-    /// entitlement one no longer tells anyone to add a capability that is not needed.
+    /// The Keychain reasons are deprecated and kept so existing `switch` statements over `Reason`
+    /// keep compiling, but nothing throws them any more. They still describe themselves without
+    /// trapping, and the entitlement one no longer tells anyone to add a capability that is not
+    /// needed.
+    ///
+    /// Deprecated itself, so that naming the deprecated cases here raises no warning.
+    @available(*, deprecated)
     @Test
     func reason_whenALegacyKeychainCase_stillDescribesItselfAndAsksForNoCapability() async throws {
         // Given
@@ -66,6 +70,7 @@ struct ClientIdentityErrorTests {
         #expect(reasons[0].description.contains("no longer thrown"))
         #expect(reasons[1].description.contains("SecItemCopyMatching(identity)"))
         #expect(reasons[1].description.contains("\(errSecItemNotFound)"))
+        #expect(reasons[2].description.contains("unexpected type"))
     }
 
     /// The exact gap this type exists to close: `.localizedDescription` (what most catch sites

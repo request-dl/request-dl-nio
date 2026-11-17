@@ -53,7 +53,7 @@ A request using ``Certificate``/``PrivateKey`` that cannot build a client identi
 - `.reason == .unsupportedKeyFormat(header:)`: the key is not RSA (PKCS#1 or PKCS#8) or EC P-256/P-384/P-521 (SEC1 or PKCS#8), or it is password-protected in a shape RequestDL cannot decrypt. See <doc:Preparing-the-certificates>.
 - `.reason == .invalidCertificateData`: the certificate bytes are not a certificate.
 
-``ClientIdentityError/Reason/missingKeychainSharingEntitlement(operation:)``, ``ClientIdentityError/Reason/keychainOperationFailed(operation:status:)`` and ``ClientIdentityError/Reason/identityLookupReturnedWrongType`` are no longer thrown; they remain only so existing `switch` statements keep compiling.
+``ClientIdentityError/Reason/missingKeychainSharingEntitlement(operation:)``, ``ClientIdentityError/Reason/keychainOperationFailed(operation:status:)`` and ``ClientIdentityError/Reason/identityLookupReturnedWrongType`` are no longer thrown and are deprecated; they remain only so existing `switch` statements keep compiling, and a `switch` can drop them.
 
 **A client-certificate-requiring server returns an HTTP error (e.g. 400) instead of a TLS-level failure:** that's usually not a RequestDL problem. It means the handshake completed and your identity was presented, but the server didn't accept *that specific* certificate (wrong CA, expired, wrong host). Confirm the certificate/key pair you configured is the one the server actually expects.
 

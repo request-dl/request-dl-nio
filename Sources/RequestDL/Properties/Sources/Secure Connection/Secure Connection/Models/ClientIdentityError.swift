@@ -23,8 +23,8 @@ import protocol Foundation.LocalizedError
 /// ``Reason/missingKeychainSharingEntitlement(operation:)``,
 /// ``Reason/keychainOperationFailed(operation:status:)`` and
 /// ``Reason/identityLookupReturnedWrongType`` were thrown by versions that stored the identity in
-/// the Keychain. They are kept so existing code that switches over ``Reason`` keeps compiling, but
-/// nothing throws them any more.
+/// the Keychain. They are deprecated: they are kept so existing code that switches over ``Reason``
+/// keeps compiling, but nothing throws them any more, and a `switch` can drop them.
 ///
 /// `RequestDLInternals`'s raw `Internals.RawBytesIdentityBuilder.Error`/
 /// `Internals.URLSessionIdentityPolicy.ConfigurationError` (the internal, package-visible errors)
@@ -54,20 +54,38 @@ public struct ClientIdentityError: Error, Sendable {
         /// `SecKey` from them. `message` is the underlying `CFError` description.
         case keyCreationFailed(message: String)
 
-        /// No longer thrown. Older versions stored the client certificate and private key in the
-        /// Keychain, which needed the Keychain Sharing capability; the identity is now built in
-        /// memory and needs no capability. Kept only so existing `switch` statements over
-        /// ``Reason`` keep compiling.
+        /// No longer thrown, and deprecated. Older versions stored the client certificate and
+        /// private key in the Keychain, which needed the Keychain Sharing capability; the identity
+        /// is now built in memory and needs no capability. Kept only so existing `switch`
+        /// statements over ``Reason`` keep compiling.
+        @available(
+            *,
+            deprecated,
+            message:
+                "The client identity is now built in memory and never stored in the Keychain, so this is never thrown. Remove it from your switch."
+        )
         case missingKeychainSharingEntitlement(operation: String)
 
-        /// No longer thrown. Older versions reported here a failed Keychain call (`operation`
-        /// names it, `status` is the `OSStatus`); nothing is stored in the Keychain any more.
-        /// Kept only so existing `switch` statements over ``Reason`` keep compiling.
+        /// No longer thrown, and deprecated. Older versions reported here a failed Keychain call
+        /// (`operation` names it, `status` is the `OSStatus`); nothing is stored in the Keychain
+        /// any more. Kept only so existing `switch` statements over ``Reason`` keep compiling.
+        @available(
+            *,
+            deprecated,
+            message:
+                "The client identity is now built in memory and never stored in the Keychain, so this is never thrown. Remove it from your switch."
+        )
         case keychainOperationFailed(operation: String, status: OSStatus)
 
-        /// No longer thrown. Older versions reported here an unexpected result of an internal
-        /// Keychain query; no such query is made any more. Kept only so existing `switch`
-        /// statements over ``Reason`` keep compiling.
+        /// No longer thrown, and deprecated. Older versions reported here an unexpected result of
+        /// an internal Keychain query; no such query is made any more. Kept only so existing
+        /// `switch` statements over ``Reason`` keep compiling.
+        @available(
+            *,
+            deprecated,
+            message:
+                "The client identity is now built in memory and never queried from the Keychain, so this is never thrown. Remove it from your switch."
+        )
         case identityLookupReturnedWrongType
 
         // MARK: - Inits
