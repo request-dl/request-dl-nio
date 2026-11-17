@@ -307,6 +307,22 @@ extension Internals {
             certificateDER: Data,
             privateKeyDER: Data
         ) throws -> Internals.IdentityHandle {
+            try makeIdentity(
+                certificateDER: certificateDER,
+                privateKeyDER: privateKeyDER,
+                afterBuilding: Internals.LegacyIdentityItems.scheduleOnce
+            )
+        }
+
+        /// - Parameter afterBuilding: Runs once the identity is built, never when it is not, and
+        ///   cannot change what is returned: it is what starts the cleanup of the keys earlier
+        ///   versions left in the Keychain (see ``Internals/LegacyIdentityItems``), best effort and
+        ///   off this thread, once per process.
+        package static func makeIdentity(
+            certificateDER: Data,
+            privateKeyDER: Data,
+            afterBuilding: () -> Void
+        ) throws -> Internals.IdentityHandle {
             let certificate = try certificate(fromDER: certificateDER)
             let secKey = try Self.secKey(fromDER: privateKeyDER)
 
@@ -321,7 +337,11 @@ extension Internals {
                 throw Error.privateKeyDoesNotMatchCertificate
             }
 
-            return Internals.IdentityHandle(identity: identity)
+            let handle = Internals.IdentityHandle(identity: identity)
+
+            afterBuilding()
+
+            return handle
         }
 
         // MARK: - Public key pairing
