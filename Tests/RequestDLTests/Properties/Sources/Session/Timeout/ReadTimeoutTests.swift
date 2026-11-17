@@ -188,6 +188,15 @@ struct ReadTimeoutTests {
 
             // The transfer fills the window ahead of the reader and waits there: the server can
             // write no more.
+            //
+            // Waits for the window to be filled before looking for the quiet. The read deadline
+            // only stops counting while the transfer is held back, and the window only closes
+            // above its high watermark; `settled` alone returns after a quiet half second, which
+            // a server slow to start serving (0 bytes written so far) satisfies as well. Moving
+            // the clock then is a real silence, and fails the transfer with a `ReadTimeoutError`.
+            try await eventually(timeout: 60) {
+                server.bodyBytesWritten > Internals.FlowControlWindow.defaultHighWatermark
+            }
             let stalledAt = try await server.settled { server.bodyBytesWritten }
             #expect(stalledAt < Self.largeBody / 2)
 
