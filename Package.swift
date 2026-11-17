@@ -44,8 +44,8 @@ let package = Package(
             from: "2.105.0"
         ),
         .package(
-            url: "https://github.com/apple/swift-nio-extras",
-            from: "1.35.2"
+            url: "https://github.com/request-dl/swift-nio-extras",
+            from: "1.35.3"
         ),
         .package(
             url: "https://github.com/apple/swift-nio-http2",
