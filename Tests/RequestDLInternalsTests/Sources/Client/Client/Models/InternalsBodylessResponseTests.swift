@@ -60,15 +60,18 @@ struct InternalsBodylessResponseTests {
         #expect(!bodyless.isTruncatedDecoder(ChannelError.eof))
     }
 
-    // MARK: - What is being worked around
+    // MARK: - What the swift-nio-extras fork changed
 
-    /// `NIOHTTPResponseDecompressor` (swift-nio-extras) fails a response that has no body and names
-    /// `gzip` or `deflate`, because its decoder is asked to finish a stream it was never given.
+    /// Upstream `NIOHTTPResponseDecompressor` (swift-nio-extras 1.35.2) fails a response that has no
+    /// body and names `gzip` or `deflate`, because its decoder is asked to finish a stream it was
+    /// never given. `Internals.BodylessResponse` exists for that.
     ///
-    /// This is what `Internals.BodylessResponse` exists for. Should this ever stop failing, the
-    /// handler has been fixed upstream and that type, and what uses it, can go.
+    /// The `request-dl/swift-nio-extras` fork (1.35.3 and later, which `Package.swift` depends on)
+    /// accepts such a message, so this now documents the fixed behavior, and fails if the package
+    /// ever resolves to an unpatched `swift-nio-extras` again. `Internals.BodylessResponse`, and what
+    /// uses it, are redundant with the fork and can be removed in a follow-up.
     @Test(arguments: ["gzip", "deflate"])
-    func theNIODecompressor_failsAResponseWithNoBody(_ encoding: String) throws {
+    func theNIODecompressor_acceptsAResponseWithNoBody(_ encoding: String) throws {
         // Given
         let channel = EmbeddedChannel()
         try channel.pipeline.syncOperations.addHandler(NIOHTTPResponseDecompressor(limit: .none))
@@ -78,10 +81,9 @@ struct InternalsBodylessResponseTests {
             HTTPClientResponsePart.head(head(.ok, [("Content-Encoding", encoding), ("Content-Length", "40")]))
         )
 
-        // Then: the head went through, and the end of the message is what fails.
-        #expect(throws: NIOHTTPDecompression.ExtraDecompressionError.truncatedData) {
-            try channel.writeInbound(HTTPClientResponsePart.end(nil))
-        }
+        // Then: the end of the message no longer fails.
+        try channel.writeInbound(HTTPClientResponsePart.end(nil))
+        try channel.throwIfErrorCaught()
     }
 }
 
