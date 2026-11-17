@@ -30,6 +30,12 @@
 /// logical request, so most policies (host allow-listing, loop bounds, auditing) can be
 /// implemented statelessly by reading it fresh on each call.
 ///
+/// - Note: With a ``URLOverride`` declared, ``RedirectContext/redirectRequest`` is already the
+/// rewritten request: its URL is the destination that would be requested, which is what
+/// ``RedirectContext/history`` records of every earlier hop, not the host the server's `Location`
+/// named. A URL the strategy answers with that differs from the one it received goes through the
+/// override rules as well.
+///
 /// - Note: Configuring a ``RedirectStrategy`` opts a ``Session`` out of connection-pool reuse
 /// across requests. Unlike every other ``Session`` property, a strategy has no meaningful
 /// notion of equality to compare against a previously pooled client, so each resolution of a

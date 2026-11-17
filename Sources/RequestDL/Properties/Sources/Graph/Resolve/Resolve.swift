@@ -182,7 +182,9 @@ struct Resolve<Root: Property>: Sendable {
 
     /// Rewrites `baseURL`/`pathComponents` per the most specific `URLOverride` rule (then the
     /// last declared) whose origin (scheme + host + optional path prefix) matches the final
-    /// resolved request.
+    /// resolved request, and hands the rules to the session configuration, so the executors apply
+    /// them to every redirect hop too (a redirect is followed by the executor and never resolved
+    /// again). See ``Internals/URLOverrides``.
     ///
     /// Done here rather than inside `URLOverride`'s node for the same reason system-proxy
     /// resolution is: matching needs the final `baseURL`/`pathComponents`, complete only once
@@ -190,10 +192,16 @@ struct Resolve<Root: Property>: Sendable {
     /// `sessionConfiguration(for:)` so a resolved system proxy answers for the overridden
     /// destination, not the original one.
     private func applyingURLOverride(_ make: inout Make) {
-        guard
-            !make.urlOverrides.isEmpty,
-            let origin = URLOverrideEndpoint(baseURL: make.requestConfiguration.baseURL)
-        else {
+        guard !make.urlOverrides.isEmpty else {
+            return
+        }
+
+        let overrides = Internals.URLOverrides(rules: make.urlOverrides)
+
+        // Whether or not this request itself is covered: a response may send it to a host that is.
+        make.sessionConfiguration.urlOverrides = overrides
+
+        guard let origin = URLOverrideEndpoint(baseURL: make.requestConfiguration.baseURL) else {
             return
         }
 
@@ -204,31 +212,9 @@ struct Resolve<Root: Property>: Sendable {
                 .map(String.init)
         )
 
-        // The most specific (longest) matching origin path wins; among equally specific ones,
-        // the last declared. Specificity has to come first: `URLOverride([String: String])`
-        // declares its rules in `Dictionary` order, which varies between launches, so "last
-        // matching rule wins" alone picked a different destination from one launch to the next
-        // for the documented whole-host-plus-path-scoped example.
-        var match: (destination: URLOverrideEndpoint, remainder: [String], specificity: Int)?
-
-        for rule in make.urlOverrides {
-            guard
-                rule.origin.isSameOrigin(as: origin),
-                pathComponents.starts(with: rule.origin.pathComponents)
-            else {
-                continue
-            }
-
-            let specificity = rule.origin.pathComponents.count
-
-            if let match, match.specificity > specificity {
-                continue
-            }
-
-            match = (rule.destination, Array(pathComponents.dropFirst(specificity)), specificity)
-        }
-
-        guard let (destination, remainder, _) = match else {
+        guard let (destination, remainder) = overrides.match(origin: origin, pathComponents: pathComponents)
+            .map({ ($0.destination, $0.remainder) })
+        else {
             return
         }
 
