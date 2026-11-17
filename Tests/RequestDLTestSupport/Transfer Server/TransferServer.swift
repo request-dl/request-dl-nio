@@ -95,6 +95,9 @@ package final class TransferServer: @unchecked Sendable {
         package let isBodyComplete: Bool
         package let status: Int
 
+        /// Where this request's head arrived among every request's, over every connection, from 0.
+        package let arrival: Int
+
         package func header(_ name: String) -> String? {
             headers.first { $0.name.lowercased() == name.lowercased() }?.value
         }
@@ -278,10 +281,17 @@ package final class TransferServer: @unchecked Sendable {
         set { lock.withLock { _dropsFinalResponse = newValue } }
     }
 
-    /// Every request that got as far as a complete head, in arrival order, recorded once it's
-    /// done (answered, dropped, or failed).
+    /// Every request that got as far as a complete head, in the order their heads arrived,
+    /// recorded once it's done (answered, dropped, or failed).
+    ///
+    /// A request is recorded when the server finishes with it, which for two that overlap can be
+    /// the later one first (a cancelled download only ends when its connection is noticed to be
+    /// gone), so the order they are recorded in is not the order they were made in. This list is
+    /// in the second one, and a request that is still being served is not in it yet: wait for as
+    /// many as the test sent (``awaitRecordedRequests(_:atLeast:timeout:matching:)``) before
+    /// counting on the last one being the last one made.
     package var requests: [ReceivedRequest] {
-        lock.withLock { _requests }
+        lock.withLock { _requests.sorted { $0.arrival < $1.arrival } }
     }
 
     /// Download body bytes the kernel accepted, over every connection.
@@ -338,6 +348,7 @@ package final class TransferServer: @unchecked Sendable {
     private var _rejectsEveryPatchWithConflict = false
     private var _keepsAtMostPerPatch: Int?
     private var _requests: [ReceivedRequest] = []
+    private var _nextArrival = 0
     private var _bodyBytesWritten = 0
     private var _uploadBytesReceived = 0
     private var _acceptedConnections = 0
@@ -1067,6 +1078,13 @@ package final class TransferServer: @unchecked Sendable {
         lock.withLock { _uploadBytesReceived += count }
     }
 
+    fileprivate func nextArrival() -> Int {
+        lock.withLock {
+            defer { _nextArrival += 1 }
+            return _nextArrival
+        }
+    }
+
     fileprivate func didStall() {
         lock.withLock { _stalledConnections += 1 }
     }
@@ -1089,7 +1107,8 @@ package final class TransferServer: @unchecked Sendable {
             bodyLength: bodyLength,
             isBodyIntact: isIntact,
             isBodyComplete: isComplete,
-            status: status
+            status: status,
+            arrival: head.arrival
         )
 
         lock.withLock { _requests.append(request) }
@@ -1160,6 +1179,7 @@ private struct TransferServerIO {
         let method: String
         let path: String
         let headers: [(name: String, value: String)]
+        let arrival: Int
 
         func header(_ name: String) -> String? {
             headers.first { $0.name.lowercased() == name.lowercased() }?.value
@@ -1204,7 +1224,8 @@ private struct TransferServerIO {
                 return Head(
                     method: requestLine.first ?? "",
                     path: requestLine.count > 1 ? requestLine[1] : "",
-                    headers: headers
+                    headers: headers,
+                    arrival: server.nextArrival()
                 )
             }
 
