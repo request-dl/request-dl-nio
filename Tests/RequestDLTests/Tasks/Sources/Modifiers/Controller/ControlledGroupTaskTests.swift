@@ -52,6 +52,13 @@ struct ControlledGroupTaskTests {
             let running = _Concurrency.Task { try await group.result() }
 
             try await eventually(timeout: 30) { server.acceptedConnections == Self.requests }
+
+            // An accepted connection is not a served one: the server hands each to a thread of its
+            // own, which still has to read the request head before it writes a byte. `settled`
+            // alone would call a server that has not started yet "stalled" at 0 after its quiet
+            // half second, and the kernel buffers filling afterwards would then read as the
+            // controller leaking bytes.
+            try await eventually(timeout: 30) { server.bodyBytesWritten > 0 }
             let stalledAt = try await server.settled { server.bodyBytesWritten }
 
             // Then: every request is held well short of its body.
@@ -90,6 +97,13 @@ struct ControlledGroupTaskTests {
             let running = _Concurrency.Task { try await group.result() }
 
             try await eventually(timeout: 30) { server.acceptedConnections == Self.requests }
+
+            // An accepted connection is not a served one: the server hands each to a thread of its
+            // own, which still has to read the request head before it writes a byte. `settled`
+            // alone would call a server that has not started yet "stalled" at 0 after its quiet
+            // half second, and the kernel buffers filling afterwards would then read as the
+            // controller leaking bytes.
+            try await eventually(timeout: 30) { server.bodyBytesWritten > 0 }
             let stalledAt = try await server.settled { server.bodyBytesWritten }
 
             // Then
