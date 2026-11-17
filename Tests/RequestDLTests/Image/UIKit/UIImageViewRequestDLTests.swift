@@ -15,6 +15,15 @@ import UIKit
 @MainActor
 struct UIImageViewRequestDLTests {
 
+    /// A real, distinct image: UIKit treats two empty `UIImage()` as equal and may keep the old
+    /// instance on assignment, which defeats the identity checks below.
+    private static func makeImage(_ color: UIColor) -> UIImage {
+        UIGraphicsImageRenderer(size: CGSize(width: 2, height: 2)).image { context in
+            color.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 2, height: 2))
+        }
+    }
+
     @Test
     func setImageAppliesTheLoadedImage() async throws {
         // Given
@@ -35,7 +44,7 @@ struct UIImageViewRequestDLTests {
     func placeholderIsAppliedImmediately() {
         // Given
         let imageView = UIImageView()
-        let placeholder = UIImage()
+        let placeholder = Self.makeImage(.blue)
 
         // When
         imageView.rdl.setImage(
@@ -56,7 +65,7 @@ struct UIImageViewRequestDLTests {
     func startingALoadClearsTheCurrentImageWhenThereIsNoPlaceholder() {
         // Given
         let imageView = UIImageView()
-        imageView.image = UIImage()
+        imageView.image = Self.makeImage(.red)
 
         // When
         imageView.rdl.setImage(
@@ -76,7 +85,7 @@ struct UIImageViewRequestDLTests {
     func startingALoadByURLClearsTheCurrentImage() {
         // Given
         let imageView = UIImageView()
-        imageView.image = UIImage()
+        imageView.image = Self.makeImage(.red)
 
         // When
         imageView.rdl.setImage(with: URL(string: "https://invalid.invalid/image.png")!)
@@ -90,8 +99,8 @@ struct UIImageViewRequestDLTests {
     func placeholderReplacesTheCurrentImage() {
         // Given
         let imageView = UIImageView()
-        imageView.image = UIImage()
-        let placeholder = UIImage()
+        imageView.image = Self.makeImage(.red)
+        let placeholder = Self.makeImage(.blue)
 
         // When
         imageView.rdl.setImage(
@@ -112,7 +121,7 @@ struct UIImageViewRequestDLTests {
     func keepingTheCurrentImageLeavesTheViewUntouchedWhileLoading() {
         // Given
         let imageView = UIImageView()
-        let current = UIImage()
+        let current = Self.makeImage(.red)
         imageView.image = current
 
         // When
@@ -122,7 +131,7 @@ struct UIImageViewRequestDLTests {
                 try await Task.sleep(nanoseconds: 200_000_000)
                 return .init(head: .stub, payload: .onePixelPNG)
             },
-            placeholder: UIImage(),
+            placeholder: Self.makeImage(.blue),
             keepsCurrentImageWhileLoading: true
         )
 
@@ -135,7 +144,7 @@ struct UIImageViewRequestDLTests {
     func keepingTheCurrentImageStillAppliesTheLoadedImage() async throws {
         // Given
         let imageView = UIImageView()
-        let current = UIImage()
+        let current = Self.makeImage(.red)
         imageView.image = current
         let signal = AsyncSignal()
 
