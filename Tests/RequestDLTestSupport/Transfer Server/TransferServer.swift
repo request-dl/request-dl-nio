@@ -1097,7 +1097,11 @@ package final class TransferServer: @unchecked Sendable {
             return nil
         }
 
-        let bounds = value.dropFirst("bytes=".count).split(separator: "-", maxSplits: 1, omittingEmptySubsequences: false)
+        let bounds = value.dropFirst("bytes=".count).split(
+            separator: "-",
+            maxSplits: 1,
+            omittingEmptySubsequences: false
+        )
 
         guard bounds.count == 2, let first = Int(bounds[0]) else {
             return nil

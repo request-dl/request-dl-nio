@@ -95,7 +95,8 @@ extension Internals.CacheControl {
 
             case 206:
                 // `bytes <first>-<last>/<total>` for a byte that is there: the body went on.
-                guard let range = head.headerValues(named: "Content-Range").first, range.lowercased().hasPrefix("bytes") else {
+                guard let range = head.headerValues(named: "Content-Range").first, range.lowercased().hasPrefix("bytes")
+                else {
                     return .undecided
                 }
 
