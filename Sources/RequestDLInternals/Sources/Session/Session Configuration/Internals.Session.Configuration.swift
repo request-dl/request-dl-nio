@@ -135,6 +135,15 @@ extension Internals.Session {
                 tracing: .init()
             )
 
+            // The decompressor fails a message it was given nothing of, a redirect included, which
+            // the delegate cannot recover from. On the connection for HTTP/1.1, and on every stream
+            // for HTTP/2, where each has a decompressor of its own. See
+            // `Internals.NothingToDecode`.
+            if case .enabled = configuration.decompression {
+                configuration.http1_1ConnectionDebugInitializer = Internals.NothingToDecode.install(on:)
+                configuration.http2StreamChannelDebugInitializer = Internals.NothingToDecode.install(on:)
+            }
+
             configuration.tlsCustomVerification = secureConnectionOutput?.tlsCustomVerification
             #if canImport(Darwin)
             configuration.tlsCustomVerificationNetworkFramework =
