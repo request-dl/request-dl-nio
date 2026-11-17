@@ -30,15 +30,67 @@ import Testing
 /// concurrently, and, because the override is process-wide rather than per-suite, it also
 /// covers every other suite in the same test run once installed, not just the ones that carry
 /// this trait.
+///
+/// ## A held lock on a late machine is a warning, not an error
+///
+/// The watchdog measures wall clock, and a lock held across an `await` on
+/// `Internals.FileSystemManager`'s thread pool (on purpose) also counts the time that work spent
+/// queued behind every other suite's file work. Where the whole suite is oversubscribed (the
+/// URLSession-only CI job, where a trivial cache test took over a minute) that queue alone
+/// outlasts the 15 s budget: the reports there all named the same `Internals.Buffer.write`
+/// holder, with nobody waiting behind it. One recorded issue fails the job, so this trait records
+/// an "AsyncLock held" report as a *warning* when ``PoolLagMonitor`` has seen the machine start
+/// work more than ``lagThreshold`` seconds late within the last ``lagWindow`` seconds, and says so
+/// in the message. With healthy pools it stays an error, since that is what a real deadlock
+/// looks like.
 package struct NonFatalWatchdogTrait: TestTrait, SuiteTrait, TestScoping {
+
+    /// How late work has to have started, at worst, for a held lock to be put down to the machine.
+    package static let lagThreshold = 5.0
+
+    /// How far back that lateness is looked for. Longer than the lock's own 15 s budget, since
+    /// the report arrives after the stall that caused it has been going on for that long.
+    package static let lagWindow = 20.0
 
     package var isRecursive: Bool { true }
 
     private static let install: Void = {
+        PoolLagMonitor.shared.start()
+
         Internals.Override.AssertionFailure.installGlobally { message, _, _ in
-            Issue.record(Comment(rawValue: message))
+            report(message, lag: PoolLagMonitor.shared.worstLag(within: lagWindow)) {
+                Issue.record(Comment(rawValue: $0), severity: $1)
+            }
         }
     }()
+
+    /// Turns a watchdog report into a recorded issue: an error, unless it is a held lock and
+    /// `lag` says the machine itself was late, in which case a warning that carries the lag.
+    ///
+    /// The recording is a parameter so a test can see what would be recorded without the test
+    /// itself being failed by it.
+    package static func report(
+        _ message: String,
+        lag: PoolLagMonitor.Lag,
+        record: (String, Issue.Severity) -> Void
+    ) {
+        guard message.contains("AsyncLock held"), lag.seconds > lagThreshold, let source = lag.source else {
+            record(message, .error)
+            return
+        }
+
+        record(
+            """
+            \(message)
+
+            Downgraded to a warning: work handed to the \(source.rawValue) started \
+            about \(Int(lag.seconds.rounded()))s late in the last \(Int(lagWindow))s (more than \
+            \(Int(lagThreshold))s), so this runner is stalled and nothing here is known to be \
+            deadlocked.
+            """,
+            .warning
+        )
+    }
 
     /// Forces the one-time install to run now, if it hasn't already.
     ///
