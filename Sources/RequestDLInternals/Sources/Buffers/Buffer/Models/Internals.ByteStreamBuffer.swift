@@ -52,7 +52,9 @@ extension Internals {
         }
 
         package func readData(length: UInt64) async throws -> Data? {
-            try byteHandle.read(upToCount: Int(length))
+            // Clamped: this is "up to", and the store hands back what is there. `Int` is 32 bits on
+            // watchOS arm64_32, where a `UInt64` past 2 GiB would trap.
+            try byteHandle.read(upToCount: Int(clamping: length))
         }
 
         package func close() async throws {

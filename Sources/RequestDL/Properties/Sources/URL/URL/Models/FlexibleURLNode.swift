@@ -148,9 +148,12 @@ extension FlexibleURLNode {
     /// joins query items as-is, expecting them already percent encoded, so the decoded form
     /// turned `q=a%26b` into `q=a&b` (two parameters), `%3D` into a live `=`, and `%2B` into a
     /// `+` a server reads as a space.
+    ///
+    /// A bare `name` (`?uploads`) has a `nil` value and stays bare, while `name=` has an empty one
+    /// and keeps its `=`: they are different queries, and a presigned URL signs the exact bytes.
     fileprivate func queries(from components: URLComponents) -> [QueryItem] {
-        components.percentEncodedQueryItems?.compactMap { item in
-            QueryItem(name: item.name, value: item.value ?? "")
+        components.percentEncodedQueryItems?.map { item in
+            item.value.map { QueryItem(name: item.name, value: $0) } ?? QueryItem(name: item.name)
         } ?? []
     }
 }
