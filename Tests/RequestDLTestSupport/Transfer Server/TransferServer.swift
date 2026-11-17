@@ -612,7 +612,11 @@ package final class TransferServer: @unchecked Sendable {
             headers.append(("Content-Encoding", contentEncoding))
         }
 
-        if resource.supportsRanges, let first = Self.rangeStart(head.header("Range")) {
+        // Where a closed range (`bytes=N-M`) stops; the body goes to the end of the resource
+        // otherwise.
+        var end = resource.length - 1
+
+        if resource.supportsRanges, let (first, last) = Self.range(head.header("Range")) {
             let validatorMatches: Bool
 
             if let ifRange = head.header("If-Range"), resource.honorsIfRange {
@@ -643,11 +647,12 @@ package final class TransferServer: @unchecked Sendable {
 
                 status = 206
                 start = first
-                headers.append(("Content-Range", "bytes \(first)-\(resource.length - 1)/\(resource.length)"))
+                end = min(last ?? end, end)
+                headers.append(("Content-Range", "bytes \(first)-\(end)/\(resource.length)"))
             }
         }
 
-        let count = resource.length - start
+        let count = end + 1 - start
 
         if resource.isChunked {
             headers.append(("Transfer-Encoding", "chunked"))
@@ -1085,14 +1090,28 @@ package final class TransferServer: @unchecked Sendable {
         return Array((lines.joined(separator: "\r\n") + "\r\n\r\n").utf8)
     }
 
-    /// `N` from `bytes=N-`; anything else (a closed range, several ranges) is ignored, like a
-    /// server that only implements what these tests ask for.
-    private static func rangeStart(_ value: String?) -> Int? {
-        guard let value, value.hasPrefix("bytes="), value.hasSuffix("-") else {
+    /// `N` from `bytes=N-`, or `N` and `M` from `bytes=N-M`; anything else (a suffix range, several
+    /// ranges) is ignored, like a server that only implements what these tests ask for.
+    private static func range(_ value: String?) -> (first: Int, last: Int?)? {
+        guard let value, value.hasPrefix("bytes=") else {
             return nil
         }
 
-        return Int(value.dropFirst("bytes=".count).dropLast())
+        let bounds = value.dropFirst("bytes=".count).split(separator: "-", maxSplits: 1, omittingEmptySubsequences: false)
+
+        guard bounds.count == 2, let first = Int(bounds[0]) else {
+            return nil
+        }
+
+        if bounds[1].isEmpty {
+            return (first, nil)
+        }
+
+        guard let last = Int(bounds[1]), last >= first else {
+            return nil
+        }
+
+        return (first, last)
     }
 }
 
