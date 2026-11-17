@@ -114,6 +114,70 @@ struct InternalsRawBytesIdentityBuilderIdentityTests {
         #expect(fixture.canSign(with: second.identity))
     }
 
+    // MARK: - The cleanup of the old keys
+
+    /// What starts the cleanup (see `InternalsLegacyIdentityItemsTests`) runs once the identity
+    /// exists, and changes nothing about it.
+    @Test(arguments: Fixture.Kind.allCases)
+    func makeIdentity_whenTheIdentityIsBuilt_startsTheCleanupAfterwards(_ kind: Fixture.Kind) throws {
+        // Given
+        let fixture = try Fixture(kind)
+        var calls = 0
+
+        // When
+        let handle = try Internals.RawBytesIdentityBuilder.makeIdentity(
+            certificateDER: fixture.certificateDER,
+            privateKeyDER: fixture.keyDER,
+            afterBuilding: { calls += 1 }
+        )
+
+        // Then
+        #expect(calls == 1)
+        #expect(fixture.canSign(with: handle.identity))
+    }
+
+    @Test(arguments: Fixture.Kind.allCases)
+    func makeIdentity_whenTheIdentityCannotBeBuilt_doesNotStartTheCleanup(_ kind: Fixture.Kind) throws {
+        // Given
+        let fixture = try Fixture(kind)
+        let other = try Fixture(kind)
+        var calls = 0
+
+        // When
+        #expect(throws: Internals.RawBytesIdentityBuilder.Error.privateKeyDoesNotMatchCertificate) {
+            _ = try Internals.RawBytesIdentityBuilder.makeIdentity(
+                certificateDER: fixture.certificateDER,
+                privateKeyDER: other.keyDER,
+                afterBuilding: { calls += 1 }
+            )
+        }
+
+        // Then
+        #expect(calls == 0)
+    }
+
+    /// The real start of the cleanup: any number of builds, on any thread, in an unsigned process
+    /// (where it finds nothing to do), returns at once and builds the identity.
+    @Test
+    func makeIdentity_whenBuiltFromManyThreads_buildsEveryIdentity() async throws {
+        let fixture = try Fixture(.ec)
+
+        let signed = try await withThrowingTaskGroup(of: Bool.self) { group in
+            for _ in 0..<8 {
+                group.addTask {
+                    let handle = try Internals.RawBytesIdentityBuilder.makeIdentity(
+                        certificateDER: fixture.certificateDER,
+                        privateKeyDER: fixture.keyDER
+                    )
+                    return fixture.canSign(with: handle.identity)
+                }
+            }
+            return try await group.reduce(into: [Bool]()) { $0.append($1) }
+        }
+
+        #expect(signed == Array(repeating: true, count: 8))
+    }
+
     // MARK: - A key that is not the certificate's
 
     @Test(arguments: Fixture.Kind.allCases)

@@ -15,7 +15,7 @@ RequestDL turns your certificate and private key into the identity `URLSession` 
 This has consequences worth knowing:
 
 - **No Keychain Sharing capability and no entitlement.** An unsigned command-line tool, a `swift test` run, a signed app without Keychain Sharing and every Simulator all work the same.
-- **No Keychain cleanup, and no interference between processes.** The macOS login keychain is shared by every process of the same user; since RequestDL stores nothing there, your app, its extensions and any other process using the same certificate cannot delete what another one is using.
+- **Nothing to clean up, and no interference between processes.** The macOS login keychain is shared by every process of the same user; since RequestDL stores nothing there, your app, its extensions and any other process using the same certificate cannot delete what another one is using.
 - **EC client certificates work on macOS without signing.** P-256, P-384 and P-521 keys (SEC1 or PKCS#8) are paired like RSA ones, including on macOS in a process with no signing at all (the old Keychain path could not store an imported EC key there). The handshake was exercised with P-256.
 
 ## What you need to do
@@ -25,19 +25,29 @@ Nothing beyond configuring the certificate and the key, as always. In particular
 - Add **Keychain Sharing** (or any `keychain-access-groups` entitlement) to any target, the app or an extension.
 - Sign the app any specific way: no `codesign --entitlements` step, no provisioning profile requirement for this feature.
 - Convert to PKCS#12: RequestDL keeps accepting raw PEM/DER bytes or file paths.
-- Clean up anything in the Keychain.
+- Clean up anything in the Keychain yourself, unless you want to remove what a version before this one left in the macOS login keychain (see below).
 
 ## Items left by earlier versions
 
-Versions of RequestDL before this change stored the client certificate and private key in the Keychain (items labelled `RequestDL.mtls.…`) and removed them when the session ended. Nothing reads them any more, but one that an earlier version could not remove (the process was killed, or another process was still using it) can still be there. Removing them is optional and harmless.
+Versions of RequestDL before this change stored the client certificate and private key in the Keychain (items labelled `RequestDL.mtls.…`) and removed them when the session ended. Nothing reads them any more, but one that an earlier version could not remove (the process was killed before it could, or another process was still using it) can still be there.
 
-On macOS, in the **login** keychain, with **Keychain Access**:
+### In the data-protection keychain: removed automatically
+
+A signed app that could use the data-protection keychain (on macOS, one with Keychain Sharing), and an app on iOS, tvOS, watchOS or visionOS, stored them there. The first time a client identity is built in a process, RequestDL looks there, in the background and without delaying the request, and removes the **private keys** an earlier version left. It removes one only when all of this holds:
+
+- it is a key (never a certificate), in the data-protection keychain this process can see (the access groups of your own app, which include any group it shares with other apps of your team);
+- its label is exactly `RequestDL.mtls.key.` followed by 40 lowercase hex digits that are the hash of the key's own public key, or by 64 lowercase hex digits on a key that has a 20-byte application label (the first versions' label);
+- it was created more than 24 hours ago, so it is very unlikely to be one that an older copy of your app, or another app of your team sharing the keychain group, is using right now (an older version that is still running and reuses a key made more than a day ago can fail one request, and builds the key again for the next). An item with no creation date is kept.
+
+It never touches certificates (they are public data, and an equal certificate may be yours), items that this process cannot see, or any key whose label does not match exactly. Keys of another app of your team in a keychain group shared with this one are visible to this process: only the ones that match all of the above are removed. If Security answers that it would need the user (a prompt, a locked device), it stops. It is best effort: when the process lacks the entitlement, or anything fails, nothing is removed and nothing is reported, and the next process tries again. A leftover certificate stays in the keychain: RequestDL does not remove it.
+
+### In the macOS login keychain: not removed
+
+RequestDL does **not** clean the legacy macOS keychain. It is shared with every program of the user, an item there cannot be checked for its age, and nothing tells whose item it is. By hand, with **Keychain Access**, in the **login** keychain:
 
 1. Search for `RequestDL.mtls.` and delete the matching **keys** (`RequestDL.mtls.key.…`).
 2. The macOS file keychain did not store a label for the certificate, so a leftover certificate does not show up in that search: look for your client certificate by its name in the *Certificates* category and delete the copy RequestDL added, if you did not import it yourself.
 3. Do this after every copy of your app is updated: one still on an older version recreates the items.
-
-A signed macOS app with Keychain Sharing, and an app on iOS, tvOS or watchOS, stored them in its own data-protection keychain, which Keychain Access does not show; there, the items go away when the app is deleted.
 
 ## Platforms
 
