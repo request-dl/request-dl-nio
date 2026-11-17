@@ -133,7 +133,8 @@ extension Internals.Session {
 
             // Without a configuration of its own AsyncHTTPClient follows redirects its own way, which
             // knows nothing of the overrides: the default is spelled out when there are any.
-            let redirectConfiguration = urlOverrides.isEmpty
+            let redirectConfiguration =
+                urlOverrides.isEmpty
                 ? redirectConfiguration
                 : (redirectConfiguration ?? .default)
 

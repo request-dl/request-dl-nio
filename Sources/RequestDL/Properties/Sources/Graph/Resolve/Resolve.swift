@@ -212,8 +212,9 @@ struct Resolve<Root: Property>: Sendable {
                 .map(String.init)
         )
 
-        guard let (destination, remainder) = overrides.match(origin: origin, pathComponents: pathComponents)
-            .map({ ($0.destination, $0.remainder) })
+        guard
+            let (destination, remainder) = overrides.match(origin: origin, pathComponents: pathComponents)
+                .map({ ($0.destination, $0.remainder) })
         else {
             return
         }

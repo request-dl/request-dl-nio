@@ -45,7 +45,10 @@ struct InternalsURLOverridesTests {
     func rewriting_whenThePathIsScoped_replacesTheMatchedPrefixByComponent() {
         // Given
         let overrides = overrides(
-            (endpoint("https", "staging.example.test", path: ["api", "v1"]), endpoint("https", "new.example.test", path: ["v2"]))
+            (
+                endpoint("https", "staging.example.test", path: ["api", "v1"]),
+                endpoint("https", "new.example.test", path: ["v2"])
+            )
         )
 
         // When / Then
