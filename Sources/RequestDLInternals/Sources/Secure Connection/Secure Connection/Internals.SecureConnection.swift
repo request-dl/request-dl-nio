@@ -23,15 +23,13 @@ extension Internals {
 
         // MARK: - Internal properties
 
-        /// - Note: `certificateChain`/`privateKey` (mTLS, via `tlsLocalIdentityNetworkFramework`),
+        /// - Note: `certificateChain`/`privateKey` (mTLS, via `tlsLocalIdentityChainProviderNetworkFramework`),
         /// `tlsPins` (SPKI pinning), `additionalTrustRoots`, `.noHostnameVerification`,
         /// `revocationPolicy`, and `trustDecisionObserver` all reach Network.framework, through the
         /// two trust/identity hooks
-        /// `Internals.NIOTrustEvaluator`/`makeLocalIdentityForNetworkFramework()` install, except a
-        /// `certificateChain` resolving to more than one certificate, which
-        /// `networkFrameworkIncompatibilityReasons()` below flags instead, since
-        /// `makeLocalIdentityForNetworkFramework()` has no way to carry the rest alongside the
-        /// `SecIdentity` it builds. None of
+        /// `Internals.NIOTrustEvaluator`/`makeLocalIdentityForNetworkFramework()` install. A
+        /// `certificateChain` of several certificates is carried whole: the leaf becomes the
+        /// `SecIdentity` and the rest travel alongside it as intermediates. None of
         /// `additionalTrustRoots`/`.noHostnameVerification`/`revocationPolicy`/
         /// `trustDecisionObserver` has a native Network.framework counterpart (unlike `trustRoots`,
         /// which `getNWProtocolTLSOptions` does carry over, or NIOSSL's own
@@ -133,49 +131,13 @@ extension Internals {
             if pskIdentityResolver != nil { reasons.append(.pskIdentityResolver) }
             #endif
 
-            // `makeLocalIdentityForNetworkFramework()` below only builds the `SecIdentity`-backed
-            // `tlsLocalIdentityNetworkFramework` from the *first* certificate in the chain. Unlike
-            // `.urlSession` (`Internals.URLSessionIdentityPolicy`, which hands the rest to
-            // `URLCredential(identity:certificates:persistence:)`) or `.nio` (whose NIOSSL
-            // `TLSConfiguration.certificateChain` carries every certificate), AsyncHTTPClient's
-            // NIOTransportServices bridge has no equivalent "plus these supplementary certificates"
-            // API alongside a `SecIdentity` for this package to use. A server that doesn't already
-            // have the intermediate in its own trust store can't complete the chain from a
-            // leaf-only presentation and rejects the handshake with `unknown_ca` (confirmed end to
-            // end with a real three-level chain against a server trusting only the root).
-            //
-            // Decided by how many certificates the chain really resolves to, not by how it was
-            // declared: one PEM file or blob (`Certificates(_:)`, a single `Certificate` over a
-            // bundle) holds leaf and intermediates just as `Certificates { Certificate(leaf);
-            // Certificate(intermediate) }` does.
-            if resolvedClientCertificateCount > 1 {
-                reasons.append(.multipleClientCertificatesUnderNetworkFramework)
-            }
+            // A client chain of several certificates is *not* a reason: Network.framework presents
+            // the intermediates alongside the identity (`makeLocalIdentityForNetworkFramework()`
+            // below hands them to `tlsLocalIdentityChainProviderNetworkFramework`), the same as
+            // `.urlSession` and `.nio` do. `.multipleClientCertificatesUnderNetworkFramework` is
+            // therefore never produced any more.
 
             return reasons
-        }
-
-        /// How many certificates `certificateChain` holds, read from the PEM data itself (see
-        /// `CertificateChain.resolvedCertificateCount`, which remembers the answer: this runs
-        /// for every request).
-        ///
-        /// A chain that cannot be read or parsed here is not what this answers: building the
-        /// identity reports that, with its own error, and this check, which has no way to fail,
-        /// must not hide it behind another reason. It falls back to the declared shape.
-        private var resolvedClientCertificateCount: Int {
-            guard let certificateChain else {
-                return 0
-            }
-
-            if let count = certificateChain.resolvedCertificateCount {
-                return count
-            }
-
-            if case .certificates(let certificates) = certificateChain {
-                return certificates.count
-            }
-
-            return 1
         }
 
         /// Deliberately does *not* check `certificateChain`/`privateKey`/`additionalTrustRoots`/
@@ -244,7 +206,7 @@ extension Internals {
         ///     certificate's) just because `certificateChain`/`privateKey` happen to be configured
         ///     for some other executor's mTLS.
         ///   - When `true`, mTLS travels through `HTTPClient.Configuration
-        ///     .tlsLocalIdentityProviderNetworkFramework` (`localIdentityHandle`) for
+        ///     .tlsLocalIdentityChainProviderNetworkFramework` (`localIdentityHandle`) for
         ///     Network.framework. The NIOSSL identity (`nioSSLCertificateChain`/`nioSSLPrivateKey`)
         ///     is not built at all.
         ///
@@ -392,7 +354,7 @@ extension Internals {
         /// - Parameter isCompatibleWithNetworkFramework: See `build(isCompatibleWithNetworkFramework:)`'s
         /// own doc comment. When `true`, `certificateChain`/`privateKey` are deliberately left off
         /// the returned `TLSConfiguration`. mTLS still travels through
-        /// `tlsLocalIdentityNetworkFramework`/`localIdentityHandle` (`makeLocalIdentityForNetworkFramework()`)
+        /// `tlsLocalIdentityChainProviderNetworkFramework`/`localIdentityHandle` (`makeLocalIdentityForNetworkFramework()`)
         /// for Network.framework; setting these two *as well*, on the same `TLSConfiguration`
         /// AsyncHTTPClient's NIOTransportServices bridge also reads, would crash there outright.
         private func makeTLSConfigurationByContext(
@@ -440,6 +402,11 @@ extension Internals {
         /// `Internals.URLSessionIdentityPolicy` does for `.urlSession`, through the shared
         /// `RawBytesIdentityBuilder` entry points.
         ///
+        /// The leaf certificate becomes the identity; every further certificate of the chain is
+        /// kept on the handle as an intermediate (`Internals.IdentityHandle.certificates`, without
+        /// the leaf, the order `sec_identity_create_with_certificates` expects), which is what lets
+        /// a server that trusts only the root accept the handshake.
+        ///
         /// Returns the whole `Internals.IdentityHandle`, not just its `.identity`.
         /// `Internals.Client` holds onto it, one layer further down the chain (`Output` ->
         /// `Internals.Session.Configuration.Output` -> `Internals.Client`). Handles built for the
@@ -458,10 +425,16 @@ extension Internals {
 
                 let privateKeyDER = try RawBytesIdentityBuilder.privateKeyDER(from: privateKey)
 
-                return try RawBytesIdentityBuilder.makeIdentity(
+                let handle = try RawBytesIdentityBuilder.makeIdentity(
                     certificateDER: leaf,
                     privateKeyDER: privateKeyDER
                 )
+
+                let intermediates = try derCertificates.dropFirst().map {
+                    try RawBytesIdentityBuilder.certificate(fromDER: $0)
+                }
+
+                return Internals.IdentityHandle(identity: handle.identity, certificates: intermediates)
 
             case (.some, nil), (nil, .some):
                 throw Internals.URLSessionIdentityPolicy.ConfigurationError.incompleteClientIdentity

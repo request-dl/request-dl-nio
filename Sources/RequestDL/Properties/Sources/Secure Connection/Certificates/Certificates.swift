@@ -14,6 +14,11 @@ import class Foundation.Bundle
 /// for sending the public certificates.
 ///
 /// The receiver obtains the sender's certificates as Trust Roots.
+///
+/// For a client certificate (mTLS) the first certificate is the client's own (the leaf) and the
+/// ones that follow are the intermediates that lead from it to the authority the server trusts.
+/// Every executor presents the whole chain, ``Session/Executor/nioTransportServices``
+/// (Network.framework) included, so a server that trusts only the root accepts the handshake.
 public struct Certificates<Content: Property>: Property {
 
     private struct Node: SecureConnectionPropertyNode {

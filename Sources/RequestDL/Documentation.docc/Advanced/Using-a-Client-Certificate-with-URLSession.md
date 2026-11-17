@@ -18,6 +18,18 @@ This has consequences worth knowing:
 - **No Keychain cleanup, and no interference between processes.** The macOS login keychain is shared by every process of the same user; since RequestDL stores nothing there, your app, its extensions and any other process using the same certificate cannot delete what another one is using.
 - **EC client certificates work on macOS without signing.** P-256, P-384 and P-521 keys (SEC1 or PKCS#8) are paired like RSA ones, including on macOS in a process with no signing at all (the old Keychain path could not store an imported EC key there). The handshake was exercised with P-256.
 
+### Certificate chains with intermediates
+
+When your client certificate is issued by an intermediate authority, configure the whole chain: the client certificate first, then the intermediates, as one PEM file or as several ``Certificate`` values inside ``Certificates``. RequestDL presents the leaf as the identity and the rest alongside it, on every executor:
+
+- `.urlSession` hands the intermediates to the `URLCredential` it answers the server's challenge with.
+- `.nio` gives all of them to NIOSSL.
+- `.nioTransportServices` (Network.framework) presents them through `sec_identity_create_with_certificates`, which AsyncHTTPClient calls when the identity carries intermediates.
+
+A server that trusts only the root authority therefore accepts the handshake on all three, without having the intermediate in its own trust store. The root itself is normally left out of what you configure, as the server already has it; including it is harmless.
+
+Earlier versions could not do this under `.nioTransportServices`: a chain with more than one certificate made RequestDL refuse that executor, with ``ExecutorRequirementError/Reason/multipleClientCertificatesUnderNetworkFramework`` when you pinned it, or fall back to `.urlSession` when you only preferred it. That is gone: the reason is never produced any more and is deprecated, and a chain with intermediates keeps `.nioTransportServices` eligible. A `switch` over ``ExecutorRequirementError/Reason`` can drop it.
+
 ## What you need to do
 
 Nothing beyond configuring the certificate and the key, as always. In particular you do **not** need to:
