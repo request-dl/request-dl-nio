@@ -162,9 +162,14 @@ extension Internals.Session {
             }
 
             #if canImport(Darwin)
-            if let secIdentity = secureConnectionOutput?.localIdentityHandle?.identity {
-                configuration.tlsLocalIdentityProviderNetworkFramework = { host, port in
-                    identityOrigins.contains(host: host, port: port) ? secIdentity : nil
+            if let handle = secureConnectionOutput?.localIdentityHandle {
+                let identity = HTTPClient.Configuration.NetworkFrameworkClientIdentity(
+                    identity: handle.identity,
+                    certificates: handle.certificates
+                )
+
+                configuration.tlsLocalIdentityChainProviderNetworkFramework = { host, port in
+                    identityOrigins.contains(host: host, port: port) ? identity : nil
                 }
             }
             #endif

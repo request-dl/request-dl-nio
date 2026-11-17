@@ -16,13 +16,21 @@ extension Internals {
     /// to delete. Two handles built from the same certificate/key pair are independent, and
     /// dropping one never affects the other, in this process or in any other.
     ///
-    /// `@unchecked Sendable` because `SecIdentity` is an immutable, reference-counted Core
-    /// Foundation object and `identity` is a `let`.
+    /// `certificates` are the intermediates the client presents along with the identity, in the
+    /// shape Network.framework wants them (see
+    /// `HTTPClient.Configuration.NetworkFrameworkClientIdentity`): the chain that follows the
+    /// identity's own certificate, **without** that leaf, ordered from the one that issued it up
+    /// towards the root. Empty when the chain is the leaf alone.
+    ///
+    /// `@unchecked Sendable` because `SecIdentity` and `SecCertificate` are immutable,
+    /// reference-counted Core Foundation objects and both properties are `let`s.
     package final class IdentityHandle: @unchecked Sendable {
         package let identity: SecIdentity
+        package let certificates: [SecCertificate]
 
-        package init(identity: SecIdentity) {
+        package init(identity: SecIdentity, certificates: [SecCertificate] = []) {
             self.identity = identity
+            self.certificates = certificates
         }
     }
 }

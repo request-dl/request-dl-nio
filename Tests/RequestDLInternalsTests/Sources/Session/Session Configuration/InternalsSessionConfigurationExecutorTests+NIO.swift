@@ -460,17 +460,14 @@ extension InternalsSessionConfigurationExecutorTests {
         }
     }
 
-    /// `Internals.ExecutorIncompatibilityReason .multipleClientCertificatesUnderNetworkFramework`,
-    /// proven at the resolution-logic level without a live network round trip:
-    /// `Internals.SecureConnection .makeLocalIdentityForNetworkFramework()` only ever builds its
-    /// `SecIdentity` from a `certificateChain`'s first certificate, so a chain of more than one
-    /// (leaf plus at least one intermediate) must steer resolution off `.nioTransportServices` the
-    /// same way `cipherSuiteValues` etc. already do. See `DataTaskTests+NIO`'s
-    /// `dataTask_whenClientCertificateChainHasIntermediateUnderNIORequired_completesHandshake`/
-    /// `dataTask_whenClientCertificateChainHasIntermediateAndNIOTransportServicesRequired_throwsExecutorError`
-    /// for the end-to-end confirmation this unit test only asserts the *decision* for.
+    /// A chain of more than one certificate (leaf plus at least one intermediate) no longer
+    /// steers resolution off `.nioTransportServices`: the intermediates are presented next to the
+    /// identity (`tlsLocalIdentityChainProviderNetworkFramework`). Proven at the
+    /// resolution-logic level without a live network round trip; see `DataTaskTests+NIO`'s
+    /// `dataTask_whenClientCertificateChainHasIntermediateUnderNIOTransportServicesRequired_completesHandshake`
+    /// for the end-to-end confirmation.
     @Test
-    func requireExecutor_whenNIOTransportServicesPinnedWithMultipleClientCertificates_throwsWithExactReasons()
+    func requireExecutor_whenNIOTransportServicesPinnedWithMultipleClientCertificates_doesNotThrow()
         async throws
     {
         // Given
@@ -483,20 +480,10 @@ extension InternalsSessionConfigurationExecutorTests {
         ])
         configuration.secureConnection = secureConnection
 
-        // When
-        do {
-            try configuration.requireExecutor(.nioTransportServices)
-            Issue.record("Not expecting success")
-        } catch let error as Internals.IncompatibleExecutorConfigurationError {
-            // Then
-            #expect(error.requiredExecutor == .nioTransportServices)
-            #expect(error.reasons == [.multipleClientCertificatesUnderNetworkFramework])
-        }
+        // When / Then
+        try configuration.requireExecutor(.nioTransportServices)
     }
 
-    /// A single-certificate chain (leaf only, no intermediate) is exactly what
-    /// `makeLocalIdentityForNetworkFramework()` already handles fine, so it must not trip this
-    /// reason.
     @Test
     func requireExecutor_whenNIOTransportServicesPinnedWithSingleClientCertificate_doesNotThrow() async throws {
         // Given
@@ -512,14 +499,10 @@ extension InternalsSessionConfigurationExecutorTests {
         try configuration.requireExecutor(.nioTransportServices)
     }
 
-    /// Unlike every other `..._fallsBackToNIO` case above, a multi-certificate chain does *not*
-    /// rule out `.urlSession`: `URLCredential(identity:certificates:persistence:)` genuinely
-    /// carries supplementary certificates alongside an identity, the same way NIOSSL's own
-    /// `TLSConfiguration.certificateChain` does. So a preference for `.nioTransportServices` the
-    /// configuration can't actually satisfy falls through to `.urlSession` (still ahead of `.nio`
-    /// in the default priority order), not all the way to `.nio`.
+    /// A preference for `.nioTransportServices` is kept with a multi-certificate client chain,
+    /// where it used to fall through to `.urlSession`.
     @Test
-    func resolveExecutor_whenMultipleClientCertificatesSetAndNIOTransportServicesPreferred_fallsBackToURLSession()
+    func resolveExecutor_whenMultipleClientCertificatesSetAndNIOTransportServicesPreferred_staysOnNetworkFramework()
         async throws
     {
         // Given
@@ -538,7 +521,7 @@ extension InternalsSessionConfigurationExecutorTests {
 
         // Then
         #if canImport(Darwin)
-        #expect(sut == .urlSession)
+        #expect(sut == .nioTransportServices)
         #else
         #expect(sut == .nio)
         #endif

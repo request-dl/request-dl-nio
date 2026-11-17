@@ -7,6 +7,16 @@
 import AsyncHTTPClient
 import Testing
 
+#if canImport(Security)
+import Security
+#endif
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
+
 @testable import RequestDLInternals
 @testable import RequestDLTestSupport
 
@@ -125,8 +135,79 @@ struct InternalsIdentityOriginsTests {
         #if canImport(Darwin)
         #expect(output.localIdentityHandle == nil)
         #expect(httpClientConfiguration.tlsLocalIdentityProviderNetworkFramework == nil)
+        #expect(httpClientConfiguration.tlsLocalIdentityChainProviderNetworkFramework == nil)
         #endif
     }
+
+    #if canImport(Darwin)
+    /// The Network.framework provider answers the identity together with its intermediates, and
+    /// only for origins requests were made to: the same scoping as the NIOSSL one, with the chain
+    /// AsyncHTTPClient hands to `sec_identity_create_with_certificates`.
+    @Test
+    func build_whenTheChainHasIntermediates_offersTheNetworkFrameworkIdentityWithThemOnlyToRegisteredOrigins()
+        throws
+    {
+        // Given
+        let leaf = CertificateResource("client_chain_leaf", format: .pem)
+        let intermediate = CertificateResource("client_chain_intermediate", format: .pem)
+
+        var configuration = Internals.Session.Configuration()
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.certificateChain = .certificates([
+            Internals.Certificate(leaf.certificateURL.absolutePath(percentEncoded: false), format: .pem),
+            Internals.Certificate(intermediate.certificateURL.absolutePath(percentEncoded: false), format: .pem),
+        ])
+        secureConnection.privateKey = .privateKey(
+            .init(leaf.privateKeyURL.absolutePath(percentEncoded: false), format: .pem)
+        )
+        configuration.secureConnection = secureConnection
+
+        // When
+        let output = try configuration.build(isCompatibleWithNetworkFramework: true)
+        let httpClientConfiguration = output.httpClientConfiguration
+        let provider = try #require(httpClientConfiguration.tlsLocalIdentityChainProviderNetworkFramework)
+        let handle = try #require(output.localIdentityHandle)
+
+        // Then: given to no origin until one is requested, and never through the leaf-only provider.
+        #expect(httpClientConfiguration.tlsLocalIdentityProviderNetworkFramework == nil)
+        #expect(provider("localhost", 8_443) == nil)
+
+        output.identityOrigins.register(host: "localhost", port: 8_443)
+
+        let identity = try #require(provider("localhost", 8_443))
+        #expect(!identity.certificates.isEmpty)
+        #expect(identity.certificates.count == 1)
+        #expect(identity.identity === handle.identity)
+        #expect(
+            identity.certificates.map { SecCertificateCopyData($0) as Data }
+                == Array(try #require(secureConnection.certificateChain).resolvedDERBytes().dropFirst())
+        )
+        #expect(provider("localhost", 9_443) == nil)
+        #expect(provider("redirect-target.example", 8_443) == nil)
+    }
+
+    @Test
+    func build_whenTheChainIsTheLeafAlone_offersTheNetworkFrameworkIdentityWithNoIntermediates() throws {
+        // Given
+        let client = Certificates().client()
+
+        var configuration = Internals.Session.Configuration()
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.certificateChain = .file(client.certificateURL.absolutePath(percentEncoded: false))
+        secureConnection.privateKey = .privateKey(
+            .init(client.privateKeyURL.absolutePath(percentEncoded: false), format: .pem)
+        )
+        configuration.secureConnection = secureConnection
+
+        // When
+        let output = try configuration.build(isCompatibleWithNetworkFramework: true)
+        let provider = try #require(output.httpClientConfiguration.tlsLocalIdentityChainProviderNetworkFramework)
+        output.identityOrigins.register(host: "localhost", port: 8_443)
+
+        // Then
+        #expect(try #require(provider("localhost", 8_443)).certificates.isEmpty)
+    }
+    #endif
 
     @Test
     func build_whenNoMTLSConfigured_installsNoProvider() throws {
