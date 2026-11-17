@@ -17,27 +17,29 @@ extension Internals {
         // MARK: - Private properties
 
         /// `nil` when no limit was configured, leaving operations unthrottled.
-        private let semaphore: Semaphore?
+        private let semaphore: AsyncCancellableSemaphore?
 
         // MARK: - Inits
 
         /// A non-positive limit is treated as no limit at all. It reaches here unvalidated (from
         /// `Session.maximumConcurrentConnections(_:)`, or a `Configured` config file), and
-        /// neither alternative is survivable: `Semaphore.init(permits:)` traps on a negative
-        /// count, even in release builds, and a zero-permit semaphore can never be acquired, so
-        /// every request through the session would wait forever.
+        /// neither alternative is survivable: `AsyncCancellableSemaphore.init(permits:)` traps on a
+        /// negative count, even in release builds, and a zero-permit semaphore is a gate that no
+        /// request ever opens (nothing here holds a slot to give back), so every request through
+        /// the session would wait forever.
         package init(maximumConcurrentConnections: Int?) {
             semaphore =
                 maximumConcurrentConnections
                 .flatMap { $0 > .zero ? $0 : nil }
-                .map { Semaphore(permits: $0) }
+                .map { AsyncCancellableSemaphore(permits: $0) }
         }
 
         // MARK: - Internal methods
 
         /// Waits for a free slot, then hands back a closure that releases it.
         ///
-        /// Waiting is cancellable: a caller whose `Task` is cancelled before it was handed a slot
+        /// Waiting is cancellable (`AsyncCancellableSemaphore`, unlike `AsyncSemaphore`, which is
+        /// cancellation transparent): a caller whose `Task` is cancelled before it was handed a slot
         /// stops waiting at once and throws, without having taken one, and without anyone behind it
         /// losing their place. With no limit configured there is nothing to wait for, and the call
         /// returns without looking at cancellation; the caller decides what to do with a cancelled
@@ -67,9 +69,9 @@ extension Internals.ThrottledExecutor {
     ///
     /// Same escape-hatch shape as `Internals.Client.connectionSemaphoreForTesting`, which this
     /// backs: gated behind `@_spi(Testing)` on top of `package` so a test can wait for an exact
-    /// ``Semaphore/waitingCount`` instead of sleeping a fixed duration and hoping the right
-    /// number of requests reached the semaphore by then.
-    package var semaphoreForTesting: Semaphore? {
+    /// ``AsyncCancellableSemaphore/waitingCount`` instead of sleeping a fixed duration and hoping the
+    /// right number of requests reached the semaphore by then.
+    package var semaphoreForTesting: AsyncCancellableSemaphore? {
         semaphore
     }
 }

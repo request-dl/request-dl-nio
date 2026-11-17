@@ -5,6 +5,7 @@
 #if canImport(NIOCore) && canImport(Darwin)
 
 import Foundation
+@_spi(Testing) import SwiftAsyncStream
 import Testing
 
 @_spi(Testing) @testable import RequestDLInternals
