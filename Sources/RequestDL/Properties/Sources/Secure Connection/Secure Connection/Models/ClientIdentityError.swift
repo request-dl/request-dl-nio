@@ -91,6 +91,10 @@ public struct ClientIdentityError: Error, Sendable {
                 self = .keyCreationFailed(message: message)
             case .privateKeyDoesNotMatchCertificate:
                 self = .keyCreationFailed(message: "it is not the private key of the configured certificate")
+            case .unsupportedCertificatePublicKey:
+                self = .keyCreationFailed(
+                    message: "the public key of the configured certificate uses an unsupported algorithm or curve"
+                )
             }
         }
     }

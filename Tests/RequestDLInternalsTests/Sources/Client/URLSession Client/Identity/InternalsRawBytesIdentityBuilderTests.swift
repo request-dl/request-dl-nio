@@ -347,16 +347,46 @@ struct InternalsRawBytesIdentityBuilderTests {
         }
     }
 
-    /// Nothing to compare, so nothing is refused here: `SecIdentityCreate` is what finds out
-    /// whether an identity forms.
+    /// Nothing to compare means no identity can form, and `SecIdentityCreate` must not be asked:
+    /// it aborts the process on such a certificate.
     @Test
-    func validate_whenTheCertificatesPublicKeyCannotBeRead_passes() throws {
+    func validate_whenTheCertificatesPublicKeyCannotBeRead_throwsUnsupportedCertificatePublicKey() throws {
         // Given
         let secKey = try Internals.RawBytesIdentityBuilder.secKey(fromDER: Self.makeRSAPKCS1DER())
         let applicationLabel = try Internals.RawBytesIdentityBuilder.applicationLabel(of: secKey)
 
         // Then
-        try Internals.RawBytesIdentityBuilder.validate(certificatePublicKey: nil, pairsWith: applicationLabel)
+        #expect(throws: Internals.RawBytesIdentityBuilder.Error.unsupportedCertificatePublicKey) {
+            try Internals.RawBytesIdentityBuilder.validate(certificatePublicKey: nil, pairsWith: applicationLabel)
+        }
+    }
+
+    /// A self-signed certificate whose public key is on the brainpoolP256r1 curve, which Security
+    /// cannot read (`SecCertificateCopyKey` answers `nil`). Public data; its validity window does
+    /// not matter here, nothing checks it.
+    private static let brainpoolCertificateDER = Data(
+        base64Encoded: """
+            MIIBbDCCAROgAwIBAgIUKE9hrWnCNG6/MdBEuu9q1s6Jq9EwCgYIKoZIzj0EAwIwHDEaMBgGA1UEAwwRci1icmFpbnBvb2xQMjU2\
+            cjEwHhcNMjYxMTE3MTAzMjQzWhcNMjYxMTE5MTAzMjQzWjAcMRowGAYDVQQDDBFyLWJyYWlucG9vbFAyNTZyMTBaMBQGByqGSM49\
+            AgEGCSskAwMCCAEBBwNCAARAo4gleqyZNxlOMolFgIepqSKTrgjDmexXIuatgQLT1wyd1X3Ysinpq7/jQaqanokDyMjqeIkbNvEW\
+            b8UJr22xozIwMDAdBgNVHQ4EFgQUBpNnLmgr0cyMinXL4j80+JpuSWcwDwYDVR0TAQH/BAUwAwEB/zAKBggqhkjOPQQDAgNHADBE\
+            AiBLwQ3fcI9g1Emtv0B1iqDZKtrr7LZmwRa93JYekcqMHgIgM1rTYp6HwOgeMwMsc/yd9AUbLy8Li4I6BjvHyySbgA4=
+            """
+    )
+
+    /// The real case behind the test above: asking `SecIdentityCreate` for an identity of a
+    /// certificate like this one takes the whole process down, so `makeIdentity` has to refuse it
+    /// first, whatever key it is given.
+    @Test
+    func makeIdentity_whenTheCertificatesPublicKeyCannotBeRead_throwsInsteadOfAbortingTheProcess() throws {
+        // Given
+        let certificateDER = try #require(Self.brainpoolCertificateDER)
+        let keyDER = try Self.makeRSAPKCS1DER()
+
+        // Then
+        #expect(throws: Internals.RawBytesIdentityBuilder.Error.unsupportedCertificatePublicKey) {
+            try Internals.RawBytesIdentityBuilder.makeIdentity(certificateDER: certificateDER, privateKeyDER: keyDER)
+        }
     }
 
     // MARK: - Unsupported formats

@@ -90,6 +90,7 @@ struct ClientIdentityErrorTests {
             .unsupportedKeyFormat("-----BEGIN PRIVATE KEY-----"),
             .secKeyCreationFailed("bad key"),
             .privateKeyDoesNotMatchCertificate,
+            .unsupportedCertificatePublicKey,
         ]
     )
     func error_whenEveryInternalCaseRewrapped_hasNonEmptyDescription(

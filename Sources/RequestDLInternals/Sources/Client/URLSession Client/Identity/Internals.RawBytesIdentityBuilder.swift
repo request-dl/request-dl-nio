@@ -27,13 +27,17 @@ extension Internals {
     /// an `Internals.SecureConnection` into per-host TLS challenge handling.
     package enum RawBytesIdentityBuilder {
 
-        package enum Error: Swift.Error, CustomStringConvertible, Sendable {
+        package enum Error: Swift.Error, CustomStringConvertible, Equatable, Sendable {
             case invalidCertificateData
             case unsupportedKeyFormat(String)
             case secKeyCreationFailed(String)
 
             /// The private key is not the one of the certificate: no identity can be built from them.
             case privateKeyDoesNotMatchCertificate
+
+            /// The certificate's public key cannot be read: its algorithm or curve is not one
+            /// Security supports (RSA-PSS keys, brainpool or secp256k1 curves, ...).
+            case unsupportedCertificatePublicKey
 
             package var description: String {
                 switch self {
@@ -55,6 +59,9 @@ extension Internals {
                     return "SecKeyCreateWithData failed: \(message)."
                 case .privateKeyDoesNotMatchCertificate:
                     return "The private key is not the one of the configured certificate (their public keys differ)."
+                case .unsupportedCertificatePublicKey:
+                    return
+                        "The public key of the configured certificate cannot be read: its algorithm or curve is not supported (RSA and EC P-256/P-384/P-521 are)."
                 }
             }
         }
@@ -303,9 +310,11 @@ extension Internals {
             let certificate = try certificate(fromDER: certificateDER)
             let secKey = try Self.secKey(fromDER: privateKeyDER)
 
-            // Checked on public-key bytes first: it does not rely on how a given OS release
-            // treats a pair that does not match (`SecIdentityCreate` answers `nil` on the ones
-            // this was checked against, and its `nil` still maps to the same error below).
+            // Checked on public-key bytes first, and never skipped: `SecIdentityCreate` aborts the
+            // process on a certificate whose public key cannot be read (see
+            // `validate(certificatePublicKey:pairsWith:)`), and its answer for a pair that does
+            // not match is not something every OS release is known to give (`nil` is what it
+            // gives on the ones this was checked against, and still maps to the same error below).
             try Self.validate(certificate: certificate, pairsWith: try Self.applicationLabel(of: secKey))
 
             guard let identity = SecIdentityCreate(nil, certificate, secKey) else {
@@ -347,11 +356,13 @@ extension Internals {
         }
 
         /// - Parameter certificatePublicKey: The external representation of the certificate's
-        ///   public key, or `nil` when it cannot be read back. There is nothing to compare then,
-        ///   and `store(...)` still finds out whether an identity forms.
+        ///   public key, or `nil` when it cannot be read back. Throws then, and never reaches
+        ///   `SecIdentityCreate`: handed such a certificate it raises an Objective-C exception
+        ///   (`SecKeyCopyExternalRepresentation called with NULL SecKeyRef`) that nothing can
+        ///   catch, and the process aborts.
         package static func validate(certificatePublicKey: Data?, pairsWith applicationLabel: Data) throws {
             guard let certificatePublicKey else {
-                return
+                throw Error.unsupportedCertificatePublicKey
             }
 
             guard Data(Insecure.SHA1.hash(data: certificatePublicKey)) == applicationLabel else {
