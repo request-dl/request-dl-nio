@@ -497,16 +497,16 @@ extension InternalsSecureConnectionTests {
         #expect(!secureConnection.urlSessionIncompatibilityReasons().isEmpty)
     }
 
-    /// `build()` must not call `makeLocalIdentityForNetworkFramework()`, a Keychain round-trip,
-    /// on Darwin whenever both `certificateChain`/`privateKey` are configured, for a caller that
-    /// is never going to run over Network.framework at all. Otherwise configuring mTLS for
-    /// `.urlSession`/`.nioTransportServices` would silently break a `.nio`-pinned request too,
-    /// on any process without Keychain Sharing entitlement (e.g. this SwiftPM test harness).
+    /// `build()` must not call `makeLocalIdentityForNetworkFramework()` on Darwin whenever both
+    /// `certificateChain`/`privateKey` are configured, for a caller that is never going to run
+    /// over Network.framework at all. Otherwise configuring mTLS for `.urlSession`/
+    /// `.nioTransportServices` would make a `.nio`-pinned request fail on a pair that cannot form
+    /// an identity, though NIOSSL has no use for one.
     ///
     /// See `DataTaskTests.dataTask_whenCAEnabled()`, which pins `.requiredExecutor(.nio)`
     /// specifically to avoid this.
     @Test
-    func secureConnection_whenMTLSConfiguredButNetworkFrameworkNotNeeded_skipsKeychainIdentityBuild() async throws {
+    func secureConnection_whenMTLSConfiguredButNetworkFrameworkNotNeeded_skipsTheNFIdentityBuild() async throws {
         // Given
         let client = Certificates().client()
 
@@ -519,8 +519,7 @@ extension InternalsSecureConnectionTests {
         // When
         let sut = try secureConnection.build(isCompatibleWithNetworkFramework: false)
 
-        // Then: completes without ever attempting the Keychain round-trip, even on a machine
-        // with no Keychain Sharing entitlement at all. The identity is in `nioSSLCertificateChain`
+        // Then: completes without building a Network.framework identity. The identity is in `nioSSLCertificateChain`
         // and `nioSSLPrivateKey`, proving `build()` did real work rather than short-circuiting,
         // and not on `tlsConfiguration`: set there it would go to every host the client connects
         // to, redirect targets included (see `Internals.IdentityOrigins`).
@@ -539,13 +538,9 @@ extension InternalsSecureConnectionTests {
     /// `localIdentityHandle`, would crash the process the moment this configuration actually ran
     /// over `.nioTransportServices`.
     ///
-    /// The Keychain round trip `build(isCompatibleWithNetworkFramework: true)` needs
-    /// (`makeLocalIdentityForNetworkFramework()`) succeeds on real macOS (bare `swift test` or an
-    /// Xcode-run macOS test bundle) because `Internals.RawBytesIdentityBuilder
-    /// .makeIdentity(_:_:)` sets `kSecAttrApplicationLabel` correctly. Every other Apple
-    /// platform's Simulator, reached only via `xcodebuild test` against SwiftPM's auto-generated
-    /// scheme, has no `.entitlements` file to add Keychain Sharing to at all, so `SecItemAdd`
-    /// there fails with `errSecMissingEntitlement` before identity pairing is ever reached.
+    /// The identity `build(isCompatibleWithNetworkFramework: true)` makes
+    /// (`makeLocalIdentityForNetworkFramework()`) is built in memory, so it needs no Keychain
+    /// access or entitlement and builds the same on macOS and on every Simulator.
     @Test
     func secureConnection_whenMTLSConfiguredAndNetworkFrameworkNeeded_omitsRawCertificateChainFromTLSConfiguration()
         async throws
@@ -560,22 +555,10 @@ extension InternalsSecureConnectionTests {
         )
 
         // When / Then
-        func verify() throws {
-            let sut = try secureConnection.build(isCompatibleWithNetworkFramework: true)
+        let sut = try secureConnection.build(isCompatibleWithNetworkFramework: true)
 
-            #expect(sut.tlsConfiguration.certificateChain.isEmpty)
-            #expect(sut.tlsConfiguration.privateKey == nil)
-        }
-
-        #if os(macOS) || !canImport(Darwin)
-        try verify()
-        #else
-        withKnownIssue(
-            "no Keychain Sharing entitlement on this platform's SwiftPM-generated Xcode scheme; see this test's own doc comment"
-        ) {
-            try verify()
-        }
-        #endif
+        #expect(sut.tlsConfiguration.certificateChain.isEmpty)
+        #expect(sut.tlsConfiguration.privateKey == nil)
     }
 }
 

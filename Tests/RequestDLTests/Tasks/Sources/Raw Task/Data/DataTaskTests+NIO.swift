@@ -24,16 +24,10 @@ import struct Foundation.Data
 
 extension DataTaskTests {
 
-    /// Pinned to `.nio`: a real client-certificate handshake over `.urlSession` is a confirmed,
-    /// unconditional `withKnownIssue` on this SwiftPM test harness (no Keychain Sharing
-    /// entitlement on any platform; see `RequestConfigurationURLSessionClientMTLSTests`'s type
-    /// doc comment, which already tracks this exact gap at the `Internals.URLSessionClient`
-    /// layer).
-    ///
-    /// Since `resolveExecutor()` decides which backend a real `DataTask` runs over, this test
-    /// would otherwise hit that same unconditional gap by default and fail for a reason that has
-    /// nothing to do with what it's actually verifying: that mTLS client-cert auth works end to
-    /// end through the public `DataTask` API, which NIO already does reliably.
+    /// Pinned to `.nio`, so what it verifies is NIOSSL's own client-certificate handshake through
+    /// the public `DataTask` API. The `.urlSession` and `.nioTransportServices` counterparts
+    /// (`dataTask_whenCAEnabledUnderURLSession`, `dataTask_whenCAEnabledUnderNIOTransportServices`)
+    /// cover the same handshake over those executors.
     @Test
     func dataTask_whenCAEnabled() async throws {
         // Given
@@ -161,15 +155,8 @@ extension DataTaskTests {
     /// `requiredExecutor(.nioTransportServices)` any time mTLS is also configured, since mTLS is
     /// genuinely supported there, just through a different channel.
     ///
-    /// The Keychain round trip this needs succeeds on real macOS (bare `swift test` or an Xcode-run
-    /// macOS test bundle) because `Internals.RawBytesIdentityBuilder .makeIdentity(_:_:)` sets
-    /// `kSecAttrApplicationLabel` correctly. Every other Apple platform's Simulator, reached only
-    /// via `xcodebuild test` against SwiftPM's auto-generated scheme, has no `.entitlements` file
-    /// to add Keychain Sharing to at all (there is nowhere in a `Package.swift`-only project to
-    /// configure one; see
-    /// `Sources/RequestDL/Documentation.docc/Advanced/Using-a-Client-Certificate-with-URLSession.md`,
-    /// written for a real app target's Signing & Capabilities tab), so `SecItemAdd` there fails
-    /// with `errSecMissingEntitlement` before identity pairing is ever reached.
+    /// The client identity is built in memory (`SecIdentityCreate`), so this needs no Keychain
+    /// access and no entitlement, and runs the same on macOS and on every Simulator.
     @Test
     func dataTask_whenCAEnabledUnderNIOTransportServices() async throws {
         // Given
@@ -219,15 +206,7 @@ extension DataTaskTests {
             #expect(result.response == output)
         }
 
-        #if os(macOS) || !canImport(Darwin)
         try await verify()
-        #else
-        await withKnownIssue(
-            "no Keychain Sharing entitlement on this platform's SwiftPM-generated Xcode scheme; see this test's own doc comment"
-        ) {
-            try await verify()
-        }
-        #endif
     }
 
     /// Positive control for `Internals.ExecutorIncompatibilityReason
@@ -249,13 +228,9 @@ extension DataTaskTests {
     /// `resolveExecutor_whenMultipleClientCertificatesSetAndNIOTransportServicesPreferred_fallsBackToNIO`
     /// for the resolution logic itself, proven without needing a live network round trip.
     ///
-    /// Unlike `dataTask_whenCAEnabledUnderNIOTransportServices` above, this one needs no
-    /// `withKnownIssue`/Keychain-entitlement caveat on iOS/tvOS/watchOS/Catalyst Simulator:
-    /// `.requiredExecutor(.nio)` reads the identity straight off NIOSSL's own
-    /// `TLSConfiguration.certificateChain`/`privateKey`, with no `SecIdentity`/Keychain round
-    /// trip involved, so there's no entitlement gap to hit. Wrapping its body in
-    /// `withKnownIssue` would fail with "Known issue was not recorded", since the body
-    /// unconditionally succeeds.
+    /// Unlike `dataTask_whenCAEnabledUnderNIOTransportServices` above, `.requiredExecutor(.nio)`
+    /// reads the identity straight off NIOSSL's own `TLSConfiguration.certificateChain`/
+    /// `privateKey`, with no `SecIdentity` involved.
     @Test
     func dataTask_whenClientCertificateChainHasIntermediateUnderNIORequired_completesHandshake() async throws {
         // Given
@@ -368,8 +343,7 @@ extension DataTaskTests {
     /// every connection of the client is proxied, so the identity that is used is the NIOSSL one
     /// and the Network.framework one is not needed. `Internals.SecureConnection.build(
     /// isCompatibleWithNetworkFramework:isProxied:)` builds the NIOSSL one in that case, a read of
-    /// the PEM files and no Keychain round trip, which is why this needs no `withKnownIssue`
-    /// caveat for the Keychain entitlement either.
+    /// the PEM files and no `SecIdentity`.
     ///
     /// The server verifies the client certificate (`LocalServer.TLSOption.client(_:)`), so the
     /// handshake only completes if the certificate reached the tunnel. Both ways of asking for the

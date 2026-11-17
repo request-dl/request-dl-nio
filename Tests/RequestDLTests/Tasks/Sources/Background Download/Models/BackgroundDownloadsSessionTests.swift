@@ -228,17 +228,13 @@ struct BackgroundDownloadsSessionTests {
     // MARK: - clientIdentity caching
 
     /// A client-certificate challenge must not call
-    /// `Internals.ClientIdentityDescriptor.makeIdentity()` fresh every time, paying its full
-    /// Keychain round trip (two `SecItemAdd` calls, then a `kSecMatchLimitAll` scan of the *entire*
-    /// keychain, since `kSecClassIdentity` supports no label-based query) even for a redirect
-    /// chain, or several downloads sharing one client certificate, within the same process.
-    /// `Internals.IdentityManager`'s own weak-reference deduplication can't help, since nothing
-    /// retains the previous challenge's handle past answering it. See `resolvedIdentity(for:)`'s
-    /// own doc comment for why this is tested directly rather than through a real challenge.
+    /// `Internals.ClientIdentityDescriptor.makeIdentity()` fresh every time, re-reading the two
+    /// files and re-parsing the key, even for a redirect chain, or several downloads sharing one
+    /// client certificate, within the same process. See `resolvedIdentity(for:)`'s own doc comment
+    /// for why this is tested directly rather than through a real challenge.
     ///
-    /// The Keychain round trip this needs succeeds on real macOS (bare `swift test`), the same
-    /// platform/entitlement caveat `InternalsClientIdentityDescriptorTests`'s own
-    /// `rebuiltIdentity_...` test documents.
+    /// The identity is built in memory, so this needs no Keychain access or entitlement and runs
+    /// on every platform.
     @Test
     func resolvedIdentity_whenCalledTwiceForTheSameDescriptor_reusesTheSameHandle() async throws {
         // Given
@@ -255,34 +251,13 @@ struct BackgroundDownloadsSessionTests {
 
         // When / Then
         //
-        // `resolvedIdentity(for:)`'s cache hit is only observable once its first call has
-        // something to hit: `makeIdentity()`'s own Keychain round trip succeeds on real macOS (see
-        // `InternalsClientIdentityDescriptorTests
-        // .rebuiltIdentity_whenPresentedToServerRequiringClientCertificate_completesHandshake`'s
-        // own doc comment), but every other Apple platform's Simulator, reached only via
-        // `xcodebuild test` against SwiftPM's auto-generated scheme, has no `.entitlements` file
-        // to add Keychain Sharing to at all, so `SecItemAdd` fails with `errSecMissingEntitlement`
-        // before identity pairing is ever reached, the same gap that test documents.
-        func verify() throws {
-            let first = try #require(session.resolvedIdentity(for: descriptor))
-            let second = try #require(session.resolvedIdentity(for: descriptor))
+        let first = try #require(session.resolvedIdentity(for: descriptor))
+        let second = try #require(session.resolvedIdentity(for: descriptor))
 
-            // Then: the exact same `Internals.IdentityHandle` instance, not merely two handles
-            // wrapping an equivalent `SecIdentity`, proving the second call skipped
-            // `makeIdentity()`'s own Keychain round trip entirely rather than happening to land on
-            // the same Keychain item again.
-            #expect(first.handle === second.handle)
-        }
-
-        #if os(macOS)
-        try verify()
-        #else
-        withKnownIssue(
-            "no Keychain Sharing entitlement on this platform's SwiftPM-generated Xcode scheme; see InternalsClientIdentityDescriptorTests's own doc comment"
-        ) {
-            try verify()
-        }
-        #endif
+        // Then: the exact same `Internals.IdentityHandle` instance, not merely two handles
+        // wrapping an equivalent `SecIdentity`, proving the second call skipped
+        // `makeIdentity()` entirely.
+        #expect(first.handle === second.handle)
     }
 
     // MARK: - firstTask(matching:in:)
