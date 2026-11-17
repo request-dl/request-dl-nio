@@ -378,8 +378,7 @@ extension InternalsSessionConfigurationExecutorTests {
     /// `requiredExecutor(.nio)` has to be the executor a real request dispatches over, not merely
     /// validate (via `requireExecutor(_:)`, called separately): resolving to `.urlSession` on a
     /// compatible config, silently, would defeat a `DataTaskTests` test pinning
-    /// `.requiredExecutor(.nio)` to keep a client-cert mTLS test off `.urlSession`'s
-    /// unconditional Keychain-Sharing gap.
+    /// `.requiredExecutor(.nio)` to keep a client-cert mTLS test on NIOSSL.
     @Test
     func resolveExecutor_whenNIORequired_resolvesToNIORegardlessOfPreferredExecutorOrCompatibility() async throws {
         // Given: compatible with `.urlSession`, and even prefers it, yet `.nio` is required.

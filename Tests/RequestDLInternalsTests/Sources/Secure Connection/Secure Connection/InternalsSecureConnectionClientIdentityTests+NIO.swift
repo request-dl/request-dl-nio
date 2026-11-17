@@ -17,7 +17,7 @@ import Foundation
 
 /// The client identity (`certificateChain` + `privateKey`) half of `Internals.SecureConnection`:
 /// what is left of a chain when only a leaf can go out, and what a half-configured identity
-/// does on each executor. None of it touches the Keychain: every case below either fails before
+/// does on each executor. None of it needs a Network.framework identity: every case below either fails before
 /// building an identity or only builds NIOSSL's.
 struct InternalsSecureConnectionClientIdentityTests {
 

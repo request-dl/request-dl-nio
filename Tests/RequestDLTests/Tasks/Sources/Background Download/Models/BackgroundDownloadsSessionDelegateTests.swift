@@ -17,8 +17,7 @@ import Foundation
 /// used as a way to get a real `URLSessionDownloadTask` object to set `taskDescription` on and
 /// hand to the delegate method by hand. This exercises the same code a real background transfer
 /// would run through, without starting one: this SwiftPM test harness has none of the entitlements
-/// a real background session needs to actually schedule anything (the same gap already documented
-/// for Keychain-backed mTLS), so this is the ceiling of what can be verified here. See
+/// a real background session needs to actually schedule anything, so this is the ceiling of what can be verified here. See
 /// `BackgroundDownloadTaskTests`'s own doc comment for the same reasoning applied to `result()`.
 ///
 /// Every delegate method under test is synchronous by contract (that's the whole reason `Session`

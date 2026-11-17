@@ -76,14 +76,11 @@ extension Internals {
         private let throttledExecutor: Internals.ThrottledExecutor
 
         #if canImport(Darwin)
-        /// The mTLS client identity's Keychain-item handle, when `SecureConnection.certificateChain`/
-        /// `.privateKey` were configured for a Network.framework connection. Held for as long as
-        /// this `Client` (and so this client's underlying `HTTPClient`) is alive.
-        ///
-        /// Released automatically through `IdentityHandle`'s own `deinit` once this property is
-        /// torn down, mirroring `Internals.URLSessionIdentityPolicy`'s own identity lifecycle
-        /// exactly, and only actually deleting the underlying Keychain items once every other
-        /// live `Internals.IdentityHandle` for that same certificate/key pair has gone away too.
+        /// The mTLS client identity (held in memory, nothing is stored in a Keychain), when
+        /// `SecureConnection.certificateChain`/`.privateKey` were configured for a
+        /// Network.framework connection. Held for as long as this `Client` (and so this client's
+        /// underlying `HTTPClient`) is alive, mirroring `Internals.URLSessionIdentityPolicy`'s own
+        /// identity lifecycle.
         private let localIdentityHandle: Internals.IdentityHandle?
         #endif
 
@@ -156,10 +153,6 @@ extension Internals {
         #endif
 
         deinit {
-            // The mTLS identity's Keychain items (if any) are released through
-            // `localIdentityHandle`'s own `deinit`, automatically, once this stored property is
-            // torn down below. No explicit call needed here.
-
             // Shutting down from here is a last resort, so it is guarded by the same flag the
             // explicit path sets. Without the guard this shut down a client the manager had
             // already closed, and the second call is an error nobody was positioned to see.

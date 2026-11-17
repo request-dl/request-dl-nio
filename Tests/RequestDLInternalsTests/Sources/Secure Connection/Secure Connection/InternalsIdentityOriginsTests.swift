@@ -91,10 +91,9 @@ struct InternalsIdentityOriginsTests {
 
     /// On Network.framework with a proxy, every connection is proxied and its TLS is done by
     /// NIOSSL, so the NIOSSL provider is what must answer, and the Network.framework identity,
-    /// which costs a Keychain round trip, is not built: this passes in a process without the
-    /// Keychain entitlement.
+    /// which nothing would use, is not built.
     @Test
-    func build_whenProxiedOnNetworkFramework_offersTheNIOSSLIdentityAndBuildsNoKeychainOne() throws {
+    func build_whenProxiedOnNetworkFramework_offersTheNIOSSLIdentityAndBuildsNoNetworkFrameworkOne() throws {
         // Given
         let client = Certificates().client()
 

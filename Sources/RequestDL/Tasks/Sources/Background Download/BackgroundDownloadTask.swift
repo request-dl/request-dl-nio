@@ -38,7 +38,7 @@ import struct Foundation.URL
 /// ```
 ///
 /// `content` can configure ``TrustRoots``/``AdditionalTrustRoots``/``SecureConnection/verification(_:)``
-/// freely: none of them need a Keychain round-trip to survive a relaunch, only the certificate
+/// freely: none of them need anything beyond the certificate bytes to survive a relaunch, only the certificate
 /// bytes themselves, which travel alongside `id`/`destination` in the scheduled task's own state.
 ///
 /// ## Redirects

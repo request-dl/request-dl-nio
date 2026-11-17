@@ -18,13 +18,10 @@ import Foundation
 #endif
 
 /// Covers `Internals.RawBytesIdentityBuilder.secKey(fromDER:)`'s own format classification,
-/// namely RSA/PKCS#1, RSA/PKCS#8, EC/SEC1, EC/PKCS#8, independent of the Keychain round trip
-/// `makeIdentity(certificateDER:privateKeyDER:)` wraps around it. That round trip is a confirmed,
-/// unconditional `withKnownIssue` on this SwiftPM test harness regardless of key type (no Keychain
-/// Sharing entitlement; see `RequestConfigurationURLSessionClientMTLSTests`'s own doc comment),
-/// so testing the actual new logic here, which needs no Keychain access at all
-/// (`SecKeyCreateWithData` builds an ephemeral, non-persistent `SecKey` purely in memory), is what
-/// actually proves PKCS#8/EC support works, in an environment where the full round trip can't.
+/// namely RSA/PKCS#1, RSA/PKCS#8, EC/SEC1, EC/PKCS#8, on its own, apart from the
+/// `makeIdentity(certificateDER:privateKeyDER:)` that pairs the result with a certificate (see
+/// `InternalsRawBytesIdentityBuilderIdentityTests`). `SecKeyCreateWithData` builds an ephemeral,
+/// non-persistent `SecKey` purely in memory.
 ///
 /// Test fixtures are generated fresh per run rather than checked in as static files: RSA keys via
 /// `SecKeyCreateRandomKey` (no Keychain persistence needed since `kSecAttrIsPermanent` isn't set),
@@ -311,177 +308,9 @@ struct InternalsRawBytesIdentityBuilderTests {
         }
     }
 
-    // MARK: - Keychain round trip (store(...))
-
-    /// `makeIdentity(_:_:)` on macOS tries the modern, data-protection Keychain first
-    /// (`store(...useDataProtectionKeychain: true)`), only falling back to the legacy one on
-    /// `errSecMissingEntitlement`. Confirms that first attempt is genuinely made, not skipped,
-    /// in this unsigned `swift test` harness, which has no `keychain-access-groups` entitlement
-    /// (see `store(...)`'s own doc comment). Replacing `makeIdentity(_:_:)`'s `do`/`catch` with
-    /// an unconditional `useDataProtectionKeychain: true` call makes every RSA mTLS round-trip
-    /// test (`dataTask_whenCAEnabled`,
-    /// `urlSessionClient_whenMTLSConfigured_completesHandshakeMatchingNIOBackend`, ...) fail
-    /// with exactly this error, since there's no legacy-Keychain fallback left to rescue them.
-    @Test
-    func store_whenUsingDataProtectionKeychainInUnsignedProcess_throwsMissingEntitlement() throws {
-        // Given: any real certificate/key pair works here. RSA, since it's what's already
-        // checked in and it isn't the EC-specific gap `store(...)` itself documents.
-        let client = Certificates().client()
-        let certificate = try Self.certificate(fromPEMFile: client.certificateURL)
-        let secKey = try Self.secKey(fromPrivateKeyPEMFile: client.privateKeyURL)
-
-        // When
-        do {
-            _ = try Internals.RawBytesIdentityBuilder.store(
-                certificate: certificate,
-                secKey: secKey,
-                label: "InternalsRawBytesIdentityBuilderTests.dataProtectionKeychain." + UUID().uuidString,
-                useDataProtectionKeychain: true
-            )
-            Issue.record("Not expecting success")
-        } catch Internals.RawBytesIdentityBuilder.Error.missingKeychainSharingEntitlement(let operation) {
-            // Then
-            #expect(operation == "SecItemAdd(key)")
-        }
-    }
-
-    /// On macOS, the legacy (non-data-protection) Keychain, the only one an unsigned process
-    /// like this test harness can fall back to, cannot store an EC private key this package
-    /// *imports* from raw bytes (the gap `store(...)`'s own doc comment describes), unlike RSA
-    /// (confirmed working by the test right above, and by every RSA mTLS round-trip test
-    /// elsewhere). `SecItemAdd` returns exactly `-25304`/`errSecInvalidItemRef`, and only for
-    /// *importing* external EC key material into this Keychain: the identical call for RSA
-    /// succeeds, and so does a freshly generated (`SecKeyCreateRandomKey`, not imported) EC key.
-    ///
-    /// `makeIdentity(_:_:)`'s data-protection-Keychain-first fallback doesn't fix this: it only
-    /// helps a *signed* macOS app with the Keychain Sharing entitlement, which this unsigned
-    /// test process has no way to obtain (see `InternalsRawBytesIdentityBuilderTests`'s own type
-    /// doc comment).
-    ///
-    /// macOS only: `useDataProtectionKeychain: false` doesn't exercise a distinct "legacy"
-    /// Keychain on iOS/tvOS/watchOS/Catalyst the way it does on macOS, since there's only ever
-    /// the one data-protection Keychain there (see `makeIdentity(_:_:)`'s own `#else` branch).
-    /// Passing `false` on those platforms still hits the missing-entitlement wall
-    /// `store_whenUsingDataProtectionKeychainInUnsignedProcess_throwsMissingEntitlement` already
-    /// covers, not the `-25304` this test is after.
-    #if os(macOS)
-    @Test
-    func store_whenGivenAnECKeyOnTheLegacyKeychain_throwsInvalidItemRef() throws {
-        // Given
-        let client = Certificates().clientEC()
-        let certificate = try Self.certificate(fromPEMFile: client.certificateURL)
-        let secKey = try Self.secKey(fromPrivateKeyPEMFile: client.privateKeyURL)
-
-        // When
-        do {
-            _ = try Internals.RawBytesIdentityBuilder.store(
-                certificate: certificate,
-                secKey: secKey,
-                label: "InternalsRawBytesIdentityBuilderTests.ecLegacyKeychain." + UUID().uuidString,
-                useDataProtectionKeychain: false
-            )
-            Issue.record("Not expecting success")
-        } catch Internals.RawBytesIdentityBuilder.Error.keychainOperationFailed(let status, let operation) {
-            // Then
-            #expect(status == errSecInvalidItemRef)
-            #expect(operation == "SecItemAdd(key)")
-        }
-    }
-
-    /// The RSA counterpart to the EC test right above, on the exact same (legacy) Keychain:
-    /// proves the gap is EC-specific, not a general problem with this test harness or with
-    /// `useDataProtectionKeychain: false` storage. macOS only; see that test's own doc comment.
-    @Test
-    func store_whenGivenAnRSAKeyOnTheLegacyKeychain_succeeds() throws {
-        // Given: a pair of its own. With the pair the handshake tests share, another test
-        // releasing its handle for it deletes the key or the certificate between this test's add
-        // and its look for the identity, and the look fails with `errSecItemNotFound` (-25300).
-        let fixture = try InternalsRawBytesIdentityBuilderKeychainTests.Fixture()
-        let certificate = try Internals.RawBytesIdentityBuilder.certificate(fromDER: fixture.certificateDER)
-        let secKey = try Internals.RawBytesIdentityBuilder.secKey(fromDER: fixture.pkcs1)
-
-        let label = "InternalsRawBytesIdentityBuilderTests.rsaLegacyKeychain." + UUID().uuidString
-        defer {
-            Self.deleteKeychainItems(labelled: label)
-            fixture.cleanUp()
-        }
-
-        // When / Then
-        _ = try Internals.RawBytesIdentityBuilder.store(
-            certificate: certificate,
-            secKey: secKey,
-            label: label,
-            useDataProtectionKeychain: false
-        )
-    }
-
-    /// The file keychain answers a second `SecItemAdd` of a key it already holds with
-    /// `errSecDuplicateItem` and stores an extra copy of it that has no label, which nothing can
-    /// find or delete afterwards. Every `swift test` run used to leave thousands of them in the
-    /// login keychain.
-    @Test
-    func store_whenTheKeyIsAlreadyStored_addsNoCopyOfIt() throws {
-        // Given: a pair of its own, so that deleting its key at the end takes nothing from the
-        // tests that handshake with `Certificates().client()` at the same time.
-        let client = CertificateResource("client_chain_leaf", format: .pem)
-        let certificate = try Self.certificate(fromPEMFile: client.certificateURL)
-        let secKey = try Self.secKey(fromPrivateKeyPEMFile: client.privateKeyURL)
-
-        let labels = (0..<3).map { _ in "InternalsRawBytesIdentityBuilderTests.noCopy." + UUID().uuidString }
-        defer { labels.forEach(Self.deleteKeychainItems(labelled:)) }
-
-        let before = Self.unlabelledPrivateKeyCount()
-
-        // When
-        for label in labels {
-            _ = try Internals.RawBytesIdentityBuilder.store(
-                certificate: certificate,
-                secKey: secKey,
-                label: label,
-                useDataProtectionKeychain: false
-            )
-        }
-
-        // Then
-        #expect(Self.unlabelledPrivateKeyCount() == before)
-    }
-
-    fileprivate static func unlabelledPrivateKeyCount() -> Int {
-        var result: CFTypeRef?
-        let status = SecItemCopyMatching(
-            [
-                kSecClass: kSecClassKey,
-                kSecAttrKeyClass: kSecAttrKeyClassPrivate,
-                kSecMatchLimit: kSecMatchLimitAll,
-                kSecReturnAttributes: true,
-                kSecUseDataProtectionKeychain: false,
-            ] as CFDictionary,
-            &result
-        )
-
-        guard status == errSecSuccess, let items = result as? [[String: Any]] else {
-            return 0
-        }
-
-        return items.filter { (($0[kSecAttrLabel as String] as? String) ?? "").isEmpty }.count
-    }
-
-    fileprivate static func deleteKeychainItems(labelled label: String) {
-        for itemClass in [kSecClassKey, kSecClassCertificate] {
-            SecItemDelete(
-                [
-                    kSecClass: itemClass,
-                    kSecAttrLabel: label,
-                    kSecUseDataProtectionKeychain: false,
-                ] as CFDictionary
-            )
-        }
-    }
-    #endif
-
     // MARK: - Pairing a private key with a certificate
 
-    /// None of these touch the Keychain: the pair is checked before anything is stored.
+    /// Pure comparisons of public-key bytes: nothing is built or stored.
     @Test
     func validate_whenTheCertificatesPublicKeyIsTheKeys_passes() throws {
         // Given
@@ -518,8 +347,8 @@ struct InternalsRawBytesIdentityBuilderTests {
         }
     }
 
-    /// Nothing to compare, so nothing is refused: `store(...)` is what finds out whether an
-    /// identity forms.
+    /// Nothing to compare, so nothing is refused here: `SecIdentityCreate` is what finds out
+    /// whether an identity forms.
     @Test
     func validate_whenTheCertificatesPublicKeyCannotBeRead_passes() throws {
         // Given
