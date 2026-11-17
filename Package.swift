@@ -69,7 +69,7 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/o-nnerb/swift-async-stream",
-            from: "3.0.1"
+            from: "3.0.2"
         ),
         .package(
             url: "https://github.com/apple/swift-async-algorithms",
