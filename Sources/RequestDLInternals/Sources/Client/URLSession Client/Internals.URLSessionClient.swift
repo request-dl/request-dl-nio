@@ -2120,7 +2120,7 @@ extension Internals.URLSessionClient {
     /// The semaphore backing `maximumConcurrentConnections`, `nil` when the client was not configured with
     /// a limit. Same escape hatch as `Internals.Client.connectionSemaphoreForTesting`: it lets a test wait
     /// for an exact number of queued requests instead of guessing at a delay.
-    package var connectionSemaphoreForTesting: Internals.ThrottledExecutor.Semaphore? {
+    package var connectionSemaphoreForTesting: AsyncCancellableSemaphore? {
         throttledExecutor.semaphoreForTesting
     }
 
