@@ -624,6 +624,77 @@ struct InternalsClientManagerTests {
             try await task.value
         }
     }
+
+    // MARK: - Sweep
+
+    /// A client with nothing in flight reads as idle, and so does one between two calls a caller makes in a
+    /// row (cache revalidation's `HEAD`, then the real `GET`): `isRunning` is `false` for the whole gap. What
+    /// tells them apart is `operationGeneration`, bumped by every operation that finishes. A client that
+    /// finished one since the sweep last looked was in use more recently than its `readAt` says, so the
+    /// sweep refreshes it instead of un-pooling it, however old `readAt` is.
+    ///
+    /// The sweep is run by hand, at an instant chosen to be past `lifetime` for everything in the table, so
+    /// the age of the client is a fact of the test rather than a wait for it.
+    @Test
+    func manager_whenAnOperationCompletedSinceTheClientWasLastTouched_sweepShouldKeepItPooledOnce() async throws {
+        try await withHangingTCPServer { port in
+            // Given: a pooled client, recorded at generation zero.
+            let lifetime: Int64 = 5 * 60 * 1_000_000_000
+            let manager = Internals.ClientManager(lifetime: lifetime)
+            let provider = Internals.SharedSessionProvider()
+            let sessionConfiguration = Internals.Session.Configuration()
+
+            let client = try await manager.client(provider: provider, sessionConfiguration: sessionConfiguration)
+            let generation = client.operationGeneration
+            #expect(manager.count == 1)
+
+            // And an operation that starts and finishes on it: a request that is cancelled while it waits.
+            let task = try await client.execute(
+                request: try HTTPClient.Request(url: "http://127.0.0.1:\(port)/"),
+                logger: nil
+            )
+
+            #expect(client.isRunning)
+            task()()
+
+            await #expect(throws: (any Error).self) {
+                _ = try await task.response()
+            }
+
+            // Polled: the operation is closed from the event loop, after the caller already has its answer.
+            for _ in 0..<6_000 where client.isRunning {
+                try await _Concurrency.Task.sleep(nanoseconds: 10_000_000)
+            }
+
+            try #require(!client.isRunning)
+            try #require(client.operationGeneration != generation)
+
+            // When: the sweep runs with the client idle and, by age alone, long expired.
+            let afterLifetime = Self.instant(after: lifetime)
+            await manager.cleanupIfNeeded(at: afterLifetime)
+
+            // Then: it was active since it was last looked at, so it stays, and is still the one handed out.
+            #expect(manager.count == 1)
+
+            let again = try await manager.client(provider: provider, sessionConfiguration: sessionConfiguration)
+            #expect(again === client)
+
+            // And that grace is for the operation that earned it. With nothing completed since, the same
+            // client, once it is past `lifetime` again, is un-pooled by the next sweep. A new instant: handing it
+            // out just now refreshed `readAt`.
+            await manager.cleanupIfNeeded(at: Self.instant(after: lifetime))
+            #expect(manager.count == 0)
+        }
+    }
+
+    /// A moment `nanoseconds` past now, on the clock the sweep reads.
+    private static func instant(after nanoseconds: Int64) -> Internals.ClientManager.MonotonicInstant {
+        #if canImport(Darwin)
+        DispatchTime.now().uptimeNanoseconds + UInt64(nanoseconds) + 1
+        #else
+        ContinuousClock.now.advanced(by: .nanoseconds(nanoseconds + 1))
+        #endif
+    }
 }
 
 /// Runs `body` against a TCP listener that accepts connections and then says nothing at all.

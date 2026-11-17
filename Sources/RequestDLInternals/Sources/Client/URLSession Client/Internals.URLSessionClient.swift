@@ -76,12 +76,18 @@ extension Internals {
         /// .proxyBearerAuthorizationUnderURLSession`), so a well-formed caller never passes that
         /// here. See `Internals.Proxy.buildConnectionProxyDictionary()`'s doc comment for the
         /// per-platform status of this mapping.
+        /// - Parameter sessionDelegate: Handed to the `URLSession` itself, which holds on to it
+        /// until the session is invalidated. Every exchange answers through its own task delegate,
+        /// so production leaves this `nil`; it exists so a test can observe the session being
+        /// invalidated (`urlSession(_:didBecomeInvalidWithError:)`), the one thing the session
+        /// reports about its own end and that nothing else exposes once the client is gone.
         package init(
             configuration: URLSessionConfiguration,
             secureConnection: Internals.SecureConnection? = nil,
             redirectConfiguration: Internals.RedirectConfiguration = .follow(max: 5, allowCycles: false),
             proxy: Internals.Proxy? = nil,
-            maximumConcurrentConnections: Int? = nil
+            maximumConcurrentConnections: Int? = nil,
+            sessionDelegate: (any URLSessionDelegate)? = nil
         ) throws {
             let configuration = configuration
             // Explicitly `[:]`, not left untouched, when `proxy` is `nil`. `URLSession` treats an
@@ -108,7 +114,7 @@ extension Internals {
             // gets as far as `deinit`, so a session created first would be left running for ever.
             let identityPolicy = try secureConnection.map(Internals.URLSessionIdentityPolicy.init)
 
-            session = URLSession(configuration: configuration)
+            session = URLSession(configuration: configuration, delegate: sessionDelegate, delegateQueue: nil)
             throttledExecutor = Internals.ThrottledExecutor(
                 maximumConcurrentConnections: maximumConcurrentConnections
             )
@@ -183,14 +189,13 @@ extension Internals {
             // Waited on before anything else, mirroring `Internals.Client.execute`: a session
             // configured with a limit must never let more requests than that reach the network,
             // whether the cap is enforced by the NIO or the URLSession executor.
-            let release = await throttledExecutor.acquire()
+            let release = try await throttledExecutor.acquire()
             defer { release() }
 
-            // `AsyncSemaphore.wait()` (backing `acquire()` above) is documented as "cancellation
-            // transparent": a waiter cancelled while queued still takes its turn once a slot
-            // frees up, rather than being skipped. Without this check, a caller whose own `Task`
-            // was cancelled while queued here still had its request dispatched onto the wire the
-            // moment `acquire()` returned.
+            // `acquire()` above throws once the caller's `Task` is cancelled while it waits for a
+            // slot. This covers a caller cancelled just after it was handed one, and one with no
+            // limit to wait for: without it, its request would be dispatched onto the wire all the
+            // same.
             try Task.checkCancellation()
 
             let tlsDelegate = makeTLSDelegate(for: request.url)
@@ -259,12 +264,11 @@ extension Internals {
             let operation = try beginOperation()
             defer { operation.complete() }
 
-            let release = await throttledExecutor.acquire()
+            let release = try await throttledExecutor.acquire()
             defer { release() }
 
-            // See the equivalent comment in `execute(request:delegate:)`: a cancelled caller
-            // must not have its request dispatched once a slot frees up, since the semaphore
-            // itself is "cancellation transparent" and would otherwise let it through anyway.
+            // See the equivalent comment in `execute(request:delegate:)`: a caller cancelled just
+            // after it was handed a slot, or one with no limit, must not have its request dispatched.
             try Task.checkCancellation()
 
             let materialized: Internals.URLSessionUploadFile.Materialized
@@ -348,10 +352,10 @@ extension Internals {
             // throttle wait so this client counts as busy for as long as a caller is queued on
             // it, not just once it starts sending.
             let operation = try beginOperation()
-            let release = await throttledExecutor.acquire()
+            let release = try await throttledExecutor.acquire()
 
-            // See the equivalent comment in `execute(request:delegate:)`: a cancelled caller
-            // must not have its request dispatched once a slot frees up. Both the operation slot
+            // See the equivalent comment in `execute(request:delegate:)`: a caller cancelled just
+            // after it was handed a slot must not have its request dispatched. Both the operation slot
             // and the throttle permit are handed back here, since neither overload's usual
             // release path (`onDownloadComplete`, wired up below) ever runs when the request is
             // never actually dispatched.
@@ -561,10 +565,10 @@ extension Internals {
             // throttle wait so this client counts as busy for as long as a caller is queued on
             // it, not just once it starts sending.
             let operation = try beginOperation()
-            let release = await throttledExecutor.acquire()
+            let release = try await throttledExecutor.acquire()
 
-            // See the equivalent comment in `execute(request:delegate:)`: a cancelled caller must
-            // not have its request dispatched once a slot frees up. Both the operation slot and the
+            // See the equivalent comment in `execute(request:delegate:)`: a caller cancelled just
+            // after it was handed a slot must not have its request dispatched. Both the operation slot and the
             // throttle permit are handed back here, since neither is tied to a `defer` in this
             // overload, and their usual release path (`onDownloadComplete`, wired up below) never
             // runs when the request is never actually dispatched.
@@ -2112,6 +2116,13 @@ extension Internals.URLSessionClient {
 }
 
 extension Internals.URLSessionClient {
+
+    /// The semaphore backing `maximumConcurrentConnections`, `nil` when the client was not configured with
+    /// a limit. Same escape hatch as `Internals.Client.connectionSemaphoreForTesting`: it lets a test wait
+    /// for an exact number of queued requests instead of guessing at a delay.
+    package var connectionSemaphoreForTesting: Internals.ThrottledExecutor.Semaphore? {
+        throttledExecutor.semaphoreForTesting
+    }
 
     /// The origins requests were made to with this client, which its client identity may be
     /// presented to. Lets a test see that an `execute` overload recorded its request's origin.

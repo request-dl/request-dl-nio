@@ -191,6 +191,8 @@ extension Internals {
         /// backwards and no client is ever recycled, forwards and every client is eligible at
         /// once, including one handed out a moment ago and about to be used.
         #if canImport(Darwin)
+        package typealias MonotonicInstant = UInt64
+
         static func monotonicNow() -> UInt64 {
             DispatchTime.now().uptimeNanoseconds
         }
@@ -199,6 +201,8 @@ extension Internals {
             now - item.readAt > lifetime
         }
         #else
+        package typealias MonotonicInstant = ContinuousClock.Instant
+
         static func monotonicNow() -> ContinuousClock.Instant {
             ContinuousClock.now
         }
@@ -218,9 +222,12 @@ extension Internals {
         /// asked anything yet, still reads as idle here. Shutting it down explicitly from here
         /// would close it out from under that caller instead of merely un-pooling it, which is the
         /// same hazard `_evictIfNeeded(protecting:)`'s doc comment describes for the ceiling path.
-        private func cleanupIfNeeded() async {
+        ///
+        /// - Parameter now: Defaults to the monotonic clock. Not `private` and not fixed to it, so a
+        /// test can run one sweep at an instant of its choosing, and so decide what is "idle for
+        /// longer than `lifetime`" without waiting that long for it.
+        package func cleanupIfNeeded(at now: MonotonicInstant = ClientManager.monotonicNow()) async {
             await lock.withLock {
-                let now = Self.monotonicNow()
 
                 // Dropped off `tableLock`, below: a client that nobody else holds retires itself
                 // when its last reference goes, which can mean a Keychain delete for one with a

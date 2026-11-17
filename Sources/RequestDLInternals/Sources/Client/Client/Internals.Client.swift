@@ -218,14 +218,15 @@ extension Internals {
         ) async throws -> UnsafeTask<Delegate.Response> {
             // Waited on before anything else, so a session configured with a limit never opens
             // more connections than that, whether or not one is free to reuse.
-            let release = await throttledExecutor.acquire()
+            //
+            // Throws `CancellationError` if the caller's `Task` is cancelled while it waits, without
+            // having taken a slot.
+            let release = try await throttledExecutor.acquire()
 
-            // `AsyncSemaphore.wait()` (backing `acquire()` above) is documented as "cancellation
-            // transparent": a waiter cancelled while queued still takes its turn once a slot
-            // frees up, rather than being skipped. Without this check, a caller whose own `Task`
-            // was cancelled while queued here still had its request dispatched onto the wire the
-            // moment `acquire()` returned. The slot is handed back first, since it was already
-            // claimed and nothing past this point will release it otherwise.
+            // A caller cancelled just after it was handed a slot, or one with no limit to wait
+            // for, still gets here. Without this check its request would be dispatched onto the
+            // wire all the same. The slot is handed back first, since it was already claimed and
+            // nothing past this point will release it otherwise.
             guard !Task.isCancelled else {
                 release()
                 throw CancellationError()
@@ -529,11 +530,11 @@ extension Internals.Client {
     /// accessor's name and gating stay put so the tests reaching for it don't have to change.
     /// Gated behind `@_spi(Testing)` on top of `package` so this reads as a deliberate escape
     /// hatch and not something ordinary package code reaches for by accident. Exposed so a test
-    /// can wait for an exact ``AsyncSemaphore/waitingCount`` instead of sleeping a fixed duration
+    /// can wait for an exact ``Internals/ThrottledExecutor/Semaphore/waitingCount`` instead of sleeping a fixed duration
     /// and hoping the right number of requests reached the semaphore by then: sleep-based
     /// synchronization races under CI scheduler contention the same way `AsyncLock.Watchdog`
     /// false positives do.
-    public var connectionSemaphoreForTesting: AsyncSemaphore? {
+    package var connectionSemaphoreForTesting: Internals.ThrottledExecutor.Semaphore? {
         throttledExecutor.semaphoreForTesting
     }
 }
