@@ -1,9 +1,5 @@
 # Using a Client Certificate with the URLSession Executor
 
-Set up the one-time Xcode project capability an app needs before a client certificate can be presented over the `.urlSession` executor.
-
-# Using a Client Certificate with the URLSession Executor
-
 Present a client certificate (mTLS) over the `.urlSession` executor, which needs no Xcode capability, no signing and no Keychain access.
 
 ## Overview
@@ -14,13 +10,13 @@ Your RequestDL code does not change at all. `SecureConnection { Certificates { C
 
 ### How the identity is built
 
-RequestDL turns your certificate and private key into the identity `URLSession` presents during the handshake **in memory**, pairing the two with `SecIdentityCreate`. Nothing is written to, read from or deleted from any Keychain. The private key lives only as long as the request's session (or the background download that needs it) holds the identity, and goes with it.
+RequestDL turns your certificate and private key into the identity `URLSession` presents during the handshake **in memory**, pairing the two with `SecIdentityCreate`. Nothing is written to, read from or deleted from any Keychain. The private key is held by the identity, so it stays in memory for as long as `URLSession` or Network.framework still use it (a short while after the session ends) and is released after that. RequestDL does not wipe the memory the key was parsed from. The Keychain's "accessible only while unlocked" protection no longer applies either: the key is as protected as the certificate and key files you configured, so a background download with a client certificate can also run while the device is locked.
 
 This has consequences worth knowing:
 
 - **No Keychain Sharing capability and no entitlement.** An unsigned command-line tool, a `swift test` run, a signed app without Keychain Sharing and every Simulator all work the same.
 - **No Keychain cleanup, and no interference between processes.** The macOS login keychain is shared by every process of the same user; since RequestDL stores nothing there, your app, its extensions and any other process using the same certificate cannot delete what another one is using.
-- **EC client certificates work everywhere.** P-256, P-384 and P-521 keys (SEC1 or PKCS#8) are presented like RSA ones, including on macOS in a process with no signing at all.
+- **EC client certificates work on macOS without signing.** P-256, P-384 and P-521 keys (SEC1 or PKCS#8) are paired like RSA ones, including on macOS in a process with no signing at all (the old Keychain path could not store an imported EC key there). The handshake was exercised with P-256.
 
 ## What you need to do
 
@@ -33,23 +29,27 @@ Nothing beyond configuring the certificate and the key, as always. In particular
 
 ## Items left by earlier versions
 
-Versions of RequestDL before this change stored the client certificate and private key in the Keychain (items labelled `RequestDL.mtls.…`) and removed them when the session ended. Nothing reads them any more, but one that an earlier version could not remove (the process was killed, or another process was still using it) can still be there. Removing them is optional and harmless:
+Versions of RequestDL before this change stored the client certificate and private key in the Keychain (items labelled `RequestDL.mtls.…`) and removed them when the session ended. Nothing reads them any more, but one that an earlier version could not remove (the process was killed, or another process was still using it) can still be there. Removing them is optional and harmless.
 
-1. Open **Keychain Access** and select the **login** keychain.
-2. Search for `RequestDL.mtls.`.
-3. Delete the matching **keys** and **certificates**. Items of an app that is still on an older version are recreated by that version, so do this after every copy of your app is updated.
+On macOS, in the **login** keychain, with **Keychain Access**:
+
+1. Search for `RequestDL.mtls.` and delete the matching **keys** (`RequestDL.mtls.key.…`).
+2. The macOS file keychain did not store a label for the certificate, so a leftover certificate does not show up in that search: look for your client certificate by its name in the *Certificates* category and delete the copy RequestDL added, if you did not import it yourself.
+3. Do this after every copy of your app is updated: one still on an older version recreates the items.
+
+A signed macOS app with Keychain Sharing, and an app on iOS, tvOS or watchOS, stored them in its own data-protection keychain, which Keychain Access does not show; there, the items go away when the app is deleted.
 
 ## Platforms
 
 The in-memory identity is a public API on every platform RequestDL supports (`SecIdentityCreate`: macOS 10.12, iOS 11.2, tvOS 11.2, watchOS 4.2, visionOS 1.0).
 
-Validated with a real mTLS handshake, RSA and EC P-256, over `URLSession` and over Network.framework on macOS, in an unsigned process with no entitlements. The same tests run on the iOS, tvOS and watchOS Simulators in CI. Not separately validated on a physical device, or on macOS 12–14 and iOS 15–17.
+Validated with a real mTLS handshake, RSA and EC P-256, over `URLSession` (foreground and background) on macOS, in an unsigned process with no entitlements. The iOS, tvOS and watchOS Simulators, a physical device, and macOS 12–14 / iOS 15–17 were not validated separately.
 
 ## Troubleshooting
 
 A request using ``Certificate``/``PrivateKey`` that cannot build a client identity throws ``ClientIdentityError``; `error.reason` names the specific cause, and both `"\(error)"`/`error.description` and `error.localizedDescription` carry the same text.
 
-- `.reason == .keyCreationFailed(message:)` with *"it is not the private key of the configured certificate"*: the key you configured is not the one of the certificate (their public keys differ). Check that both files come from the same pair.
+- `.reason == .keyCreationFailed(message:)` with *"it is not the private key of the configured certificate"*: the key you configured is not the one of the certificate (their public keys differ). Check that both files come from the same pair. With *"unsupported algorithm or curve"*: the certificate's own public key is of a kind Security cannot read (RSA-PSS, brainpool, secp256k1); use an RSA or P-256/P-384/P-521 certificate.
 - `.reason == .unsupportedKeyFormat(header:)`: the key is not RSA (PKCS#1 or PKCS#8) or EC P-256/P-384/P-521 (SEC1 or PKCS#8), or it is password-protected in a shape RequestDL cannot decrypt. See <doc:Preparing-the-certificates>.
 - `.reason == .invalidCertificateData`: the certificate bytes are not a certificate.
 
