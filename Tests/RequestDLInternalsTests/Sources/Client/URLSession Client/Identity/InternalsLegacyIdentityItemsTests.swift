@@ -17,8 +17,9 @@ import Foundation
 
 /// The cleanup of the keys earlier versions left in the Keychain.
 ///
-/// Nothing here reads, writes or deletes in a real Keychain: the deleting tests use
-/// `FakeKeychainItemStore` only, and the real `SecItemDelete` is never reached from a test.
+/// Nothing in this file reads, writes or deletes in a real Keychain: the deleting tests use
+/// `FakeKeychainItemStore` only. (Any test that builds an identity through the default
+/// `makeIdentity` starts the real cleanup, whose query finds nothing in an unsigned test process.)
 struct InternalsLegacyIdentityItemsTests {
 
     typealias Items = Internals.LegacyIdentityItems
@@ -123,11 +124,21 @@ struct InternalsLegacyIdentityItemsTests {
     }
 
     @Test
-    func isLibraryKeyLabel_whenTheSuffixIs64Hex_isTrueWhateverTheApplicationLabel() {
+    func isLibraryKeyLabel_whenTheSuffixIs64HexAndTheKeyHasA20ByteApplicationLabel_isTrue() {
         let label = "RequestDL.mtls.key." + Self.sha256Hex
 
         #expect(Items.isLibraryKeyLabel(label, applicationLabel: Self.applicationLabel))
-        #expect(Items.isLibraryKeyLabel(label, applicationLabel: nil))
+        #expect(Items.isLibraryKeyLabel(label, applicationLabel: Data(repeating: 0, count: 20)))
+    }
+
+    @Test
+    func isLibraryKeyLabel_whenTheSuffixIs64HexAndTheKeyHasNoSHA1ApplicationLabel_isFalse() {
+        let label = "RequestDL.mtls.key." + Self.sha256Hex
+
+        #expect(!Items.isLibraryKeyLabel(label, applicationLabel: nil))
+        #expect(!Items.isLibraryKeyLabel(label, applicationLabel: Data()))
+        #expect(!Items.isLibraryKeyLabel(label, applicationLabel: Data(repeating: 1, count: 19)))
+        #expect(!Items.isLibraryKeyLabel(label, applicationLabel: Data(repeating: 1, count: 32)))
     }
 
     @Test
@@ -157,7 +168,12 @@ struct InternalsLegacyIdentityItemsTests {
                 applicationLabel: Self.applicationLabel
             )
         )
-        #expect(!Items.isLibraryKeyLabel("RequestDL.mtls.key." + Self.sha256Hex.uppercased(), applicationLabel: nil))
+        #expect(
+            !Items.isLibraryKeyLabel(
+                "RequestDL.mtls.key." + Self.sha256Hex.uppercased(),
+                applicationLabel: Self.applicationLabel
+            )
+        )
     }
 
     @Test
@@ -305,7 +321,10 @@ struct InternalsLegacyIdentityItemsTests {
         #expect(store.items.map(\.persistentRef) == [Data("ref-2".utf8)])
     }
 
-    @Test(arguments: [errSecInteractionNotAllowed, errSecAuthFailed, errSecUserCanceled])
+    @Test(arguments: [
+        errSecInteractionNotAllowed, errSecAuthFailed, errSecUserCanceled, errSecInteractionRequired,
+        errSecNotAvailable,
+    ])
     func removeOrphanedKeys_whenSecurityNeedsTheUser_stopsWithoutInsisting(_ status: OSStatus) {
         let store = FakeKeychainItemStore(
             items: [Self.key(ref: 1), Self.key(ref: 2), Self.key(ref: 3)],

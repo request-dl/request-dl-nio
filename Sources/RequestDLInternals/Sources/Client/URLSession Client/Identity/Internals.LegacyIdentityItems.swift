@@ -200,7 +200,8 @@ extension Internals {
         ///   `applicationLabel` (the SHA-1 of the key's own public key): the label of the later
         ///   versions, which the library can prove it made, because it is derived from the item;
         /// - `RequestDL.mtls.key.` and 64 lowercase hex digits (the SHA-256 of the key's DER): the
-        ///   label of the first versions that had it, which cannot be checked against the item.
+        ///   label of the first versions that had it, which cannot be checked against the item
+        ///   beyond the key having a 20-byte application label, as those versions always set.
         ///
         /// Anything else is not ours: another length, uppercase, another prefix.
         package static func isLibraryKeyLabel(_ label: String, applicationLabel: Data?) -> Bool {
@@ -222,7 +223,9 @@ extension Internals {
                 guard let applicationLabel else { return false }
                 return Array(hex(applicationLabel).utf8) == Array(suffix)
             case 64:
-                return true
+                // Those versions set the key's own application label too (a SHA-1, 20 bytes): a
+                // key without one is not the library's.
+                return applicationLabel?.count == 20
             default:
                 return false
             }

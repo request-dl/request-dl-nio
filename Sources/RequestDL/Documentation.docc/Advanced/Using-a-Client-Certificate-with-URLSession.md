@@ -33,17 +33,17 @@ Versions of RequestDL before this change stored the client certificate and priva
 
 ### In the data-protection keychain: removed automatically
 
-An app signed with Keychain Sharing, and an app on iOS, tvOS, watchOS or visionOS, stored them in its own data-protection keychain. The first time a client identity is built in a process, RequestDL looks there, in the background and without delaying the request, and removes the **private keys** an earlier version left. It removes one only when all of this holds:
+A signed app that could use the data-protection keychain (on macOS, one with Keychain Sharing), and an app on iOS, tvOS, watchOS or visionOS, stored them there. The first time a client identity is built in a process, RequestDL looks there, in the background and without delaying the request, and removes the **private keys** an earlier version left. It removes one only when all of this holds:
 
-- it is a key (never a certificate), in the data-protection keychain this process can see (the access groups of your own app);
-- its label is exactly `RequestDL.mtls.key.` followed by 40 lowercase hex digits that are the hash of the key's own public key, or by 64 lowercase hex digits (the first versions' label);
-- it was created more than 24 hours ago, so it cannot be one an older copy of your app, or an extension, is using right now. An item with no creation date is kept.
+- it is a key (never a certificate), in the data-protection keychain this process can see (the access groups of your own app, which include any group it shares with other apps of your team);
+- its label is exactly `RequestDL.mtls.key.` followed by 40 lowercase hex digits that are the hash of the key's own public key, or by 64 lowercase hex digits on a key that has a 20-byte application label (the first versions' label);
+- it was created more than 24 hours ago, so it is very unlikely to be one that an older copy of your app, or another app of your team sharing the keychain group, is using right now (an older version that is still running and reuses a key made more than a day ago can fail one request, and builds the key again for the next). An item with no creation date is kept.
 
-It never touches certificates (they are public data, and an equal certificate may be yours), the items of other apps, or any label that does not match exactly. If Security answers that it would need the user (a prompt, a locked device), it stops. It is best effort: when the process lacks the entitlement, or anything fails, nothing is removed and nothing is reported, and the next process tries again. A leftover certificate stays in your app's keychain until the app is deleted.
+It never touches certificates (they are public data, and an equal certificate may be yours), items that this process cannot see, or any key whose label does not match exactly. Keys of another app of your team in a keychain group shared with this one are visible to this process: only the ones that match all of the above are removed. If Security answers that it would need the user (a prompt, a locked device), it stops. It is best effort: when the process lacks the entitlement, or anything fails, nothing is removed and nothing is reported, and the next process tries again. A leftover certificate stays in the keychain: RequestDL does not remove it.
 
 ### In the macOS login keychain: not removed
 
-RequestDL does **not** clean the legacy macOS keychain. It is shared with every program of the user, it keeps no creation date for an item, and nothing tells whose item it is. By hand, with **Keychain Access**, in the **login** keychain:
+RequestDL does **not** clean the legacy macOS keychain. It is shared with every program of the user, an item there cannot be checked for its age, and nothing tells whose item it is. By hand, with **Keychain Access**, in the **login** keychain:
 
 1. Search for `RequestDL.mtls.` and delete the matching **keys** (`RequestDL.mtls.key.…`).
 2. The macOS file keychain did not store a label for the certificate, so a leftover certificate does not show up in that search: look for your client certificate by its name in the *Certificates* category and delete the copy RequestDL added, if you did not import it yourself.

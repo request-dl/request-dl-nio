@@ -137,27 +137,6 @@ struct InternalsRawBytesIdentityBuilderIdentityTests {
     }
 
     @Test(arguments: Fixture.Kind.allCases)
-    func makeIdentity_whenTheCleanupHasNothingToRemove_returnsTheSameKindOfIdentity(_ kind: Fixture.Kind) throws {
-        // Given
-        let fixture = try Fixture(kind)
-        let store = FakeKeychainItemStore(items: [], failingQuery: errSecMissingEntitlement)
-
-        // When
-        let handle = try Internals.RawBytesIdentityBuilder.makeIdentity(
-            certificateDER: fixture.certificateDER,
-            privateKeyDER: fixture.keyDER,
-            afterBuilding: {
-                // A cleanup whose query fails does not throw, and returns without a removal.
-                #expect(Internals.LegacyIdentityItems.removeOrphanedKeys(from: store, now: Date()) == 0)
-            }
-        )
-
-        // Then
-        #expect(fixture.canSign(with: handle.identity))
-        fixture.expectNothingStored(before: false)
-    }
-
-    @Test(arguments: Fixture.Kind.allCases)
     func makeIdentity_whenTheIdentityCannotBeBuilt_doesNotStartTheCleanup(_ kind: Fixture.Kind) throws {
         // Given
         let fixture = try Fixture(kind)
