@@ -276,7 +276,7 @@ struct NonFatalWatchdogTraitTests {
 
     /// What the monitor's thread does on a healthy machine: wakes every `interval` and probes.
     private static func keepWaking(_ monitor: PoolLagMonitor, clock: FakeClock, for seconds: Double) {
-        for _ in 0 ..< Int(seconds / 0.25) {
+        for _ in 0..<Int(seconds / 0.25) {
             clock.advance(seconds: 0.25)
             monitor.heartbeat()
             monitor.tick()
