@@ -44,6 +44,13 @@ extension Property {
     /// the response is not cached: the request still succeeds and returns the whole body, nothing
     /// is stored, and a warning is logged. The next request for the same URL is then a cache miss.
     ///
+    /// A response that nothing proves arrived whole is not stored. On `.urlSession` that is every
+    /// response without a `Content-Length` (chunked, in practice): CFNetwork reports one cut
+    /// between two chunks as complete. It is delivered to the caller as usual, and the next request
+    /// for that URL goes to the network. The `.nio` executors end a chunked body with a terminator
+    /// and cache it as usual, and ``Property/cacheCompletenessProbe(_:)`` lets `.urlSession` ask the
+    /// server first. See <doc:Cache-support>.
+    ///
     /// - Parameter cachePolicy: The cache policy set to be added to the request.
     /// - Returns: A property with the added cache policy.
     ///
