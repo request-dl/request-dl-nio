@@ -96,6 +96,8 @@ Session-level — these configure the same `Session`-level settings a declared `
 - `-L` / `--location` (with `--max-redirs`) — follows redirects, up to 50 by default; `--max-redirs -1` means no limit
 - `-k` / `--insecure` — disables certificate verification
 - `-x` / `--proxy` — `[scheme://][user[:password]@]host[:port]`; a `socks*` scheme maps to a SOCKS proxy, anything else to HTTP; defaults to port 1080
+- `--socks5 <host[:port]>` / `--socks5-hostname <host[:port]>` — a SOCKS5 proxy named without a scheme (the same proxy `-x socks5://host[:port]` names; destinations are always sent to the proxy as names)
+- `-U` / `--proxy-user <user:password>` — the credentials of the proxy `-x`/`--socks5` names: `Proxy-Authorization` Basic for an HTTP proxy, the SOCKS5 user name and password (RFC 1929) for a SOCKS proxy. Credentials written in the proxy's own URL win over it, as in curl. It is an error without a proxy to apply to
 - `--resolve HOST:PORT:ADDRESS` — overrides DNS resolution for `HOST` (the port is validated but not carried through — the override applies to every port on that host)
 - `--compressed` — enables (unbounded) response decompression
 - `--cacert <path>` — a custom CA bundle to verify the server against, in place of the default trust store
@@ -103,11 +105,13 @@ Session-level — these configure the same `Session`-level settings a declared `
 
 `-L` and `--compressed` don't just add an opt-in: whenever *any* session-level flag is present, the produced description also **explicitly disables** redirects and decompression unless `-L`/`--compressed` say otherwise — this package normally follows redirects by default, the opposite of curl's own default, so matching curl faithfully means actively turning that off, not just leaving this package's defaults in place. Decompression is off by default on every platform now, matching curl's own default already, so `--compressed`'s absence needs no equivalent override there. A command using none of these session-level flags is unaffected by this and behaves exactly as before they existed.
 
+**SOCKS5 credentials.** The user name and the password of a `socks*` proxy (`-x socks5://user:password@host`, or `-U`) are the ones SOCKS5 sends in clear text, 1 to 255 bytes for the user name and 0 to 255 for the password in UTF-8; outside of that the command is rejected with ``RequestDL/CURLParsingError`` (naming the flag, never the credentials), and an empty password (`user:` or `user@host`) is allowed. Credentials inside a `socks*` proxy URL are percent-decoded, as curl does (`us%40er` is `us@er`); `-U` values are used as written, and so are the credentials of an HTTP proxy URL, as they always were. Every `socks*` scheme, `socks4` and `socks4a` included, is spoken as SOCKS5, which is the only version that has a user name and a password to send. See ``RequestDL/Proxy`` for what a failed authentication does.
+
 `--resolve` (`dnsOverride`) is incompatible with the `.urlSession` executor — a command using it only runs under `.nio`/`.nioTransportServices`.
 
 ### What isn't supported, and why
 
-Everything else — cookie jars, `--cert-type`/`--key-type` (PEM is assumed), `--proxy-user`, HTTP/3, and any scheme other than `http` or `https` (`unix://`, `http+unix://`, `ftp://`, …) — throws ``RequestDL/CURLParsingError`` rather than being silently accepted. These aren't just unimplemented conveniences: silently accepting one of them would make the request actually performed diverge from what the command says.
+Everything else — cookie jars, `--cert-type`/`--key-type` (PEM is assumed), `--proxy-anyauth`/`--proxy-digest`/`--proxy-ntlm` and the other `--proxy-*` options, `--socks4`/`--socks4a`, HTTP/3, and any scheme other than `http` or `https` (`unix://`, `http+unix://`, `ftp://`, …) — throws ``RequestDL/CURLParsingError`` rather than being silently accepted. These aren't just unimplemented conveniences: silently accepting one of them would make the request actually performed diverge from what the command says.
 
 ## Topics
 
