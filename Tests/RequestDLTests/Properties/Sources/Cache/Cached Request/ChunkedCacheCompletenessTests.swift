@@ -45,7 +45,8 @@ struct ChunkedCacheCompletenessTests {
     private static func run(
         against server: TransferServer,
         executor: Executor,
-        probes: Bool = false
+        probes: Bool = false,
+        expectingRequests expected: Int = 1
     ) async -> Outcome {
         let dataCache = DataCache(suiteName: UUID().uuidString)
         await dataCache.removeAll()
@@ -80,6 +81,11 @@ struct ChunkedCacheCompletenessTests {
         )
 
         await dataCache.removeAll()
+
+        // The server records a request once it has finished writing the answer, which a client
+        // that has read all of it can get ahead of. Waited for here, so a slow runner does not
+        // read the log one entry short.
+        try? await eventually { server.requests.count >= expected }
 
         return Outcome(
             bytes: bytes,
@@ -135,7 +141,7 @@ struct ChunkedCacheCompletenessTests {
         try await withTransferServer(.init(length: Self.length, isChunked: true)) { server in
             server.dropPlan = [Self.cutOnAChunkBoundary]
 
-            let outcome = await Self.run(against: server, executor: .urlSession, probes: true)
+            let outcome = await Self.run(against: server, executor: .urlSession, probes: true, expectingRequests: 2)
 
             #expect(outcome.bytes == Self.cutOnAChunkBoundary)
             #expect(outcome.requests.count == 2)
@@ -152,7 +158,7 @@ struct ChunkedCacheCompletenessTests {
     @Test
     private func probe_whenTheBodyWasWhole_cachesIt() async throws {
         try await withTransferServer(.init(length: Self.length, isChunked: true)) { server in
-            let outcome = await Self.run(against: server, executor: .urlSession, probes: true)
+            let outcome = await Self.run(against: server, executor: .urlSession, probes: true, expectingRequests: 2)
 
             #expect(outcome.bytes == Self.length)
             #expect(outcome.requests.count == 2)
