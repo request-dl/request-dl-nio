@@ -2,6 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Dispatch
 import SwiftAsyncStream
 
 #if canImport(FoundationEssentials)
@@ -213,7 +214,27 @@ extension Internals {
                     return index
                 }
 
+                #if DEBUG
+                // TEMPORARY (CI diagnosis, do not merge): who holds a write for that long.
+                let tmpCalledAt = DispatchTime.now().uptimeNanoseconds
+                let tmpPriority = Task.currentPriority
+                #endif
+
                 return await lock.withLock { () async -> UInt64 in
+                    #if DEBUG
+                    let tmpAcquiredAt = DispatchTime.now().uptimeNanoseconds
+                    defer {
+                        let tmpDoneAt = DispatchTime.now().uptimeNanoseconds
+                        if tmpDoneAt - tmpAcquiredAt > 5_000_000_000 {
+                            print(
+                                "[TMP-CI slow Buffer.write] priority=\(tmpPriority) now=\(Task.currentPriority) "
+                                    + "calledAt=\(tmpCalledAt / 1_000_000)ms waited=\((tmpAcquiredAt - tmpCalledAt) / 1_000_000)ms "
+                                    + "held=\((tmpDoneAt - tmpAcquiredAt) / 1_000_000)ms bytes=\(data.count) storage=\(Stream.self)"
+                            )
+                        }
+                    }
+                    #endif
+
                     await _createResourceIfNeeded()
 
                     do {

@@ -11,6 +11,7 @@
 //   6.2 and 6.3), where that whole type is unavailable.
 // Degrading to empty rather than failing keeps this file harmless everywhere it isn't needed.
 #if DEBUG && canImport(Testing)
+import Dispatch
 import RequestDLInternals
 import Testing
 
@@ -61,6 +62,8 @@ package struct NonFatalWatchdogTrait: TestTrait, SuiteTrait, TestScoping {
 
         Internals.Override.AssertionFailure.installGlobally { message, _, _ in
             let lags = PoolLagMonitor.shared.lags(within: lagWindow)
+            // TEMPORARY (CI diagnosis, do not merge).
+            print("[TMP-CI watchdog report] at \(DispatchTime.now().uptimeNanoseconds / 1_000_000)ms lags=\(lags)")
 
             report(message, lag: .worst(of: lags), lags: lags) {
                 Issue.record(Comment(rawValue: $0), severity: $1)

@@ -210,6 +210,9 @@ package final class PoolLagMonitor: @unchecked Sendable {
             return true
         }
 
+        // TEMPORARY (CI diagnosis, do not merge).
+        print("[TMP-CI PoolLagMonitor] started at \(DispatchTime.now().uptimeNanoseconds / 1_000_000)ms")
+
         guard shouldStart else {
             return
         }
@@ -341,7 +344,18 @@ package final class PoolLagMonitor: @unchecked Sendable {
     // MARK: - Private methods
 
     private func run() {
+        // TEMPORARY (CI diagnosis, do not merge).
+        var tmpRounds = 0
+
         while true {
+            tmpRounds += 1
+
+            if tmpRounds % 20 == 0 {
+                print(
+                    "[TMP-CI PoolLagMonitor] at \(DispatchTime.now().uptimeNanoseconds / 1_000_000)ms lags(5s)=\(lags(within: 5))"
+                )
+            }
+
             let isStopped = lock.withLock { _state.isStopped }
 
             if isStopped {
