@@ -193,6 +193,146 @@ struct ProxyTests {
     }
 
     @Test
+    func proxy_whenSOCKSConnectionWithBasicAuthorization_convertsToSOCKSCredentials() async throws {
+        // Given
+        let host = UUID().uuidString
+        let port = 1_090
+
+        // When
+        let resolved = try await resolve(
+            Proxy(
+                host: host,
+                port: port,
+                connection: .socks,
+                authorization: .basic(username: "user", password: "pass")
+            )
+        )
+
+        // Then
+        #expect(resolved.session.configuration.proxy?.host == host)
+        #expect(resolved.session.configuration.proxy?.port == port)
+        #expect(resolved.session.configuration.proxy?.connectionProtocol == .socks)
+        #expect(resolved.session.configuration.proxy?.authorization == .socks(username: "user", password: "pass"))
+    }
+
+    @Test
+    func proxy_whenHTTPConnectionThroughTheConnectionInitializer_keepsTheHTTPShape() async throws {
+        // When
+        let resolved = try await resolve(
+            Proxy(host: "proxy.example", port: 8_080, connection: .http, authorization: .bearer(tokens: "abc"))
+        )
+
+        // Then
+        #expect(resolved.session.configuration.proxy?.connectionProtocol == .http)
+        #expect(resolved.session.configuration.proxy?.authorization == .bearer(tokens: "abc"))
+    }
+
+    @Test
+    func proxy_whenSOCKSConnectionWithEmptyPassword_isAllowed() async throws {
+        // When
+        let resolved = try await resolve(
+            Proxy(host: "proxy.example", port: 1_080, connection: .socks, authorization: .basic(username: "u", password: ""))
+        )
+
+        // Then
+        #expect(resolved.session.configuration.proxy?.authorization == .socks(username: "u", password: ""))
+    }
+
+    @Test
+    func proxy_whenSOCKSCredentialsAtTheLimits_areAllowed() async throws {
+        // Given
+        let username = String(repeating: "a", count: 255)
+        let password = String(repeating: "é", count: 127) + "a"  // 255 bytes in UTF-8
+
+        // When
+        let resolved = try await resolve(
+            Proxy(
+                host: "proxy.example",
+                port: 1_080,
+                connection: .socks,
+                authorization: .basic(username: username, password: password)
+            )
+        )
+
+        // Then
+        #expect(resolved.session.configuration.proxy?.authorization == .socks(username: username, password: password))
+    }
+
+    @Test
+    func proxy_whenSOCKSBearerAuthorization_throwsWithoutTheSecret() async throws {
+        // Given
+        let token = "super-secret-token"
+
+        // When
+        let error = await #expect(throws: ProxyAuthorizationError.self) {
+            try await resolve(
+                Proxy(host: "proxy.example", port: 1_080, connection: .socks, authorization: .bearer(tokens: token))
+            )
+        }
+
+        // Then
+        #expect(error?.reason == .socksRequiresUsernameAndPassword)
+        #expect(!String(describing: error).contains(token))
+    }
+
+    @Test
+    func proxy_whenSOCKSRawBasicCredentials_throws() async throws {
+        // Then
+        let error = await #expect(throws: ProxyAuthorizationError.self) {
+            // When
+            try await resolve(
+                Proxy(
+                    host: "proxy.example",
+                    port: 1_080,
+                    connection: .socks,
+                    authorization: .basic(credentials: "dXNlcjpwYXNz")
+                )
+            )
+        }
+
+        #expect(error?.reason == .socksRequiresUsernameAndPassword)
+    }
+
+    @Test
+    func proxy_whenSOCKSUsernameIsEmpty_throws() async throws {
+        let error = await #expect(throws: ProxyAuthorizationError.self) {
+            try await resolve(
+                Proxy(host: "proxy.example", port: 1_080, connection: .socks, authorization: .basic(username: "", password: "p"))
+            )
+        }
+
+        #expect(error?.reason == .socksUsernameLength(actual: 0))
+    }
+
+    @Test
+    func proxy_whenSOCKSUsernameHas256Bytes_throws() async throws {
+        let username = String(repeating: "a", count: 256)
+
+        let error = await #expect(throws: ProxyAuthorizationError.self) {
+            try await resolve(
+                Proxy(host: "proxy.example", port: 1_080, connection: .socks, authorization: .basic(username: username, password: "p"))
+            )
+        }
+
+        #expect(error?.reason == .socksUsernameLength(actual: 256))
+        #expect(!String(describing: error).contains(username))
+    }
+
+    @Test
+    func proxy_whenSOCKSPasswordHas256Bytes_throws() async throws {
+        // 128 two-byte characters: the limit is on bytes, not on characters.
+        let password = String(repeating: "é", count: 128)
+
+        let error = await #expect(throws: ProxyAuthorizationError.self) {
+            try await resolve(
+                Proxy(host: "proxy.example", port: 1_080, connection: .socks, authorization: .basic(username: "u", password: password))
+            )
+        }
+
+        #expect(error?.reason == .socksPasswordLength(actual: 256))
+    }
+
+    @Test
     func neverBody() async throws {
         // Given
         let property = Proxy(

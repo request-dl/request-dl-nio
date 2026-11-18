@@ -18,12 +18,51 @@ import RequestDLInternals
 /// DataTask {
 ///     BaseURL("example.com")
 ///     Proxy(
-///         host: "socks-proxy.com",
-///         port: 1080,
+///         host: "http-proxy.com",
+///         port: 8080,
 ///         authorization: .basic(username: "user", password: "pass")
 ///     )
 /// }
 /// ```
+///
+/// ## SOCKS5 with a user name and a password
+///
+/// A SOCKS5 proxy that requires authentication takes a user name and a password
+/// (RFC 1929) through ``init(host:port:connection:authorization:)``, with the same
+/// ``ProxyAuthorization/basic(username:password:)`` an HTTP proxy takes:
+///
+/// ```swift
+/// DataTask {
+///     BaseURL("example.com")
+///     Proxy(
+///         host: "socks-proxy.com",
+///         port: 1080,
+///         connection: .socks,
+///         authorization: .basic(username: "user", password: "pass")
+///     )
+/// }
+/// ```
+///
+/// - The user name takes 1 to 255 bytes and the password 0 to 255 bytes, counted in UTF-8, so an
+///   empty password is valid and a non-ASCII one is counted by its encoded size. Outside of
+///   that, resolving the request throws a ``ProxyAuthorizationError`` before anything is sent.
+/// - SOCKS5 authenticates with a user name and a password and nothing else:
+///   ``ProxyAuthorization/basic(credentials:)`` and ``ProxyAuthorization/bearer(tokens:)`` are
+///   HTTP header values, and are refused with a ``ProxyAuthorizationError``. Nothing is
+///   converted from them.
+/// - The credentials are sent **in clear text** to the proxy (RFC 1929 has no encryption), so
+///   anyone who can read the connection to the proxy can read them; use the proxy only over a
+///   network that is trusted, or tunnel to it. The credentials are never part of the request
+///   that the tunnel carries.
+/// - A proxy that rejects the credentials fails the request at once with the underlying
+///   transport's error, and it is not retried: sending the same wrong credentials again could
+///   only lock the account. Under the `.nio` and `.nioTransportServices` executors that error is
+///   `SOCKSError.AuthenticationFailed`; under `.urlSession` it is a POSIX `EAUTH` (80) error.
+/// - A proxy that does not require authentication simply does not ask for the credentials,
+///   which are then not sent.
+/// - Under `.urlSession` a user name or password of more than 254 bytes cannot be sent intact:
+///   CFNetwork cuts it. Such a session does not run on `.urlSession`; see
+///   ``Session/requiredExecutor(_:)`` and ``ExecutorRequirementError``.
 ///
 /// A HTTP proxy can also carry extra headers on its `CONNECT` request (sent only while
 /// establishing the tunnel, never on the request the tunnel then carries) by composing them
@@ -102,8 +141,6 @@ public struct Proxy<Headers: Property>: Property {
     ///
     /// Initializes a new instance of `Proxy` without authorization credentials.
     ///
-    /// > Warning: SOCKS currently not available with authorization.
-    ///
     /// - Parameters:
     ///    - host: The hostname or IP address of the proxy server.
     ///    - port: The port number on which the proxy server is listening.
@@ -122,6 +159,53 @@ public struct Proxy<Headers: Property>: Property {
         self.port = port
         self.connectionProtocol = connectionProtocol
         self.authorization = nil
+        self.connectHeaders = EmptyProperty()
+    }
+
+    ///
+    /// Initializes a new instance of `Proxy` with authorization credentials, for either protocol.
+    ///
+    /// ```swift
+    /// Proxy(
+    ///     host: "socks-proxy.com",
+    ///     port: 1080,
+    ///     connection: .socks,
+    ///     authorization: .basic(username: "user", password: "pass")
+    /// )
+    /// ```
+    ///
+    /// For an HTTP proxy this is the same as ``init(host:port:authorization:)``. For a SOCKS
+    /// proxy the authorization is the user name and the password of SOCKS5 (RFC 1929):
+    /// ``ProxyAuthorization/basic(username:password:)`` is converted to them, and
+    /// ``ProxyAuthorization/basic(credentials:)`` and ``ProxyAuthorization/bearer(tokens:)`` are
+    /// refused.
+    ///
+    /// - Parameters:
+    ///    - host: The hostname or IP address of the proxy server.
+    ///    - port: The port number on which the proxy server is listening.
+    ///    - connectionProtocol: The protocol used by the proxy (e.g., HTTP, SOCKS).
+    ///    - authorization: The credentials for authenticating with the proxy server.
+    ///
+    /// - Returns: A new instance of `Proxy`.
+    ///
+    /// > Important: The user name and the password of a SOCKS5 proxy are sent in clear text.
+    ///
+    /// - Throws: Resolving the request throws a ``ProxyAuthorizationError`` for a SOCKS proxy
+    /// whose authorization is not a user name and a password, whose user name does not have 1
+    /// to 255 bytes in UTF-8, or whose password does not have 0 to 255.
+    ///
+    /// > Note: This initializer is available when `Headers` is `EmptyProperty`.
+    ///
+    public init(
+        host: String,
+        port: Int,
+        connection connectionProtocol: ConnectionProtocol,
+        authorization: ProxyAuthorization
+    ) where Headers == EmptyProperty {
+        self.host = host
+        self.port = port
+        self.connectionProtocol = connectionProtocol
+        self.authorization = authorization
         self.connectHeaders = EmptyProperty()
     }
 
@@ -168,12 +252,14 @@ public struct Proxy<Headers: Property>: Property {
             inputs: inputs
         )
 
+        let connection = property.connectionProtocol.build()
+
         return .leaf(
             Node(
                 host: property.host,
                 port: property.port,
-                connectionProtocol: property.connectionProtocol.build(),
-                authorization: property.authorization?.build(),
+                connectionProtocol: connection,
+                authorization: try property.authorization?.build(for: connection),
                 connectHeaders: connectHeaders
             )
         )
