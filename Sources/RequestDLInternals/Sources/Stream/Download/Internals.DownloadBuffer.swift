@@ -274,7 +274,7 @@ extension Internals {
             ) async throws {
                 guard incomeBytes.readableBytes > .zero else { return }
 
-                let incoming = try await Self.readableBytes(&incomeBytes, count: incomeBytes.readableBytes)
+                let incoming = try await Self.readableData(&incomeBytes, count: incomeBytes.readableBytes)
 
                 guard !separator.isEmpty else {
                     // Degenerate configuration: there is nothing to split on, so everything is
@@ -306,7 +306,7 @@ extension Internals {
                         throw Internals.ReadingModeItemTooLargeError(maximumItemSize: maximumItemSize)
                     }
 
-                    await buffer.writeBytes(Array(incoming[start...index]))
+                    await buffer.writeBytes(incoming[start...index])
                     start = incoming.index(after: index)
 
                     await _emit(&buffer)
@@ -320,7 +320,7 @@ extension Internals {
                         throw Internals.ReadingModeItemTooLargeError(maximumItemSize: maximumItemSize)
                     }
 
-                    await buffer.writeBytes(Array(incoming[start...]))
+                    await buffer.writeBytes(incoming[start...])
                 }
             }
 
@@ -366,12 +366,6 @@ extension Internals {
             /// would reach the reader as one that succeeded.
             ///
             /// - Throws: ``AsyncBytesReadError``.
-            private static func readableBytes(_ buffer: inout Internals.AnyBuffer, count: Int) async throws -> [UInt8] {
-                [UInt8](try await readableData(&buffer, count: count))
-            }
-
-            /// ``readableBytes(_:count:)`` for the callers that do not need an array, which would
-            /// be one more copy of every block.
             private static func readableData(_ buffer: inout Internals.AnyBuffer, count: Int) async throws -> Data {
                 guard let data = await buffer.readData(count), !data.isEmpty else {
                     throw AsyncBytesReadError()

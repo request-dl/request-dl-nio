@@ -1960,9 +1960,10 @@ extension Internals.URLSessionClient {
             // NIO delegate callback as the original motivating case; this is the same shape of
             // problem one layer up, for `URLSessionDataDelegate` instead of
             // `HTTPClientResponseDelegate`).
-            let byteURL = Internals.ByteURL()
-            byteURL.replace(with: data)
-            downloadBuffer.append(Internals.DataBuffer(byteURL))
+            //
+            // `adopting:` takes `data` as the store instead of writing it into an empty one,
+            // which would copy every chunk a second time.
+            downloadBuffer.append(Internals.DataBuffer(Internals.ByteURL(adopting: data)))
         }
 
         /// Resolves `completion`/`headCompletion`: the streamed-upload and streamed-download
