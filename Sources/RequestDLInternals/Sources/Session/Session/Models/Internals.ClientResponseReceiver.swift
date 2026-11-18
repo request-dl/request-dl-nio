@@ -64,6 +64,14 @@ extension Internals {
         /// Set by the head: the response is one that cannot have a body.
         private var _isBodyless = false
 
+        /// The URL of the first request AsyncHTTPClient reported a response to.
+        private var _firstVisitedURL: String?
+
+        /// The URL of the request the final response answers, once a redirect took it somewhere
+        /// other than where it started. `nil` while it has not, so `url` is reported then, exactly
+        /// as it was written.
+        private var _redirectedURL: String?
+
         // MARK: - Inits
 
         package init(
@@ -139,6 +147,28 @@ extension Internals {
             }
         }
 
+        /// Delivered for the head of every exchange, a redirect's included, before that head is
+        /// acted on, and with the request that exchange sent: after a redirect, the one built for
+        /// its target (by a strategy, if one was configured). Which is why the final response
+        /// reports the URL that answered it, as `.urlSession` does, and not the one first sent.
+        package func didVisitURL(
+            task: HTTPClient.Task<Response>,
+            _ request: HTTPClient.Request,
+            _ head: HTTPResponseHead
+        ) {
+            lock.withLock {
+                let visitedURL = request.url.absoluteString
+
+                guard let firstVisitedURL = _firstVisitedURL else {
+                    _firstVisitedURL = visitedURL
+                    return
+                }
+
+                // Back where it started (a cycle that was allowed) is no redirect to report.
+                _redirectedURL = visitedURL == firstVisitedURL ? nil : visitedURL
+            }
+        }
+
         package func didReceiveHead(task: HTTPClient.Task<Response>, _ head: HTTPResponseHead) -> EventLoopFuture<Void>
         {
             decide {
@@ -150,7 +180,7 @@ extension Internals {
                 }
 
                 let responseHead = ResponseHead(
-                    url: url,
+                    url: _redirectedURL ?? url,
                     status: ResponseHead.Status(
                         code: head.status.code,
                         reason: head.status.reasonPhrase

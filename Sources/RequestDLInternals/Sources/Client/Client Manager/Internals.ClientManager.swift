@@ -198,7 +198,15 @@ extension Internals {
         }
 
         func isExpired(_ item: Item, at now: UInt64) -> Bool {
-            now - item.readAt > lifetime
+            // `now` is the instant the sweep *started* (a default argument, evaluated before it
+            // waits for ``lock``), and a client resolved while it waited is stamped later than
+            // that. An unsigned `now - readAt` then underflows, which traps. An item newer than
+            // the instant being judged is, by definition, not old enough to expire.
+            guard now > item.readAt else {
+                return false
+            }
+
+            return now - item.readAt > lifetime
         }
         #else
         package typealias MonotonicInstant = ContinuousClock.Instant
@@ -422,7 +430,8 @@ extension Internals {
                     configuration: sessionConfiguration.buildURLSessionConfiguration(),
                     secureConnection: sessionConfiguration.secureConnection,
                     redirectConfiguration: sessionConfiguration.redirectConfiguration
-                        ?? .follow(max: 5, allowCycles: false),
+                        ?? .default,
+                    urlOverrides: sessionConfiguration.urlOverrides,
                     proxy: sessionConfiguration.proxy,
                     maximumConcurrentConnections: sessionConfiguration.maximumConcurrentConnections
                 )

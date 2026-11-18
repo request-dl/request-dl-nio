@@ -30,6 +30,18 @@ import SwiftAsyncStream
 /// not begun yet counts for however long it has been waiting, so a pool that is stuck right now
 /// is visible while it is still stuck, not once it recovers.
 ///
+/// Two stalls never show in how late a pool *starts* work, so they are watched for too:
+/// - The whole process (or machine) not running at all, monitor thread included. Every probe has
+///   long begun by the time such a freeze starts, so none is pending through it, and once it ends
+///   the next probes begin on time. What does show is the monitor's own thread waking late: it
+///   asks for a wake-up every `interval`, so a gap far beyond that is a freeze. The gap counts
+///   while it is still open, too (from the last wake-up until now), so a watchdog report that
+///   wakes up from the same freeze *before* the monitor does already sees it. This is the
+///   stall the URLSession-only and iPadOS CI jobs hit: a dozen independent locks all reported
+///   at once, each held by one `Internals.Buffer.write`, with no pool late.
+/// - A file system that accepts work on time but takes ages to finish it. One probe therefore
+///   writes (and removes) a one-byte file on the file pool, and counts until that is done.
+///
 /// The monitor never waits on a probe, so it cannot itself hang, and it never has more than one
 /// probe of each kind in flight, so a stalled pool does not make it pile work onto that pool.
 package final class PoolLagMonitor: @unchecked Sendable {
@@ -38,6 +50,20 @@ package final class PoolLagMonitor: @unchecked Sendable {
     package enum Source: String, Sendable, CaseIterable {
         case filePool = "file pool"
         case cooperativePool = "cooperative pool"
+        case monitorThread = "lag monitor's own thread"
+        case fileWrite = "file write"
+
+        /// What a lag of `seconds` from this source means, for a report to say.
+        package func symptom(seconds: Int) -> String {
+            switch self {
+            case .filePool, .cooperativePool:
+                return "work handed to the \(rawValue) started about \(seconds)s late"
+            case .monitorThread:
+                return "the \(rawValue) woke about \(seconds)s late"
+            case .fileWrite:
+                return "a one-byte \(rawValue) on the file pool took about \(seconds)s"
+            }
+        }
     }
 
     /// How late work started.
@@ -74,6 +100,19 @@ package final class PoolLagMonitor: @unchecked Sendable {
             Probe(source: .cooperativePool) { began in
                 Task.detached { began() }
             },
+            Probe(source: .fileWrite) { began in
+                Task.detached {
+                    _ = try? await Internals.FileSystemManager.run {
+                        let url = FileManager.default.temporaryDirectory.appendingPathComponent(
+                            "RequestDLTestSupport.PoolLagMonitor.\(ProcessInfo.processInfo.processIdentifier)"
+                        )
+
+                        try? Data([0]).write(to: url)
+                        try? FileManager.default.removeItem(at: url)
+                        began()
+                    }
+                }
+            },
         ]
     }
 
@@ -90,6 +129,7 @@ package final class PoolLagMonitor: @unchecked Sendable {
         var samples: [Sample] = []
         var pending: [Source: UInt64] = [:]
         var completed = 0
+        var lastHeartbeat: UInt64?
         var isStarted = false
         var isStopped = false
     }
@@ -189,13 +229,44 @@ package final class PoolLagMonitor: @unchecked Sendable {
         }
     }
 
+    /// Records that the monitor's thread is running, now. ``start()``'s thread calls this every
+    /// time it wakes; it is exposed so a test can drive the monitor without a thread or a wait.
+    ///
+    /// A gap since the previous heartbeat longer than `interval` is recorded as a sample of how
+    /// much longer, and until the next heartbeat ``worstLag(within:)`` counts the gap that is
+    /// still open. The two happen under one lock, so a reader sees one or the other.
+    package func heartbeat() {
+        let intervalNanoseconds = Self.nanoseconds(interval)
+
+        lock.withLock {
+            // Read under the lock, like every other timestamp the state keeps, so a reader never
+            // sees one later than its own `now()` (which would wrap the subtraction around).
+            let current = now()
+
+            if let last = _state.lastHeartbeat {
+                let gap = current &- last
+
+                if gap > intervalNanoseconds {
+                    _state.samples.append(
+                        Sample(recordedAt: current, nanoseconds: gap - intervalNanoseconds, source: .monitorThread)
+                    )
+                }
+            }
+
+            _state.lastHeartbeat = current
+            _prune(at: current)
+        }
+    }
+
     /// The worst lag seen within the last `window` seconds, counting any probe that has been
     /// waiting to begin for that long so far. ``Lag/none`` if there is none.
     package func worstLag(within window: Double) -> Lag {
-        let current = now()
         let windowNanoseconds = Self.nanoseconds(window)
 
         return lock.withLock {
+            // Under the lock: a heartbeat or a tick stamped after a `now()` read outside it would
+            // be later than `current`, and `current &- it` would wrap to a huge, false lag.
+            let current = now()
             var worst = Lag.none
 
             for sample in _state.samples where current &- sample.recordedAt <= windowNanoseconds {
@@ -203,6 +274,19 @@ package final class PoolLagMonitor: @unchecked Sendable {
 
                 if seconds > worst.seconds {
                     worst = Lag(seconds: seconds, source: sample.source)
+                }
+            }
+
+            if let last = _state.lastHeartbeat, !_state.isStopped {
+                let overdue = current &- last
+                let intervalNanoseconds = Self.nanoseconds(interval)
+
+                if overdue > intervalNanoseconds {
+                    let seconds = Double(overdue - intervalNanoseconds) / 1_000_000_000
+
+                    if seconds > worst.seconds {
+                        worst = Lag(seconds: seconds, source: .monitorThread)
+                    }
                 }
             }
 
@@ -228,6 +312,7 @@ package final class PoolLagMonitor: @unchecked Sendable {
                 return
             }
 
+            heartbeat()
             tick()
 
             // Woken early only by ``stop()``.
@@ -238,19 +323,24 @@ package final class PoolLagMonitor: @unchecked Sendable {
     }
 
     private func began(_ source: Source) {
-        let current = now()
-
         lock.withLock {
+            // Under the lock, for the same reason as in ``worstLag(within:)``.
+            let current = now()
+
             guard let startedAt = _state.pending.removeValue(forKey: source) else {
                 return
             }
 
             _state.completed += 1
             _state.samples.append(Sample(recordedAt: current, nanoseconds: current &- startedAt, source: source))
-
-            let horizon = Self.nanoseconds(retention)
-            _state.samples.removeAll { current &- $0.recordedAt > horizon }
+            _prune(at: current)
         }
+    }
+
+    /// - Warning: Lockless. The caller must be holding ``lock``.
+    private func _prune(at current: UInt64) {
+        let horizon = Self.nanoseconds(retention)
+        _state.samples.removeAll { current &- $0.recordedAt > horizon }
     }
 
     private static func nanoseconds(_ seconds: Double) -> UInt64 {

@@ -37,6 +37,15 @@ extension Internals {
             "Host",
         ]
 
+        /// ``crossOriginHeaders`` without `Host`: what AsyncHTTPClient's own redirect handling
+        /// removes (and `URLSession` removes `Authorization` of) for a redirect to another origin.
+        package static let credentialHeaders = [
+            "Origin",
+            "Cookie",
+            "Authorization",
+            "Proxy-Authorization",
+        ]
+
         // MARK: - Package static methods
 
         /// Whether `lhs` and `rhs` share an origin (scheme, host, and port), per RFC 6454.

@@ -22,16 +22,33 @@ extension Internals {
 
         // MARK: - Internal methods
 
+        /// What a session that declares no redirect configuration follows: AsyncHTTPClient's own
+        /// default, which `URLSession` is made to match.
+        package static let `default`: Self = .follow(max: 5, allowCycles: false)
+
         #if canImport(NIOCore)
-        package func build() -> HTTPClient.Configuration.RedirectConfiguration {
+        /// - Parameter urlOverrides: The rules each hop is rewritten with before it is followed.
+        /// Empty (the default) follows every `Location` as the server wrote it. Not applied to
+        /// `.disallow`, which follows nothing.
+        package func build(
+            urlOverrides: Internals.URLOverrides = .init()
+        ) -> HTTPClient.Configuration.RedirectConfiguration {
             switch self {
             case .disallow:
                 return .disallow
             case .follow(let max, let allowCycles):
                 // Not `.follow(max:allowCycles:)`: see ``Internals/NIOFollowRedirectStrategy``.
-                return .strategy(Internals.NIOFollowRedirectStrategy(max: max, allowCycles: allowCycles))
+                return .strategy(
+                    Internals.NIOFollowRedirectStrategy(
+                        max: max,
+                        allowCycles: allowCycles,
+                        urlOverrides: urlOverrides
+                    )
+                )
             case .strategy(let strategy):
-                return .strategy(Internals.NIORedirectStrategyAdapter(strategy: strategy))
+                return .strategy(
+                    Internals.NIORedirectStrategyAdapter(strategy: strategy, urlOverrides: urlOverrides)
+                )
             }
         }
         #endif

@@ -95,6 +95,9 @@ package final class TransferServer: @unchecked Sendable {
         package let isBodyComplete: Bool
         package let status: Int
 
+        /// Where this request's head arrived among every request's, over every connection, from 0.
+        package let arrival: Int
+
         package func header(_ name: String) -> String? {
             headers.first { $0.name.lowercased() == name.lowercased() }?.value
         }
@@ -222,6 +225,22 @@ package final class TransferServer: @unchecked Sendable {
         set { lock.withLock { _omitsLocationOnCreation = newValue } }
     }
 
+    /// Where the requests that create an upload are redirected, one per request and in order:
+    /// each is answered with a `307` to the next of these (a path on this server, or an absolute
+    /// URL), after its body is read. Once empty, creations are answered as usual.
+    package var creationRedirects: [String] {
+        get { lock.withLock { _creationRedirects } }
+        set { lock.withLock { _creationRedirects = newValue } }
+    }
+
+    /// Answer the requests that create an upload with `Location: uploads/<id>`, relative to the
+    /// URL the creation was sent to, instead of `/uploads/<id>`. Any path that has `/uploads/<id>`
+    /// in it is then that upload, so where the client resolved it is told by the path it used.
+    package var answersCreationWithRelativeLocation: Bool {
+        get { lock.withLock { _answersCreationWithRelativeLocation } }
+        set { lock.withLock { _answersCreationWithRelativeLocation = newValue } }
+    }
+
     /// Per `HEAD` of an upload, the status to answer with in place of the one that says where the
     /// upload stands (consumed in order; once empty the server answers properly again).
     package var headStatuses: [Int] {
@@ -262,10 +281,17 @@ package final class TransferServer: @unchecked Sendable {
         set { lock.withLock { _dropsFinalResponse = newValue } }
     }
 
-    /// Every request that got as far as a complete head, in arrival order, recorded once it's
-    /// done (answered, dropped, or failed).
+    /// Every request that got as far as a complete head, in the order their heads arrived,
+    /// recorded once it's done (answered, dropped, or failed).
+    ///
+    /// A request is recorded when the server finishes with it, which for two that overlap can be
+    /// the later one first (a cancelled download only ends when its connection is noticed to be
+    /// gone), so the order they are recorded in is not the order they were made in. This list is
+    /// in the second one, and a request that is still being served is not in it yet: wait for as
+    /// many as the test sent (``awaitRecordedRequests(_:atLeast:timeout:matching:)``) before
+    /// counting on the last one being the last one made.
     package var requests: [ReceivedRequest] {
-        lock.withLock { _requests }
+        lock.withLock { _requests.sorted { $0.arrival < $1.arrival } }
     }
 
     /// Download body bytes the kernel accepted, over every connection.
@@ -313,6 +339,8 @@ package final class TransferServer: @unchecked Sendable {
     private var _expiresUploadsBeforeNextRequest = false
     private var _creationStatus: Int?
     private var _omitsLocationOnCreation = false
+    private var _creationRedirects: [String] = []
+    private var _answersCreationWithRelativeLocation = false
     private var _dropsFinalResponse = false
     private var _headStatuses: [Int] = []
     private var _headOverstatesOffsetBy = 0
@@ -320,6 +348,7 @@ package final class TransferServer: @unchecked Sendable {
     private var _rejectsEveryPatchWithConflict = false
     private var _keepsAtMostPerPatch: Int?
     private var _requests: [ReceivedRequest] = []
+    private var _nextArrival = 0
     private var _bodyBytesWritten = 0
     private var _uploadBytesReceived = 0
     private var _acceptedConnections = 0
@@ -770,7 +799,9 @@ package final class TransferServer: @unchecked Sendable {
             return nil
         }
 
-        if head.path.hasPrefix("/uploads/") {
+        let isRelative = lock.withLock { _answersCreationWithRelativeLocation }
+
+        if head.path.hasPrefix("/uploads/") || (isRelative && head.path.contains("/uploads/")) {
             return serveHeldUpload(head, dialect: dialect, io: &io)
         }
 
@@ -794,6 +825,19 @@ package final class TransferServer: @unchecked Sendable {
             return false
         }
 
+        let redirect = lock.withLock { _creationRedirects.isEmpty ? nil : _creationRedirects.removeFirst() }
+
+        if let redirect {
+            var headers = [("Location", redirect), ("Content-Length", "0")]
+
+            if dialect == .tus {
+                headers.append(("Tus-Resumable", "1.0.0"))
+            }
+
+            record(head, bodyLength: 0, isIntact: true, isComplete: true, status: 307)
+            return io.send(Self.head(status: 307, headers: headers), counted: false)
+        }
+
         let (id, status, omitsLocation) = lock.withLock { () -> (Int, Int, Bool) in
             let id = _nextUploadID
             _nextUploadID += 1
@@ -813,7 +857,7 @@ package final class TransferServer: @unchecked Sendable {
         var headers: [(String, String)] = [("Content-Length", "0")]
 
         if (200..<300).contains(status), !omitsLocation {
-            headers.append(("Location", "/uploads/\(id)"))
+            headers.append(("Location", isRelative ? "uploads/\(id)" : "/uploads/\(id)"))
         }
 
         if dialect == .tus {
@@ -1039,6 +1083,13 @@ package final class TransferServer: @unchecked Sendable {
         lock.withLock { _uploadBytesReceived += count }
     }
 
+    fileprivate func nextArrival() -> Int {
+        lock.withLock {
+            defer { _nextArrival += 1 }
+            return _nextArrival
+        }
+    }
+
     fileprivate func didStall() {
         lock.withLock { _stalledConnections += 1 }
     }
@@ -1061,7 +1112,8 @@ package final class TransferServer: @unchecked Sendable {
             bodyLength: bodyLength,
             isBodyIntact: isIntact,
             isBodyComplete: isComplete,
-            status: status
+            status: status,
+            arrival: head.arrival
         )
 
         lock.withLock { _requests.append(request) }
@@ -1150,6 +1202,7 @@ private struct TransferServerIO {
         let method: String
         let path: String
         let headers: [(name: String, value: String)]
+        let arrival: Int
 
         func header(_ name: String) -> String? {
             headers.first { $0.name.lowercased() == name.lowercased() }?.value
@@ -1194,7 +1247,8 @@ private struct TransferServerIO {
                 return Head(
                     method: requestLine.first ?? "",
                     path: requestLine.count > 1 ? requestLine[1] : "",
-                    headers: headers
+                    headers: headers,
+                    arrival: server.nextArrival()
                 )
             }
 
