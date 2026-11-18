@@ -6,6 +6,7 @@
 import FoundationEssentials
 #else
 import struct Foundation.URL
+import struct Foundation.URLComponents
 #endif
 
 extension Internals.SystemProxyResolver {
@@ -59,7 +60,9 @@ extension Internals.SystemProxyResolver {
 
         let authorization: Internals.Proxy.Authorization?
 
-        if let username = proxy.user, let password = proxy.password {
+        if connection == .socks {
+            authorization = socksAuthorization(of: proxy)
+        } else if let username = proxy.user, let password = proxy.password {
             authorization = .basic(username: username, password: password)
         } else {
             authorization = nil
@@ -71,6 +74,27 @@ extension Internals.SystemProxyResolver {
             connection: connection,
             authorization: authorization
         )
+    }
+
+    /// The RFC 1929 credentials of a `socks5://user:password@host` value, percent-decoded, the
+    /// way curl reads them. A user with no password (`socks5://user@host`) has an empty one, which
+    /// SOCKS5 allows. No user means no credentials.
+    ///
+    /// Read from the percent-encoded components and decoded here: `URL.password` is not decoded
+    /// the same way on every platform, and a `@` or `:` in a credential can only be written
+    /// encoded.
+    private static func socksAuthorization(of proxy: URL) -> Internals.Proxy.Authorization? {
+        guard
+            let components = URLComponents(url: proxy, resolvingAgainstBaseURL: false),
+            let encodedUsername = components.percentEncodedUser,
+            let username = encodedUsername.removingPercentEncoding
+        else {
+            return nil
+        }
+
+        let password = components.percentEncodedPassword?.removingPercentEncoding ?? ""
+
+        return .socks(username: username, password: password)
     }
 
     // MARK: - no_proxy

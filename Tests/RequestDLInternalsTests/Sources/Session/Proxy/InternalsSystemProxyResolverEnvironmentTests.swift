@@ -73,7 +73,28 @@ struct InternalsSystemProxyResolverEnvironmentTests {
 
         #expect(proxy?.connectionProtocol == .socks)
         #expect(proxy?.port == 1_080)
-        #expect(proxy?.authorization == .basic(username: "user", password: "secret"))
+        #expect(proxy?.authorization == .socks(username: "user", password: "secret"))
+    }
+
+    @Test
+    func aSocksProxy_percentDecodesItsCredentials() throws {
+        let proxy = try proxy("http://example.com", ["http_proxy": "socks5://us%40er:p%3Ass%C3%A9@socks.example"])
+
+        #expect(proxy?.authorization == .socks(username: "us@er", password: "p:ssé"))
+    }
+
+    @Test
+    func aSocksProxy_withAUserAndNoPassword_hasAnEmptyPassword() throws {
+        let proxy = try proxy("http://example.com", ["http_proxy": "socks5://user@socks.example"])
+
+        #expect(proxy?.authorization == .socks(username: "user", password: ""))
+    }
+
+    @Test
+    func aSocksProxy_withoutAUser_hasNoCredentials() throws {
+        let proxy = try proxy("http://example.com", ["http_proxy": "socks5://socks.example"])
+
+        #expect(proxy?.authorization == nil)
     }
 
     // MARK: - no_proxy

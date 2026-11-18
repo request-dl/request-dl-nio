@@ -327,17 +327,27 @@ extension Internals.SystemProxyResolver {
             // Rarely present. The system usually keeps the password in the keychain and hands
             // it to CFNetwork on demand, so a proxy that needs credentials generally still
             // wants an explicit `Proxy`.
-            authorization: authorization(dictionary)
+            authorization: authorization(dictionary, connection: connection)
         )
     }
 
-    private static func authorization(_ dictionary: [String: Any]) -> Internals.Proxy.Authorization? {
+    /// A SOCKS entry's credentials are the RFC 1929 ones, an HTTP entry's the `Proxy-Authorization`
+    /// header's.
+    private static func authorization(
+        _ dictionary: [String: Any],
+        connection: Internals.Proxy.ConnectionProtocol
+    ) -> Internals.Proxy.Authorization? {
         guard
             let username = dictionary[kCFProxyUsernameKey as String] as? String,
             let password = dictionary[kCFProxyPasswordKey as String] as? String
         else { return nil }
 
-        return .basic(username: username, password: password)
+        switch connection {
+        case .http:
+            return .basic(username: username, password: password)
+        case .socks:
+            return .socks(username: username, password: password)
+        }
     }
 }
 
