@@ -194,6 +194,52 @@ struct InternalsProxyTests {
     }
 
     @Test
+    func validate_whenSOCKSCredentialsHaveANUL_throws() {
+        for authorization in [
+            Internals.Proxy.Authorization.socks(username: "u\u{0}", password: "p"),
+            .socks(username: "u", password: "\u{0}p"),
+        ] {
+            #expect(throws: Internals.Proxy.Authorization.Mismatch.socksCredentialContainsNUL) {
+                try authorization.validate(for: .socks)
+            }
+        }
+    }
+
+    @Test
+    func droppingUnusableSOCKSCredentials_keepsWhatCanBeSentAndDropsTheRest() {
+        let usable = Internals.Proxy(
+            host: "p",
+            port: 1,
+            connection: .socks,
+            authorization: .socks(username: "u", password: "")
+        )
+        #expect(usable.droppingUnusableSOCKSCredentials(logger: nil) == usable)
+
+        for authorization in [
+            Internals.Proxy.Authorization.socks(username: "", password: "p"),
+            .socks(username: String(repeating: "u", count: 256), password: "p"),
+            .socks(username: "u", password: String(repeating: "p", count: 256)),
+            .socks(username: "u", password: "p\u{0}"),
+        ] {
+            let unusable = Internals.Proxy(host: "p", port: 1, connection: .socks, authorization: authorization)
+
+            #expect(
+                unusable.droppingUnusableSOCKSCredentials(logger: nil)
+                    == Internals.Proxy(host: "p", port: 1, connection: .socks, authorization: nil)
+            )
+        }
+
+        // HTTP is never touched.
+        let http = Internals.Proxy(
+            host: "p",
+            port: 1,
+            connection: .http,
+            authorization: .basic(username: "", password: "p")
+        )
+        #expect(http.droppingUnusableSOCKSCredentials(logger: nil) == http)
+    }
+
+    @Test
     func validate_whenTheShapeDoesNotFitTheProtocol_throws() {
         for authorization in [
             Internals.Proxy.Authorization.basic(username: "u", password: "p"),

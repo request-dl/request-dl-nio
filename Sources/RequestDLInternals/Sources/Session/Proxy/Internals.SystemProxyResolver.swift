@@ -233,7 +233,7 @@ extension Internals.SystemProxyResolver {
             return nil
 
         case .proxy(let proxy):
-            return proxy
+            return proxy.droppingUnusableSOCKSCredentials(logger: logger)
 
         case .autoConfiguration(let scriptURL):
             return try apply(
@@ -246,7 +246,8 @@ extension Internals.SystemProxyResolver {
                 policy: pac.onFailure,
                 scriptURL: scriptURL,
                 logger: logger
-            )
+            )?
+            .droppingUnusableSOCKSCredentials(logger: logger)
         }
     }
 
@@ -395,7 +396,7 @@ extension Internals.SystemProxyResolver {
         pac: PACOptions,
         logger: Logger?
     ) async throws -> Internals.Proxy? {
-        proxy(forURL: url, environment: ProcessInfo.processInfo.environment)
+        proxy(forURL: url, environment: ProcessInfo.processInfo.environment, logger: logger)
     }
 }
 

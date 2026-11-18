@@ -33,6 +33,12 @@ public struct ProxyAuthorizationError: Error, Sendable, Hashable {
         /// The password of a SOCKS5 proxy takes 0 to 255 bytes in UTF-8 (an empty password is
         /// valid). `actual` is the number of bytes it has.
         case socksPasswordLength(actual: Int)
+
+        /// The user name or the password of a SOCKS5 proxy has a NUL (`\0`) in it. SOCKS5 could
+        /// carry it, but `URLSession` treats the credentials as C strings and would cut them
+        /// there, so the proxy would be authenticated with other credentials than the NIO
+        /// executors send. It is refused so that no executor does either.
+        case socksCredentialsContainNUL
     }
 
     // MARK: - Public properties
@@ -44,8 +50,15 @@ public struct ProxyAuthorizationError: Error, Sendable, Hashable {
 
     init(_ mismatch: Internals.Proxy.Authorization.Mismatch) {
         switch mismatch {
-        case .httpShapeOnSOCKSProxy, .socksShapeOnHTTPProxy:
+        case .httpShapeOnSOCKSProxy:
             self.reason = .socksRequiresUsernameAndPassword
+        case .socksShapeOnHTTPProxy:
+            // Unreachable from the public API: `ProxyAuthorization` has no SOCKS-only shape, and
+            // `build(for:)` only makes `.socks` for a SOCKS proxy. Saying "SOCKS requires..." for
+            // it would be a wrong message, so it is not mapped at all.
+            preconditionFailure("A SOCKS authorization was built for an HTTP proxy.")
+        case .socksCredentialContainsNUL:
+            self.reason = .socksCredentialsContainNUL
         case .socksUsernameLength(let actual):
             self.reason = .socksUsernameLength(actual: actual)
         case .socksPasswordLength(let actual):
@@ -78,6 +91,13 @@ extension ProxyAuthorizationError: CustomStringConvertible {
             return """
                 RequestDL could not use this proxy authorization with a SOCKS proxy: the password \
                 has \(actual) bytes in UTF-8, and SOCKS5 takes 0 to 255. The request was not sent.
+                """
+
+        case .socksCredentialsContainNUL:
+            return """
+                RequestDL could not use this proxy authorization with a SOCKS proxy: the user name \
+                or the password has a NUL character, which URLSession would cut the credentials at. \
+                The request was not sent.
                 """
         }
     }

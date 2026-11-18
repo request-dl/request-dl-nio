@@ -352,6 +352,62 @@ struct ProxyTests {
         #expect(error?.reason == .socksPasswordLength(actual: 256))
     }
 
+    @Test(arguments: [("us\u{0}er", "pass"), ("user", "pa\u{0}ss"), ("user", "\u{0}")])
+    func proxy_whenSOCKSCredentialsHaveANUL_throws(_ username: String, _ password: String) async throws {
+        let error = await #expect(throws: ProxyAuthorizationError.self) {
+            try await resolve(
+                Proxy(
+                    host: "proxy.example",
+                    port: 1_080,
+                    connection: .socks,
+                    authorization: .basic(username: username, password: password)
+                )
+            )
+        }
+
+        #expect(error?.reason == .socksCredentialsContainNUL)
+        #expect(error.map { !$0.description.contains("\u{0}") } == true)
+    }
+
+    @Test
+    func proxy_whenHTTPCredentialsHaveANUL_isNotTouched() async throws {
+        // The restriction is SOCKS5's: an HTTP proxy's header is as it always was.
+        let resolved = try await resolve(
+            Proxy(
+                host: "proxy.example",
+                port: 8_080,
+                connection: .http,
+                authorization: .basic(username: "u\u{0}", password: "p")
+            )
+        )
+
+        #expect(resolved.session.configuration.proxy?.authorization == .basic(username: "u\u{0}", password: "p"))
+    }
+
+    @Test(arguments: [
+        ProxyAuthorizationError.Reason.socksRequiresUsernameAndPassword,
+        .socksUsernameLength(actual: 0),
+        .socksUsernameLength(actual: 256),
+        .socksPasswordLength(actual: 256),
+        .socksCredentialsContainNUL,
+    ])
+    func proxyAuthorizationError_describesItselfWithoutAnyCredentials(_ reason: ProxyAuthorizationError.Reason) {
+        let error = ProxyAuthorizationError(
+            {
+                switch reason {
+                case .socksRequiresUsernameAndPassword: return .httpShapeOnSOCKSProxy
+                case .socksUsernameLength(let actual): return .socksUsernameLength(actual)
+                case .socksPasswordLength(let actual): return .socksPasswordLength(actual)
+                case .socksCredentialsContainNUL: return .socksCredentialContainsNUL
+                }
+            }()
+        )
+
+        #expect(error.reason == reason)
+        #expect(error.description.contains("SOCKS"))
+        #expect(error.description.contains("not sent"))
+    }
+
     @Test
     func neverBody() async throws {
         // Given

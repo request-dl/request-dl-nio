@@ -2,6 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Logging
+
 #if canImport(NIOCore)
 import AsyncHTTPClient
 #endif
@@ -58,6 +60,10 @@ extension Internals {
                 case socksShapeOnHTTPProxy
                 case socksUsernameLength(Int)
                 case socksPasswordLength(Int)
+                /// A NUL byte in the user name or the password. RFC 1929 allows it, but
+                /// CFNetwork treats the credentials as C strings and would cut them at it, so
+                /// `.urlSession` would authenticate with other credentials than `.nio`.
+                case socksCredentialContainsNUL
             }
 
             /// The username and password to send to a SOCKS proxy; only the `.socks` shape has them.
@@ -75,7 +81,8 @@ extension Internals {
             }
 
             /// Checks that this authorization is usable on a proxy of `connection`, and, on a
-            /// SOCKS proxy, that the credentials fit RFC 1929.
+            /// SOCKS proxy, that the credentials fit RFC 1929 (and carry no NUL byte, see
+            /// ``Mismatch/socksCredentialContainsNUL``).
             package func validate(for connection: ConnectionProtocol) throws {
                 switch connection {
                 case .http:
@@ -97,6 +104,10 @@ extension Internals {
 
                     guard Self.socksPasswordByteCounts.contains(passwordCount) else {
                         throw Mismatch.socksPasswordLength(passwordCount)
+                    }
+
+                    guard !credentials.username.utf8.contains(0), !credentials.password.utf8.contains(0) else {
+                        throw Mismatch.socksCredentialContainsNUL
                     }
                 }
             }
@@ -148,6 +159,37 @@ extension Internals {
             self.connectionProtocol = connectionProtocol
             self.authorization = authorization
             self.connectHeaders = connectHeaders
+        }
+
+        /// The same proxy when its SOCKS credentials can be sent, and otherwise the proxy without them.
+        ///
+        /// For what the system decides and not the caller: a proxy found in the environment or
+        /// the system settings used to be run without the credentials it carried for SOCKS (they
+        /// were dropped), so credentials RFC 1929 cannot carry are still dropped rather than
+        /// failing a request that the user did not configure. Reported through `logger`, without
+        /// the credentials. An explicit `Proxy` never goes through this: it throws instead.
+        package func droppingUnusableSOCKSCredentials(logger: Logger?) -> Internals.Proxy {
+            guard connectionProtocol == .socks, let authorization else {
+                return self
+            }
+
+            do {
+                try authorization.validate(for: .socks)
+                return self
+            } catch let mismatch as Authorization.Mismatch {
+                Internals.Log.systemProxySOCKSCredentialsIgnored(mismatch: mismatch)
+                    .log(level: .warning, logger: logger)
+            } catch {
+                // `validate(for:)` only throws `Mismatch`.
+            }
+
+            return Internals.Proxy(
+                host: host,
+                port: port,
+                connection: connectionProtocol,
+                authorization: nil,
+                connectHeaders: connectHeaders
+            )
         }
 
         /// Checks that `authorization` is usable on this proxy's protocol, and in the sizes

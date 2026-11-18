@@ -596,7 +596,7 @@ extension Internals.Session.Configuration {
     /// `connectionPool`, `ignoreUncleanSSLShutdown`, `networkFrameworkWaitForConnectivity`) is
     /// either NIO/NIOTS-specific with nothing to translate to or already excluded from resolving
     /// to `.urlSession` by `urlSessionIncompatibilityReasons()` (like `dnsOverride`,
-    /// `httpVersion == .http1Only`, `proxy.connectHeaders`, `.socks`, `.bearer`,
+    /// `httpVersion == .http1Only`, `proxy.connectHeaders`, `.bearer`, SOCKS credentials over 254 bytes,
     /// `decompression == .disabled`), so nothing is left for a compatible configuration to lose.
     ///
     /// Compression isn't translated here: `RequestConfiguration.applyCompression()` compresses

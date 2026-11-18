@@ -2,6 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Logging
+
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #else
@@ -24,7 +26,10 @@ extension Internals.SystemProxyResolver {
     ///   the proxy for the server's own outgoing connections.
     /// - `no_proxy` entries are names, suffixes, `host:port`, `*`, and address ranges in CIDR
     ///   notation.
-    static func proxy(forURL url: URL, environment: [String: String]) -> Internals.Proxy? {
+    ///
+    /// SOCKS credentials that RFC 1929 cannot carry are dropped and reported through `logger`, see
+    /// ``Internals/Proxy/droppingUnusableSOCKSCredentials(logger:)``.
+    static func proxy(forURL url: URL, environment: [String: String], logger: Logger? = nil) -> Internals.Proxy? {
         guard let host = url.host else {
             return nil
         }
@@ -74,6 +79,7 @@ extension Internals.SystemProxyResolver {
             connection: connection,
             authorization: authorization
         )
+        .droppingUnusableSOCKSCredentials(logger: logger)
     }
 
     /// The RFC 1929 credentials of a `socks5://user:password@host` value, percent-decoded, the
