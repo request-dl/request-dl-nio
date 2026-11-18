@@ -25,6 +25,10 @@ extension Internals {
 
         let strategy: any Internals.RedirectStrategy
 
+        /// Rewrites each hop the way the first request was. See
+        /// ``Internals/URLOverrides/rewritingRedirect(_:previous:)``.
+        var urlOverrides: Internals.URLOverrides = .init()
+
         // MARK: - Internal methods
 
         func redirectDecision(for context: HTTPClientRedirectContext) throws -> HTTPClientRedirectDecision {
@@ -34,6 +38,11 @@ extension Internals {
             let previousURL = history.last?.request.url
 
             var candidate = Internals.RedirectRequest(context.redirectRequest)
+
+            // Before anything else looks at it, the strategy included: the candidate is the
+            // request that would be sent, which is what `history` records of every earlier hop.
+            urlOverrides.rewritingRedirect(&candidate, previous: history.last?.request)
+            let rewrittenURL = candidate.url
 
             // AsyncHTTPClient has already stripped what it knows to strip for a redirect to
             // another origin, which does not include an explicit `Host`.
@@ -55,6 +64,13 @@ extension Internals {
             case .doNotFollow:
                 return .doNotFollow
             case .follow(var redirectRequest):
+                // What the strategy kept of the candidate's URL is already the destination. One it
+                // wrote itself is a URL like any other `Location`; rewriting the first again would
+                // send a destination through the rules a second time.
+                if redirectRequest.url != rewrittenURL, let url = urlOverrides.rewriting(redirectRequest.url) {
+                    redirectRequest.url = url
+                }
+
                 // Again, on what the strategy answered with: nothing it did to the URL or the
                 // headers has been checked against the origin it is now going to.
                 Self.sanitize(&redirectRequest, from: previousURL)

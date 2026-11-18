@@ -47,6 +47,7 @@ extension Internals {
         /// `HTTPClient.Task`s.
         private let operationQueue = Internals.ClientOperationQueue()
         private let redirectConfiguration: Internals.RedirectConfiguration
+        private let urlOverrides: Internals.URLOverrides
         private let proxyAuthorization: Internals.Proxy.Authorization?
         private let identityPolicy: Internals.URLSessionIdentityPolicy?
 
@@ -70,6 +71,8 @@ extension Internals {
         /// (`.follow(max: 5, allowCycles: false)`, see `HTTPClient.Configuration.RedirectConfiguration.init()`)
         /// so a caller that does not set `Internals.Session.Configuration.redirectConfiguration`
         /// gets identical behavior regardless of which executor the session resolves to.
+        /// - Parameter urlOverrides: The rules every redirect hop is rewritten with before it is
+        /// followed, the way the first request already was. See ``Internals/URLOverrides``.
         /// - Parameter proxy: Both `.http` (`.server`) and `.socks` are mapped onto
         /// `configuration`. `.bearer` proxy authorization is the one thing that stays excluded
         /// from `.urlSession` upstream (`Internals.ExecutorIncompatibilityReason
@@ -85,6 +88,7 @@ extension Internals {
             configuration: URLSessionConfiguration,
             secureConnection: Internals.SecureConnection? = nil,
             redirectConfiguration: Internals.RedirectConfiguration = .follow(max: 5, allowCycles: false),
+            urlOverrides: Internals.URLOverrides = .init(),
             proxy: Internals.Proxy? = nil,
             maximumConcurrentConnections: Int? = nil,
             sessionDelegate: (any URLSessionDelegate)? = nil
@@ -119,6 +123,7 @@ extension Internals {
                 maximumConcurrentConnections: maximumConcurrentConnections
             )
             self.redirectConfiguration = redirectConfiguration
+            self.urlOverrides = urlOverrides
             self.proxyAuthorization = proxy?.authorization
             self.identityPolicy = identityPolicy
         }
@@ -202,6 +207,7 @@ extension Internals {
 
             let taskDelegate = TaskDelegate(
                 redirectConfiguration: redirectConfiguration,
+                urlOverrides: urlOverrides,
                 initialRequest: request,
                 proxyAuthorization: proxyAuthorization,
                 tls: tlsDelegate,
@@ -282,6 +288,7 @@ extension Internals {
 
             let taskDelegate = TaskDelegate(
                 redirectConfiguration: redirectConfiguration,
+                urlOverrides: urlOverrides,
                 initialRequest: request,
                 proxyAuthorization: proxyAuthorization,
                 tls: tlsDelegate,
@@ -377,6 +384,7 @@ extension Internals {
 
             let taskDelegate = TaskDelegate(
                 redirectConfiguration: redirectConfiguration,
+                urlOverrides: urlOverrides,
                 initialRequest: request,
                 proxyAuthorization: proxyAuthorization,
                 tls: tlsDelegate,
@@ -664,10 +672,12 @@ extension Internals {
             let metrics = Internals.RequestMetricsCollector()
 
             let redirectConfiguration = redirectConfiguration
+            let urlOverrides = urlOverrides
             let proxyAuthorization = proxyAuthorization
 
             let taskDelegate = TaskDelegate(
                 redirectConfiguration: redirectConfiguration,
+                urlOverrides: urlOverrides,
                 initialRequest: request,
                 proxyAuthorization: proxyAuthorization,
                 tls: tlsDelegate,
@@ -687,6 +697,7 @@ extension Internals {
             let continuationDelegate: @Sendable (URLRequest) -> TaskDelegate = { continuation in
                 TaskDelegate(
                     redirectConfiguration: redirectConfiguration,
+                    urlOverrides: urlOverrides,
                     initialRequest: continuation,
                     proxyAuthorization: proxyAuthorization,
                     tls: tlsDelegate,
@@ -1292,6 +1303,7 @@ extension Internals.URLSessionClient {
         // MARK: - Private properties
 
         private let redirectConfiguration: Internals.RedirectConfiguration
+        private let urlOverrides: Internals.URLOverrides
         private let proxyAuthorization: Internals.Proxy.Authorization?
         private let tlsDelegate: TLSDelegate?
         private let forwardingDelegate: URLSessionTaskDelegate?
@@ -1398,6 +1410,7 @@ extension Internals.URLSessionClient {
 
         init(
             redirectConfiguration: Internals.RedirectConfiguration,
+            urlOverrides: Internals.URLOverrides = .init(),
             initialRequest: URLRequest,
             proxyAuthorization: Internals.Proxy.Authorization?,
             tls tlsDelegate: TLSDelegate?,
@@ -1411,6 +1424,7 @@ extension Internals.URLSessionClient {
             observer: Internals.ExecutionObserver? = nil
         ) {
             self.redirectConfiguration = redirectConfiguration
+            self.urlOverrides = urlOverrides
             self.proxyAuthorization = proxyAuthorization
             self.tlsDelegate = tlsDelegate
             self.forwardingDelegate = delegate
@@ -1458,9 +1472,14 @@ extension Internals.URLSessionClient {
             _ session: URLSession,
             task: URLSessionTask,
             willPerformHTTPRedirection response: HTTPURLResponse,
-            newRequest request: URLRequest,
+            newRequest proposedRequest: URLRequest,
             completionHandler: @escaping (URLRequest?) -> Void
         ) {
+            // The hop as it is going to be requested: a `Location` that names a host a
+            // `URLOverride` stands in for is mapped to its destination, before anything below
+            // counts, compares or follows it.
+            let request = rewrittenByURLOverrides(proposedRequest)
+
             switch redirectConfiguration {
             case .disallow:
                 completionHandler(nil)
@@ -1502,6 +1521,8 @@ extension Internals.URLSessionClient {
                 let sanitizedRequest = sanitizedForRedirect(request)
                 let entry = historyEntry(for: response)
 
+                let candidateURL = sanitizedRequest.url?.absoluteString ?? ""
+
                 let context = lock.withLock { () -> Internals.RedirectContext in
                     _history.append(entry)
                     return Internals.RedirectContext(
@@ -1524,8 +1545,15 @@ extension Internals.URLSessionClient {
                 switch decision {
                 case .doNotFollow:
                     completionHandler(nil)
-                case .follow(let redirectRequest):
+                case .follow(var redirectRequest):
                     let newRequest: URLRequest
+
+                    // What the strategy kept of the candidate's URL is already the destination. One
+                    // it wrote itself is a URL like any other `Location`; rewriting the first again
+                    // would send a destination through the rules a second time.
+                    if redirectRequest.url != candidateURL, let url = urlOverrides.rewriting(redirectRequest.url) {
+                        redirectRequest.url = url
+                    }
 
                     do {
                         // Sanitized again, against the same previous hop: the strategy may have
@@ -1576,6 +1604,39 @@ extension Internals.URLSessionClient {
 
             lock.withLock { _pendingManualBodyRedirect = request }
             completionHandler(nil)
+        }
+
+        /// `request` with its URL mapped through the `URLOverride` rules, when one covers it.
+        ///
+        /// The cross-origin decision of what follows is taken on the URLs actually requested, the
+        /// previous hop's against this one's rewritten URL; see
+        /// ``Internals/URLOverrides/rewritingRedirect(_:previous:)``, which also puts back the
+        /// credentials `URLSession` took off because the `Location` named another host than the
+        /// one the previous hop was sent to, when the rewritten URL is back on it.
+        private func rewrittenByURLOverrides(_ request: URLRequest) -> URLRequest {
+            guard !urlOverrides.isEmpty else {
+                return request
+            }
+
+            var candidate = Internals.RedirectRequest(request)
+            let previous = lock.withLock { Internals.RedirectRequest(_lastRequest) }
+            urlOverrides.rewritingRedirect(&candidate, previous: previous)
+
+            guard candidate.url != request.url?.absoluteString, let url = URL(string: candidate.url) else {
+                return request
+            }
+
+            var rewritten = request
+            rewritten.url = url
+
+            for header in Internals.RedirectSanitizer.credentialHeaders
+            where rewritten.value(forHTTPHeaderField: header) == nil {
+                if let value = candidate.headers.first(name: header) {
+                    rewritten.setValue(value, forHTTPHeaderField: header)
+                }
+            }
+
+            return rewritten
         }
 
         /// The request that produced `response`, per `_lastRequest`: the request one hop

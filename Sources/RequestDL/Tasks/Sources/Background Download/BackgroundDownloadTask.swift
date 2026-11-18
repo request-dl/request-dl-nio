@@ -54,6 +54,8 @@ import struct Foundation.URL
 ///   somewhere else, or authenticate with `Authorization` or a signed URL.
 /// - ``Session/disableRedirect()``, ``Session/enableRedirectFollow(max:allowCycles:)`` and
 ///   ``Session/redirectStrategy(_:)`` have no effect.
+/// - ``URLOverride`` rewrites the request that starts the download, but not the hops of a redirect
+///   the system follows: a `Location` naming the host an override stands in for reaches the real one.
 ///
 /// ## Request body
 ///

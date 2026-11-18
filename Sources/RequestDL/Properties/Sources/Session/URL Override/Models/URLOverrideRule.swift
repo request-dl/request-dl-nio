@@ -2,9 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
-/// A single parsed origin/destination pair accumulated by ``URLOverride``.
-struct URLOverrideRule: Sendable {
+import RequestDLInternals
 
-    let origin: URLOverrideEndpoint
-    let destination: URLOverrideEndpoint
-}
+/// A single parsed origin/destination pair accumulated by ``URLOverride``.
+typealias URLOverrideRule = Internals.URLOverrides.Rule

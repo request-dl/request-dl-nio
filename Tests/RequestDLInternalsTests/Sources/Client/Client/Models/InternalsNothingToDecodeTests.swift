@@ -51,19 +51,22 @@ struct InternalsNothingToDecodeTests {
 
     // MARK: - Nothing to decode
 
-    /// What happens without it, and why it exists: a redirect that names an encoding and has no
-    /// body fails the request.
+    /// What happens without it. Upstream `swift-nio-extras` 1.35.2 reported a redirect that names an
+    /// encoding and has no body as truncated, which is why `Internals.NothingToDecode` exists. The
+    /// `request-dl/swift-nio-extras` fork (1.35.3 and later, which `Package.swift` depends on)
+    /// accepts it, so this now documents the fixed behavior, and fails if the package ever
+    /// resolves to an unpatched `swift-nio-extras` again. The handler is redundant with the fork
+    /// and can be removed in a follow-up.
     @Test
-    func withoutIt_aMessageWithNoBodyIsReportedAsTruncated() throws {
+    func withoutIt_aMessageWithNoBodyEndsWithoutAnError() throws {
         let channel = try channel(installing: false)
         defer { _ = try? channel.finish() }
 
         try channel.writeInbound(head(.movedPermanently))
+        try channel.writeInbound(HTTPClientResponsePart.end(nil))
+
         // `EmbeddedChannel` throws what was caught from the write that caused it.
-        #expect(throws: NIOHTTPDecompression.ExtraDecompressionError.truncatedData) {
-            try channel.writeInbound(HTTPClientResponsePart.end(nil))
-            try channel.throwIfErrorCaught()
-        }
+        try channel.throwIfErrorCaught()
     }
 
     @Test(arguments: [HTTPResponseStatus.movedPermanently, .temporaryRedirect, .noContent, .notModified, .ok])

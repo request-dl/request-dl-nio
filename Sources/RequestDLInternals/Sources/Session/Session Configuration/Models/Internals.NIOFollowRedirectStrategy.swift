@@ -32,6 +32,9 @@ extension Internals {
 
         let max: Int
         let allowCycles: Bool
+        /// Rewrites each hop the way the first request was, before it is checked or followed. See
+        /// ``Internals/URLOverrides/rewritingRedirect(_:previous:)``.
+        var urlOverrides: Internals.URLOverrides = .init()
 
         // MARK: - Internal methods
 
@@ -43,6 +46,19 @@ extension Internals {
             }
 
             var request = context.redirectRequest
+
+            // First, so that the cycle check below compares the URL that would actually be
+            // requested with the ones that were, and not a `Location` that spells the host an
+            // override stands in for.
+            if !urlOverrides.isEmpty {
+                var candidate = Internals.RedirectRequest(request)
+                let previous = context.history.last.map { Internals.RedirectRequest($0.request) }
+
+                urlOverrides.rewritingRedirect(&candidate, previous: previous)
+
+                request.url = candidate.url
+                request.headers = candidate.headers.build()
+            }
 
             guard allowCycles || !context.history.contains(where: { $0.request.url == request.url }) else {
                 throw HTTPClientError.redirectCycleDetected
