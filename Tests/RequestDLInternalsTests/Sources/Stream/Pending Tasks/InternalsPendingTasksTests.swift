@@ -121,4 +121,73 @@ struct InternalsPendingTasksTests {
         release.signal()
         await pendingTasks.waitUntilIdle()
     }
+
+    // MARK: - Priority
+
+    @Test
+    func pendingTasks_whenStartedFromAHighPriorityTask_shouldRunTheWorkAtItsPriority() async {
+        // Given
+        let pendingTasks = Internals.PendingTasks()
+        let observed = Box<_Concurrency.TaskPriority?>(nil)
+
+        // When
+        await _Concurrency.Task(priority: .high) {
+            pendingTasks.run {
+                observed.withLock { $0 = _Concurrency.Task.currentPriority }
+            }
+        }.value
+
+        await pendingTasks.waitUntilIdle()
+
+        // Then: inherited, not a fixed low priority the caller ends up waiting on.
+        #expect(observed.withLock { $0 } == .high)
+    }
+
+    @Test
+    func pendingTasks_whenTheOperationGivesAPriority_shouldRunTheWorkAtIt() async {
+        // Given: a tracker with a priority of its own, started from a high priority task.
+        let pendingTasks = Internals.PendingTasks(priority: .utility)
+        let observed = Box<[_Concurrency.TaskPriority]>([])
+
+        // When
+        await _Concurrency.Task(priority: .high) {
+            pendingTasks.run {
+                observed.withLock { $0.append(_Concurrency.Task.currentPriority) }
+            }
+
+            pendingTasks.run(priority: .medium) {
+                observed.withLock { $0.append(_Concurrency.Task.currentPriority) }
+            }
+        }.value
+
+        await pendingTasks.waitUntilIdle()
+
+        // Then: the tracker's priority, unless the operation brings its own.
+        #expect(observed.withLock { $0.sorted(by: { $0.rawValue < $1.rawValue }) } == [.utility, .medium])
+    }
+
+    /// An event loop callback is not a task: what the work needs to run at is the priority of the
+    /// request it belongs to, taken while still in that request's task.
+    @Test
+    func pendingTasks_whenStartedFromOutsideTheRequestWithItsPriority_shouldRunTheWorkAtIt() async {
+        // Given
+        let pendingTasks = Internals.PendingTasks()
+        let observed = Box<_Concurrency.TaskPriority?>(nil)
+
+        let captured = await _Concurrency.Task(priority: .high) {
+            _Concurrency.Task.currentPriority
+        }.value
+
+        // When
+        await _Concurrency.Task.detached(priority: .background) {
+            pendingTasks.run(priority: captured) {
+                observed.withLock { $0 = _Concurrency.Task.currentPriority }
+            }
+        }.value
+
+        await pendingTasks.waitUntilIdle()
+
+        // Then
+        #expect(observed.withLock { $0 } == .high)
+    }
 }

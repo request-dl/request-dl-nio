@@ -353,10 +353,10 @@ extension Internals {
             let dataCache = dataCache
             let key = requestConfiguration.url
 
-            _Concurrency.Task(priority: .background) {
-                await Self.replay(body, startingWith: firstPiece, into: download, window: window) {
-                    await dataCache.remove(forKey: key)
-                }
+            // At the priority of the request, not a low one: the response is read by the caller of
+            // this request, which is waiting on exactly what this feeds it.
+            Self.startReplay(body, startingWith: firstPiece, into: download, window: window) {
+                await dataCache.remove(forKey: key)
             }
 
             // Nothing crossed the wire for this response, but it is still part of what happened to
@@ -404,6 +404,24 @@ extension Internals {
         /// Large enough that a big entry is not read one reading-mode chunk (1 KiB by default)
         /// per trip to the file system, and small enough that the window is consulted often.
         static let replayPieceSize = 65_536
+
+        /// Starts ``replay(_:startingWith:into:window:onUnreadable:)`` as an unstructured task.
+        ///
+        /// Not detached, and with no priority of its own: it inherits the one of the caller. The
+        /// reader of `download` waits for what the replay feeds it, so a fixed low priority here
+        /// is a priority inversion, a cached response stalled behind unrelated background work.
+        @discardableResult
+        static func startReplay(
+            _ body: Internals.AnyBuffer,
+            startingWith firstPiece: [UInt8] = [],
+            into download: Internals.DownloadBuffer,
+            window: Internals.FlowControlWindow,
+            onUnreadable: (@Sendable () async -> Void)? = nil
+        ) -> _Concurrency.Task<Void, Never> {
+            _Concurrency.Task {
+                await replay(body, startingWith: firstPiece, into: download, window: window, onUnreadable: onUnreadable)
+            }
+        }
 
         /// Feeds a cached body into `download`, one piece at a time, and waits for room in `window`
         /// between pieces.
@@ -720,6 +738,11 @@ extension Internals {
                 return nil
             }
 
+            // The closure below runs when the head arrives, on whatever is delivering the response
+            // (an event loop), which is not this request's task. The write is this request's work,
+            // and has to run at its priority.
+            let priority = _Concurrency.Task.currentPriority
+
             return { head -> Internals.AsyncStream<Internals.DataBuffer>? in
                 let headHeaders = RequestDL.HTTPHeaders(head.headers.map { ($0.name, $0.value) })
 
@@ -766,7 +789,7 @@ extension Internals {
                 // of a body for a writer that is not keeping up.
                 let asyncBuffers = Internals.DownloadBuffer.makeCacheStream()
 
-                dataCache.trackWrite {
+                dataCache.trackWrite(priority: priority) {
                     // On every exit path. Without it, a task that gives up before reaching the
                     // loop leaves behind a stream nobody will ever drain, and the download goes
                     // on feeding it for the rest of the response. Closing makes every later
