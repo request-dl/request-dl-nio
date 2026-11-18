@@ -430,7 +430,8 @@ extension Internals {
                     configuration: sessionConfiguration.buildURLSessionConfiguration(),
                     secureConnection: sessionConfiguration.secureConnection,
                     redirectConfiguration: sessionConfiguration.redirectConfiguration
-                        ?? .follow(max: 5, allowCycles: false),
+                        ?? .default,
+                    urlOverrides: sessionConfiguration.urlOverrides,
                     proxy: sessionConfiguration.proxy,
                     maximumConcurrentConnections: sessionConfiguration.maximumConcurrentConnections
                 )
