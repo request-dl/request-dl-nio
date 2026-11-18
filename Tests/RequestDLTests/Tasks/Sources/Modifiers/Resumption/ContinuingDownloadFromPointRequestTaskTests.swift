@@ -395,10 +395,11 @@ struct ContinuingDownloadFromPointRequestTaskTests {
             #expect(count == Self.length)
             #expect(isIntact)
 
-            // The continuation was asked for first, and then the whole resource, which carries
-            // neither header. The server records a request once it is done with it, which can
-            // be after the download already finished.
-            try await awaitRecordedRequests(server, atLeast: 2)
+            // The original, then the continuation, then the whole resource, which carries neither
+            // header. The server records a request once it is done with it, which can be after
+            // the download already finished and, for one the client gave up on, after the next
+            // one: all three are waited for, and they are read in the order they arrived.
+            try await awaitRecordedRequests(server, atLeast: 3)
 
             let requests = server.requests.suffix(2)
             #expect(requests.first?.header("Range") != nil)

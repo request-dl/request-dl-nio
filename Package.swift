@@ -44,8 +44,8 @@ let package = Package(
             from: "2.105.0"
         ),
         .package(
-            url: "https://github.com/apple/swift-nio-extras",
-            from: "1.35.2"
+            url: "https://github.com/request-dl/swift-nio-extras",
+            from: "1.35.3"
         ),
         .package(
             url: "https://github.com/apple/swift-nio-http2",
@@ -69,7 +69,7 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/o-nnerb/swift-async-stream",
-            from: "3.0.1"
+            from: "3.0.2"
         ),
         .package(
             url: "https://github.com/apple/swift-async-algorithms",

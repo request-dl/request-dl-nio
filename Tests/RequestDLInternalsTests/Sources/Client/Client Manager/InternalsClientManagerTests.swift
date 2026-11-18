@@ -687,6 +687,33 @@ struct InternalsClientManagerTests {
         }
     }
 
+    /// The sweep takes its instant before it waits for the manager's lock, so a client resolved while it
+    /// waited is stamped *after* that instant. `now - readAt` is then negative, which on the unsigned
+    /// Darwin clock traps (`arithmetic overflow` in `isExpired`) and took the whole test process down once.
+    /// An item newer than the instant being judged is simply not expired.
+    @Test
+    func manager_whenAClientIsNewerThanTheSweepInstant_sweepShouldKeepItAndNotTrap() async throws {
+        // Given: an instant taken before the client exists, as a sweep that is still waiting for the lock
+        // has, and a client resolved after it.
+        let manager = Internals.ClientManager(lifetime: 5 * 60 * 1_000_000_000)
+        let provider = Internals.SharedSessionProvider()
+        let sessionConfiguration = Internals.Session.Configuration()
+
+        let before = Internals.ClientManager.monotonicNow()
+
+        let client = try await manager.client(provider: provider, sessionConfiguration: sessionConfiguration)
+        #expect(manager.count == 1)
+
+        // When
+        await manager.cleanupIfNeeded(at: before)
+
+        // Then
+        #expect(manager.count == 1)
+
+        let again = try await manager.client(provider: provider, sessionConfiguration: sessionConfiguration)
+        #expect(again === client)
+    }
+
     /// A moment `nanoseconds` past now, on the clock the sweep reads.
     private static func instant(after nanoseconds: Int64) -> Internals.ClientManager.MonotonicInstant {
         #if canImport(Darwin)
