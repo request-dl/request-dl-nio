@@ -18,7 +18,7 @@ import struct Foundation.URL
 /// documented subset of curl's flags: `-X`/`--request`, `-H`/`--header`, `-d`/`--data`/
 /// `--data-raw`/`--data-binary`, `-F`/`--form`, `--form-string`, `-u`/`--user`, `--url` (plus a bare trailing
 /// URL), `-G`/`--get`, `-L`/`--location` (with `--max-redirs`), `-k`/`--insecure`, `-x`/`--proxy`,
-/// `--resolve`, `--compressed`, `--cacert`, and `--cert`/`-E`/`--key`. Anything else is rejected
+/// `--socks5`/`--socks5-hostname`, `-U`/`--proxy-user`, `--resolve`, `--compressed`, `--cacert`, and `--cert`/`-E`/`--key`. Anything else is rejected
 /// with ``CURLParsingError/Context/unsupportedFlag`` rather than silently ignored.
 enum CURLCommandParser {
 
@@ -67,6 +67,7 @@ enum CURLCommandParser {
         var maxRedirects: Int?
         var isInsecure = false
         var proxy: Internals.Proxy?
+        var proxyUser: (username: String, password: String)?
         var dnsOverrides: [String: String] = [:]
         var isCompressed = false
         var caCertPath: String?
@@ -186,6 +187,28 @@ enum CURLCommandParser {
                 try require(.proxy, for: token)
                 proxy = try makeProxy(try value(for: token))
 
+            // `--socks5 host[:port]`: a SOCKS5 proxy named without a scheme. `--socks5-hostname`
+            // is the same here: the destination is always sent to the proxy as a name.
+            case "--socks5", "--socks5-hostname":
+                try require(.proxy, for: token)
+                proxy = try makeProxy("socks5://" + (try value(for: token)))
+
+            // `-U user:password` is the credentials of the proxy, wherever it comes from; the
+            // ones written in the proxy's own URL win over it, as in curl. Not percent-decoded:
+            // curl decodes only what is inside a URL. The error carries the flag, never the value.
+            case "-U", "--proxy-user":
+                try require(.proxy, for: token)
+                let credentials = try value(for: token)
+
+                guard let colonIndex = credentials.firstIndex(of: ":") else {
+                    throw CURLParsingError(.malformedArgument, token: token)
+                }
+
+                proxyUser = (
+                    String(credentials[credentials.startIndex..<colonIndex]),
+                    String(credentials[credentials.index(after: colonIndex)...])
+                )
+
             case "--resolve":
                 try require(.dnsOverrides, for: token)
                 let (host, address) = try makeDNSOverride(try value(for: token))
@@ -242,6 +265,28 @@ enum CURLCommandParser {
         }
 
         try requireHTTPScheme(of: url)
+
+        if let proxyUser {
+            guard let currentProxy = proxy else {
+                // curl would take a proxy from the environment here, which this package never
+                // reads on its own: applying the credentials to nothing would hide that.
+                throw CURLParsingError(.unsupportedFlag, token: "--proxy-user")
+            }
+
+            if currentProxy.authorization == nil {
+                proxy = Internals.Proxy(
+                    host: currentProxy.host,
+                    port: currentProxy.port,
+                    connection: currentProxy.connectionProtocol,
+                    authorization: try proxyAuthorization(
+                        username: proxyUser.username,
+                        password: proxyUser.password,
+                        connection: currentProxy.connectionProtocol,
+                        token: "--proxy-user"
+                    )
+                )
+            }
+        }
 
         try await apply(
             url: url,
@@ -355,11 +400,44 @@ enum CURLCommandParser {
         }
     }
 
+    /// The credentials of a proxy in the shape its protocol takes: `Proxy-Authorization` Basic for
+    /// HTTP, RFC 1929 user name and password for SOCKS, whose sizes are checked here so that a
+    /// command that could never authenticate is rejected while it is parsed. The error names
+    /// `token` and never carries the credentials.
+    private static func proxyAuthorization(
+        username: String,
+        password: String,
+        connection: Internals.Proxy.ConnectionProtocol,
+        token: String
+    ) throws -> Internals.Proxy.Authorization {
+        let authorization: Internals.Proxy.Authorization
+
+        switch connection {
+        case .http:
+            authorization = .basic(username: username, password: password)
+        case .socks:
+            authorization = .socks(username: username, password: password)
+        }
+
+        do {
+            try authorization.validate(for: connection)
+        } catch {
+            throw CURLParsingError(.malformedArgument, token: token)
+        }
+
+        return authorization
+    }
+
     /// Parses `[scheme://][user[:password]@]host[:port]` (curl's `-x`/`--proxy` argument) into
     /// an `Internals.Proxy`. `socks`/`socks4`/`socks4a`/`socks5`/`socks5h` schemes all map to
     /// `.socks`, since `Internals.Proxy.ConnectionProtocol` doesn't distinguish SOCKS versions.
     /// Defaults to `.http` when no scheme is given, and to port 1080 when no port is given,
     /// matching curl's own defaults.
+    ///
+    /// The user name and the password of a SOCKS proxy are percent-decoded, as curl does for the
+    /// credentials in a proxy URL (`socks5://us%40er:p%3Ass@host`), and a missing password is an
+    /// empty one (`socks5://user@host`), which SOCKS5 allows. The credentials of an HTTP proxy are
+    /// taken as written, as they always were.
     private static func makeProxy(_ value: String) throws -> Internals.Proxy {
         var remainder = Substring(value)
         var connectionProtocol: Internals.Proxy.ConnectionProtocol = .http
@@ -387,13 +465,36 @@ enum CURLCommandParser {
             let credentials = remainder[remainder.startIndex..<atIndex]
             remainder = remainder[remainder.index(after: atIndex)...]
 
+            let username: String
+            let password: String
+
             if let colonIndex = credentials.firstIndex(of: ":") {
-                authorization = .basic(
-                    username: String(credentials[credentials.startIndex..<colonIndex]),
-                    password: String(credentials[credentials.index(after: colonIndex)...])
-                )
+                username = String(credentials[credentials.startIndex..<colonIndex])
+                password = String(credentials[credentials.index(after: colonIndex)...])
             } else {
-                authorization = .basic(username: String(credentials), password: "")
+                username = String(credentials)
+                password = ""
+            }
+
+            switch connectionProtocol {
+            case .http:
+                authorization = .basic(username: username, password: password)
+
+            case .socks:
+                // The flag, not `value`, in the errors: `value` has the password in it.
+                guard
+                    let decodedUsername = username.removingPercentEncoding,
+                    let decodedPassword = password.removingPercentEncoding
+                else {
+                    throw CURLParsingError(.malformedArgument, token: "-x")
+                }
+
+                authorization = try proxyAuthorization(
+                    username: decodedUsername,
+                    password: decodedPassword,
+                    connection: .socks,
+                    token: "-x"
+                )
             }
         }
 
