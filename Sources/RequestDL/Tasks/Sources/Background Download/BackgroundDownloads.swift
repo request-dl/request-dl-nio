@@ -128,6 +128,26 @@ public enum BackgroundDownloads {
         await Session.shared.cancelProducingResumeData(id: id)
     }
 
+    /// Registers the ``Decompressor``s that decode a download which finished in a later launch than
+    /// the one that scheduled it.
+    ///
+    /// A ``BackgroundDownloadTask`` whose `content` sets ``Session/decompressionAlgorithms(_:limit:)``
+    /// with an algorithm of your own is decoded by that algorithm when the download finishes. The
+    /// system may finish it while the app is not running, though, and a launch that is only there
+    /// to deliver the event has none of `content`: the algorithm has to come from here. Call this
+    /// early in every launch, from where ``onEvent`` is set, with every decompressor your background
+    /// downloads may use. They are matched on ``Decompressor/contentEncodingValue``,
+    /// case-insensitively, and registering one again replaces it.
+    ///
+    /// Not needed for ``GzipAlgorithm``/``DeflateAlgorithm``, or for a download whose `content`
+    /// has no custom algorithm: the system decodes those on its own. A download that needs one that
+    /// is not registered fails with ``BackgroundDownloadMissingDecompressorError``.
+    public static func registerDecompressors(_ decompressors: [any Decompressor]) {
+        for decompressor in decompressors {
+            Session.shared.register(InternalsDecompressionAlgorithmAdapter(algorithm: decompressor))
+        }
+    }
+
     /// What it takes to continue a download that stopped early, from the error of its
     /// ``Event/failed(id:destination:error:)`` event.
     ///

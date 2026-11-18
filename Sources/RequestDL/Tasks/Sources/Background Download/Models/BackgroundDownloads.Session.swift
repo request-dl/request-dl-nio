@@ -75,6 +75,16 @@ extension BackgroundDownloads {
         private var _onEvent: (@Sendable (BackgroundDownloads.Event) -> Void)?
         private var _cachedIdentities: [CachedIdentity] = []
 
+        /// Decompressors the app registered (``BackgroundDownloads/registerDecompressors(_:)``),
+        /// by lowercased `Content-Encoding`. They are what decodes a download that finished in a
+        /// later launch than the one that scheduled it, where the algorithms of the original
+        /// `content` no longer exist.
+        private var _registeredDecompressors: [String: any Internals.DecompressionAlgorithm] = [:]
+
+        /// What each download scheduled by *this* process configured, by `id`. Dropped as soon as
+        /// the download ends, and empty after a relaunch.
+        private var _scheduledDecompressors: [String: [any Internals.DecompressionAlgorithm]] = [:]
+
         // MARK: - Internal properties
 
         var onEvent: (@Sendable (BackgroundDownloads.Event) -> Void)? {
@@ -89,9 +99,11 @@ extension BackgroundDownloads {
             id: String,
             destination: URL,
             serverTrust: Internals.ServerTrustPolicy.Descriptor? = nil,
-            clientIdentity: Internals.ClientIdentityDescriptor? = nil
+            clientIdentity: Internals.ClientIdentityDescriptor? = nil,
+            decompression: [any Internals.DecompressionAlgorithm]? = nil
         ) {
             let task = urlSession().downloadTask(with: request)
+            keepDecompressors(decompression, for: id)
             task.taskDescription = Self.encode(
                 id: id,
                 destination: destination,
@@ -100,7 +112,8 @@ extension BackgroundDownloads {
                 // The single host this download was actually configured for. A background session
                 // follows redirects on its own, and the challenge callback below has no other way
                 // to tell the originally-requested host apart from one a redirect pointed it at.
-                clientIdentityHost: clientIdentity == nil ? nil : request.url?.host
+                clientIdentityHost: clientIdentity == nil ? nil : request.url?.host,
+                acceptedEncodings: decompression?.map { $0.contentEncodingValue.lowercased() }
             )
             task.resume()
         }
@@ -114,8 +127,10 @@ extension BackgroundDownloads {
             destination: URL,
             serverTrust: Internals.ServerTrustPolicy.Descriptor? = nil,
             clientIdentity: Internals.ClientIdentityDescriptor? = nil,
-            host: String? = nil
+            host: String? = nil,
+            decompression: [any Internals.DecompressionAlgorithm]? = nil
         ) {
+            keepDecompressors(decompression, for: id)
             let task = Self.makeTask(
                 in: urlSession(),
                 resumingFrom: resumeData,
@@ -124,11 +139,33 @@ extension BackgroundDownloads {
                     destination: destination,
                     serverTrust: serverTrust,
                     clientIdentity: clientIdentity,
-                    clientIdentityHost: clientIdentity == nil ? nil : host
+                    clientIdentityHost: clientIdentity == nil ? nil : host,
+                    acceptedEncodings: decompression?.map { $0.contentEncodingValue.lowercased() }
                 )
             )
 
             task.resume()
+        }
+
+        func register(_ algorithm: any Internals.DecompressionAlgorithm) {
+            lock.withLock { _registeredDecompressors[algorithm.contentEncodingValue.lowercased()] = algorithm }
+        }
+
+        /// The algorithm that decodes `encoding` (lowercased) for the download `id`: the one that
+        /// download was scheduled with in this process, else one the app registered.
+        func decompressor(forEncoding encoding: String, id: String) -> (any Internals.DecompressionAlgorithm)? {
+            lock.withLock {
+                _scheduledDecompressors[id]?.first { $0.contentEncodingValue.lowercased() == encoding }
+                    ?? _registeredDecompressors[encoding]
+            }
+        }
+
+        func forgetDecompressors(for id: String) {
+            lock.withLock { _scheduledDecompressors[id] = nil }
+        }
+
+        func keepDecompressors(_ algorithms: [any Internals.DecompressionAlgorithm]?, for id: String) {
+            lock.withLock { _scheduledDecompressors[id] = algorithms }
         }
 
         /// Forwarded from `application(_:handleEventsForBackgroundURLSession:completionHandler:)`.
@@ -403,6 +440,8 @@ extension BackgroundDownloads {
                 return
             }
 
+            defer { forgetDecompressors(for: id) }
+
             // URLSession calls this for *any* HTTP status, so without this an error page would
             // replace the file already at `destination` and be reported as `.completed`. Checked
             // before touching `destination` at all; URLSession removes `location` itself once
@@ -437,11 +476,31 @@ extension BackgroundDownloads {
                     withIntermediateDirectories: true
                 )
 
-                if FileManager.default.fileExists(atPath: destination.path) {
-                    _ = try FileManager.default.replaceItemAt(destination, withItemAt: location)
-                } else {
-                    try FileManager.default.moveItem(at: location, to: destination)
+                // Decoded here, in the callback, and not afterwards: this is the only time the
+                // downloaded file exists, and a download that finished in a relaunch only has the
+                // time until `urlSessionDidFinishEvents` lets the app go back to sleep.
+                let decoded = try decodedFile(
+                    from: location,
+                    response: downloadTask.response,
+                    taskDescription: downloadTask.taskDescription,
+                    id: id,
+                    destination: destination
+                )
+                let source = decoded ?? location
+
+                do {
+                    if FileManager.default.fileExists(atPath: destination.path) {
+                        _ = try FileManager.default.replaceItemAt(destination, withItemAt: source)
+                    } else {
+                        try FileManager.default.moveItem(at: source, to: destination)
+                    }
+                } catch {
+                    if let decoded {
+                        try? FileManager.default.removeItem(at: decoded)
+                    }
+                    throw error
                 }
+
                 onEvent?(.completed(id: id, destination: destination))
             } catch {
                 onEvent?(.failed(id: id, destination: destination, error: error))
@@ -481,6 +540,7 @@ extension BackgroundDownloads {
                 return
             }
 
+            forgetDecompressors(for: id)
             onEvent?(.failed(id: id, destination: destination, error: error))
         }
 
@@ -515,6 +575,12 @@ extension BackgroundDownloads {
             /// task falls back to default handling rather than presenting the identity blind,
             /// which is the right way for this particular field to fail.
             let clientIdentityHost: String?
+
+            /// The `Content-Encoding` values the request asked for, when `Accept-Encoding` was
+            /// taken over (which switches CFNetwork's own decoding off), else `nil`. Optional for
+            /// the same reason as `clientIdentityHost`, and `nil` also means what an older
+            /// version did: the downloaded bytes are moved as they came.
+            let acceptedEncodings: [String]?
         }
 
         // Not `private`: unit-tested directly (`@testable import`) independent of any real
@@ -525,7 +591,8 @@ extension BackgroundDownloads {
             destination: URL,
             serverTrust: Internals.ServerTrustPolicy.Descriptor? = nil,
             clientIdentity: Internals.ClientIdentityDescriptor? = nil,
-            clientIdentityHost: String? = nil
+            clientIdentityHost: String? = nil,
+            acceptedEncodings: [String]? = nil
         ) -> String? {
             guard
                 let data = try? JSONEncoder().encode(
@@ -534,7 +601,8 @@ extension BackgroundDownloads {
                         destination: destination,
                         serverTrust: serverTrust,
                         clientIdentity: clientIdentity,
-                        clientIdentityHost: clientIdentityHost
+                        clientIdentityHost: clientIdentityHost,
+                        acceptedEncodings: acceptedEncodings
                     )
                 )
             else {
@@ -588,6 +656,10 @@ extension BackgroundDownloads {
             }
 
             return descriptor.clientIdentity
+        }
+
+        static func decodeAcceptedEncodings(_ taskDescription: String?) -> [String]? {
+            Self.decodeDescriptor(taskDescription)?.acceptedEncodings
         }
 
         private static func decodeDescriptor(_ taskDescription: String?) -> Descriptor? {
