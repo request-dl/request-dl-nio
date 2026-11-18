@@ -85,10 +85,11 @@ import struct Foundation.URL
 /// or such a download fails with ``BackgroundDownloadMissingDecompressorError``. The progress is
 /// in the encoded bytes, as that is what travels.
 ///
-/// Do not list ``GzipAlgorithm``, ``DeflateAlgorithm`` or ``BrotliURLSessionOnlyAlgorithm`` next to
-/// an algorithm of your own: they only stand for the system's decoding, which taking over
-/// `Accept-Encoding` turns off, so a response encoded with one of them fails, as it does for the
-/// foreground `.urlSession` executor. Leave them out and the server is asked for yours alone.
+/// ``GzipAlgorithm``, ``DeflateAlgorithm`` and ``BrotliURLSessionOnlyAlgorithm`` can't be listed next
+/// to an algorithm of your own: they only stand for the system's decoding, which taking over
+/// `Accept-Encoding` turns off, so a response encoded with one of them could not be decoded.
+/// ``result()`` refuses such a list with ``BackgroundDownloadUnsupportedConfigurationError``, and
+/// not later, when the download is done. Leave them out and the server is asked for yours alone.
 ///
 /// ## Client certificates
 ///
@@ -170,8 +171,9 @@ public struct BackgroundDownloadTask<Content: Property> {
     ///
     /// - Throws: `CocoaError.fileWriteUnsupportedScheme` if `destination` is not a file URL.
     ///   ``BackgroundDownloadUnsupportedConfigurationError`` if `content` configures a
-    ///   client certificate or SPKI pin this executor can't rebuild after a relaunch (see its own
-    ///   documentation for the specific cases), or any error `content` itself throws while being
+    ///   client certificate or SPKI pin this executor can't rebuild after a relaunch, or lists a
+    ///   system-decoded algorithm next to one of your own (see its own documentation for the
+    ///   specific cases), or any error `content` itself throws while being
     ///   resolved into a request (an invalid URL, a certificate file that can't be read, etc.),
     ///   the same errors any other task can throw at this stage.
     public func result() async throws {
@@ -209,7 +211,7 @@ public struct BackgroundDownloadTask<Content: Property> {
 
         // See `BackgroundDownloads.Session.takingOverAcceptEncoding`. What then comes back is decoded
         // when the download finishes, see `BackgroundDownloads.Session.decodedFile`.
-        let decompression = BackgroundDownloads.Session.takingOverAcceptEncoding(
+        let decompression = try BackgroundDownloads.Session.takingOverAcceptEncoding(
             of: &request,
             for: resolved.session.configuration.decompression
         )

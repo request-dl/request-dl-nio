@@ -372,7 +372,7 @@ struct BackgroundDownloadsSessionDecompressionTests {
     func aListOfWhatTheSystemDecodes_leavesAcceptEncodingAlone() throws {
         var request = URLRequest(url: try #require(URL(string: "https://example.invalid")))
 
-        let algorithms = BackgroundDownloads.Session.takingOverAcceptEncoding(
+        let algorithms = try BackgroundDownloads.Session.takingOverAcceptEncoding(
             of: &request,
             for: .enabled(algorithms: [Self.algorithm(GzipAlgorithm()), Self.algorithm(DeflateAlgorithm())], limit: .none)
         )
@@ -385,10 +385,41 @@ struct BackgroundDownloadsSessionDecompressionTests {
     func disabled_leavesAcceptEncodingAlone() throws {
         var request = URLRequest(url: try #require(URL(string: "https://example.invalid")))
 
-        let algorithms = BackgroundDownloads.Session.takingOverAcceptEncoding(of: &request, for: .disabled)
+        let algorithms = try BackgroundDownloads.Session.takingOverAcceptEncoding(of: &request, for: .disabled)
 
         #expect(algorithms == nil)
         #expect(request.value(forHTTPHeaderField: "Accept-Encoding") == nil)
+    }
+
+    @Test(arguments: [
+        ["gzip"], ["deflate"], ["br"], ["gzip", "rle"], ["rle", "deflate"],
+    ] as [[String]])
+    func aSystemDecodedAlgorithmNextToACustomOne_isRefused(_ names: [String]) throws {
+        var request = URLRequest(url: try #require(URL(string: "https://example.invalid")))
+        let algorithms: [any Internals.DecompressionAlgorithm] = names.map {
+            switch $0 {
+            case "gzip": Self.algorithm(GzipAlgorithm())
+            case "deflate": Self.algorithm(DeflateAlgorithm())
+            case "br": Self.algorithm(BrotliURLSessionOnlyAlgorithm())
+            default: Self.algorithm(RLEDecompressor())
+            }
+        }
+        let mixed = algorithms.contains { $0.contentEncodingValue == "rle" }
+
+        do {
+            _ = try BackgroundDownloads.Session.takingOverAcceptEncoding(
+                of: &request,
+                for: .enabled(algorithms: algorithms, limit: .none)
+            )
+            #expect(!mixed, "a mixed list must be refused")
+        } catch let error as BackgroundDownloadUnsupportedConfigurationError {
+            #expect(mixed)
+            guard case .nativeAlgorithmNextToCustomAlgorithm = error.reason else {
+                Issue.record("Expected .nativeAlgorithmNextToCustomAlgorithm, got \(error.reason)")
+                return
+            }
+            #expect(request.value(forHTTPHeaderField: "Accept-Encoding") == nil)
+        }
     }
 
     @Test
@@ -396,7 +427,7 @@ struct BackgroundDownloadsSessionDecompressionTests {
         var request = URLRequest(url: try #require(URL(string: "https://example.invalid")))
         request.setValue("gzip", forHTTPHeaderField: "Accept-Encoding")
 
-        let algorithms = BackgroundDownloads.Session.takingOverAcceptEncoding(
+        let algorithms = try BackgroundDownloads.Session.takingOverAcceptEncoding(
             of: &request,
             for: .enabled(algorithms: [Self.algorithm(RLEDecompressor())], limit: .none)
         )

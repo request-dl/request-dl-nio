@@ -13,7 +13,9 @@ import protocol Foundation.LocalizedError
 #endif
 
 /// An error thrown when a ``BackgroundDownloadTask``'s content configures a client certificate
-/// (mTLS) or SPKI pinning in a shape that can't survive a relaunch.
+/// (mTLS) or SPKI pinning in a shape that can't survive a relaunch, or lists decompression
+/// algorithms in a combination it can't decode (see
+/// ``Reason/nativeAlgorithmNextToCustomAlgorithm``).
 ///
 /// A background download can outlive the process that started it: the delegate answering a
 /// challenge after the app relaunches has no `Property` tree left to resolve
@@ -55,6 +57,14 @@ public struct BackgroundDownloadUnsupportedConfigurationError: Error, Sendable {
         /// once that process exits.
         case spkiPinningAlgorithmNotSupported
 
+        /// ``Session/decompressionAlgorithms(_:limit:)`` lists ``GzipAlgorithm``,
+        /// ``DeflateAlgorithm`` or ``BrotliURLSessionOnlyAlgorithm`` next to an algorithm of your
+        /// own. Those three only stand for the system's own decoding, which asking for your
+        /// algorithm turns off for every encoding, so a response encoded with one of them could
+        /// not be decoded: it would fail once the download had finished, possibly hours later and
+        /// in another launch. Refused when the download is scheduled instead.
+        case nativeAlgorithmNextToCustomAlgorithm
+
         // MARK: - Inits
 
         init(_ reason: Internals.ClientIdentityDescriptor.ResolutionError) {
@@ -89,6 +99,10 @@ public struct BackgroundDownloadUnsupportedConfigurationError: Error, Sendable {
     init(_ reason: Internals.ServerTrustPolicy.DescriptorError) {
         self.reason = Reason(reason)
     }
+
+    init(reason: Reason) {
+        self.reason = reason
+    }
 }
 
 // MARK: - LocalizedError
@@ -105,7 +119,12 @@ extension BackgroundDownloadUnsupportedConfigurationError: LocalizedError {
 extension BackgroundDownloadUnsupportedConfigurationError: CustomStringConvertible {
 
     public var description: String {
-        "BackgroundDownloadTask can't use this client certificate configuration: \(reason.description)"
+        switch reason {
+        case .nativeAlgorithmNextToCustomAlgorithm:
+            return "BackgroundDownloadTask can't use this decompression configuration: \(reason.description)"
+        default:
+            return "BackgroundDownloadTask can't use this client certificate configuration: \(reason.description)"
+        }
     }
 }
 
@@ -131,6 +150,14 @@ extension BackgroundDownloadUnsupportedConfigurationError.Reason: CustomStringCo
                 a password-protected private key can't be used here -- rebuilding the identity \
                 after a relaunch would need the password again, and neither the decrypted key nor \
                 the password itself is persisted. Use an unencrypted private key file instead.
+                """
+        case .nativeAlgorithmNextToCustomAlgorithm:
+            return
+                """
+                GzipAlgorithm, DeflateAlgorithm and BrotliURLSessionOnlyAlgorithm can't be listed next \
+                to an algorithm of your own -- they only stand for the system's decoding, which \
+                asking for yours turns off. Leave them out of .decompressionAlgorithms(_:limit:) and \
+                the server is asked for yours alone.
                 """
         case .spkiPinningAlgorithmNotSupported:
             return

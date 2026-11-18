@@ -142,12 +142,22 @@ extension BackgroundDownloads.Session {
     ///
     /// Not for `.disabled`, which keeps what a background download has always done: the system
     /// decides.
+    ///
+    /// - Throws: ``BackgroundDownloadUnsupportedConfigurationError`` when the list that takes over
+    ///   `Accept-Encoding` also holds an algorithm that only stands for the system's decoding
+    ///   (`GzipAlgorithm`, `DeflateAlgorithm`, `BrotliURLSessionOnlyAlgorithm`). Taking over turns
+    ///   that decoding off, so such a response would fail when the download is done, which is too
+    ///   late to be told.
     static func takingOverAcceptEncoding(
         of request: inout URLRequest,
         for decompression: Internals.Decompression
-    ) -> [any Internals.DecompressionAlgorithm]? {
+    ) throws -> [any Internals.DecompressionAlgorithm]? {
         guard case .enabled(let algorithms, _) = decompression, decompression.requiresManualURLSessionHandling else {
             return nil
+        }
+
+        guard !algorithms.contains(where: \.isNativelyDecodedByURLSession) else {
+            throw BackgroundDownloadUnsupportedConfigurationError(reason: .nativeAlgorithmNextToCustomAlgorithm)
         }
 
         request.setValue(decompression.acceptEncoding, forHTTPHeaderField: "Accept-Encoding")
