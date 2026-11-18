@@ -309,7 +309,8 @@ extension Internals {
             cache: ((Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
             logger: TaskLogger?,
             flowControl: Internals.FlowControlWindow = .init(),
-            transferControl: Internals.TransferControl? = nil
+            transferControl: Internals.TransferControl? = nil,
+            cookies: Internals.CookieContext? = nil
         ) async throws -> SessionTask {
             // Before anything can be produced into the window, so a suspension that came first
             // already holds.
@@ -407,7 +408,8 @@ extension Internals {
                 logger: logger,
                 transferControl: transferControl,
                 reconnection: reconnection,
-                metrics: metrics
+                metrics: metrics,
+                cookies: cookies
             )
 
             let response = Internals.AsyncResponse(

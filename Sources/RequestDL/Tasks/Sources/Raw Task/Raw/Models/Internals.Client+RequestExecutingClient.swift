@@ -36,7 +36,8 @@ extension Internals.Client: RequestExecutingClient {
             decompression: decompression,
             cache: cache,
             logger: logger,
-            transferControl: transferControl
+            transferControl: transferControl,
+            cookies: configuration.cookies
         )
     }
 
@@ -71,7 +72,8 @@ extension Internals.Client: RequestExecutingClient {
         let accumulator = Internals.MetricsCollectingAccumulator(
             request: request,
             metrics: metrics ?? Internals.RequestMetricsCollector(),
-            source: .revalidation
+            source: .revalidation,
+            cookies: configuration.cookies
         )
 
         let task = try await execute(request: request, delegate: accumulator, logger: logger)

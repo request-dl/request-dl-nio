@@ -49,6 +49,9 @@ extension Internals {
         /// per hop, all reported to this same receiver.
         private let metrics: Internals.RequestMetricsCollector?
 
+        /// The cookie jar the request takes part in, if its session has one.
+        private let cookies: Internals.CookieContext?
+
         // MARK: - Unsafe properties
 
         private var _phase: Phase = .upload
@@ -85,7 +88,8 @@ extension Internals {
             logger: Internals.TaskLogger?,
             transferControl: Internals.TransferControl? = nil,
             reconnection: Internals.NIODownloadReconnection? = nil,
-            metrics: Internals.RequestMetricsCollector? = nil
+            metrics: Internals.RequestMetricsCollector? = nil,
+            cookies: Internals.CookieContext? = nil
         ) {
             self.url = url
             self.upload = upload
@@ -98,6 +102,7 @@ extension Internals {
             self.transferControl = transferControl
             self.reconnection = reconnection
             self.metrics = metrics
+            self.cookies = cookies
         }
 
         // MARK: - Internal methods
@@ -156,6 +161,10 @@ extension Internals {
             _ request: HTTPClient.Request,
             _ head: HTTPResponseHead
         ) {
+            // Every hop's head is stored here, and only here, with the URL of the request that
+            // hop answered: this is the one place that sees the `Set-Cookie` of a redirect.
+            cookies?.store(headerFields: head.headers.map { (name: $0.name, value: $0.value) }, for: request.url)
+
             lock.withLock {
                 let visitedURL = request.url.absoluteString
 
@@ -166,6 +175,21 @@ extension Internals {
 
                 // Back where it started (a cycle that was allowed) is no redirect to report.
                 _redirectedURL = visitedURL == firstVisitedURL ? nil : visitedURL
+            }
+        }
+
+        /// Replaces the `Cookie` header a redirect hop inherited from the request before it, which
+        /// AsyncHTTPClient only strips across origins: within one origin it is the very header the
+        /// first request sent, without what the redirect itself set and with what it deleted.
+        package func willFollowRedirect(request: inout HTTPClient.Request) {
+            guard let cookies, cookies.managesHeader else {
+                return
+            }
+
+            request.headers.remove(name: "Cookie")
+
+            if let value = cookies.cookieHeaderForRedirect(to: request.url) {
+                request.headers.add(name: "Cookie", value: value)
             }
         }
 

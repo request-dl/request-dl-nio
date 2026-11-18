@@ -1,0 +1,73 @@
+//
+// See LICENSE for this package's licensing information.
+//
+
+import RequestDLInternals
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
+
+/// The rules of a [Public Suffix List](https://publicsuffix.org), which a ``CookieJar`` uses to
+/// refuse a cookie set for a `Domain` under which unrelated parties register names.
+///
+/// RequestDL does not ship a list: it changes as new domains appear, and keeping it current is not
+/// the job of a networking library. Download `public_suffix_list.dat` and bundle it with your app,
+/// or fetch it yourself, and parse it once:
+///
+/// ```swift
+/// let list = try PublicSuffixList(contentsOf: bundledListURL)
+/// let jar = CookieJar(publicSuffixList: list)
+/// ```
+///
+/// Parsing a list costs a few milliseconds, so keep the value and reuse it for every jar.
+public struct PublicSuffixList: Sendable {
+
+    // MARK: - Internal properties
+
+    let list: Internals.PublicSuffixList
+
+    // MARK: - Inits
+
+    /// Parses the contents of a `public_suffix_list.dat` file.
+    ///
+    /// - Parameter data: The UTF-8 contents of the file.
+    /// - Throws: ``PublicSuffixListError`` when `data` is not text or has no rule in it.
+    public init(data: Data) throws {
+        guard let contents = String(data: data, encoding: .utf8) else {
+            throw PublicSuffixListError.notText
+        }
+
+        list = try Self.parse(contents)
+    }
+
+    /// Reads and parses a `public_suffix_list.dat` file.
+    ///
+    /// - Parameter fileURL: Where the file is.
+    /// - Throws: The error reading the file throws, or ``PublicSuffixListError``.
+    public init(contentsOf fileURL: URL) throws {
+        try self.init(data: Data(contentsOf: fileURL))
+    }
+
+    // MARK: - Private static methods
+
+    private static func parse(_ contents: String) throws -> Internals.PublicSuffixList {
+        do {
+            return try Internals.PublicSuffixList(contents)
+        } catch {
+            throw PublicSuffixListError.noRules
+        }
+    }
+}
+
+/// Why a ``PublicSuffixList`` could not be made.
+public enum PublicSuffixListError: Error, Sendable, Equatable {
+
+    /// The data is not UTF-8 text.
+    case notText
+
+    /// The text has no rule in it, so it is not a Public Suffix List.
+    case noRules
+}

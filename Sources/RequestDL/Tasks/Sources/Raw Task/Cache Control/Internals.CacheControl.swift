@@ -155,8 +155,10 @@ extension Internals {
         }
 
         /// The request headers that identify an account: `Authorization`, `Cookie` and
-        /// `Proxy-Authorization`, by lowercased name. The package turns the cookie jar off on both
-        /// executors, so a `Cookie` is always one the caller put on the request by hand.
+        /// `Proxy-Authorization`, by lowercased name. A `Cookie` is one the caller put on the
+        /// request by hand, or one the session's `CookieJar` added: `RawTask` adds it before this
+        /// is built, so a response fetched with a jar's cookies is never found by a request
+        /// without them.
         private static let credentialFields = ["authorization", "cookie", "proxy-authorization"]
 
         /// Whether the stored response was stored for the credentials this request sends.
