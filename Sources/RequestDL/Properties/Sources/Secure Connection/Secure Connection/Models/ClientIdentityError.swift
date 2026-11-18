@@ -16,11 +16,15 @@ import protocol Foundation.LocalizedError
 /// An error thrown when RequestDL cannot turn a configured client certificate/private key into a
 /// `URLSession`-presentable identity, under the `.urlSession` executor (`Session.Executor`).
 ///
-/// Building that identity is a Keychain round-trip with no in-memory alternative on Apple
-/// platforms. See <doc:Using-a-Client-Certificate-with-URLSession> for the full walkthrough,
-/// including the one-time Xcode project setting
-/// (``Reason/missingKeychainSharingEntitlement(operation:)``'s most common cause) most apps using
-/// ``Certificate``/``PrivateKey`` under this executor need.
+/// The identity is built in memory from the certificate and the private key: nothing is written to
+/// the Keychain, and no Keychain Sharing entitlement or signed app is needed. See
+/// <doc:Using-a-Client-Certificate-with-URLSession> for the walkthrough.
+///
+/// ``Reason/missingKeychainSharingEntitlement(operation:)``,
+/// ``Reason/keychainOperationFailed(operation:status:)`` and
+/// ``Reason/identityLookupReturnedWrongType`` were thrown by versions that stored the identity in
+/// the Keychain. They are deprecated: they are kept so existing code that switches over ``Reason``
+/// keeps compiling, but nothing throws them any more, and a `switch` can drop them.
 ///
 /// `RequestDLInternals`'s raw `Internals.RawBytesIdentityBuilder.Error`/
 /// `Internals.URLSessionIdentityPolicy.ConfigurationError` (the internal, package-visible errors)
@@ -50,24 +54,38 @@ public struct ClientIdentityError: Error, Sendable {
         /// `SecKey` from them. `message` is the underlying `CFError` description.
         case keyCreationFailed(message: String)
 
-        /// This app is missing the Keychain Sharing capability that writing a client
-        /// certificate/private key into the Keychain requires. `operation` names the specific
-        /// Keychain call that failed. This is almost always fixed by adding **Keychain Sharing**
-        /// under the affected target's Signing & Capabilities tab in Xcode. See
-        /// <doc:Using-a-Client-Certificate-with-URLSession>.
+        /// No longer thrown, and deprecated. Older versions stored the client certificate and
+        /// private key in the Keychain, which needed the Keychain Sharing capability; the identity
+        /// is now built in memory and needs no capability. Kept only so existing `switch`
+        /// statements over ``Reason`` keep compiling.
+        @available(
+            *,
+            deprecated,
+            message:
+                "The client identity is now built in memory and never stored in the Keychain, so this is never thrown. Remove it from your switch."
+        )
         case missingKeychainSharingEntitlement(operation: String)
 
-        /// A Keychain operation failed for a reason other than a missing entitlement. `operation`
-        /// names the specific Keychain call, `status` is the underlying `OSStatus`.
-        ///
-        /// On a non-sandboxed macOS process (a bare command-line tool, for instance), this can
-        /// surface even with Keychain Sharing correctly configured. See
-        /// <doc:Using-a-Client-Certificate-with-URLSession>'s "Platforms" section for that
-        /// specific, still-unresolved gap; adding Keychain Sharing again will not fix it.
+        /// No longer thrown, and deprecated. Older versions reported here a failed Keychain call
+        /// (`operation` names it, `status` is the `OSStatus`); nothing is stored in the Keychain
+        /// any more. Kept only so existing `switch` statements over ``Reason`` keep compiling.
+        @available(
+            *,
+            deprecated,
+            message:
+                "The client identity is now built in memory and never stored in the Keychain, so this is never thrown. Remove it from your switch."
+        )
         case keychainOperationFailed(operation: String, status: OSStatus)
 
-        /// An internal Keychain query returned a value of an unexpected type. Not expected to
-        /// happen in practice; please report this if it does.
+        /// No longer thrown, and deprecated. Older versions reported here an unexpected result of
+        /// an internal Keychain query; no such query is made any more. Kept only so existing
+        /// `switch` statements over ``Reason`` keep compiling.
+        @available(
+            *,
+            deprecated,
+            message:
+                "The client identity is now built in memory and never queried from the Keychain, so this is never thrown. Remove it from your switch."
+        )
         case identityLookupReturnedWrongType
 
         // MARK: - Inits
@@ -89,14 +107,12 @@ public struct ClientIdentityError: Error, Sendable {
                 self = .unsupportedKeyFormat(header: header)
             case .secKeyCreationFailed(let message):
                 self = .keyCreationFailed(message: message)
-            case .missingKeychainSharingEntitlement(let operation):
-                self = .missingKeychainSharingEntitlement(operation: operation)
-            case .keychainOperationFailed(let status, let operation):
-                self = .keychainOperationFailed(operation: operation, status: status)
-            case .identityLookupReturnedWrongType:
-                self = .identityLookupReturnedWrongType
             case .privateKeyDoesNotMatchCertificate:
                 self = .keyCreationFailed(message: "it is not the private key of the configured certificate")
+            case .unsupportedCertificatePublicKey:
+                self = .keyCreationFailed(
+                    message: "the public key of the configured certificate uses an unsupported algorithm or curve"
+                )
             }
         }
     }
@@ -115,7 +131,7 @@ public struct ClientIdentityError: Error, Sendable {
         self.reason = Reason(error)
     }
 
-    /// Rewraps the raw Keychain-failure `Internals.RawBytesIdentityBuilder` throws from
+    /// Rewraps the raw failure `Internals.RawBytesIdentityBuilder` throws from
     /// `RequestDLInternals`, where the public, documented ``ClientIdentityError`` itself isn't
     /// reachable.
     init(_ error: Internals.RawBytesIdentityBuilder.Error) {
@@ -168,12 +184,9 @@ extension ClientIdentityError.Reason: CustomStringConvertible {
             return "the configured private key was rejected: \(message)."
         case .missingKeychainSharingEntitlement(let operation):
             return """
-                \(operation) failed because this app is missing the Keychain Sharing capability \
-                mTLS under the URLSession executor needs, in order to store a client certificate/\
-                private key. In Xcode, select this target's Signing & Capabilities tab, click "+ \
-                Capability", and add "Keychain Sharing" -- no further configuration is needed. See \
-                https://github.com/request-dl/request-dl-nio/blob/main/Sources/RequestDL/Documentation.docc/Advanced/Using-a-Client-Certificate-with-URLSession.md#troubleshooting \
-                for the full walkthrough.
+                \(operation) failed because this app is missing the Keychain Sharing capability. \
+                This is no longer thrown: the client identity is built in memory and needs no \
+                capability.
                 """
         case .keychainOperationFailed(let operation, let status):
             let message = SecCopyErrorMessageString(status, nil).map { String($0) } ?? "unknown"

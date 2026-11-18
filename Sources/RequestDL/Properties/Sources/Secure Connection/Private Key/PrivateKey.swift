@@ -92,7 +92,7 @@ public struct PrivateKey: Property {
     /// - Important: Reachable under ``Session/Executor/nio`` unconditionally: NIOSSL/BoringSSL
     /// decrypts the key itself, straight from this password. Under
     /// ``Session/Executor/urlSession``/``Session/Executor/nioTransportServices``, mTLS needs a
-    /// Keychain `SecIdentity`, which needs the key material already decrypted to build one.
+    /// `SecIdentity`, which is built in memory and needs the key material already decrypted.
     ///
     /// This package can decrypt a traditional PKCS#1 RSA PEM key itself to get there
     /// (`format: .pem`, `"-----BEGIN RSA PRIVATE KEY-----"` with `Proc-Type`/`DEK-Info` headers),

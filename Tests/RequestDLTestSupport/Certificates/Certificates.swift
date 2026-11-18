@@ -24,10 +24,7 @@ struct Certificates {
         )
     }
 
-    /// An EC (P-256) client certificate/key pair, as opposed to `client()`'s RSA one. Used
-    /// specifically to exercise the gap `Internals.RawBytesIdentityBuilder.store(...)`'s own doc
-    /// comment describes: macOS's legacy (non-data-protection) Keychain cannot store an
-    /// *imported* EC private key, unlike RSA.
+    /// An EC (P-256) client certificate/key pair, as opposed to `client()`'s RSA one.
     func clientEC() -> CertificateResource {
         .init("client_ec", format: format)
     }

@@ -10,9 +10,9 @@ import Testing
 
 @testable import RequestDL
 
-/// Covers `ClientIdentityError`'s own rewrap/description logic, independent of the real
-/// Keychain round-trip that actually triggers it (`RawTaskExecutorDispatchTests` covers that end
-/// to end through the public `DataTask` API).
+/// Covers `ClientIdentityError`'s own rewrap/description logic, independent of the identity build
+/// that actually triggers it (`RawTaskExecutorDispatchTests` covers that end to end through the
+/// public `DataTask` API).
 ///
 /// Without this type, `RawTask.result()` would let
 /// `Internals.RawBytesIdentityBuilder.Error`/`Internals.URLSessionIdentityPolicy.ConfigurationError`
@@ -45,72 +45,48 @@ struct ClientIdentityErrorTests {
         }
     }
 
+    /// The Keychain reasons are deprecated and kept so existing `switch` statements over `Reason`
+    /// keep compiling, but nothing throws them any more. They still describe themselves without
+    /// trapping, and the entitlement one no longer tells anyone to add a capability that is not
+    /// needed.
+    ///
+    /// Deprecated itself, so that naming the deprecated cases here raises no warning.
+    @available(*, deprecated)
     @Test
-    func error_whenRewrappedFromMissingEntitlement_carriesOperationAndReadsActionably() async throws {
+    func reason_whenALegacyKeychainCase_stillDescribesItselfAndAsksForNoCapability() async throws {
         // Given
-        let internalError = Internals.RawBytesIdentityBuilder.Error.missingKeychainSharingEntitlement(
-            operation: "SecItemAdd(key)"
-        )
+        let reasons: [ClientIdentityError.Reason] = [
+            .missingKeychainSharingEntitlement(operation: "SecItemAdd(key)"),
+            .keychainOperationFailed(operation: "SecItemCopyMatching(identity)", status: errSecItemNotFound),
+            .identityLookupReturnedWrongType,
+        ]
 
-        // When
-        let error = ClientIdentityError(internalError)
-
-        // Then
-        guard case .missingKeychainSharingEntitlement(let operation) = error.reason else {
-            Issue.record("Expected .missingKeychainSharingEntitlement, got \(error.reason)")
-            return
+        for reason in reasons {
+            // Then
+            #expect(!reason.description.isEmpty)
+            #expect(!reason.description.contains("Signing & Capabilities"))
         }
-        #expect(operation == "SecItemAdd(key)")
-        #expect(error.description.contains("Keychain Sharing"))
-        #expect(error.description.contains("Signing & Capabilities"))
-        #expect(error.description.contains("Using-a-Client-Certificate-with-URLSession.md"))
+
+        #expect(reasons[0].description.contains("no longer thrown"))
+        #expect(reasons[1].description.contains("SecItemCopyMatching(identity)"))
+        #expect(reasons[1].description.contains("\(errSecItemNotFound)"))
+        #expect(reasons[2].description.contains("unexpected type"))
     }
 
     /// The exact gap this type exists to close: `.localizedDescription` (what most catch sites
     /// actually print/display) must carry the same actionable text `.description` does, not
-    /// Foundation's generic NSError fallback. Confirmed failing before `LocalizedError`
-    /// conformance was added (see the phase's own investigation), not assumed.
+    /// Foundation's generic NSError fallback.
     @Test
     func error_whenAccessedViaLocalizedDescription_readsTheSameActionableTextAsDescription() async throws {
         // Given
-        let internalError = Internals.RawBytesIdentityBuilder.Error.missingKeychainSharingEntitlement(
-            operation: "SecItemAdd(key)"
-        )
-        let error = ClientIdentityError(internalError)
+        let error = ClientIdentityError(Internals.RawBytesIdentityBuilder.Error.invalidCertificateData)
 
         // When
         let localized = (error as any Error).localizedDescription
 
         // Then
         #expect(localized == error.description)
-        #expect(localized.contains("Keychain Sharing"))
-    }
-
-    @Test
-    func error_whenRewrappedFromKeychainOperationFailed_describesTheOSStatus() async throws {
-        // Given
-        let internalError = Internals.RawBytesIdentityBuilder.Error.keychainOperationFailed(
-            errSecItemNotFound,
-            operation: "SecItemCopyMatching(identity)"
-        )
-
-        // When
-        let error = ClientIdentityError(internalError)
-
-        // Then
-        guard case .keychainOperationFailed(let operation, let status) = error.reason else {
-            Issue.record("Expected .keychainOperationFailed, got \(error.reason)")
-            return
-        }
-        #expect(operation == "SecItemCopyMatching(identity)")
-        #expect(status == errSecItemNotFound)
-        #expect(error.description.contains("SecItemCopyMatching(identity)"))
-        #expect(error.description.contains("\(errSecItemNotFound)"))
-        // This bucket must not claim a missing entitlement: it can be a genuinely different,
-        // still-unresolved issue on non-sandboxed macOS (see <doc:Using-a-Client-Certificate-with-URLSession>'s
-        // "Platforms" section), and telling someone to add a capability that won't fix it would be
-        // actively misleading.
-        #expect(!error.description.contains("Keychain Sharing"))
+        #expect(localized.contains("could not be parsed as a certificate"))
     }
 
     @Test(
@@ -118,10 +94,8 @@ struct ClientIdentityErrorTests {
             Internals.RawBytesIdentityBuilder.Error.invalidCertificateData,
             .unsupportedKeyFormat("-----BEGIN PRIVATE KEY-----"),
             .secKeyCreationFailed("bad key"),
-            .keychainOperationFailed(errSecDuplicateItem, operation: "SecItemAdd(certificate)"),
-            .missingKeychainSharingEntitlement(operation: "SecItemAdd(key)"),
-            .identityLookupReturnedWrongType,
             .privateKeyDoesNotMatchCertificate,
+            .unsupportedCertificatePublicKey,
         ]
     )
     func error_whenEveryInternalCaseRewrapped_hasNonEmptyDescription(
@@ -140,6 +114,11 @@ struct ClientIdentityErrorTests {
         let error = ClientIdentityError(Internals.RawBytesIdentityBuilder.Error.privateKeyDoesNotMatchCertificate)
 
         // Then
+        guard case .keyCreationFailed(let message) = error.reason else {
+            Issue.record("Expected .keyCreationFailed, got \(error.reason)")
+            return
+        }
+        #expect(message == "it is not the private key of the configured certificate")
         #expect(error.description.contains("not the private key of the configured certificate"))
         #expect(!error.description.contains("Keychain Sharing"))
     }

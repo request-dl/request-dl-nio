@@ -22,8 +22,7 @@ import struct Foundation.URL
 /// ever reaching `BackgroundDownloads.Session.shared.schedule(...)`. Actually scheduling a
 /// download would start a real `URLSessionConfiguration.background` session from this bare
 /// SwiftPM test harness, an unsigned CLI process with none of the entitlements a real app target
-/// has; that path is not exercised here, the same way this suite's mTLS tests don't exercise a
-/// real Keychain round trip either.
+/// has; that path is not exercised here.
 ///
 /// A file-backed client certificate is legitimately *accepted* (it is not a rejection case);
 /// see `InternalsClientIdentityDescriptorTests` for that half, since proving it doesn't throw

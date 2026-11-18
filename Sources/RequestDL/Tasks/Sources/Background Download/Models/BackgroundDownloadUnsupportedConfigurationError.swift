@@ -21,7 +21,7 @@ import protocol Foundation.LocalizedError
 /// `id`/`destination` on the scheduled task itself.
 ///
 /// `Certificate`/`PrivateKey` backed by a **file path** work fine: the path is what's persisted,
-/// and the identity is rebuilt from that file via the same Keychain round-trip on every
+/// and the identity is rebuilt in memory from that file on every
 /// challenge, live or after a relaunch alike.
 ///
 /// What doesn't survive is anything that isn't a stable path on disk, or an SPKI pin hashed with
