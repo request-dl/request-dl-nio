@@ -85,6 +85,18 @@ imageView.rdl.setImage(
 
 Every `setImage` call cancels whatever load is already in flight on that image view first, which is what makes it safe to call from `tableView(_:cellForRowAt:)`, `collectionView(_:cellForItemAt:)`, or a `WKInterfaceTable` row controller — a cell recycled mid-load never has a stale image land on it after the fact. Call `.rdl.cancel()` directly (for instance, from `prepareForReuse()`) to stop a load without starting another.
 
+Starting a `setImage` also replaces whatever the view is showing right away: with `placeholder` when you pass one, and with nothing when you don't. This is what keeps a reused cell honest — a recycled cell would otherwise keep the previous row's image on screen, the wrong picture, until the new one arrives. It is the same default as SDWebImage and Kingfisher.
+
+> Important: Before this default, `setImage` left the current image untouched when `placeholder` was `nil`. If you relied on that, pass `keepsCurrentImageWhileLoading: true`.
+
+When the view reloads the *same* content — refreshing an avatar, say — keeping the old image on screen is better than flashing a placeholder, so opt in:
+
+```swift
+avatarView.rdl.setImage(with: avatarURL, keepsCurrentImageWhileLoading: true)
+```
+
+With `keepsCurrentImageWhileLoading: true` the view isn't touched until the new image arrives, and `placeholder` is ignored.
+
 > Note: `WKInterfaceImage` doesn't expose a way to read the image back — `WKInterfaceObject` types are one-way proxies to a system-rendered element — so use the `completion` handler if you need to react to the result there.
 
 ### RDLImageLoader
