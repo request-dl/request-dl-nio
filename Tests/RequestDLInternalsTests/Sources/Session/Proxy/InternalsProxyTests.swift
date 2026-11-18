@@ -80,11 +80,23 @@ struct InternalsProxyTests {
         // The pooled client is keyed on this: two sessions with different SOCKS credentials must
         // not share a client, whose proxy connection is authenticated as one of them.
         let base = Internals.Proxy(
-            host: "p", port: 1, connection: .socks, authorization: .socks(username: "u", password: "a"))
+            host: "p",
+            port: 1,
+            connection: .socks,
+            authorization: .socks(username: "u", password: "a")
+        )
         let otherPassword = Internals.Proxy(
-            host: "p", port: 1, connection: .socks, authorization: .socks(username: "u", password: "b"))
+            host: "p",
+            port: 1,
+            connection: .socks,
+            authorization: .socks(username: "u", password: "b")
+        )
         let otherUsername = Internals.Proxy(
-            host: "p", port: 1, connection: .socks, authorization: .socks(username: "v", password: "a"))
+            host: "p",
+            port: 1,
+            connection: .socks,
+            authorization: .socks(username: "v", password: "a")
+        )
         let none = Internals.Proxy(host: "p", port: 1, connection: .socks, authorization: nil)
 
         #expect(base != otherPassword)
@@ -95,9 +107,17 @@ struct InternalsProxyTests {
     @Test
     func proxy_whenSOCKSCredentialsMatch_shouldBeEqualAndHashEqual() {
         let lhs = Internals.Proxy(
-            host: "p", port: 1, connection: .socks, authorization: .socks(username: "u", password: ""))
+            host: "p",
+            port: 1,
+            connection: .socks,
+            authorization: .socks(username: "u", password: "")
+        )
         let rhs = Internals.Proxy(
-            host: "p", port: 1, connection: .socks, authorization: .socks(username: "u", password: ""))
+            host: "p",
+            port: 1,
+            connection: .socks,
+            authorization: .socks(username: "u", password: "")
+        )
 
         #expect(lhs == rhs)
         #expect(lhs.hashValue == rhs.hashValue)
@@ -312,7 +332,9 @@ extension InternalsProxyTests {
         let resolved = try #require(try configuration.build().httpClientConfiguration.proxy)
 
         // Then: the same proxy AsyncHTTPClient builds from the credentials itself...
-        #expect(resolved == (try .socksServer(host: "proxy.example", port: 1_081, username: "user", password: "sekret")))
+        #expect(
+            resolved == (try .socksServer(host: "proxy.example", port: 1_081, username: "user", password: "sekret"))
+        )
         // ...which differs from the one without them.
         #expect(resolved != .socksServer(host: "proxy.example", port: 1_081))
         #expect(resolved.authorization == nil)

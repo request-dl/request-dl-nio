@@ -203,7 +203,9 @@ struct InternalsSessionConfigurationExecutorTests {
         var configuration = Internals.Session.Configuration()
 
         configuration.proxy = Internals.Proxy(host: "localhost", port: 1080, connection: .socks, authorization: nil)
-        #expect(!configuration.urlSessionIncompatibilityReasons().contains(.proxySOCKSCredentialsTooLongUnderURLSession))
+        #expect(
+            !configuration.urlSessionIncompatibilityReasons().contains(.proxySOCKSCredentialsTooLongUnderURLSession)
+        )
 
         configuration.proxy = Internals.Proxy(
             host: "localhost",
@@ -211,7 +213,9 @@ struct InternalsSessionConfigurationExecutorTests {
             connection: .http,
             authorization: .basic(username: String(repeating: "u", count: 300), password: "p")
         )
-        #expect(!configuration.urlSessionIncompatibilityReasons().contains(.proxySOCKSCredentialsTooLongUnderURLSession))
+        #expect(
+            !configuration.urlSessionIncompatibilityReasons().contains(.proxySOCKSCredentialsTooLongUnderURLSession)
+        )
     }
 
     @Test

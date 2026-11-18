@@ -231,7 +231,12 @@ struct ProxyTests {
     func proxy_whenSOCKSConnectionWithEmptyPassword_isAllowed() async throws {
         // When
         let resolved = try await resolve(
-            Proxy(host: "proxy.example", port: 1_080, connection: .socks, authorization: .basic(username: "u", password: ""))
+            Proxy(
+                host: "proxy.example",
+                port: 1_080,
+                connection: .socks,
+                authorization: .basic(username: "u", password: "")
+            )
         )
 
         // Then
@@ -297,7 +302,12 @@ struct ProxyTests {
     func proxy_whenSOCKSUsernameIsEmpty_throws() async throws {
         let error = await #expect(throws: ProxyAuthorizationError.self) {
             try await resolve(
-                Proxy(host: "proxy.example", port: 1_080, connection: .socks, authorization: .basic(username: "", password: "p"))
+                Proxy(
+                    host: "proxy.example",
+                    port: 1_080,
+                    connection: .socks,
+                    authorization: .basic(username: "", password: "p")
+                )
             )
         }
 
@@ -310,7 +320,12 @@ struct ProxyTests {
 
         let error = await #expect(throws: ProxyAuthorizationError.self) {
             try await resolve(
-                Proxy(host: "proxy.example", port: 1_080, connection: .socks, authorization: .basic(username: username, password: "p"))
+                Proxy(
+                    host: "proxy.example",
+                    port: 1_080,
+                    connection: .socks,
+                    authorization: .basic(username: username, password: "p")
+                )
             )
         }
 
@@ -325,7 +340,12 @@ struct ProxyTests {
 
         let error = await #expect(throws: ProxyAuthorizationError.self) {
             try await resolve(
-                Proxy(host: "proxy.example", port: 1_080, connection: .socks, authorization: .basic(username: "u", password: password))
+                Proxy(
+                    host: "proxy.example",
+                    port: 1_080,
+                    connection: .socks,
+                    authorization: .basic(username: "u", password: password)
+                )
             )
         }
 

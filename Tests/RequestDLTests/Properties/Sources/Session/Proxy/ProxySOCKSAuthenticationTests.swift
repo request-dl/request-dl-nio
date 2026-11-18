@@ -103,7 +103,11 @@ struct ProxySOCKSAuthenticationTests {
         defer { Task { try? await proxy.shutdown() } }
 
         // When
-        let outcome = try await run(through: proxy, executor: executor, authorization: .basic(username: "user", password: "pass"))
+        let outcome = try await run(
+            through: proxy,
+            executor: executor,
+            authorization: .basic(username: "user", password: "pass")
+        )
 
         // Then
         #expect(try outcome.result.get() == "Hello Through SOCKS")
@@ -124,7 +128,11 @@ struct ProxySOCKSAuthenticationTests {
         let outcome = try await run(through: proxy, authorization: .basic(username: "user", password: ""))
 
         #expect(try outcome.result.get() == "Hello Through SOCKS")
-        #expect(proxy.observations.authenticationAttempts == [.init(username: Array("user".utf8), password: [], accepted: true)])
+        #expect(
+            proxy.observations.authenticationAttempts == [
+                .init(username: Array("user".utf8), password: [], accepted: true)
+            ]
+        )
     }
 
     @Test
@@ -183,13 +191,19 @@ struct ProxySOCKSAuthenticationTests {
         defer { Task { try? await proxy.shutdown() } }
 
         // When
-        let outcome = try await run(through: proxy, executor: executor, authorization: .basic(username: "user", password: "WRONG"))
+        let outcome = try await run(
+            through: proxy,
+            executor: executor,
+            authorization: .basic(username: "user", password: "WRONG")
+        )
 
         // Then
-        let error = try #require({ () -> (any Error)? in
-            if case .failure(let error) = outcome.result { return error }
-            return nil
-        }())
+        let error = try #require(
+            { () -> (any Error)? in
+                if case .failure(let error) = outcome.result { return error }
+                return nil
+            }()
+        )
 
         #expect(outcome.elapsed < .seconds(5))
         // The proxy was asked once and rejected: nothing retried the same wrong credentials.
@@ -223,7 +237,8 @@ struct ProxySOCKSAuthenticationTests {
         ProxyAuthorization.bearer(tokens: "token"),
         ProxyAuthorization.basic(credentials: "dXNlcjpwYXNz"),
     ])
-    func socks_whenAuthorizationIsAnHTTPHeader_throwsBeforeConnecting(_ authorization: ProxyAuthorization) async throws {
+    func socks_whenAuthorizationIsAnHTTPHeader_throwsBeforeConnecting(_ authorization: ProxyAuthorization) async throws
+    {
         let proxy = try await LocalSOCKSProxy.start(credentials: .init(username: "user", password: "pass"))
         defer { Task { try? await proxy.shutdown() } }
 
@@ -281,7 +296,12 @@ struct ProxySOCKSAuthenticationTests {
             Session()
                 .requiredExecutor(.urlSession)
 
-            Proxy(host: "127.0.0.1", port: 1, connection: .socks, authorization: .basic(username: username, password: "p"))
+            Proxy(
+                host: "127.0.0.1",
+                port: 1,
+                connection: .socks,
+                authorization: .basic(username: username, password: "p")
+            )
         }
         .extractPayload()
 
@@ -302,7 +322,12 @@ struct ProxySOCKSAuthenticationTests {
         let username = String(repeating: "u", count: 255)
 
         let resolved = try await resolve(
-            Proxy(host: "127.0.0.1", port: 1, connection: .socks, authorization: .basic(username: username, password: "p"))
+            Proxy(
+                host: "127.0.0.1",
+                port: 1,
+                connection: .socks,
+                authorization: .basic(username: username, password: "p")
+            )
         )
 
         #expect(resolved.session.configuration.resolveExecutor() != .urlSession)
@@ -313,7 +338,12 @@ struct ProxySOCKSAuthenticationTests {
         let username = String(repeating: "u", count: 254)
 
         let resolved = try await resolve(
-            Proxy(host: "127.0.0.1", port: 1, connection: .socks, authorization: .basic(username: username, password: "p"))
+            Proxy(
+                host: "127.0.0.1",
+                port: 1,
+                connection: .socks,
+                authorization: .basic(username: username, password: "p")
+            )
         )
 
         #expect(resolved.session.configuration.urlSessionIncompatibilityReasons().isEmpty)

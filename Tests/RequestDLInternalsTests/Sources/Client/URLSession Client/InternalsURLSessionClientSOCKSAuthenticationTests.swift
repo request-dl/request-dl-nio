@@ -125,7 +125,11 @@ struct InternalsURLSessionClientSOCKSAuthenticationTests {
         try await proxy.shutdown()
 
         try assertDelivered(outcome)
-        #expect(proxy.observations.authenticationAttempts == [.init(username: Array("user".utf8), password: [], accepted: true)])
+        #expect(
+            proxy.observations.authenticationAttempts == [
+                .init(username: Array("user".utf8), password: [], accepted: true)
+            ]
+        )
     }
 
     @Test
