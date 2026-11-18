@@ -8,7 +8,7 @@
 //
 // Unlike `Internals.ServerTrustPolicy.Descriptor` (public certificate bytes, fine to
 // carry verbatim), embedding key material in a task's plain-text description would be a real
-// regression from the Keychain-only handling this package otherwise holds itself to.
+// regression from the never-persisted handling this package otherwise holds itself to.
 //
 // This is why a client identity sourced from `.bytes` (in-memory only, no path to persist) can't
 // be supported here at all, and why an identity is rebuilt fresh from disk on every challenge
@@ -98,16 +98,13 @@ extension Internals {
             }
         }
 
-        /// Rebuilds a `SecIdentity` from disk, via the same Keychain round-trip
-        /// `Internals.URLSessionIdentityPolicy` uses. Safe to call repeatedly (the Keychain
-        /// label is content-derived, so re-adding the same identity is a no-op success, not a
-        /// duplicate), and expected to be: this runs fresh on every client-certificate challenge,
-        /// live or after a relaunch alike.
+        /// Rebuilds a `SecIdentity` from disk, in memory, the same way
+        /// `Internals.URLSessionIdentityPolicy` does. Safe to call repeatedly (nothing is stored
+        /// anywhere, so every call is independent), and expected to be: this runs fresh on every
+        /// client-certificate challenge, live or after a relaunch alike.
         ///
-        /// The caller doesn't need to remove the returned handle explicitly; just don't retain
-        /// it past the point it's done answering. `Internals.IdentityHandle`'s own `deinit`
-        /// releases it, deleting the underlying Keychain items only once every other live handle
-        /// for this same certificate/key pair has gone away too.
+        /// There is nothing to clean up: don't retain the returned handle past the point it's
+        /// done answering, and the key goes with it.
         package func makeIdentity() throws -> (
             handle: Internals.IdentityHandle, intermediates: [SecCertificate]
         ) {

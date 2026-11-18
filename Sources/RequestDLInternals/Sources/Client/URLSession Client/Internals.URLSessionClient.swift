@@ -63,8 +63,8 @@ extension Internals {
         // MARK: - Inits
 
         /// - Parameter secureConnection: Resolved once, here, into an
-        /// `Internals.URLSessionIdentityPolicy`, including the Keychain round-trip a client
-        /// identity needs, and cached for the lifetime of this client, mirroring
+        /// `Internals.URLSessionIdentityPolicy`, including building the client
+        /// identity, and cached for the lifetime of this client, mirroring
         /// NIOSSL's own per-connection `TLSConfiguration` caching in `Internals.ClientManager`.
         /// `nil` when the resolved request carries no TLS customization at all.
         /// - Parameter redirectConfiguration: Defaults to AsyncHTTPClient's own default

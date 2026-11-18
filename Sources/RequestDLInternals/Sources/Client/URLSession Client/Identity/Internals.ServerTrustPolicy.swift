@@ -3,7 +3,7 @@
 //
 
 // The server-trust half of `Internals.URLSessionIdentityPolicy`, pulled out on its own: unlike
-// the client-identity half, it needs no Keychain round-trip, so it can be rebuilt from nothing
+// the client-identity half, it needs no client identity, so it can be rebuilt from nothing
 // but raw certificate bytes. That's exactly what a `BackgroundDownloadTask` needs to do after
 // a relaunch, with no `Internals.SecureConnection` left in memory to resolve from.
 

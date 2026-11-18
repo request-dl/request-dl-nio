@@ -40,8 +40,8 @@ extension Internals {
 
         /// Flags a `client(provider:sessionConfiguration:)` or `cleanupIfNeeded()` that is still
         /// running after 45s. Set higher than the other `AsyncLock`s in `Internals`: a client
-        /// resolution can build an HTTP client, read a TLS identity off disk and, for mTLS, make
-        /// synchronous Keychain calls, so a wide margin is needed to avoid flagging a legitimately
+        /// resolution can build an HTTP client, read a TLS identity off disk and, for mTLS, build the
+        /// identity (parsing a certificate and a private key), so a wide margin is needed to avoid flagging a legitimately
         /// busy one. Development builds only. See `AsyncLock.Watchdog`.
         #if DEBUG
         private static let watchdog: AsyncLock.Watchdog? = .init(seconds: 45) {
@@ -238,8 +238,8 @@ extension Internals {
             await lock.withLock {
 
                 // Dropped off `tableLock`, below: a client that nobody else holds retires itself
-                // when its last reference goes, which can mean a Keychain delete for one with a
-                // client identity, and that does not belong under a mutex every lookup also takes.
+                // when its last reference goes, which can mean tearing down its connections and
+                // identity, and that does not belong under a mutex every lookup also takes.
                 let expired = tableLock.withLock { () -> [Item] in
                     var expired = [Item]()
 
@@ -358,7 +358,7 @@ extension Internals {
         ///
         /// - Returns: The clients that were un-pooled, so the caller can let go of them *after*
         ///   releasing ``tableLock``: one that nobody else holds retires itself the moment its last
-        ///   reference goes, and that can mean a Keychain delete for a client identity.
+        ///   reference goes, and that can mean tearing down its connections and client identity.
         @discardableResult
         func _evictIfNeeded(
             protecting protectedClient: Internals.ClientManager.Client? = nil
@@ -415,9 +415,8 @@ extension Internals {
         /// `Internals.URLSessionClient.init` is routed through `Internals.FileSystemManager.run`
         /// rather than called directly: it reads the certificate/private-key files a
         /// `SecureConnection` names (`Internals.Certificate.resolvedDERBytes()`, portable and
-        /// NIOSSL-backed alike) and, for mTLS, makes synchronous Keychain calls
-        /// (`Internals.RawBytesIdentityBuilder`/`Internals.IdentityManager`), none of which are
-        /// `async`, since Keychain's own API isn't. Calling it inline here would block whichever
+        /// NIOSSL-backed alike) and, for mTLS, builds the client identity
+        /// (`Internals.RawBytesIdentityBuilder`), none of which is `async`. Calling it inline here would block whichever
         /// Swift Concurrency cooperative thread reached this cache miss for as long as that takes;
         /// `FileSystemManager.run` is the same escape hatch every other blocking file operation in
         /// `Internals` already uses for exactly that reason (see its own doc comment).
