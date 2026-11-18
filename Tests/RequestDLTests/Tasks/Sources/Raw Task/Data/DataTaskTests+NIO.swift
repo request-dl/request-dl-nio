@@ -222,7 +222,7 @@ extension DataTaskTests {
     /// Unlike `dataTask_whenCAEnabledUnderNIOTransportServices` above, `.requiredExecutor(.nio)`
     /// reads the identity straight off NIOSSL's own `TLSConfiguration.certificateChain`/
     /// `privateKey`, with no `SecIdentity` involved.
-        @Test
+    @Test
     func dataTask_whenClientCertificateChainHasIntermediateUnderNIORequired_completesHandshake() async throws {
         // Given
         let server = Certificates().server()
