@@ -67,7 +67,7 @@ enum CURLCommandParser {
         var maxRedirects: Int?
         var isInsecure = false
         var proxy: Internals.Proxy?
-        var proxyUser: (username: String, password: String)?
+        var proxyUser: (username: String, password: String, flag: String)?
         var dnsOverrides: [String: String] = [:]
         var isCompressed = false
         var caCertPath: String?
@@ -185,13 +185,22 @@ enum CURLCommandParser {
 
             case "-x", "--proxy":
                 try require(.proxy, for: token)
-                proxy = try makeProxy(try value(for: token))
+                proxy = try makeProxy(try value(for: token), flag: token)
 
             // `--socks5 host[:port]`: a SOCKS5 proxy named without a scheme. `--socks5-hostname`
-            // is the same here: the destination is always sent to the proxy as a name.
+            // is the same here: the destination is always sent to the proxy as a name. A value
+            // that names a scheme of its own (`--socks5 socks5h://host`) is a mistake, not a
+            // second scheme to honor: it is rejected (the error names the flag, never the value,
+            // which may hold credentials); use `-x` for a proxy URL.
             case "--socks5", "--socks5-hostname":
                 try require(.proxy, for: token)
-                proxy = try makeProxy("socks5://" + (try value(for: token)))
+                let endpoint = try value(for: token)
+
+                guard !endpoint.contains("://") else {
+                    throw CURLParsingError(.malformedArgument, token: token)
+                }
+
+                proxy = try makeProxy("socks5://" + endpoint, flag: token)
 
             // `-U user:password` is the credentials of the proxy, wherever it comes from; the
             // ones written in the proxy's own URL win over it, as in curl. Not percent-decoded:
@@ -206,7 +215,8 @@ enum CURLCommandParser {
 
                 proxyUser = (
                     String(credentials[credentials.startIndex..<colonIndex]),
-                    String(credentials[credentials.index(after: colonIndex)...])
+                    String(credentials[credentials.index(after: colonIndex)...]),
+                    token
                 )
 
             case "--resolve":
@@ -270,7 +280,7 @@ enum CURLCommandParser {
             guard let currentProxy = proxy else {
                 // curl would take a proxy from the environment here, which this package never
                 // reads on its own: applying the credentials to nothing would hide that.
-                throw CURLParsingError(.unsupportedFlag, token: "--proxy-user")
+                throw CURLParsingError(.unsupportedFlag, token: proxyUser.flag)
             }
 
             if currentProxy.authorization == nil {
@@ -282,7 +292,7 @@ enum CURLCommandParser {
                         username: proxyUser.username,
                         password: proxyUser.password,
                         connection: currentProxy.connectionProtocol,
-                        token: "--proxy-user"
+                        token: proxyUser.flag
                     )
                 )
             }
@@ -438,7 +448,10 @@ enum CURLCommandParser {
     /// credentials in a proxy URL (`socks5://us%40er:p%3Ass@host`), and a missing password is an
     /// empty one (`socks5://user@host`), which SOCKS5 allows. The credentials of an HTTP proxy are
     /// taken as written, as they always were.
-    private static func makeProxy(_ value: String) throws -> Internals.Proxy {
+    ///
+    /// Every error names `flag` (the one the user typed) and never `value`, which can hold the
+    /// credentials.
+    private static func makeProxy(_ value: String, flag: String) throws -> Internals.Proxy {
         var remainder = Substring(value)
         var connectionProtocol: Internals.Proxy.ConnectionProtocol = .http
 
@@ -481,25 +494,24 @@ enum CURLCommandParser {
                 authorization = .basic(username: username, password: password)
 
             case .socks:
-                // The flag, not `value`, in the errors: `value` has the password in it.
                 guard
                     let decodedUsername = username.removingPercentEncoding,
                     let decodedPassword = password.removingPercentEncoding
                 else {
-                    throw CURLParsingError(.malformedArgument, token: "-x")
+                    throw CURLParsingError(.malformedArgument, token: flag)
                 }
 
                 authorization = try proxyAuthorization(
                     username: decodedUsername,
                     password: decodedPassword,
                     connection: .socks,
-                    token: "-x"
+                    token: flag
                 )
             }
         }
 
         guard !remainder.isEmpty else {
-            throw CURLParsingError(.malformedArgument, token: value)
+            throw CURLParsingError(.malformedArgument, token: flag)
         }
 
         guard
@@ -515,7 +527,7 @@ enum CURLCommandParser {
         }
 
         guard (0...65_535).contains(port) else {
-            throw CURLParsingError(.malformedArgument, token: value)
+            throw CURLParsingError(.malformedArgument, token: flag)
         }
 
         return Internals.Proxy(
