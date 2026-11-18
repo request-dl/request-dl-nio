@@ -60,7 +60,8 @@ import Crypto
 ///   `"http"`, defaults to `1080` for `"socks"`), and `proxy.type` (`"http"` or `"socks"`, default
 ///   `"http"`). Also reads `proxy.authorization` (same shape as the top-level `authorization`
 ///   key; for a `"socks"` proxy only `scheme: "basic"` with `username` and `password`, which are
-///   the SOCKS5 user name and password sent in clear text, with the sizes ``Proxy`` documents)
+///   the SOCKS5 user name and password sent in clear text; sizes ``Proxy`` does not allow are
+///   not a ``ConfiguredError`` but a ``ProxyAuthorizationError``, thrown when the request is built)
 ///   and, for `"http"` proxies only, `proxy.connectHeaders` (string array, colon-separated
 ///   pairs, sent only on the proxy's `CONNECT` request).
 /// - `cachePolicy` (string, optional): `"memory"`, `"disk"`, or `"all"`, passed to

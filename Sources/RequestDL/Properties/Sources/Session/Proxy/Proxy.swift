@@ -44,8 +44,13 @@ import RequestDLInternals
 /// ```
 ///
 /// - The user name takes 1 to 255 bytes and the password 0 to 255 bytes, counted in UTF-8, so an
-///   empty password is valid and a non-ASCII one is counted by its encoded size. Outside of
+///   empty password is valid and a non-ASCII one is counted by its encoded size. Neither can
+///   contain a NUL character, which `URLSession` would cut the credentials at. Outside of
 ///   that, resolving the request throws a ``ProxyAuthorizationError`` before anything is sent.
+/// - A proxy found by ``SystemProxy`` (the environment, or the system settings) can carry
+///   credentials too, and is used with them. Credentials of that kind that SOCKS5 cannot carry
+///   (by the limits above) are ignored with a warning in the log, never an error, and the proxy
+///   is used without them.
 /// - SOCKS5 authenticates with a user name and a password and nothing else:
 ///   ``ProxyAuthorization/basic(credentials:)`` and ``ProxyAuthorization/bearer(tokens:)`` are
 ///   HTTP header values, and are refused with a ``ProxyAuthorizationError``. Nothing is
