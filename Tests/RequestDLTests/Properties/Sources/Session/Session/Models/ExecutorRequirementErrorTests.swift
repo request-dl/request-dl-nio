@@ -62,6 +62,7 @@ struct ExecutorRequirementErrorTests {
             .http1OnlyUnderURLSession,
             .proxyConnectHeadersUnderURLSession,
             .proxyBearerAuthorizationUnderURLSession,
+            .proxySOCKSCredentialsTooLongUnderURLSession,
             .decompressionRequiresURLSession,
             .maximumTLSVersionUnderURLSession,
             .applicationProtocolsUnderURLSession,

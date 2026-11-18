@@ -143,7 +143,7 @@ extension Internals.Session {
                 redirectConfiguration: redirectConfiguration?.build(urlOverrides: urlOverrides),
                 timeout: timeout.build(),
                 connectionPool: connectionPool.build(),
-                proxy: proxy?.build(),
+                proxy: try proxy?.build(),
                 decompression: decompression.build(),
                 tracing: .init()
             )
@@ -330,6 +330,13 @@ extension Internals.Session.Configuration {
 
             if case .bearer = proxy.authorization {
                 reasons.append(.proxyBearerAuthorizationUnderURLSession)
+            }
+
+            if let credentials = proxy.authorization?.socksCredentials,
+                max(credentials.username.utf8.count, credentials.password.utf8.count)
+                    > Internals.Proxy.Authorization.urlSessionSOCKSCredentialByteLimit
+            {
+                reasons.append(.proxySOCKSCredentialsTooLongUnderURLSession)
             }
         }
 

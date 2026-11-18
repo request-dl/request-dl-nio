@@ -73,8 +73,10 @@ extension Internals {
         /// gets identical behavior regardless of which executor the session resolves to.
         /// - Parameter urlOverrides: The rules every redirect hop is rewritten with before it is
         /// followed, the way the first request already was. See ``Internals/URLOverrides``.
-        /// - Parameter proxy: Both `.http` (`.server`) and `.socks` are mapped onto
-        /// `configuration`. `.bearer` proxy authorization is the one thing that stays excluded
+        /// - Parameter proxy: Both `.http` (`.server`) and `.socks` (with RFC 1929
+        /// username/password, through `SOCKSUser`/`SOCKSPassword`) are mapped onto
+        /// `configuration`. Throws `Internals.Proxy.Authorization.Mismatch` when the authorization
+        /// does not fit the proxy. `.bearer` proxy authorization is the one thing that stays excluded
         /// from `.urlSession` upstream (`Internals.ExecutorIncompatibilityReason
         /// .proxyBearerAuthorizationUnderURLSession`), so a well-formed caller never passes that
         /// here. See `Internals.Proxy.buildConnectionProxyDictionary()`'s doc comment for the
@@ -93,6 +95,11 @@ extension Internals {
             maximumConcurrentConnections: Int? = nil,
             sessionDelegate: (any URLSessionDelegate)? = nil
         ) throws {
+            // A shape that does not fit the proxy (`.bearer` on SOCKS, a SOCKS username/password
+            // on HTTP) or credentials RFC 1929 cannot carry are an error here, not something
+            // `buildConnectionProxyDictionary()` quietly leaves out of the dictionary.
+            try proxy?.validate()
+
             let configuration = configuration
             // Explicitly `[:]`, not left untouched, when `proxy` is `nil`. `URLSession` treats an
             // unset `connectionProxyDictionary` as "inherit whatever macOS's Network preferences
@@ -2117,7 +2124,9 @@ extension Internals.URLSessionClient {
                     persistence: .forSession
                 )
 
-            case .bearer, nil:
+            // A SOCKS proxy is authenticated by `connectionProxyDictionary`'s
+            // `SOCKSUser`/`SOCKSPassword` while the connection is made, never by a challenge.
+            case .bearer, .socks, nil:
                 return nil
             }
         }

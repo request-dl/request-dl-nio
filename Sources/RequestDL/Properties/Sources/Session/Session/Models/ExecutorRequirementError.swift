@@ -28,6 +28,7 @@ public struct ExecutorRequirementError: Error, Sendable {
         case http1OnlyUnderURLSession
         case proxyConnectHeadersUnderURLSession
         case proxyBearerAuthorizationUnderURLSession
+        case proxySOCKSCredentialsTooLongUnderURLSession
         case decompressionRequiresURLSession
         case maximumTLSVersionUnderURLSession
         case applicationProtocolsUnderURLSession
@@ -69,6 +70,8 @@ public struct ExecutorRequirementError: Error, Sendable {
                 self = .proxyConnectHeadersUnderURLSession
             case .proxyBearerAuthorizationUnderURLSession:
                 self = .proxyBearerAuthorizationUnderURLSession
+            case .proxySOCKSCredentialsTooLongUnderURLSession:
+                self = .proxySOCKSCredentialsTooLongUnderURLSession
             case .decompressionRequiresURLSession:
                 self = .decompressionRequiresURLSession
             case .maximumTLSVersionUnderURLSession:
@@ -147,6 +150,8 @@ extension ExecutorRequirementError.Reason: CustomStringConvertible {
             return "custom proxy CONNECT headers (unsupported under URLSession)"
         case .proxyBearerAuthorizationUnderURLSession:
             return "a bearer-token proxy authorization (unsupported under URLSession)"
+        case .proxySOCKSCredentialsTooLongUnderURLSession:
+            return "a SOCKS proxy username or password longer than 254 bytes (unsupported under URLSession)"
         case .decompressionRequiresURLSession:
             return
                 "a decompression algorithm that only works under URLSession (unsupported under NIO/NIOTransportServices)"

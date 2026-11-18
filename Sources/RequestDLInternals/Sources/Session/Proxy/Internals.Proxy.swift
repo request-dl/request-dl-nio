@@ -6,18 +6,104 @@
 import AsyncHTTPClient
 #endif
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
+
 extension Internals {
 
     package struct Proxy: Sendable {
 
+        /// The credentials of a proxy, in the shape the proxy's protocol takes them.
+        ///
+        /// `.basic`, `.basicRawCredentials` and `.bearer` are HTTP `Proxy-Authorization` header
+        /// shapes, for an `.http` proxy. `.socks` is what a `.socks` proxy takes: the
+        /// username/password sub-negotiation of RFC 1929, which is not a header and has no scheme.
+        /// A shape on the other kind of proxy is rejected by ``validate(for:)`` rather than
+        /// dropped, so credentials are never silently left unused.
+        ///
+        /// The secrets of every shape are kept out of `description`, `debugDescription` and the
+        /// `Mirror`; `==` and `hash(into:)` still see them (a pooled client is only reusable by
+        /// the same credentials).
         package enum Authorization: Sendable, Hashable {
 
             case basic(username: String, password: String)
             case basicRawCredentials(String)
             case bearer(tokens: String)
 
+            /// SOCKS5 username/password (RFC 1929). The username takes 1...255 bytes and the
+            /// password 0...255 bytes, in UTF-8, and the password is sent in clear text.
+            case socks(username: String, password: String)
+
+            /// What RFC 1929 allows for the username: its length is one byte on the wire, and
+            /// zero is not a username.
+            package static let socksUsernameByteCounts = 1...255
+
+            /// What RFC 1929 allows for the password: an empty one is valid.
+            package static let socksPasswordByteCounts = 0...255
+
+            /// The longest username or password `URLSession` sends intact: CFNetwork cuts a longer
+            /// one at 254 bytes, which RFC 1929 would still accept at 255. Measured, not
+            /// documented; see `InternalsURLSessionClientSOCKSAuthenticationTests`.
+            package static let urlSessionSOCKSCredentialByteLimit = 254
+
+            /// Why an authorization does not fit the proxy it is configured on.
+            package enum Mismatch: Sendable, Hashable {
+                /// A SOCKS proxy was given an HTTP header shape (`.basic`, `.basicRawCredentials`,
+                /// `.bearer`).
+                case httpShapeOnSOCKSProxy
+                /// An HTTP proxy was given the SOCKS username/password shape.
+                case socksShapeOnHTTPProxy
+                case socksUsernameLength(Int)
+                case socksPasswordLength(Int)
+            }
+
+            /// The username and password to send to a SOCKS proxy; only the `.socks` shape has them.
+            ///
+            /// `.basic(username:password:)` is deliberately not converted here: the public
+            /// `Proxy` converts it when it builds the node, so everything below it sees one
+            /// shape per protocol, and an HTTP shape that reaches a SOCKS proxy any other way
+            /// is a mistake that is reported (``Mismatch/httpShapeOnSOCKSProxy``), not guessed at.
+            package var socksCredentials: (username: String, password: String)? {
+                guard case .socks(let username, let password) = self else {
+                    return nil
+                }
+
+                return (username, password)
+            }
+
+            /// Checks that this authorization is usable on a proxy of `connection`, and, on a
+            /// SOCKS proxy, that the credentials fit RFC 1929.
+            package func validate(for connection: ConnectionProtocol) throws {
+                switch connection {
+                case .http:
+                    if case .socks = self {
+                        throw Mismatch.socksShapeOnHTTPProxy
+                    }
+
+                case .socks:
+                    guard let credentials = socksCredentials else {
+                        throw Mismatch.httpShapeOnSOCKSProxy
+                    }
+
+                    let usernameCount = credentials.username.utf8.count
+                    let passwordCount = credentials.password.utf8.count
+
+                    guard Self.socksUsernameByteCounts.contains(usernameCount) else {
+                        throw Mismatch.socksUsernameLength(usernameCount)
+                    }
+
+                    guard Self.socksPasswordByteCounts.contains(passwordCount) else {
+                        throw Mismatch.socksPasswordLength(passwordCount)
+                    }
+                }
+            }
+
             #if canImport(NIOCore)
-            package func build() -> HTTPClient.Authorization {
+            /// The header an `.http` proxy is sent. A `.socks` authorization has none.
+            package func build() throws -> HTTPClient.Authorization {
                 switch self {
                 case .basic(let username, let password):
                     return .basic(username: username, password: password)
@@ -25,6 +111,8 @@ extension Internals {
                     return .basic(credentials: credentials)
                 case .bearer(let tokens):
                     return .bearer(tokens: tokens)
+                case .socks:
+                    throw Mismatch.socksShapeOnHTTPProxy
                 }
             }
             #endif
@@ -62,18 +150,38 @@ extension Internals {
             self.connectHeaders = connectHeaders
         }
 
+        /// Checks that `authorization` is usable on this proxy's protocol, and in the sizes
+        /// SOCKS5 can carry. Throws ``Authorization/Mismatch`` otherwise.
+        package func validate() throws {
+            try authorization?.validate(for: connectionProtocol)
+        }
+
         #if canImport(NIOCore)
-        package func build() -> HTTPClient.Configuration.Proxy {
+        /// - Throws: ``Authorization/Mismatch`` when `authorization` does not fit the proxy's
+        /// protocol, or AsyncHTTPClient's own `HTTPClientError.invalidProxyConfiguration` if it
+        /// still rejects the SOCKS credentials.
+        package func build() throws -> HTTPClient.Configuration.Proxy {
+            try validate()
+
             switch connectionProtocol {
             case .http:
                 return .server(
                     host: host,
                     port: port,
-                    authorization: authorization?.build(),
+                    authorization: try authorization?.build(),
                     connectHeaders: connectHeaders.build()
                 )
             case .socks:
-                return .socksServer(host: host, port: port)
+                guard let credentials = authorization?.socksCredentials else {
+                    return .socksServer(host: host, port: port)
+                }
+
+                return try .socksServer(
+                    host: host,
+                    port: port,
+                    username: credentials.username,
+                    password: credentials.password
+                )
             }
         }
         #endif
@@ -103,6 +211,34 @@ extension Internals.Proxy: Hashable {
         hasher.combine(connectionProtocol)
         hasher.combine(authorization)
         hasher.combine(connectHeaders)
+    }
+}
+
+// MARK: - Secrets
+
+extension Internals.Proxy.Authorization.Mismatch: Error {}
+
+extension Internals.Proxy.Authorization: CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
+
+    package var description: String {
+        switch self {
+        case .basic:
+            return "Authorization.basic(username: <redacted>, password: <redacted>)"
+        case .basicRawCredentials:
+            return "Authorization.basicRawCredentials(<redacted>)"
+        case .bearer:
+            return "Authorization.bearer(<redacted>)"
+        case .socks:
+            return "Authorization.socks(username: <redacted>, password: <redacted>)"
+        }
+    }
+
+    package var debugDescription: String {
+        description
+    }
+
+    package var customMirror: Mirror {
+        Mirror(self, children: [(label: String?, value: Any)](), displayStyle: .enum)
     }
 }
 
@@ -158,11 +294,23 @@ extension Internals.Proxy {
             ]
 
         case .socks:
-            return [
+            var dictionary: [AnyHashable: Any] = [
                 "SOCKSEnable": 1,
                 "SOCKSProxy": host,
                 "SOCKSPort": port,
             ]
+
+            // RFC 1929 username/password. Verified against `LocalSOCKSProxy`
+            // (`InternalsURLSessionClientSOCKSAuthenticationTests`): with these two keys
+            // `URLSession` offers methods `00 02` in its greeting and sends the credentials, and
+            // a wrong password fails at once with `NSPOSIXErrorDomain` 80. Without them the
+            // greeting offers `00` only.
+            if let credentials = authorization?.socksCredentials {
+                dictionary["SOCKSUser"] = credentials.username
+                dictionary["SOCKSPassword"] = credentials.password
+            }
+
+            return dictionary
         }
     }
 }

@@ -27,6 +27,12 @@ extension Internals {
         /// identity/certificates), so `.bearer` proxy authorization is unanswerable through the
         /// proxy authentication challenge delegate regardless of platform.
         case proxyBearerAuthorizationUnderURLSession
+        /// A SOCKS5 username or password of 255 bytes. RFC 1929 allows that, but CFNetwork cuts
+        /// both at 254 when it sends them (measured: a 255-byte username arrives as 254 bytes
+        /// and the proxy rejects it), so `.urlSession` would fail the authentication of
+        /// credentials that are valid. See `Internals.Proxy.Authorization
+        /// .urlSessionSOCKSCredentialByteLimit`.
+        case proxySOCKSCredentialsTooLongUnderURLSession
         /// The mirror image of the `UnderURLSession` cases above: a configured
         /// `Decompressor.requiresURLSession` algorithm (`BrotliURLSessionOnlyAlgorithm`, or a
         /// third-party one answering the same way) rules out `.nio`/`.nioTransportServices`

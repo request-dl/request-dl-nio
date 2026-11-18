@@ -165,6 +165,55 @@ struct InternalsSessionConfigurationExecutorTests {
         #expect(configuration.urlSessionIncompatibilityReasons().contains(.proxyBearerAuthorizationUnderURLSession))
     }
 
+    @Test(arguments: [
+        (254, 254, false),
+        (255, 0, true),
+        (1, 255, true),
+        (255, 255, true),
+    ])
+    func configuration_whenSOCKSCredentialsSet_containsReasonOnlyAbove254Bytes(
+        usernameCount: Int,
+        passwordCount: Int,
+        expectsReason: Bool
+    ) async throws {
+        // Given: CFNetwork cuts a SOCKS5 username or password at 254 bytes, so valid 255-byte
+        // credentials would be sent damaged and rejected: `.urlSession` is ruled out for them.
+        var configuration = Internals.Session.Configuration()
+
+        // When
+        configuration.proxy = Internals.Proxy(
+            host: "localhost",
+            port: 1080,
+            connection: .socks,
+            authorization: .socks(
+                username: String(repeating: "u", count: usernameCount),
+                password: String(repeating: "p", count: passwordCount)
+            )
+        )
+
+        // Then
+        #expect(
+            configuration.urlSessionIncompatibilityReasons().contains(.proxySOCKSCredentialsTooLongUnderURLSession)
+                == expectsReason
+        )
+    }
+
+    @Test
+    func configuration_whenSOCKSWithoutCredentialsOrHTTPProxy_doesNotContainTheSOCKSCredentialsReason() async throws {
+        var configuration = Internals.Session.Configuration()
+
+        configuration.proxy = Internals.Proxy(host: "localhost", port: 1080, connection: .socks, authorization: nil)
+        #expect(!configuration.urlSessionIncompatibilityReasons().contains(.proxySOCKSCredentialsTooLongUnderURLSession))
+
+        configuration.proxy = Internals.Proxy(
+            host: "localhost",
+            port: 8888,
+            connection: .http,
+            authorization: .basic(username: String(repeating: "u", count: 300), password: "p")
+        )
+        #expect(!configuration.urlSessionIncompatibilityReasons().contains(.proxySOCKSCredentialsTooLongUnderURLSession))
+    }
+
     @Test
     func configuration_whenProxyBasicAuthorizationSet_doesNotContainReason() async throws {
         // Given
