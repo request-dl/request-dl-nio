@@ -59,6 +59,40 @@ func application(
 
 This is required, not optional — without it, a download that finishes while your app is suspended or not running has no way to reconnect and report back through ``BackgroundDownloads/onEvent``.
 
+## Decoding the response
+
+``Session/decompressionAlgorithms(_:limit:)`` works for a background download, including a ``Decompressor`` of your own. The system decodes gzip, deflate and brotli by itself, and a list with only those leaves that to it. Once the list holds an algorithm of your own, the request names all of them in `Accept-Encoding`, which turns the system's decoding off for every one of them, and the file is decoded when it has finished downloading:
+
+```swift
+try await BackgroundDownloadTask(
+    id: "episode-42",
+    destination: episodesDirectory.appendingPathComponent("episode-42.mp3")
+) {
+    BaseURL("api.example.com")
+    Path("episodes/42/audio")
+    Session()
+        .decompressionAlgorithms([MyCodec(), .gzip])
+}
+.result()
+```
+
+The file is read in pieces, decoded, and written beside `destination`, so it is never held whole in memory; it takes the place of what was there only once it is complete. ``BackgroundDownloads/Event/completed(id:destination:)`` follows that, and ``BackgroundDownloads/Event/progress(id:destination:bytesWritten:totalBytesExpected:)`` counts the bytes that travel, the encoded ones. A response encoded in something that is not on the list fails the download with ``UnsupportedContentEncodingError``, and a body that is cut short or corrupt fails with what your decompressor throws, leaving what was at `destination` untouched.
+
+### Registering your decompressors
+
+The system may finish a download while your app is not running. The launch it starts to deliver the event has none of the content above, and a ``Decompressor`` is a value of your own type, not something that can be kept across a launch. Hand them back early in every launch, where you set ``BackgroundDownloads/onEvent``:
+
+```swift
+BackgroundDownloads.registerDecompressors([MyCodec()])
+BackgroundDownloads.onEvent = { event in /* ... */ }
+```
+
+A download that needs one that is not registered fails with ``BackgroundDownloadMissingDecompressorError``. Its file is not kept, as it is encoded and the system removes it when the callback returns: schedule the download again once the decompressor is registered.
+
+Only what the request asked for is decoded. Do not list ``GzipAlgorithm``, ``DeflateAlgorithm`` or ``BrotliURLSessionOnlyAlgorithm`` next to an algorithm of your own: they only stand for the system's decoding, which asking for yours turns off, so a response encoded with one of them fails, as it does for the foreground `.urlSession` executor. Leave them out and the server is asked for yours alone. A download continued from resume data is decoded, or not, by what the request that stopped asked for, so the content you pass when continuing has to list the same algorithms.
+
+> Note: Decoding runs inside the system's callback, so it counts against the time the system gives the app to handle the event, and a very slow codec on a very large file can run out of it. A list with only gzip, deflate and brotli never pays that, because the system decodes them as the bytes arrive.
+
 ## Cancelling a download
 
 ```swift
@@ -178,3 +212,4 @@ Only the file path is persisted alongside `id`/`destination` — never the key m
 
 - ``BackgroundDownloadUnsupportedConfigurationError``
 - ``BackgroundDownloadStatusCodeError``
+- ``BackgroundDownloadMissingDecompressorError``
