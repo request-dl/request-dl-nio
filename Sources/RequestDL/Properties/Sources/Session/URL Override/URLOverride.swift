@@ -21,9 +21,56 @@
 /// domain cutovers, not to bypassing DNS or tunneling through an intermediary, which is what
 /// ``DNSOverride``/``Proxy`` are for.
 ///
-/// It is also unrelated to `Session.disableRedirect()`/`.enableRedirectFollow(...)`, despite the
-/// naming proximity: those follow HTTP 3xx responses returned by the server, while `URLOverride`
-/// never sees a 3xx and rewrites the request before it is ever sent.
+/// It is unrelated to `Session.disableRedirect()`/`.enableRedirectFollow(...)` as a *policy*,
+/// despite the naming proximity: those decide whether HTTP 3xx responses returned by the server
+/// are followed, while `URLOverride` never decides that. It does, though, keep applying to the
+/// hops of a redirect that is followed (see "Redirects" below).
+///
+/// ## Redirects
+///
+/// The override is applied to every hop of a redirect, not only to the first request: a `Location`
+/// that names a host (scheme, host and port) one of the rules covers is rewritten with that rule,
+/// the same way the request was, on both executors. A response of the staging server redirecting
+/// back to `https://staging.example.com/login` therefore keeps reaching the destination the
+/// override maps it to, instead of the real `staging.example.com`.
+///
+/// ```swift
+/// DataTask {
+///     BaseURL("staging.example.com")
+///     Path("start")
+///     URLOverride("http://127.0.0.1:8080", from: "https://staging.example.com")
+/// }
+/// // GET http://127.0.0.1:8080/start
+/// // 302, Location: https://staging.example.com/login
+/// // GET http://127.0.0.1:8080/login   <- still the destination, not the real host
+/// ```
+///
+/// - A `Location` that no rule covers (another host, scheme or port) is followed exactly as the
+///   server wrote it. An override never redirects traffic that wasn't addressed to its origin.
+/// - A relative `Location` is resolved against the host the previous hop was actually sent to,
+///   which is already the destination, so it needs no rule.
+/// - A path-scoped rule replaces its matched prefix on a hop as it does on the request, and
+///   rules are chosen the same way (most specific first, then the last declared). The destination
+///   is never matched again, so there is no chaining.
+/// - What ``RedirectStrategy`` and `Session.onRedirect(_:)` receive is already the rewritten
+///   request, which is also what the history records of every earlier hop. A URL a strategy
+///   answers with that differs from the one it was handed is a `Location` of its own and goes
+///   through the rules too.
+///
+/// Whether a hop leaves the origin (and so loses `Authorization`, `Cookie`, `Origin`,
+/// `Proxy-Authorization` and an explicit `Host`, like any redirect to another origin) is decided
+/// on the destinations actually contacted: the one the previous hop was sent to against the one
+/// this hop is rewritten to, not on the `Location` the server wrote, which names a host that is
+/// never contacted. So a redirect back to the overridden host stays on the origin the request was
+/// sent to and keeps its credentials, as a redirect that never left it does, and a redirect to
+/// any other destination, overridden or not, is another origin and loses them. An override can't
+/// send credentials anywhere the request wasn't already going.
+///
+/// > Note: Two hosts overridden to the *same* destination are, for this check, the same origin:
+/// > both are sent to one place, which already received the credentials.
+///
+/// > Important: A ``BackgroundDownloadTask`` is followed through redirects by the system, which
+/// > gives the app no chance to rewrite a hop: the override applies to the request that starts it.
 ///
 /// Both initializers take full `"scheme://host[/path]"` strings, never a bare host, so the
 /// `://` keeps parsing unambiguous and the scheme mandatory, the same way ``BaseURL`` validates

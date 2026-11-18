@@ -643,6 +643,61 @@ struct ResumableUploadExecutionTests {
         }
     }
 
+    // MARK: - A redirected creation
+
+    private enum CreationRedirect: CaseIterable, CustomTestStringConvertible {
+        case once
+        case twice
+        case toAnotherOrigin
+
+        var testDescription: String {
+            switch self {
+            case .once: "once"
+            case .twice: "twice"
+            case .toAnotherOrigin: "to another origin"
+            }
+        }
+    }
+
+    /// A `Location` relative to the URL that answered the creation is relative to where the
+    /// creation ended up, not to where it was sent, on every executor: `.nio` reports the URL of
+    /// the last request it followed a redirect to, as `.urlSession` does.
+    @Test(arguments: cases, CreationRedirect.allCases)
+    private func aRelativeLocation_isResolvedAgainstWhereTheCreationWasRedirected(
+        _ scenario: Case,
+        _ redirect: CreationRedirect
+    ) async throws {
+        try await Self.withUploadServer(scenario) { server in
+            try await withTransferServer(.init(length: 1_024)) { other in
+                // Given: the creation, sent to `/files/report.bin`, is answered by `/v2/create`.
+                other.resumableProtocol = server.resumableProtocol
+
+                let target: TransferServer
+
+                switch redirect {
+                case .once:
+                    server.creationRedirects = ["/v2/create"]
+                    target = server
+                case .twice:
+                    server.creationRedirects = ["/v1/create", "/v2/create"]
+                    target = server
+                case .toAnotherOrigin:
+                    server.creationRedirects = ["http://127.0.0.1:\(other.port)/v2/create"]
+                    target = other
+                }
+
+                target.answersCreationWithRelativeLocation = true
+
+                // When
+                _ = try await Self.upload(to: server, scenario).result()
+
+                // Then: `uploads/1` from `/v2/create` is `/v2/uploads/1`, and the body went there.
+                #expect(target.heldUploads[1]?.data == Self.body())
+                #expect(target.requests.filter { $0.method == "PATCH" }.map(\.path) == ["/v2/uploads/1"])
+            }
+        }
+    }
+
     // MARK: - Not an upload
 
     @Test(arguments: Executor.allCases)

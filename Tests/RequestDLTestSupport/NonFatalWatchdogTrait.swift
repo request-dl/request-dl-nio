@@ -39,9 +39,10 @@ import Testing
 /// URLSession-only CI job, where a trivial cache test took over a minute) that queue alone
 /// outlasts the 15 s budget: the reports there all named the same `Internals.Buffer.write`
 /// holder, with nobody waiting behind it. One recorded issue fails the job, so this trait records
-/// an "AsyncLock held" report as a *warning* when ``PoolLagMonitor`` has seen the machine start
-/// work more than ``lagThreshold`` seconds late within the last ``lagWindow`` seconds, and says so
-/// in the message. With healthy pools it stays an error, since that is what a real deadlock
+/// an "AsyncLock held" report as a *warning* when ``PoolLagMonitor`` has seen the machine run
+/// more than ``lagThreshold`` seconds late within the last ``lagWindow`` seconds (a pool starting
+/// work late, its own thread waking late, or a tiny file write taking that long), and says so in
+/// the message. With healthy pools it stays an error, since that is what a real deadlock
 /// looks like.
 package struct NonFatalWatchdogTrait: TestTrait, SuiteTrait, TestScoping {
 
@@ -83,10 +84,9 @@ package struct NonFatalWatchdogTrait: TestTrait, SuiteTrait, TestScoping {
             """
             \(message)
 
-            Downgraded to a warning: work handed to the \(source.rawValue) started \
-            about \(Int(lag.seconds.rounded()))s late in the last \(Int(lagWindow))s (more than \
-            \(Int(lagThreshold))s), so this runner is stalled and nothing here is known to be \
-            deadlocked.
+            Downgraded to a warning: \(source.symptom(seconds: Int(lag.seconds.rounded()))) \
+            in the last \(Int(lagWindow))s (more than \(Int(lagThreshold))s), so this runner is \
+            stalled and nothing here is known to be deadlocked.
             """,
             .warning
         )

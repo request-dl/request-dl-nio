@@ -188,6 +188,101 @@ struct NonFatalWatchdogTraitTests {
         #expect(enqueued.withLockedValue { $0 } == stoppedAt)
     }
 
+    /// A freeze of the whole process stops the monitor's thread too, and every probe has long
+    /// begun by then, so no pool ever looks late. The thread waking late is what shows it: while
+    /// it is still asleep (the gap so far counts), once it wakes (the gap is a sample), until
+    /// that ages out of the window.
+    @Test
+    func aMonitorThreadThatStopsWaking_isLateWhileAsleep_andOnceAwake() {
+        // Given
+        let clock = FakeClock()
+        let monitor = PoolLagMonitor(interval: 0.25, probes: [], now: { clock.now })
+        monitor.heartbeat()
+
+        // When
+        clock.advance(seconds: 20.25)
+
+        // Then
+        #expect(monitor.worstLag(within: 20) == .init(seconds: 20, source: .monitorThread))
+
+        // When
+        monitor.heartbeat()
+
+        // Then
+        #expect(monitor.worstLag(within: 20) == .init(seconds: 20, source: .monitorThread))
+
+        // When: it keeps waking on time for longer than the window.
+        Self.keepWaking(monitor, clock: clock, for: 21)
+
+        // Then
+        #expect(monitor.worstLag(within: 20) == .none)
+    }
+
+    /// What the URLSession-only and iPadOS jobs saw: after a freeze, a dozen locks report at once,
+    /// some before the monitor's thread wakes up from that same freeze and some after. Every one
+    /// of them is a warning.
+    @Test
+    func severalHeldLocks_reportedAtOnceAfterAFreeze_areAllWarnings() {
+        // Given
+        let clock = FakeClock()
+        let monitor = PoolLagMonitor(interval: 0.25, probes: Self.instantProbes, now: { clock.now })
+        Self.keepWaking(monitor, clock: clock, for: 10)
+
+        // When: everything stops for 20s, then thirteen reports and the monitor's own wake-up
+        // race each other.
+        clock.advance(seconds: 20)
+
+        let recorded = LockedValueBox<Recorded>([])
+        DispatchQueue.concurrentPerform(iterations: 14) { index in
+            guard index != 7 else {
+                monitor.heartbeat()
+                monitor.tick()
+                return
+            }
+
+            let lag = monitor.worstLag(within: NonFatalWatchdogTrait.lagWindow)
+            let report = Self.record(Self.heldLock, lag: lag)
+            recorded.withLockedValue { $0.append(contentsOf: report) }
+        }
+
+        // Then
+        let all = recorded.withLockedValue { $0 }
+        #expect(all.count == 13)
+        #expect(all.allSatisfy { $0.severity == .warning })
+        #expect(all.allSatisfy { $0.message.contains(PoolLagMonitor.Source.monitorThread.rawValue) })
+    }
+
+    /// A monitor that kept waking on time, with every probe beginning at once, is no evidence of
+    /// a stall: a lock held through that is an error.
+    @Test
+    func aHeldLock_whileTheMonitorKeptWakingOnTime_staysAnError() {
+        // Given
+        let clock = FakeClock()
+        let monitor = PoolLagMonitor(interval: 0.25, probes: Self.instantProbes, now: { clock.now })
+
+        // When
+        Self.keepWaking(monitor, clock: clock, for: 30)
+        let recorded = Self.record(Self.heldLock, lag: monitor.worstLag(within: NonFatalWatchdogTrait.lagWindow))
+
+        // Then
+        #expect(recorded.map(\.severity) == [.error])
+        #expect(recorded.first?.message == Self.heldLock)
+    }
+
+    /// A probe for every source that begins as soon as it is handed over.
+    private static let instantProbes: [PoolLagMonitor.Probe] = PoolLagMonitor.Source.allCases.map { source in
+        .init(source: source) { began in began() }
+    }
+
+    /// What the monitor's thread does on a healthy machine: wakes every `interval` and probes.
+    private static func keepWaking(_ monitor: PoolLagMonitor, clock: FakeClock, for seconds: Double) {
+        for _ in 0..<Int(seconds / 0.25) {
+            clock.advance(seconds: 0.25)
+            monitor.heartbeat()
+            monitor.tick()
+        }
+    }
+
     /// The real probes, on the real pools: they begin, and say how long that took.
     @Test
     func theStandardProbes_measureTheRealPools() async throws {

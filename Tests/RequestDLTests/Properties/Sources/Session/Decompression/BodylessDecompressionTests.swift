@@ -125,22 +125,110 @@ struct BodylessDecompressionTests {
         #expect(result.metrics?.transactions.allSatisfy { $0.error == nil } == true)
     }
 
-    /// A redirect with an encoding and no body is still a failure under `.nio`: it reaches the
-    /// delegate before there is a head to tell it apart by, and the redirect it was taking cannot
-    /// be resumed from there. It is for `async-http-client` (or what is in front of its
-    /// decompressor) to fix, and this fails the day it does.
-    @Test
-    private func aRedirectWithAnEncodingAndNoBody_stillFailsUnderNIO() async throws {
-        // Given
+    /// A redirect with an encoding and no body is followed under `.nio` too. The decompressor's
+    /// complaint about it came from inside AsyncHTTPClient, before the delegate had a head to tell
+    /// it apart by, and failed the redirect: it is now dropped in the pipeline, see
+    /// `Internals.NothingToDecode`.
+    @Test(arguments: [301, 302, 303, 307, 308])
+    private func aRedirectWithAnEncodingAndNoBody_isFollowedUnderNIO(_ status: Int) async throws {
+        // Given: the redirect, and where it goes, which is encoded too.
+        let target = try Server()
+        let body = try CustomDecompressorIntegrationTests.gzipCompressed("moved here")
+
+        target.respondOnce(
+            headers:
+                "HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\nContent-Length: \(body.count)\r\nConnection: close\r\n\r\n",
+            body: body
+        )
+
         let server = try Server()
         server.respondOnce(
             headers:
-                "HTTP/1.1 301 Moved Permanently\r\nLocation: http://127.0.0.1:1/x\r\nContent-Encoding: gzip\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+                "HTTP/1.1 \(status) Moved\r\nLocation: http://127.0.0.1:\(target.port)/moved\r\nContent-Encoding: gzip\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
             body: []
         )
 
+        // When
+        let result = try await DataTask {
+            BaseURL(.http, host: "127.0.0.1:\(server.port)")
+            Session().decompressionAlgorithms([.gzip]).requiredExecutor(.nio)
+        }
+        .result()
+
         // Then
-        await withKnownIssue {
+        #expect(result.head.status.code == 200)
+        #expect(String(decoding: result.payload, as: UTF8.self) == "moved here")
+        #expect(target.request.hasPrefix("GET /moved "))
+        #expect(result.metrics?.transactions.count == 2)
+        #expect(result.metrics?.transactions.allSatisfy { $0.error == nil } == true)
+    }
+
+    /// The same over HTTP/2, where the decompressor is in each stream's pipeline and not in the
+    /// connection's.
+    @Test
+    private func aRedirectWithAnEncodingAndNoBody_isFollowedUnderNIOOverHTTP2() async throws {
+        // Given: `HTTP2LocalServer` only speaks `h2`, so a request that completes went over it.
+        let server = try await HTTP2LocalServer.start { path in
+            if path == "/redirect" {
+                return (.movedPermanently, [("location", "/final"), ("content-encoding", "gzip")])
+            }
+
+            return (.ok, [("content-encoding", "gzip")])
+        }
+
+        let certificate = Certificates().server()
+
+        // When
+        let result: TaskResult<Data>
+
+        do {
+            result = try await DataTask {
+                BaseURL(server.baseURL)
+                Path("/redirect")
+                Session().decompressionAlgorithms([.gzip]).requiredExecutor(.nio)
+
+                SecureConnection {
+                    TrustRoots(certificate.certificateURL.absolutePath(percentEncoded: false))
+                }
+            }
+            .result()
+        } catch {
+            try await server.stop()
+            throw error
+        }
+
+        let requests = server.requests
+        try await server.stop()
+
+        // Then
+        #expect(result.head.status.code == 200)
+        #expect(requests.map(\.path) == ["/redirect", "/final"])
+        #expect(result.metrics?.transactions.allSatisfy { $0.error == nil } == true)
+    }
+
+    /// A redirect whose encoded body is cut short is still a failure: what is dropped is a
+    /// complaint about nothing, not about something that was there.
+    @Test
+    private func aRedirectWithATruncatedEncodedBody_isStillAFailureUnderNIO() async throws {
+        // Given: where it goes answers, so only the truncation can fail the request.
+        let target = try Server()
+        target.respondOnce(
+            headers: "HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\n",
+            body: Array("ok".utf8)
+        )
+
+        let complete = try CustomDecompressorIntegrationTests.gzipCompressed(String(repeating: "moved ", count: 100))
+        let truncated = Array(complete.prefix(10))
+
+        let server = try Server()
+        server.respondOnce(
+            headers:
+                "HTTP/1.1 301 Moved Permanently\r\nLocation: http://127.0.0.1:\(target.port)/moved\r\nContent-Encoding: gzip\r\nContent-Length: \(truncated.count)\r\nConnection: close\r\n\r\n",
+            body: truncated
+        )
+
+        // Then
+        await #expect(throws: (any Error).self) {
             _ = try await DataTask {
                 BaseURL(.http, host: "127.0.0.1:\(server.port)")
                 Session().decompressionAlgorithms([.gzip]).requiredExecutor(.nio)

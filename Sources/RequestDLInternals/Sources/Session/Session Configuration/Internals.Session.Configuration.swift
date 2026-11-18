@@ -18,6 +18,12 @@ extension Internals.Session {
 
         package var secureConnection: Internals.SecureConnection?
         package var redirectConfiguration: Internals.RedirectConfiguration?
+
+        /// The rules of every `URLOverride` the request declared, which the redirects of either
+        /// executor apply to each hop they follow. See ``Internals/URLOverrides``.
+        ///
+        /// Part of `==`: a pooled client follows redirects with the rules it was built with.
+        package var urlOverrides: Internals.URLOverrides = .init()
         package var timeout: Internals.Timeout = .init()
         package var connectionPool: Internals.ConnectionPool = .init()
         package var proxy: Internals.Proxy?
@@ -125,15 +131,31 @@ extension Internals.Session {
                 isProxied: proxy != nil
             )
 
+            // Without a configuration of its own AsyncHTTPClient follows redirects its own way, which
+            // knows nothing of the overrides: the default is spelled out when there are any.
+            let redirectConfiguration =
+                urlOverrides.isEmpty
+                ? redirectConfiguration
+                : (redirectConfiguration ?? .default)
+
             var configuration = HTTPClient.Configuration.init(
                 tlsConfiguration: secureConnectionOutput?.tlsConfiguration,
-                redirectConfiguration: redirectConfiguration?.build(),
+                redirectConfiguration: redirectConfiguration?.build(urlOverrides: urlOverrides),
                 timeout: timeout.build(),
                 connectionPool: connectionPool.build(),
                 proxy: proxy?.build(),
                 decompression: decompression.build(),
                 tracing: .init()
             )
+
+            // The decompressor fails a message it was given nothing of, a redirect included, which
+            // the delegate cannot recover from. On the connection for HTTP/1.1, and on every stream
+            // for HTTP/2, where each has a decompressor of its own. See
+            // `Internals.NothingToDecode`.
+            if case .enabled = configuration.decompression {
+                configuration.http1_1ConnectionDebugInitializer = Internals.NothingToDecode.install(on:)
+                configuration.http2StreamChannelDebugInitializer = Internals.NothingToDecode.install(on:)
+            }
 
             configuration.tlsCustomVerification = secureConnectionOutput?.tlsCustomVerification
             #if canImport(Darwin)
@@ -366,6 +388,7 @@ extension Internals.Session.Configuration: Equatable {
     package static func == (_ lhs: Self, _ rhs: Self) -> Bool {
         lhs.secureConnection == rhs.secureConnection
             && lhs.redirectConfiguration == rhs.redirectConfiguration
+            && lhs.urlOverrides == rhs.urlOverrides
             && lhs.timeout == rhs.timeout
             && lhs.connectionPool == rhs.connectionPool
             && lhs.proxy == rhs.proxy

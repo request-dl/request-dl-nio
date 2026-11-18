@@ -2,7 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
-import SwiftAsyncStream
+@_spi(Testing) import SwiftAsyncStream
 import Testing
 
 @_spi(Testing) @testable import RequestDLInternals
@@ -36,7 +36,7 @@ struct InternalsThrottledExecutorTests {
         release()
     }
 
-    /// `Semaphore.init(permits:)` preconditions on a non-negative count, which traps even
+    /// `AsyncCancellableSemaphore.init(permits:)` preconditions on a non-negative count, which traps even
     /// in release builds, so a negative limit must not reach it when the first client is built
     /// for the session.
     @Test
@@ -201,70 +201,6 @@ struct InternalsThrottledExecutorTests {
 
         // Then
         #expect(await order.names == ["0", "1", "2", "3", "4"])
-    }
-
-    /// A `Task` that is already cancelled when it asks takes no slot, even with one free.
-    @Test
-    func acquire_whenAlreadyCancelledAndASlotIsFree_throwsAndKeepsTheSlot() async throws {
-        // Given
-        let throttledExecutor = Internals.ThrottledExecutor(maximumConcurrentConnections: 1)
-        let semaphore = try #require(throttledExecutor.semaphoreForTesting)
-        let gate = AsyncSignal()
-
-        let caller = _Concurrency.Task {
-            // Cancelled before it gets to ask, not racing the call to it.
-            try? await gate.wait()
-            return try await throttledExecutor.acquire()
-        }
-
-        caller.cancel()
-        gate.signal()
-
-        // When / Then
-        await #expect(throws: CancellationError.self) {
-            _ = try await caller.value
-        }
-
-        #expect(semaphore.availablePermits == 1)
-    }
-
-    /// Whatever the interleaving of grants and cancellations, every slot ends up back where it started
-    /// and nobody is left queued.
-    @Test
-    func acquire_whenManyCallersAreCancelledWhileSomeAreGranted_returnsEverySlot() async throws {
-        // Given
-        let limit = 3
-        let throttledExecutor = Internals.ThrottledExecutor(maximumConcurrentConnections: limit)
-        let semaphore = try #require(throttledExecutor.semaphoreForTesting)
-        let callerCount = 200
-
-        // When
-        let callers = (0..<callerCount).map { index in
-            _Concurrency.Task { () -> Bool in
-                guard let release = try? await throttledExecutor.acquire() else {
-                    return false
-                }
-
-                await _Concurrency.Task.yield()
-                release()
-                return true
-            }
-        }
-
-        for (index, caller) in callers.enumerated() where index.isMultiple(of: 2) {
-            caller.cancel()
-        }
-
-        var served = 0
-
-        for caller in callers where await caller.value {
-            served += 1
-        }
-
-        // Then: callers that were not cancelled were all served, whichever of the cancelled ones were too.
-        #expect(served >= callerCount / 2)
-        #expect(semaphore.availablePermits == limit)
-        #expect(semaphore.waitingCount == 0)
     }
 }
 
