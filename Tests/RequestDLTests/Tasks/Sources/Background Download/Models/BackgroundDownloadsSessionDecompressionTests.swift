@@ -30,11 +30,11 @@ struct BackgroundDownloadsSessionDecompressionTests {
             // Given
             let plain = String(repeating: "a", count: 1_000) + String(repeating: "b", count: 777)
             let session = BackgroundDownloads.Session()
-            session.keepDecompressors([Self.algorithm(RLEDecompressor())], for: "episode")
 
             // When
             let events = try await Self.download(
                 id: "episode",
+                scheduledWith: [Self.algorithm(RLEDecompressor())],
                 to: destination,
                 encoding: "rle",
                 body: Self.rleEncode(plain),
@@ -87,11 +87,11 @@ struct BackgroundDownloadsSessionDecompressionTests {
         try await withTemporaryFileURL("destination.txt") { destination in
             // Given
             let session = BackgroundDownloads.Session()
-            session.keepDecompressors([Self.algorithm(RLEDecompressor())], for: "plain")
 
             // When
             let events = try await Self.download(
                 id: "plain",
+                scheduledWith: [Self.algorithm(RLEDecompressor())],
                 to: destination,
                 encoding: nil,
                 body: Array("not encoded".utf8),
@@ -109,11 +109,11 @@ struct BackgroundDownloadsSessionDecompressionTests {
         try await withTemporaryFileURL("destination.txt") { destination in
             // Given
             let session = BackgroundDownloads.Session()
-            session.keepDecompressors([Self.algorithm(RLEDecompressor())], for: "identity")
 
             // When
             _ = try await Self.download(
                 id: "identity",
+                scheduledWith: [Self.algorithm(RLEDecompressor())],
                 to: destination,
                 encoding: "identity",
                 body: Array("as is".utf8),
@@ -207,11 +207,11 @@ struct BackgroundDownloadsSessionDecompressionTests {
             // Given
             try Data("previous".utf8).write(to: destination)
             let session = BackgroundDownloads.Session()
-            session.keepDecompressors([Self.algorithm(RLEDecompressor())], for: "surprise")
 
             // When
             let events = try await Self.download(
                 id: "surprise",
+                scheduledWith: [Self.algorithm(RLEDecompressor())],
                 to: destination,
                 encoding: "zstd",
                 body: Array("bytes".utf8),
@@ -229,11 +229,11 @@ struct BackgroundDownloadsSessionDecompressionTests {
         try await withTemporaryFileURL("destination.txt") { destination in
             // Given
             let session = BackgroundDownloads.Session()
-            session.keepDecompressors([Self.algorithm(RLEDecompressor())], for: "stacked")
 
             // When
             let events = try await Self.download(
                 id: "stacked",
+                scheduledWith: [Self.algorithm(RLEDecompressor())],
                 to: destination,
                 encoding: "rle, rle",
                 body: Self.rleEncode("aa"),
@@ -253,11 +253,11 @@ struct BackgroundDownloadsSessionDecompressionTests {
             // Given
             try Data("previous".utf8).write(to: destination)
             let session = BackgroundDownloads.Session()
-            session.keepDecompressors([Self.algorithm(StrictDecompressor())], for: "cut")
 
             // When
             let events = try await Self.download(
                 id: "cut",
+                scheduledWith: [Self.algorithm(StrictDecompressor())],
                 to: destination,
                 encoding: "strict",
                 body: [97, 3, 98],
@@ -271,26 +271,182 @@ struct BackgroundDownloadsSessionDecompressionTests {
         }
     }
 
+    /// `finish()` of this decoder always throws, so the body is only "not finished" if it was
+    /// never asked: a body that never had a byte is no stream to finish.
     @Test
     func anEmptyBody_isNotFinished() async throws {
         try await withTemporaryFileURL("destination.txt") { destination in
             // Given
             let session = BackgroundDownloads.Session()
-            session.keepDecompressors([Self.algorithm(StrictDecompressor())], for: "empty")
 
             // When
             let events = try await Self.download(
                 id: "empty",
+                scheduledWith: [Self.algorithm(NeverFinishesDecompressor())],
                 to: destination,
-                encoding: "strict",
+                encoding: "never",
                 body: [],
-                session: session
+                session: session,
+                acceptedEncodings: ["never"]
             )
 
             // Then
-            #expect(Self.terminal(events).count == 1)
+            guard case .completed = try #require(Self.terminal(events).first) else {
+                Issue.record("Expected .completed, got \(events)")
+                return
+            }
             #expect(try Data(contentsOf: destination).isEmpty)
         }
+    }
+
+    @Test
+    func aBodyWithBytes_isFinished() async throws {
+        try await withTemporaryFileURL("destination.txt") { destination in
+            // Given
+            let session = BackgroundDownloads.Session()
+
+            // When
+            let events = try await Self.download(
+                id: "finished",
+                scheduledWith: [Self.algorithm(NeverFinishesDecompressor())],
+                to: destination,
+                encoding: "never",
+                body: [1],
+                session: session,
+                acceptedEncodings: ["never"]
+            )
+
+            // Then
+            #expect(try Self.failure(of: events) is NeverFinishesDecompressor.FinishedError)
+        }
+    }
+
+    /// Nothing but what the request asked for is decoded, a registered decompressor included.
+    @Test
+    func anEncodingThatWasNotAskedFor_isNotDecodedEvenWhenRegistered() async throws {
+        try await withTemporaryFileURL("destination.txt") { destination in
+            // Given
+            let session = BackgroundDownloads.Session()
+            session.register(Self.algorithm(RLEDecompressor()))
+
+            // When
+            let events = try await Self.download(
+                id: "unasked",
+                to: destination,
+                encoding: "rle",
+                body: Self.rleEncode("aa"),
+                session: session,
+                acceptedEncodings: ["strict"]
+            )
+
+            // Then
+            #expect((try Self.failure(of: events) as? UnsupportedContentEncodingError)?.value == "rle")
+        }
+    }
+
+    // MARK: - Pieces
+
+    /// A decoder's own unit of input (a pair, here) cut by the boundary between two reads.
+    @Test(arguments: [1, 2, 3, 5, 64 * 1024])
+    func aBoundaryInsideAUnitOfInput_isDecodedAcrossReads(_ chunkSize: Int) async throws {
+        try await withTemporaryFileURL("input.bin") { input in
+            let output = input.deletingLastPathComponent().appendingPathComponent("output.bin")
+            let plain = "aaabbbbcccccdddddd"
+            try Data(Self.rleEncode(plain)).write(to: input)
+            FileManager.default.createFile(atPath: output.path, contents: nil)
+
+            try BackgroundDownloads.Session.decode(
+                from: input,
+                to: output,
+                using: Self.algorithm(RLEDecompressor()),
+                chunkSize: chunkSize
+            )
+
+            #expect(try String(contentsOf: output, encoding: .utf8) == plain)
+        }
+    }
+
+    // MARK: - Accept-Encoding
+
+    @Test
+    func aListOfWhatTheSystemDecodes_leavesAcceptEncodingAlone() throws {
+        var request = URLRequest(url: try #require(URL(string: "https://example.invalid")))
+
+        let algorithms = BackgroundDownloads.Session.takingOverAcceptEncoding(
+            of: &request,
+            for: .enabled(algorithms: [Self.algorithm(GzipAlgorithm()), Self.algorithm(DeflateAlgorithm())], limit: .none)
+        )
+
+        #expect(algorithms == nil)
+        #expect(request.value(forHTTPHeaderField: "Accept-Encoding") == nil)
+    }
+
+    @Test
+    func disabled_leavesAcceptEncodingAlone() throws {
+        var request = URLRequest(url: try #require(URL(string: "https://example.invalid")))
+
+        let algorithms = BackgroundDownloads.Session.takingOverAcceptEncoding(of: &request, for: .disabled)
+
+        #expect(algorithms == nil)
+        #expect(request.value(forHTTPHeaderField: "Accept-Encoding") == nil)
+    }
+
+    @Test
+    func aCustomAlgorithm_takesOverAcceptEncoding() throws {
+        var request = URLRequest(url: try #require(URL(string: "https://example.invalid")))
+        request.setValue("gzip", forHTTPHeaderField: "Accept-Encoding")
+
+        let algorithms = BackgroundDownloads.Session.takingOverAcceptEncoding(
+            of: &request,
+            for: .enabled(algorithms: [Self.algorithm(RLEDecompressor())], limit: .none)
+        )
+
+        #expect(algorithms?.map(\.contentEncodingValue) == ["rle"])
+        #expect(request.value(forHTTPHeaderField: "Accept-Encoding") == "rle")
+    }
+
+    // MARK: - Resuming
+
+    @Test
+    func aResumedDownloadWhoseRequestDidNotTakeOverAcceptEncoding_isNotDecoded() throws {
+        var request = URLRequest(url: try #require(URL(string: "https://example.invalid")))
+        let algorithms = [Self.algorithm(RLEDecompressor())]
+
+        #expect(BackgroundDownloads.Session.decompression(algorithms, resumedFrom: request) == nil)
+
+        request.setValue("rle", forHTTPHeaderField: "Accept-Encoding")
+        #expect(BackgroundDownloads.Session.decompression(algorithms, resumedFrom: request)?.count == 1)
+    }
+
+    @Test
+    func aResumedDownloadWithoutARequest_keepsWhatWasConfigured() {
+        let algorithms = [Self.algorithm(RLEDecompressor())]
+
+        #expect(BackgroundDownloads.Session.decompression(algorithms, resumedFrom: nil)?.count == 1)
+        #expect(BackgroundDownloads.Session.decompression(nil, resumedFrom: nil) == nil)
+    }
+
+    // MARK: - Registry
+
+    /// Forgetting one task's algorithms leaves another's, even under the same `id`: a download
+    /// cancelled for its resume data and scheduled again is a new task whose predecessor's
+    /// completion arrives after it.
+    @Test
+    func forgettingATask_leavesTheNewerOneUnderTheSameID() throws {
+        let session = BackgroundDownloads.Session()
+        let url = try #require(URL(string: "https://example.invalid"))
+        let urlSession = URLSession(configuration: .ephemeral)
+        defer { urlSession.invalidateAndCancel() }
+
+        let old = urlSession.downloadTask(with: url)
+        let new = urlSession.downloadTask(with: url)
+        session.keepDecompressors([Self.algorithm(RLEDecompressor())], for: old)
+        session.keepDecompressors([Self.algorithm(RLEDecompressor())], for: new)
+
+        session.forgetDecompressors(for: old)
+
+        #expect(session.decompressor(forEncoding: "rle", task: old) == nil)
+        #expect(session.decompressor(forEncoding: "rle", task: new) != nil)
     }
 
     // MARK: - taskDescription
@@ -344,6 +500,7 @@ struct BackgroundDownloadsSessionDecompressionTests {
     /// produced, once the terminal one has fired.
     private static func download(
         id: String,
+        scheduledWith algorithms: [any Internals.DecompressionAlgorithm]? = nil,
         to destination: URL,
         encoding: String?,
         body: [UInt8],
@@ -370,6 +527,7 @@ struct BackgroundDownloadsSessionDecompressionTests {
         }
 
         let task = urlSession.downloadTask(with: request)
+        session.keepDecompressors(algorithms, for: task)
         task.taskDescription = BackgroundDownloads.Session.encode(
             id: id,
             destination: destination,
@@ -449,6 +607,20 @@ struct BackgroundDownloadsSessionDecompressionTests {
                 if isMidPair { throw TruncatedError() }
                 return []
             }
+        }
+    }
+
+    /// Reads every byte and then refuses to finish.
+    private struct NeverFinishesDecompressor: Decompressor {
+        struct FinishedError: Error {}
+
+        var contentEncodingValue: String { "never" }
+
+        func callAsFunction() throws -> any DecompressorStream { Stream() }
+
+        struct Stream: DecompressorStream {
+            mutating func callAsFunction(decompressing bytes: [UInt8]) throws -> [UInt8] { bytes }
+            func finish() throws -> [UInt8] { throw FinishedError() }
         }
     }
 

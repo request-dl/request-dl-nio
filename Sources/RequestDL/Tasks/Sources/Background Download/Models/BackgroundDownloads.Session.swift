@@ -81,9 +81,13 @@ extension BackgroundDownloads {
         /// `content` no longer exist.
         private var _registeredDecompressors: [String: any Internals.DecompressionAlgorithm] = [:]
 
-        /// What each download scheduled by *this* process configured, by `id`. Dropped as soon as
-        /// the download ends, and empty after a relaunch.
-        private var _scheduledDecompressors: [String: [any Internals.DecompressionAlgorithm]] = [:]
+        /// What each download scheduled by *this* process configured, by the identifier of its
+        /// `URLSessionTask`. Dropped as soon as that task ends, and empty after a relaunch.
+        ///
+        /// Not by `id`: a download that is cancelled for its resume data and scheduled again under
+        /// the same `id` is a new task, and the old one's completion, which arrives after, must not
+        /// take the new one's algorithms away.
+        private var _scheduledDecompressors: [Int: [any Internals.DecompressionAlgorithm]] = [:]
 
         // MARK: - Internal properties
 
@@ -103,7 +107,7 @@ extension BackgroundDownloads {
             decompression: [any Internals.DecompressionAlgorithm]? = nil
         ) {
             let task = urlSession().downloadTask(with: request)
-            keepDecompressors(decompression, for: id)
+            keepDecompressors(decompression, for: task)
             task.taskDescription = Self.encode(
                 id: id,
                 destination: destination,
@@ -130,18 +134,19 @@ extension BackgroundDownloads {
             host: String? = nil,
             decompression: [any Internals.DecompressionAlgorithm]? = nil
         ) {
-            keepDecompressors(decompression, for: id)
-            let task = Self.makeTask(
-                in: urlSession(),
-                resumingFrom: resumeData,
-                description: Self.encode(
-                    id: id,
-                    destination: destination,
-                    serverTrust: serverTrust,
-                    clientIdentity: clientIdentity,
-                    clientIdentityHost: clientIdentity == nil ? nil : host,
-                    acceptedEncodings: decompression?.map { $0.contentEncodingValue.lowercased() }
-                )
+            let task = Self.makeTask(in: urlSession(), resumingFrom: resumeData, description: nil)
+
+            // What was asked for is what the request that stopped asked for, which is in the resume
+            // data and not in `content`. See `decompression(_:resumedFrom:)`.
+            let decompression = Self.decompression(decompression, resumedFrom: task.originalRequest)
+            keepDecompressors(decompression, for: task)
+            task.taskDescription = Self.encode(
+                id: id,
+                destination: destination,
+                serverTrust: serverTrust,
+                clientIdentity: clientIdentity,
+                clientIdentityHost: clientIdentity == nil ? nil : host,
+                acceptedEncodings: decompression?.map { $0.contentEncodingValue.lowercased() }
             )
 
             task.resume()
@@ -151,21 +156,24 @@ extension BackgroundDownloads {
             lock.withLock { _registeredDecompressors[algorithm.contentEncodingValue.lowercased()] = algorithm }
         }
 
-        /// The algorithm that decodes `encoding` (lowercased) for the download `id`: the one that
-        /// download was scheduled with in this process, else one the app registered.
-        func decompressor(forEncoding encoding: String, id: String) -> (any Internals.DecompressionAlgorithm)? {
+        /// The algorithm that decodes `encoding` (lowercased) for `task`: the one it was scheduled
+        /// with in this process, else one the app registered.
+        func decompressor(
+            forEncoding encoding: String,
+            task: URLSessionTask
+        ) -> (any Internals.DecompressionAlgorithm)? {
             lock.withLock {
-                _scheduledDecompressors[id]?.first { $0.contentEncodingValue.lowercased() == encoding }
+                _scheduledDecompressors[task.taskIdentifier]?.first { $0.contentEncodingValue.lowercased() == encoding }
                     ?? _registeredDecompressors[encoding]
             }
         }
 
-        func forgetDecompressors(for id: String) {
-            lock.withLock { _scheduledDecompressors[id] = nil }
+        func forgetDecompressors(for task: URLSessionTask) {
+            lock.withLock { _scheduledDecompressors[task.taskIdentifier] = nil }
         }
 
-        func keepDecompressors(_ algorithms: [any Internals.DecompressionAlgorithm]?, for id: String) {
-            lock.withLock { _scheduledDecompressors[id] = algorithms }
+        func keepDecompressors(_ algorithms: [any Internals.DecompressionAlgorithm]?, for task: URLSessionTask) {
+            lock.withLock { _scheduledDecompressors[task.taskIdentifier] = algorithms }
         }
 
         /// Forwarded from `application(_:handleEventsForBackgroundURLSession:completionHandler:)`.
@@ -440,7 +448,7 @@ extension BackgroundDownloads {
                 return
             }
 
-            defer { forgetDecompressors(for: id) }
+            defer { forgetDecompressors(for: downloadTask) }
 
             // URLSession calls this for *any* HTTP status, so without this an error page would
             // replace the file already at `destination` and be reported as `.completed`. Checked
@@ -482,8 +490,7 @@ extension BackgroundDownloads {
                 let decoded = try decodedFile(
                     from: location,
                     response: downloadTask.response,
-                    taskDescription: downloadTask.taskDescription,
-                    id: id,
+                    task: downloadTask,
                     destination: destination
                 )
                 let source = decoded ?? location
@@ -540,7 +547,7 @@ extension BackgroundDownloads {
                 return
             }
 
-            forgetDecompressors(for: id)
+            forgetDecompressors(for: task)
             onEvent?(.failed(id: id, destination: destination, error: error))
         }
 

@@ -85,6 +85,11 @@ import struct Foundation.URL
 /// or such a download fails with ``BackgroundDownloadMissingDecompressorError``. The progress is
 /// in the encoded bytes, as that is what travels.
 ///
+/// Do not list ``GzipAlgorithm``, ``DeflateAlgorithm`` or ``BrotliURLSessionOnlyAlgorithm`` next to
+/// an algorithm of your own: they only stand for the system's decoding, which taking over
+/// `Accept-Encoding` turns off, so a response encoded with one of them fails, as it does for the
+/// foreground `.urlSession` executor. Leave them out and the server is asked for yours alone.
+///
 /// ## Client certificates
 ///
 /// A client certificate (mTLS) works too, as long as both ``Certificate`` and ``PrivateKey`` come
@@ -202,20 +207,12 @@ public struct BackgroundDownloadTask<Content: Property> {
 
         var request = try resolved.requestConfiguration.buildURLRequestWithoutBody()
 
-        // The same rule the foreground `.urlSession` executor follows: CFNetwork decodes gzip,
-        // deflate and br on its own, and the only way to hand it anything else is to take over
-        // `Accept-Encoding`, which switches that off for all of them. What then comes back is
-        // decoded when the download finishes, see `BackgroundDownloads.Session.decodedFile`.
-        //
-        // Not for `.disabled`, which keeps what a background download has always done: the system
-        // decides.
-        var decompression: [any Internals.DecompressionAlgorithm]?
-        let configured = resolved.session.configuration.decompression
-
-        if case .enabled(let algorithms, _) = configured, configured.requiresManualURLSessionHandling {
-            request.setValue(configured.acceptEncoding, forHTTPHeaderField: "Accept-Encoding")
-            decompression = algorithms
-        }
+        // See `BackgroundDownloads.Session.takingOverAcceptEncoding`. What then comes back is decoded
+        // when the download finishes, see `BackgroundDownloads.Session.decodedFile`.
+        let decompression = BackgroundDownloads.Session.takingOverAcceptEncoding(
+            of: &request,
+            for: resolved.session.configuration.decompression
+        )
 
         if let resumeData {
             BackgroundDownloads.Session.shared.schedule(

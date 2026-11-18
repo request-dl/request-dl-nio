@@ -89,6 +89,8 @@ BackgroundDownloads.onEvent = { event in /* ... */ }
 
 A download that needs one that is not registered fails with ``BackgroundDownloadMissingDecompressorError``. Its file is not kept, as it is encoded and the system removes it when the callback returns: schedule the download again once the decompressor is registered.
 
+Only what the request asked for is decoded. Do not list ``GzipAlgorithm``, ``DeflateAlgorithm`` or ``BrotliURLSessionOnlyAlgorithm`` next to an algorithm of your own: they only stand for the system's decoding, which asking for yours turns off, so a response encoded with one of them fails, as it does for the foreground `.urlSession` executor. Leave them out and the server is asked for yours alone. A download continued from resume data is decoded, or not, by what the request that stopped asked for, so the content you pass when continuing has to list the same algorithms.
+
 > Note: Decoding runs inside the system's callback, so it counts against the time the system gives the app to handle the event, and a very slow codec on a very large file can run out of it. A list with only gzip, deflate and brotli never pays that, because the system decodes them as the bytes arrive.
 
 ## Cancelling a download
