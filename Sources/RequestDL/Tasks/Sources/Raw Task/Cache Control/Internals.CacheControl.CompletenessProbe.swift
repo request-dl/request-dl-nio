@@ -39,13 +39,16 @@ extension Internals.CacheControl {
         /// How long the probe may take before it is given up on. A server that accepts the
         /// request and never answers would otherwise hold the cache write, and everything
         /// waiting on it, for as long as the transport's own timeout lets it.
-        static let timeLimitInNanoseconds: UInt64 = 30_000_000_000
+        static let defaultTimeLimitInNanoseconds: UInt64 = 30_000_000_000
 
         // MARK: - Internal properties
 
         let client: any RequestExecutingClient
         let requestConfiguration: RequestConfiguration
         let logger: Internals.TaskLogger?
+
+        /// Only a test sets it to anything but ``defaultTimeLimitInNanoseconds``.
+        var timeLimitInNanoseconds = Self.defaultTimeLimitInNanoseconds
 
         // MARK: - Internal static methods
 
@@ -142,7 +145,7 @@ extension Internals.CacheControl {
             let request = configuration
             let client = client
             let logger = logger
-            let limit = Self.timeLimitInNanoseconds
+            let limit = timeLimitInNanoseconds
 
             let head: Internals.ResponseHead? = await withTaskGroup(of: Internals.ResponseHead?.self) { group in
                 group.addTask {
