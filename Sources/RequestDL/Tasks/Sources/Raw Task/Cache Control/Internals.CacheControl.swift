@@ -23,7 +23,7 @@ extension Internals {
             /// measured on the way, when the cache was consulted by a conditional request that did
             /// not settle the matter, and comes before whatever the request itself measures.
             case cache(
-                (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
+                (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.Chunk>?)?,
                 revalidation: [Internals.TransactionMetrics]
             )
         }
@@ -433,7 +433,7 @@ extension Internals {
             var body = body
 
             if !firstPiece.isEmpty, !window.isReleased {
-                download.append(await Internals.DataBuffer(firstPiece))
+                download.append(Internals.Chunk(firstPiece))
             }
 
             while body.readableBytes > .zero, !window.isReleased {
@@ -449,7 +449,7 @@ extension Internals {
                     break
                 }
 
-                download.append(await Internals.DataBuffer(piece))
+                download.append(Internals.Chunk(piece))
             }
 
             download.close()
@@ -715,12 +715,12 @@ extension Internals {
         private func cacheIfNeeded(
             dataCache: DataCache,
             requestConfiguration: RequestConfiguration
-        ) async throws -> (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)? {
+        ) async throws -> (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.Chunk>?)? {
             guard requestConfiguration.isCacheEnabled else {
                 return nil
             }
 
-            return { head -> Internals.AsyncStream<Internals.DataBuffer>? in
+            return { head -> Internals.AsyncStream<Internals.Chunk>? in
                 let headHeaders = RequestDL.HTTPHeaders(head.headers.map { ($0.name, $0.value) })
 
                 let vary = varyFields(of: headHeaders)
@@ -834,7 +834,7 @@ extension Internals {
         /// the NIO executors. Stopping here, and closing the stream, makes every later append a
         /// no op.
         static func write(
-            _ asyncBuffers: Internals.AsyncStream<Internals.DataBuffer>,
+            _ asyncBuffers: Internals.AsyncStream<Internals.Chunk>,
             to cacheBuffer: inout DataCache.Buffer
         ) async throws {
             guard !cacheBuffer.hasNowhereToWrite else {
@@ -842,11 +842,10 @@ extension Internals {
                 return
             }
 
-            for try await buffer in asyncBuffers {
-                // By value, not `inout`. This is `DataCache.Buffer.writeBuffer`, which reads
-                // through `getData()` and leaves the argument's cursor alone, not the draining
-                // `Internals.Buffer.writeBuffer(_:)`.
-                await cacheBuffer.writeBuffer(buffer)
+            for try await chunk in asyncBuffers {
+                // The chunk is the very value the reader of the download holds too. Writing it
+                // reads nothing and copies nothing but into the tiers themselves.
+                await cacheBuffer.writeData(chunk.data)
 
                 if cacheBuffer.hasNowhereToWrite {
                     asyncBuffers.close()

@@ -42,7 +42,7 @@ package protocol RequestExecutingClient: Sendable {
     func execute(
         configuration: RequestConfiguration,
         decompression: Internals.Decompression,
-        cache: (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
+        cache: (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.Chunk>?)?,
         logger: Internals.TaskLogger?,
         transferControl: Internals.TransferControl?
     ) async throws -> SessionTask

@@ -31,7 +31,7 @@ struct ResumableUploadExecutionStubTests {
         func execute(
             configuration: RequestConfiguration,
             decompression: Internals.Decompression,
-            cache: (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
+            cache: (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.Chunk>?)?,
             logger: Internals.TaskLogger?,
             transferControl: Internals.TransferControl?
         ) async throws -> SessionTask {
@@ -882,7 +882,7 @@ struct ResumableUploadExecutionStubTests {
     ) async -> SessionTask {
         let upload = Internals.AsyncStream<Int>()
         let heads = Internals.AsyncStream<Internals.ResponseHead>()
-        let download = Internals.AsyncStream<Internals.DataBuffer>()
+        let download = Internals.AsyncStream<Internals.Chunk>()
 
         upload.close()
         heads.append(.success(head))
@@ -897,7 +897,7 @@ struct ResumableUploadExecutionStubTests {
             break
         case .piecesThenEndless(let count, let size):
             for _ in 0..<count {
-                download.append(.success(await Internals.DataBuffer(Data(repeating: 7, count: size))))
+                download.append(.success(Internals.Chunk(Data(repeating: 7, count: size))))
             }
         }
 

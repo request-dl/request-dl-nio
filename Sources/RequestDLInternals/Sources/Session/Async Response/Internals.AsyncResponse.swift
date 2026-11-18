@@ -18,7 +18,7 @@ extension Internals {
             package let download:
                 (
                     head: Internals.AsyncStream<Internals.ResponseHead>,
-                    bytes: Internals.AsyncStream<Internals.DataBuffer>
+                    bytes: Internals.AsyncStream<Internals.Chunk>
                 )?
 
             // MARK: - Internal methods
@@ -102,7 +102,7 @@ extension Internals {
         private let decompressionDispatch: Internals.ManualDecompressionDispatch
         private let readingMode: Internals.DownloadStep.ReadingMode
         private let head: Internals.AsyncStream<Internals.ResponseHead>
-        private let download: Internals.AsyncStream<Internals.DataBuffer>
+        private let download: Internals.AsyncStream<Internals.Chunk>
 
         // MARK: - Inits
 
@@ -113,7 +113,7 @@ extension Internals {
             decompressionDispatch: Internals.ManualDecompressionDispatch,
             readingMode: Internals.DownloadStep.ReadingMode,
             head: Internals.AsyncStream<Internals.ResponseHead>,
-            download: Internals.AsyncStream<Internals.DataBuffer>
+            download: Internals.AsyncStream<Internals.Chunk>
         ) {
             self.logger = logger
             self.uploadingBytes = uploadingBytes

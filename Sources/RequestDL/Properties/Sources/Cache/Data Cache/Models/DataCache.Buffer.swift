@@ -102,6 +102,12 @@ extension DataCache {
                 return
             }
 
+            await writeData(bytes)
+        }
+
+        /// Writes `bytes`, which are already in memory (a chunk of a download), to every tier that
+        /// is still open.
+        mutating func writeData(_ bytes: Data) async {
             let count = Int64(bytes.count)
 
             // A tier is admitted a write by the response's `Content-Length`, which is 0 when there

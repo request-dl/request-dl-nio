@@ -49,12 +49,12 @@ struct CacheWriteTests {
     /// counts what is still waiting in it.
     private func makeStream(
         count: Int
-    ) async -> (Internals.AsyncStream<Internals.DataBuffer>, Internals.FlowControlWindow) {
+    ) async -> (Internals.AsyncStream<Internals.Chunk>, Internals.FlowControlWindow) {
         let window = Internals.FlowControlWindow()
-        let stream = Internals.AsyncStream<Internals.DataBuffer>(flowControl: window)
+        let stream = Internals.AsyncStream<Internals.Chunk>(flowControl: window)
 
         for _ in 0..<count {
-            stream.append(.success(await Internals.DataBuffer(Data(repeating: 0x61, count: chunk))))
+            stream.append(.success(Internals.Chunk(Data(repeating: 0x61, count: chunk))))
         }
 
         stream.close()

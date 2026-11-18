@@ -74,7 +74,7 @@ extension Internals {
             readingMode: Internals.DownloadStep.ReadingMode,
             uploadingBytes: Int,
             decompression: Internals.Decompression = .disabled,
-            cache: ((Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
+            cache: ((Internals.ResponseHead) -> Internals.AsyncStream<Internals.Chunk>?)?,
             logger: Internals.TaskLogger?,
             flowControl: Internals.FlowControlWindow = .init(),
             transferControl: Internals.TransferControl? = nil

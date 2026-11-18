@@ -63,9 +63,9 @@ struct InternalsManualDecompressionDispatchTests {
     @Test
     func resolvedStream_whenDispatching_decodesEveryChunk() async throws {
         // Given
-        let source = Internals.AsyncStream<Internals.DataBuffer>()
-        source.append(.success(await Internals.DataBuffer(Array("hello ".utf8))))
-        source.append(.success(await Internals.DataBuffer(Array("world".utf8))))
+        let source = Internals.AsyncStream<Internals.Chunk>()
+        source.append(.success(Internals.Chunk(Array("hello ".utf8))))
+        source.append(.success(Internals.Chunk(Array("world".utf8))))
         source.close()
 
         let dispatch = Internals.ManualDecompressionDispatch.dispatch(algorithms: [MockIdentityAlgorithm()])
@@ -79,8 +79,8 @@ struct InternalsManualDecompressionDispatchTests {
 
         var iterator = output.makeAsyncIterator()
         var collected = Data()
-        while var chunk = try await iterator.next() {
-            collected += await chunk.readData(chunk.readableBytes) ?? Data()
+        while let chunk = try await iterator.next() {
+            collected += chunk.data
         }
 
         // Then
@@ -102,8 +102,8 @@ struct InternalsManualDecompressionDispatchTests {
     @Test
     func resolvedStream_whenDispatching_releasesBufferToFirstReaderOnly() async throws {
         // Given
-        let source = Internals.AsyncStream<Internals.DataBuffer>()
-        source.append(.success(await Internals.DataBuffer(Array("hello".utf8))))
+        let source = Internals.AsyncStream<Internals.Chunk>()
+        source.append(.success(Internals.Chunk(Array("hello".utf8))))
         source.close()
 
         let dispatch = Internals.ManualDecompressionDispatch.dispatch(algorithms: [MockIdentityAlgorithm()])
@@ -136,7 +136,7 @@ struct InternalsManualDecompressionDispatchTests {
     @Test
     func resolvedStream_whenContentEncodingIsStackedAcrossFieldLines_throws() async throws {
         // Given
-        let source = Internals.AsyncStream<Internals.DataBuffer>()
+        let source = Internals.AsyncStream<Internals.Chunk>()
         source.close()
 
         let dispatch = Internals.ManualDecompressionDispatch.dispatch(algorithms: [MockIdentityAlgorithm()])
@@ -157,7 +157,7 @@ struct InternalsManualDecompressionDispatchTests {
     @Test
     func resolvedStream_whenContentEncodingIsStackedInOneFieldLine_throws() async throws {
         // Given
-        let source = Internals.AsyncStream<Internals.DataBuffer>()
+        let source = Internals.AsyncStream<Internals.Chunk>()
         source.close()
 
         let dispatch = Internals.ManualDecompressionDispatch.dispatch(algorithms: [MockIdentityAlgorithm()])
@@ -177,8 +177,8 @@ struct InternalsManualDecompressionDispatchTests {
     @Test
     func resolvedStream_whenIdentityIsStackedAlongsideARealEncoding_decodesTheRealOne() async throws {
         // Given
-        let source = Internals.AsyncStream<Internals.DataBuffer>()
-        source.append(.success(await Internals.DataBuffer(Array("hello world".utf8))))
+        let source = Internals.AsyncStream<Internals.Chunk>()
+        source.append(.success(Internals.Chunk(Array("hello world".utf8))))
         source.close()
 
         let dispatch = Internals.ManualDecompressionDispatch.dispatch(algorithms: [MockIdentityAlgorithm()])
@@ -192,8 +192,8 @@ struct InternalsManualDecompressionDispatchTests {
 
         var iterator = output.makeAsyncIterator()
         var collected = Data()
-        while var chunk = try await iterator.next() {
-            collected += await chunk.readData(chunk.readableBytes) ?? Data()
+        while let chunk = try await iterator.next() {
+            collected += chunk.data
         }
 
         // Then
@@ -246,10 +246,10 @@ struct InternalsManualDecompressionDispatchTests {
     func resolvedStream_whenNeverRead_cancelsTheDecompressionTaskInsteadOfRunningForever() async throws {
         // Given
         let counter = CallCounter()
-        let source = Internals.AsyncStream<Internals.DataBuffer>()
+        let source = Internals.AsyncStream<Internals.Chunk>()
         let dispatch = Internals.ManualDecompressionDispatch.dispatch(algorithms: [CountingAlgorithm(counter: counter)])
 
-        source.append(.success(await Internals.DataBuffer(Array("first".utf8))))
+        source.append(.success(Internals.Chunk(Array("first".utf8))))
 
         // When: the resolved stream is created and immediately discarded (assigned to nothing,
         // never iterated), exactly the "inspected only the response head" scenario this guards
@@ -268,8 +268,8 @@ struct InternalsManualDecompressionDispatchTests {
 
         // More data keeps arriving on `source` well after the stream that would have consumed it
         // was discarded.
-        source.append(.success(await Internals.DataBuffer(Array("second".utf8))))
-        source.append(.success(await Internals.DataBuffer(Array("third".utf8))))
+        source.append(.success(Internals.Chunk(Array("second".utf8))))
+        source.append(.success(Internals.Chunk(Array("third".utf8))))
         source.close()
 
         try await Task.sleep(nanoseconds: 100_000_000)
@@ -283,8 +283,8 @@ struct InternalsManualDecompressionDispatchTests {
     @Test
     func resolvedStream_whenContentEncodingHasSurroundingWhitespace_stillMatches() async throws {
         // Given
-        let source = Internals.AsyncStream<Internals.DataBuffer>()
-        source.append(.success(await Internals.DataBuffer(Array("hello world".utf8))))
+        let source = Internals.AsyncStream<Internals.Chunk>()
+        source.append(.success(Internals.Chunk(Array("hello world".utf8))))
         source.close()
 
         let dispatch = Internals.ManualDecompressionDispatch.dispatch(algorithms: [MockIdentityAlgorithm()])
@@ -298,8 +298,8 @@ struct InternalsManualDecompressionDispatchTests {
 
         var iterator = output.makeAsyncIterator()
         var collected = Data()
-        while var chunk = try await iterator.next() {
-            collected += await chunk.readData(chunk.readableBytes) ?? Data()
+        while let chunk = try await iterator.next() {
+            collected += chunk.data
         }
 
         // Then
@@ -316,12 +316,12 @@ struct InternalsManualDecompressionDispatchTests {
 
     /// A metered source whose decoded stream nobody is reading yet, with 16 KiB already waiting
     /// in it: sixteen times what either window lets through before pausing.
-    private func meteredSource() async -> (Internals.AsyncStream<Internals.DataBuffer>, Internals.FlowControlWindow) {
+    private func meteredSource() async -> (Internals.AsyncStream<Internals.Chunk>, Internals.FlowControlWindow) {
         let window = Internals.FlowControlWindow(highWatermark: 1_024, lowWatermark: 512)
-        let source = Internals.AsyncStream<Internals.DataBuffer>(flowControl: window)
+        let source = Internals.AsyncStream<Internals.Chunk>(flowControl: window)
 
         for offset in stride(from: 0, to: 16_384, by: 1_024) {
-            source.append(.success(await Internals.DataBuffer(pattern(offset..<offset + 1_024))))
+            source.append(.success(Internals.Chunk(pattern(offset..<offset + 1_024))))
         }
 
         source.close()
@@ -417,7 +417,7 @@ struct InternalsManualDecompressionDispatchTests {
     @Test
     func resolvedStream_whenSourceIsNotMetered_leavesTheOutputUnmetered() async throws {
         // Given
-        let source = Internals.AsyncStream<Internals.DataBuffer>()
+        let source = Internals.AsyncStream<Internals.Chunk>()
         source.close()
 
         let dispatch = Internals.ManualDecompressionDispatch.dispatch(algorithms: [MockIdentityAlgorithm()])
@@ -533,20 +533,20 @@ struct InternalsManualDecompressionDispatchTests {
         #expect(try await collect(output) == Data("body-tail".utf8))
     }
 
-    private func collect(_ stream: Internals.AsyncStream<Internals.DataBuffer>) async throws -> Data {
+    private func collect(_ stream: Internals.AsyncStream<Internals.Chunk>) async throws -> Data {
         var iterator = stream.makeAsyncIterator()
         var collected = Data()
 
-        while var chunk = try await iterator.next() {
-            collected += await chunk.readData(chunk.readableBytes) ?? Data()
+        while let chunk = try await iterator.next() {
+            collected += chunk.data
         }
 
         return collected
     }
 
-    private func source(_ string: String) async -> Internals.AsyncStream<Internals.DataBuffer> {
-        let source = Internals.AsyncStream<Internals.DataBuffer>()
-        source.append(.success(await Internals.DataBuffer(Array(string.utf8))))
+    private func source(_ string: String) async -> Internals.AsyncStream<Internals.Chunk> {
+        let source = Internals.AsyncStream<Internals.Chunk>()
+        source.append(.success(Internals.Chunk(Array(string.utf8))))
         source.close()
         return source
     }
@@ -586,7 +586,7 @@ struct InternalsManualDecompressionDispatchTests {
         #expect(throws: Internals.UnsupportedContentEncodingError.self) {
             _ = try dispatch.resolvedStream(
                 for: responseHead(contentEncoding: "identity, gzip"),
-                source: Internals.AsyncStream<Internals.DataBuffer>(),
+                source: Internals.AsyncStream<Internals.Chunk>(),
                 readingMode: .passthrough
             )
         }
@@ -629,10 +629,10 @@ struct InternalsManualDecompressionDispatchTests {
         of parts: [String],
         readingMode: Internals.DownloadStep.ReadingMode
     ) async throws -> [String] {
-        let source = Internals.AsyncStream<Internals.DataBuffer>()
+        let source = Internals.AsyncStream<Internals.Chunk>()
 
         for part in parts {
-            source.append(.success(await Internals.DataBuffer(Array(part.utf8))))
+            source.append(.success(Internals.Chunk(Array(part.utf8))))
         }
 
         source.close()
@@ -647,8 +647,8 @@ struct InternalsManualDecompressionDispatchTests {
         var chunks = [String]()
         var iterator = output.makeAsyncIterator()
 
-        while var chunk = try await iterator.next() {
-            chunks.append(String(decoding: await chunk.readData(chunk.readableBytes) ?? Data(), as: UTF8.self))
+        while let chunk = try await iterator.next() {
+            chunks.append(String(decoding: chunk.data, as: UTF8.self))
         }
 
         return chunks

@@ -82,7 +82,7 @@ extension Internals.URLSessionClient {
         var count = 0
 
         func handOver() {
-            downloadBuffer.append(makeBuffer(Data(bytes: storage, count: count)))
+            downloadBuffer.append(Internals.Chunk(Data(bytes: storage, count: count)))
             deliveredBytes += Int64(count)
             count = .zero
         }
@@ -220,15 +220,6 @@ extension Internals.URLSessionClient {
         if count > .zero {
             await flush()
         }
-    }
-
-    /// Synchronous, in-memory construction, and deliberately not from an `async` context, where
-    /// `Internals.DataBuffer`'s `async` initializer would be picked instead: see
-    /// `TaskDelegate.urlSession(_:dataTask:didReceive:)` for why the order of appends must not
-    /// depend on it.
-    private static func makeBuffer(_ data: Data) -> Internals.DataBuffer {
-        // Adopted, not written: `replace(with:)` would copy the block into the store again.
-        Internals.DataBuffer(Internals.ByteURL(adopting: data))
     }
 
     /// The most bytes `pumpResponseBody` holds back before a flush regardless of `readingMode`.
