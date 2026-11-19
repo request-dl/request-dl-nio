@@ -151,7 +151,8 @@ struct InternalsChunkTests {
         // across the edge between two packets.
         let separator: [UInt8] = [0x0D, 0x0A, 0x0D]
         let alphabet: [UInt8] = [0x0D, 0x0A, 0x41]
-        let text = Data((0..<Int.random(in: 0...2_000, using: &generator)).map { _ in alphabet.randomElement(using: &generator)! })
+        let textLength = Int.random(in: 0...2_000, using: &generator)
+        let text = Data((0..<textLength).map { _ in alphabet.randomElement(using: &generator)! })
         let textParts = packets(of: text, using: &generator)
 
         let separated = await Internals.DownloadBuffer(readingMode: .separator(separator))
