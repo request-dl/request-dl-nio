@@ -18,7 +18,7 @@ struct InternalsAsyncBytesTests {
     @Test
     func asyncBytes_whenAppendData_shouldContainsAll() async throws {
         // Given
-        let stream = Internals.AsyncStream<Internals.DataBuffer>()
+        let stream = Internals.AsyncStream<Internals.Chunk>()
 
         let part1 = Data("Hello World".utf8)
         let part2 = Data("Earth is a small planet to live".utf8)
@@ -30,8 +30,8 @@ struct InternalsAsyncBytesTests {
         )
 
         // When
-        await stream.append(.success(Internals.DataBuffer(part1)))
-        await stream.append(.success(Internals.DataBuffer(part2)))
+        await stream.append(.success(Internals.Chunk(part1)))
+        await stream.append(.success(Internals.Chunk(part2)))
         stream.close()
 
         // Them
@@ -43,7 +43,7 @@ struct InternalsAsyncBytesTests {
     @Test
     func asyncBytes_whenAppendError_shouldContaiAnyError() async throws {
         // Given
-        let stream = Internals.AsyncStream<Internals.DataBuffer>()
+        let stream = Internals.AsyncStream<Internals.Chunk>()
 
         let part1 = Data("Hello World".utf8)
         let part2 = Data("Earth is a small planet to live".utf8)
@@ -56,8 +56,8 @@ struct InternalsAsyncBytesTests {
         )
 
         // When
-        await stream.append(.success(Internals.DataBuffer(part1)))
-        await stream.append(.success(Internals.DataBuffer(part2)))
+        await stream.append(.success(Internals.Chunk(part1)))
+        await stream.append(.success(Internals.Chunk(part2)))
         stream.append(.failure(error))
 
         var data = Data()

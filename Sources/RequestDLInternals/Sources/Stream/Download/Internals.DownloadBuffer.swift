@@ -14,11 +14,27 @@ extension Internals {
 
     package struct DownloadBuffer: Sendable {
 
+        /// What `append` queues: a chunk the producer already holds in memory, or a buffer that
+        /// still has to be read (and may sit behind the file system).
+        fileprivate enum Income: Sendable {
+            case chunk(Chunk)
+            case buffer(Internals.AnyBuffer)
+
+            var readableBytes: Int {
+                switch self {
+                case .chunk(let chunk):
+                    return chunk.readableBytes
+                case .buffer(let buffer):
+                    return buffer.readableBytes
+                }
+            }
+        }
+
         private final class Storage: @unchecked Sendable {
 
             // MARK: - Internal properties
 
-            package let stream: Internals.AsyncStream<DataBuffer>
+            package let stream: Internals.AsyncStream<Chunk>
             package let flowControl: Internals.FlowControlWindow?
 
             // MARK: - Private properties
@@ -46,8 +62,11 @@ extension Internals {
 
             // Touched only from inside a queue operation. The queue serializes them and
             // establishes the ordering between them, so nothing else may read or write these.
-            private var _buffer: DataBuffer?
-            private var _cacheStream: Internals.AsyncStream<DataBuffer>?
+            //
+            // The bytes of an item that has not ended yet, waiting for the rest of it. `nil` once
+            // the stream is over (closed or failed), which is how later appends know to do nothing.
+            private var _pending: Data? = Data()
+            private var _cacheStream: Internals.AsyncStream<Chunk>?
 
             // Starts as what the caller asked for. Only ever replaced by ``passThrough()``.
             private var _readingMode: Internals.DownloadStep.ReadingMode
@@ -65,9 +84,6 @@ extension Internals {
                 readingMode: Internals.DownloadStep.ReadingMode,
                 flowControl: Internals.FlowControlWindow?
             ) {
-                // The synchronous in-memory initializer: same store as `DataBuffer()`, without
-                // the suspension that `init()` needs for the stream types that open a file.
-                self._buffer = DataBuffer(Internals.ByteURL())
                 self._readingMode = readingMode
                 self.flowControl = flowControl
 
@@ -94,13 +110,13 @@ extension Internals {
             ///
             /// Queued like everything else so it is ordered against the appends. Setting it
             /// out of band would let chunks already dispatched miss the cache.
-            package func cacheStream(_ cacheStream: Internals.AsyncStream<DataBuffer>) {
+            package func cacheStream(_ cacheStream: Internals.AsyncStream<Chunk>) {
                 queue.addOperation {
                     self._cacheStream = cacheStream
                 }
             }
 
-            /// Queues `incomeBytes` for re-chunking.
+            /// Queues `income` for re-chunking.
             ///
             /// With a `flowControl` window, the bytes are charged right here, synchronously, and
             /// not only once they reach `stream`. The queue is a buffer in its own right: it
@@ -110,16 +126,16 @@ extension Internals {
             ///
             /// They are credited back once `_append` has run, by which point every one of them
             /// has either been dispatched into `stream` (charged again there, as it went in) or
-            /// absorbed into `_buffer` to wait for the rest of its chunk. The latter must not
+            /// absorbed into `_pending` to wait for the rest of its chunk. The latter must not
             /// stay counted: a chunk that only completes with more input would otherwise hold
             /// the window shut against exactly the input it needs, forever. See
             /// `Internals.FlowControlWindow`'s "Liveness" section.
-            package func append(_ incomeBytes: Internals.AnyBuffer) {
-                let queuedBytes = incomeBytes.readableBytes
+            fileprivate func append(_ income: Income) {
+                let queuedBytes = income.readableBytes
                 flowControl?.charge(queuedBytes)
 
                 queue.addOperation {
-                    await self._append(incomeBytes)
+                    await self._append(income)
                     self.flowControl?.credit(queuedBytes)
                 }
             }
@@ -134,7 +150,7 @@ extension Internals {
 
             package func close() {
                 queue.addOperation {
-                    await self._close()
+                    self._close()
                 }
             }
 
@@ -155,137 +171,119 @@ extension Internals {
 
             // MARK: - Unsafe methods
 
-            private func _append(_ incomeBytes: Internals.AnyBuffer) async {
-                guard var buffer = _buffer else {
+            private func _append(_ income: Income) async {
+                guard _pending != nil else {
                     return
                 }
 
-                var incomeBytes = incomeBytes
-
                 do {
-                    switch _readingMode {
-                    case .passthrough:
-                        try await _appendPassthrough(&incomeBytes)
-                    case .length(let length):
-                        try await _appendByLength(&incomeBytes, length: length, into: &buffer)
-                    case .separator(let separator, let maximumItemSize):
-                        try await _appendBySeparator(
-                            &incomeBytes,
-                            separator: separator,
-                            maximumItemSize: maximumItemSize,
-                            into: &buffer
-                        )
-                    }
+                    switch income {
+                    case .chunk(let chunk):
+                        // In memory already: nothing to read, and so nothing to suspend for.
+                        try _consume(chunk.data)
 
-                    self._buffer = buffer
+                    case .buffer(let buffer):
+                        var buffer = buffer
+
+                        // A buffer behind the file system (a cached body) is read in blocks of
+                        // ``readBlockSize``, so an entry is never pulled into memory whole, and
+                        // one trip to the file serves many chunks instead of one each (a kilobyte
+                        // by default). An in-memory one is read at once: there is no trip to
+                        // save, and `.passthrough` is meant to hand it over as one piece.
+                        let blockSize = buffer is Internals.DataBuffer ? Int.max : Self.readBlockSize
+
+                        while buffer.readableBytes > .zero {
+                            let block = try await Self.readableData(
+                                &buffer,
+                                count: min(buffer.readableBytes, blockSize)
+                            )
+
+                            try _consume(block)
+                        }
+                    }
                 } catch {
                     // Ends the stream with the error and drops the accumulated bytes. Whatever
-                    // still arrives is ignored, since there is no buffer left to put it in.
+                    // still arrives is ignored, since there is no `_pending` left to put it in.
                     _failed(error)
                 }
             }
 
-            /// Forwards the incoming bytes as they are, with no re-chunking at all.
+            /// Cuts `block` according to the reading mode and dispatches what completes.
             ///
-            /// An in-memory buffer (what the network executors hand over) is dispatched itself:
-            /// no byte is read out of it or written into another one. Anything behind the file
-            /// system (a cached body) is read in blocks of ``readBlockSize``, so an entry is
-            /// never pulled into memory whole.
-            ///
-            /// - Throws: ``AsyncBytesReadError``. See ``readableData(_:count:)``.
-            private func _appendPassthrough(_ incomeBytes: inout Internals.AnyBuffer) async throws {
-                if let dataBuffer = incomeBytes as? Internals.DataBuffer {
-                    if dataBuffer.readableBytes > .zero {
-                        _dispatch(.success(dataBuffer))
-                    }
-
+            /// Synchronous: a block is in memory by now, and the accumulator is a `Data`, so no
+            /// step of cutting has anything to wait for. Chunks are dispatched in the order they
+            /// are cut, which is the order of the stream.
+            private func _consume(_ block: Data) throws {
+                guard !block.isEmpty else {
                     return
                 }
 
-                while incomeBytes.readableBytes > .zero {
-                    let block = try await Self.readableData(
-                        &incomeBytes,
-                        count: min(incomeBytes.readableBytes, Self.readBlockSize)
-                    )
-
-                    _dispatch(.success(await DataBuffer(block)))
+                switch _readingMode {
+                case .passthrough:
+                    _dispatch(.success(Chunk(block)))
+                case .length(let length):
+                    try _consumeByLength(block, length: length)
+                case .separator(let separator, let maximumItemSize):
+                    try _consumeBySeparator(block, separator: separator, maximumItemSize: maximumItemSize)
                 }
             }
 
-            /// Reads the incoming bytes in blocks of ``readBlockSize``, not in chunks of `length`,
-            /// and cuts the chunks out of each block in memory. Reading `length` at a time made a
-            /// source behind the file system (a cached body) cost one trip per chunk, 1 KiB by
-            /// default.
+            /// Cuts chunks of `length` out of `block`, in memory.
             ///
-            /// A chunk that fits inside the current block while nothing is pending is built
-            /// straight from that slice. Only the piece of a chunk that straddles two blocks goes
-            /// through `buffer`, and a finished `buffer` is handed over as the chunk itself
-            /// instead of being copied into a new one.
+            /// A chunk that fits inside the block while nothing is pending is cut straight from it
+            /// (see ``Chunk/init(slicing:of:)`` for what that costs). Only the piece of a chunk that
+            /// straddles two blocks goes through `_pending`, and a finished `_pending` is handed
+            /// over as the chunk itself instead of being copied.
             ///
-            /// - Throws: ``AsyncBytesReadError`` when `incomeBytes` says it holds bytes and cannot
-            ///   give them. See ``readableData(_:count:)``.
-            private func _appendByLength(
-                _ incomeBytes: inout Internals.AnyBuffer,
-                length: Int,
-                into buffer: inout DataBuffer
-            ) async throws {
+            /// - Throws: ``AsyncBytesReadError`` when `length` cannot make progress.
+            private func _consumeByLength(_ block: Data, length: Int) throws {
                 // No chunk size can make progress: reading would loop without ever filling one.
                 guard length > .zero else {
                     throw AsyncBytesReadError()
                 }
 
-                while incomeBytes.readableBytes > .zero {
-                    let block = try await Self.readableData(
-                        &incomeBytes,
-                        count: min(incomeBytes.readableBytes, Self.readBlockSize)
-                    )
+                var offset = block.startIndex
 
-                    var offset = block.startIndex
+                while offset < block.endIndex {
+                    let pendingCount = _pending?.count ?? .zero
 
-                    while offset < block.endIndex {
-                        if buffer.readableBytes == .zero, block.endIndex - offset >= length {
-                            _dispatch(.success(await DataBuffer(block[offset..<offset + length])))
-                            offset += length
-                            continue
-                        }
+                    if pendingCount == .zero, block.endIndex - offset >= length {
+                        _dispatch(.success(Chunk(slicing: offset..<offset + length, of: block)))
+                        offset += length
+                        continue
+                    }
 
-                        let count = min(length - buffer.readableBytes, block.endIndex - offset)
+                    let count = min(length - pendingCount, block.endIndex - offset)
 
-                        await buffer.writeBytes(block[offset..<offset + count])
-                        offset += count
+                    _pending?.append(block[offset..<offset + count])
+                    offset += count
 
-                        if buffer.readableBytes == length {
-                            await _emit(&buffer)
-                        }
+                    if pendingCount + count == length {
+                        _emit()
                     }
                 }
             }
 
-            /// Splits the incoming bytes on `separator`, emitting a chunk per occurrence with
-            /// the separator included, exactly as before.
+            /// Splits `block` on `separator`, emitting a chunk per occurrence with the separator
+            /// included, exactly as before.
             ///
-            /// Every incoming byte is written to `buffer` exactly once, either as part of an
-            /// emitted chunk or as the remainder kept for the next call. Matching is done on a
-            /// rolling window that survives across calls, so a separator split across two
-            /// packets is still found and no trailing byte is dropped.
+            /// Every incoming byte is copied once, either into an emitted chunk or into the remainder
+            /// kept for the next call. Matching is done on a rolling window that survives across
+            /// calls, so a separator split across two packets is still found and no trailing byte is
+            /// dropped.
             ///
             /// - Throws: ``Internals/ReadingModeItemTooLargeError`` as soon as an item, separator
             ///   included, can no longer fit `maximumItemSize`: when the accumulated bytes pass
             ///   it without a separator, or when the separator ends an item that is over it.
-            private func _appendBySeparator(
-                _ incomeBytes: inout Internals.AnyBuffer,
+            private func _consumeBySeparator(
+                _ incoming: Data,
                 separator: [UInt8],
-                maximumItemSize: Int?,
-                into buffer: inout DataBuffer
-            ) async throws {
-                guard incomeBytes.readableBytes > .zero else { return }
-
-                let incoming = try await Self.readableBytes(&incomeBytes, count: incomeBytes.readableBytes)
-
+                maximumItemSize: Int?
+            ) throws {
                 guard !separator.isEmpty else {
                     // Degenerate configuration: there is nothing to split on, so everything is
                     // remainder. Matching an empty window would otherwise emit once per byte.
-                    await buffer.writeBytes(incoming)
+                    _pending?.append(incoming)
                     return
                 }
 
@@ -306,27 +304,35 @@ extension Internals {
                         continue
                     }
 
-                    // Checked before the bytes are written: an item that is already too large
-                    // is never copied into the accumulator, and not delivered.
-                    if let maximumItemSize, buffer.readableBytes + (index - start + 1) > maximumItemSize {
+                    let pendingCount = _pending?.count ?? .zero
+
+                    // Checked before the bytes are copied: an item that is already too large
+                    // is never copied into a chunk, and not delivered.
+                    if let maximumItemSize, pendingCount + (index - start + 1) > maximumItemSize {
                         throw Internals.ReadingModeItemTooLargeError(maximumItemSize: maximumItemSize)
                     }
 
-                    await buffer.writeBytes(Array(incoming[start...index]))
-                    start = incoming.index(after: index)
+                    if pendingCount == .zero {
+                        // The whole item is in this block: it becomes the chunk, with no
+                        // accumulator in between.
+                        _dispatch(.success(Chunk(slicing: start..<index + 1, of: incoming)))
+                    } else {
+                        _pending?.append(incoming[start...index])
+                        _emit()
+                    }
 
-                    await _emit(&buffer)
+                    start = incoming.index(after: index)
                     _matchLength = 0
                 }
 
                 if start < incoming.endIndex {
                     // The rest belongs to an item that has not ended yet. If it is already over
                     // the maximum, it can only get larger.
-                    if let maximumItemSize, buffer.readableBytes + (incoming.endIndex - start) > maximumItemSize {
+                    if let maximumItemSize, (_pending?.count ?? .zero) + (incoming.endIndex - start) > maximumItemSize {
                         throw Internals.ReadingModeItemTooLargeError(maximumItemSize: maximumItemSize)
                     }
 
-                    await buffer.writeBytes(Array(incoming[start...]))
+                    _pending?.append(incoming[start...])
                 }
             }
 
@@ -372,12 +378,6 @@ extension Internals {
             /// would reach the reader as one that succeeded.
             ///
             /// - Throws: ``AsyncBytesReadError``.
-            private static func readableBytes(_ buffer: inout Internals.AnyBuffer, count: Int) async throws -> [UInt8] {
-                [UInt8](try await readableData(&buffer, count: count))
-            }
-
-            /// ``readableBytes(_:count:)`` for the callers that do not need an array, which would
-            /// be one more copy of every block.
             private static func readableData(_ buffer: inout Internals.AnyBuffer, count: Int) async throws -> Data {
                 guard let data = await buffer.readData(count), !data.isEmpty else {
                     throw AsyncBytesReadError()
@@ -386,31 +386,35 @@ extension Internals {
                 return data
             }
 
-            /// Dispatches the accumulated bytes as one chunk and starts over with an empty buffer.
+            /// Dispatches the accumulated bytes as one chunk and starts over with an empty
+            /// accumulator.
             ///
-            /// The accumulator itself is what gets dispatched, not a copy of it: its store is
-            /// shared by reference, so handing it over costs nothing, and the replacement is a
-            /// fresh store. That is also what keeps the allocation from staying pinned at the size
+            /// The accumulator itself is what becomes the chunk, not a copy of it: `Data` is a
+            /// value over shared storage, so handing it over costs nothing, and the replacement is
+            /// a fresh one. That is also what keeps the allocation from staying pinned at the size
             /// of the single largest chunk (one unusually large `.length` window, or one long
             /// line before a `.separator`) for the rest of the connection, which reusing one
             /// accumulator for every chunk did unless it was cleared.
-            private func _emit(_ buffer: inout DataBuffer) async {
-                let chunk = buffer
-                buffer = await DataBuffer()
-
-                _dispatch(.success(chunk))
-            }
-
-            private func _close() async {
-                guard var buffer = _buffer else {
+            private func _emit() {
+                guard let pending = _pending else {
                     return
                 }
 
-                if let data = await buffer.readData(buffer.readableBytes) {
-                    await _dispatch(.success(.init(data)))
+                _pending = Data()
+
+                _dispatch(.success(Chunk(pending)))
+            }
+
+            private func _close() {
+                guard let pending = _pending else {
+                    return
                 }
 
-                self._buffer = nil
+                if !pending.isEmpty {
+                    _dispatch(.success(Chunk(pending)))
+                }
+
+                _pending = nil
                 _matchLength = 0
 
                 stream.close()
@@ -418,14 +422,14 @@ extension Internals {
             }
 
             private func _failed(_ error: Error) {
-                _buffer = nil
+                _pending = nil
                 _matchLength = 0
 
                 _dispatch(.failure(error))
             }
 
-            private func _dispatch(_ dataBuffer: Result<DataBuffer, Error>) {
-                stream.append(dataBuffer)
+            private func _dispatch(_ chunk: Result<Chunk, Error>) {
+                stream.append(chunk)
 
                 guard let cacheStream = _cacheStream else {
                     return
@@ -439,19 +443,21 @@ extension Internals {
                 //
                 // Ended with a failure, not closed: closing would present the part of the body
                 // that did arrive as a complete one, and it would be stored as the response.
-                if case .success = dataBuffer, let window = cacheStream.flowControlWindow, !window.isWritable {
+                if case .success = chunk, let window = cacheStream.flowControlWindow, !window.isWritable {
                     _cacheStream = nil
                     cacheStream.append(.failure(Internals.CacheBacklogExceededError(limit: window.highWatermark)))
                     return
                 }
 
-                cacheStream.append(dataBuffer)
+                // The same value goes to both streams. They share its bytes, and nothing can write
+                // them, so no ownership has to be settled between the reader and the cache.
+                cacheStream.append(chunk)
             }
         }
 
         // MARK: - Internal properties
 
-        package var stream: Internals.AsyncStream<DataBuffer> {
+        package var stream: Internals.AsyncStream<Chunk> {
             storage.stream
         }
 
@@ -503,9 +509,18 @@ extension Internals {
 
         // MARK: - Internal methods
 
+        /// Appends a body part the producer already holds in memory, which is what both network
+        /// executors do: nothing is read out of it or written into another buffer on the way.
+        package func append(_ chunk: Chunk) {
+            observer?.didReceive(chunk.readableBytes)
+            storage.append(.chunk(chunk))
+        }
+
+        /// Appends a buffer of any kind. For one that is not simply in memory (a cached body, read
+        /// back from the file system), ``append(_:)-(Chunk)`` is the call for what is.
         package func append(_ incomeBytes: Internals.AnyBuffer) {
             observer?.didReceive(incomeBytes.readableBytes)
-            storage.append(incomeBytes)
+            storage.append(.buffer(incomeBytes))
         }
 
         package func close() {
@@ -532,7 +547,7 @@ extension Internals {
 
         // Not `mutating`: the state lives in a class, so requiring `var` at the call site would
         // only advertise a mutation that never happens.
-        package func cacheStream(_ cacheStream: Internals.AsyncStream<DataBuffer>) {
+        package func cacheStream(_ cacheStream: Internals.AsyncStream<Chunk>) {
             storage.cacheStream(cacheStream)
         }
 
@@ -598,7 +613,7 @@ extension Internals.DownloadBuffer {
     package static let cacheBacklogLimit = 16 * 1_024 * 1_024
 
     /// A stream for ``cacheStream(_:)`` that is metered against ``cacheBacklogLimit``.
-    package static func makeCacheStream() -> Internals.AsyncStream<Internals.DataBuffer> {
+    package static func makeCacheStream() -> Internals.AsyncStream<Internals.Chunk> {
         .init(
             flowControl: Internals.FlowControlWindow(
                 highWatermark: cacheBacklogLimit,

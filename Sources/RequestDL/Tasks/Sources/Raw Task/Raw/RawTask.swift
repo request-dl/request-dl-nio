@@ -633,7 +633,7 @@ struct RawTask<Content: Property>: RequestTask {
         resolved: Resolved,
         client: any RequestExecutingClient,
         isURLSessionExecutor: Bool,
-        cache: (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
+        cache: (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.Chunk>?)?,
         logger: Internals.TaskLogger?,
         transferControl: Internals.TransferControl?
     ) async throws -> (task: SessionTask, onResponseHead: OnResponseHead?) {

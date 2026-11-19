@@ -123,10 +123,10 @@ extension Internals {
 
             // Built synchronously and appended in delivery order, for the same reason as in
             // `Internals.ClientResponseReceiver.didReceiveBodyPart(task:_:)`.
-            let dataBuffer = Internals.DataBuffer(Internals.ByteURL(buffer))
+            let chunk = Internals.Chunk(buffer)
 
-            reconnection.didDeliver(dataBuffer.readableBytes)
-            download.append(dataBuffer)
+            reconnection.didDeliver(chunk.readableBytes)
+            download.append(chunk)
 
             let (future, pausedPart) = PausedBodyPart.gate(download.flowControl, on: task.eventLoop)
 

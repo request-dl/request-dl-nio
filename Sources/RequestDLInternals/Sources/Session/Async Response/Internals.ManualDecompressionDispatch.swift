@@ -81,9 +81,9 @@ extension Internals.ManualDecompressionDispatch {
     /// Where it returns `source` itself, `source` has been cut by the reading mode already.
     package func resolvedStream(
         for head: Internals.ResponseHead,
-        source: Internals.AsyncStream<Internals.DataBuffer>,
+        source: Internals.AsyncStream<Internals.Chunk>,
         readingMode: Internals.DownloadStep.ReadingMode
-    ) throws -> Internals.AsyncStream<Internals.DataBuffer> {
+    ) throws -> Internals.AsyncStream<Internals.Chunk> {
         guard case .dispatch(let algorithms, let nativelyDecoded) = self else {
             return source
         }
@@ -173,7 +173,7 @@ extension Internals.ManualDecompressionDispatch {
     }
 }
 
-extension Internals.AsyncStream where Element == Internals.DataBuffer {
+extension Internals.AsyncStream where Element == Internals.Chunk {
 
     /// Feeds every chunk `source` produces through a fresh decoder, cutting what comes back to
     /// `readingMode` (see `Internals.DownloadBuffer`), no further ahead of the returned stream's
@@ -198,10 +198,10 @@ extension Internals.AsyncStream where Element == Internals.DataBuffer {
     /// .withTerminationToken(_:)`'s own doc comment), so releasing it unread (or abandoning it
     /// partway through) cancels this task instead.
     fileprivate static func decompressing(
-        _ source: Internals.AsyncStream<Internals.DataBuffer>,
+        _ source: Internals.AsyncStream<Internals.Chunk>,
         using algorithm: any Internals.DecompressionAlgorithm,
         readingMode: Internals.DownloadStep.ReadingMode
-    ) -> Internals.AsyncStream<Internals.DataBuffer> {
+    ) -> Internals.AsyncStream<Internals.Chunk> {
         // A `DownloadBuffer` rather than a bare stream: `output` is read exactly once, by the
         // single downstream consumer this decompressed stream is built for, which is what its
         // `.untilFirstIteration` stream is for (`.unbounded` retained every decoded chunk for the
@@ -237,13 +237,12 @@ extension Internals.AsyncStream where Element == Internals.DataBuffer {
                 // sequence once this task is cancelled, so no separate `Task.isCancelled` check
                 // is needed here for the loop to actually stop.
                 for try await chunk in source {
-                    var chunk = chunk
-                    let data = await chunk.readData(chunk.readableBytes) ?? Data()
+                    let data = chunk.data
                     hasInput = hasInput || !data.isEmpty
                     let decoded = try stream(decompressing: data)
 
                     if !decoded.isEmpty {
-                        output.append(await Internals.DataBuffer(decoded))
+                        output.append(Internals.Chunk(decoded))
                     }
 
                     // Before pulling the next chunk, not before appending this one: what's
@@ -270,7 +269,7 @@ extension Internals.AsyncStream where Element == Internals.DataBuffer {
                     let tail = try stream.finish()
 
                     if !tail.isEmpty {
-                        output.append(await Internals.DataBuffer(tail))
+                        output.append(Internals.Chunk(tail))
                     }
                 }
 

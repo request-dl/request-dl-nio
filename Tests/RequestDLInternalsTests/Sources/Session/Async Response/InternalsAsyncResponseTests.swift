@@ -223,7 +223,7 @@ extension InternalsAsyncResponseTests {
         let uploadingBytes: Int
         let upload: Internals.AsyncStream<Int>
         let head: Internals.AsyncStream<Internals.ResponseHead>
-        let download: Internals.AsyncStream<Internals.DataBuffer>
+        let download: Internals.AsyncStream<Internals.Chunk>
         let response: Internals.AsyncResponse
     }
 
@@ -231,7 +231,7 @@ extension InternalsAsyncResponseTests {
         uploadingBytes: Int = .zero,
         upload: Internals.AsyncStream<Int> = .init(),
         head: Internals.AsyncStream<Internals.ResponseHead> = .init(),
-        download: Internals.AsyncStream<Internals.DataBuffer> = .init()
+        download: Internals.AsyncStream<Internals.Chunk> = .init()
     ) -> Configuration {
         let response = Internals.AsyncResponse(
             logger: nil,

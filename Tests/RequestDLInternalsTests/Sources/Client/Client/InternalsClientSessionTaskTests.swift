@@ -73,7 +73,7 @@ struct InternalsClientSessionTaskTests {
         let urlString = "https://\(localServer.baseURL)\(uri)"
         let request = try HTTPClient.Request(url: urlString)
 
-        let cacheStream = Internals.AsyncStream<Internals.DataBuffer>()
+        let cacheStream = Internals.AsyncStream<Internals.Chunk>()
 
         // When
         let task = try await session.execute(
@@ -89,11 +89,8 @@ struct InternalsClientSessionTaskTests {
 
         async let cachedChunks: [Data] = {
             var chunks: [Data] = []
-            for try await buffer in cacheStream {
-                var buffer = buffer
-                if let data = await buffer.readData(buffer.readableBytes) {
-                    chunks.append(data)
-                }
+            for try await chunk in cacheStream {
+                chunks.append(chunk.data)
             }
             return chunks
         }()
@@ -150,7 +147,7 @@ struct InternalsClientSessionTaskTests {
         let request = try HTTPClient.Request(url: urlString)
 
         var cacheInvoked = false
-        let cacheStream = Internals.AsyncStream<Internals.DataBuffer>()
+        let cacheStream = Internals.AsyncStream<Internals.Chunk>()
 
         // When
         let task = try await session.execute(

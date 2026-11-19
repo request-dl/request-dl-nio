@@ -111,7 +111,7 @@ struct AsyncBytesCollectTests {
     @Test
     func collect_whenTotalSizeIsImplausiblyLarge_shouldNotPreallocateItAndStillCollectCorrectly() async throws {
         // Given
-        let stream = Internals.AsyncStream<Internals.DataBuffer>()
+        let stream = Internals.AsyncStream<Internals.Chunk>()
         let part = Data("hello".utf8)
 
         let internalBytes = Internals.AsyncBytes(
@@ -123,7 +123,7 @@ struct AsyncBytesCollectTests {
         let bytes = AsyncBytes(seed: .withoutCancellation, bytes: internalBytes)
 
         // When
-        await stream.append(.success(Internals.DataBuffer(part)))
+        await stream.append(.success(Internals.Chunk(part)))
         stream.close()
 
         let data = try await bytes.collect()

@@ -310,6 +310,17 @@ extension Internals {
         package func slice() -> Self {
             switch storage {
             case .data(let dataStorage):
+                // The readable range is the whole of `data`: `Data` is a value, so sharing its
+                // storage already gives an independent copy (copy on write), and copying the
+                // bytes here would only duplicate them. A partial range, or a `Data` that does
+                // not start at index zero, still needs the rebased copy.
+                if dataStorage.data.startIndex == .zero,
+                    dataStorage.readerIndex == .zero,
+                    dataStorage.writerIndex == dataStorage.data.count
+                {
+                    return Self(storage: .data(dataStorage))
+                }
+
                 let range = dataStorage.readerIndex..<dataStorage.writerIndex
                 let slice = Data(dataStorage.data[range])
                 return Self(storage: .data(DataStorage(data: slice, readerIndex: .zero, writerIndex: slice.count)))

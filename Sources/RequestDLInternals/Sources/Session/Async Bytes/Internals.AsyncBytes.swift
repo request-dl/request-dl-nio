@@ -8,15 +8,17 @@ import FoundationEssentials
 import struct Foundation.Data
 #endif
 
-/// Thrown by ``Internals/AsyncBytes/Iterator`` when a chunk it already received from the network
-/// fails to read back out of its own backing storage.
+/// Thrown to the reader of a download when bytes that a source reported holding could not be read
+/// back out of it: a cached body whose file was removed or whose encrypted entry no longer
+/// verifies, or a reading mode that cannot make progress.
 ///
-/// `Internals.Buffer.readData(_:)` returns `nil` for this same underlying condition (the
-/// backing resource, e.g. a temp file backing a disk-spilled chunk, became unreadable, was
-/// deleted, or otherwise failed), which is indistinguishable, at that layer, from "nothing to
-/// the `AsyncSequence` layer, though, that ambiguity must not survive: mapping it to a plain `nil`
-/// would end the sequence exactly like reaching the end of a *successful* response, silently
-/// truncating the body instead of surfacing the failure.
+/// `Internals.Buffer.readData(_:)` returns `nil` for that condition, which is indistinguishable at
+/// that layer from "nothing left to read". For the `AsyncSequence` the ambiguity must not survive:
+/// mapping it to a plain `nil` would end the sequence exactly like reaching the end of a
+/// *successful* response, silently truncating the body instead of surfacing the failure.
+///
+/// Raised by `Internals.DownloadBuffer` while it reads such a source, ahead of the stream; the
+/// elements of the stream are in memory and cannot fail to read.
 package struct AsyncBytesReadError: Swift.Error, CustomStringConvertible, Sendable {
 
     package var description: String {
@@ -34,42 +36,21 @@ extension Internals {
 
             // MARK: - Internal properties
 
-            package var iterator: Internals.AsyncStream<Internals.DataBuffer>.AsyncIterator
+            package var iterator: Internals.AsyncStream<Internals.Chunk>.AsyncIterator
 
             // MARK: - Inits
 
-            package init(_ iterator: Internals.AsyncStream<Internals.DataBuffer>.AsyncIterator) {
+            package init(_ iterator: Internals.AsyncStream<Internals.Chunk>.AsyncIterator) {
                 self.iterator = iterator
             }
 
             // MARK: - Internal methods
 
             package mutating func next() async throws -> Data? {
-                guard var dataBuffer = try await iterator.next() else {
-                    return nil
-                }
-
-                let readableBytes = dataBuffer.readableBytes
-
-                // A genuinely empty chunk (`readableBytes == .zero`) is not itself a failure (some
-                // producers forward one deliberately), and some storage backends report "resource
-                // unavailable" for a zero-length read regardless of whether anything is actually
-                // wrong, so this returns the trivial answer directly rather than routing it through
-                // `readData` at all.
-                guard readableBytes > .zero else {
-                    return Data()
-                }
-
-                // `readData` is asked for exactly `readableBytes`, always a valid range by
-                // construction, so a `nil` here cannot mean "the range wasn't readable" the way it
-                // can for an arbitrary caller-chosen length: it means the chunk's backing storage
-                // itself failed. That must not be reported as a quiet end of stream (see
-                // `AsyncBytesReadError`'s own doc comment).
-                guard let data = await dataBuffer.readData(readableBytes) else {
-                    throw AsyncBytesReadError()
-                }
-
-                return data
+                // The chunk is in memory and immutable: there is nothing to read back from, and so
+                // nothing that can fail. A chunk that is empty (some producers forward one
+                // deliberately) is an empty `Data`, not the end of the sequence.
+                try await iterator.next()?.data
             }
         }
 
@@ -82,14 +63,14 @@ extension Internals {
 
         // MARK: - Private properties
 
-        fileprivate let asyncBuffers: Internals.AsyncStream<Internals.DataBuffer>
+        fileprivate let asyncBuffers: Internals.AsyncStream<Internals.Chunk>
 
         // MARK: - Inits
 
         package init(
             logger: Internals.TaskLogger?,
             totalSize: Int,
-            stream asyncBuffers: Internals.AsyncStream<DataBuffer>
+            stream asyncBuffers: Internals.AsyncStream<Internals.Chunk>
         ) {
             self.logger = logger
             self.totalSize = totalSize
