@@ -120,4 +120,53 @@ struct InternalsAsyncQueueTests {
         release.signal()
         await queue.waitUntilIdle()
     }
+
+    // MARK: - Priority
+
+    /// What the operations run at is the priority of whoever made the queue, however they were
+    /// enqueued: a producer that is not a task at all (an event loop) has none worth inheriting.
+    @Test
+    func asyncQueue_whenCreatedByAHighPriorityTask_shouldRunOperationsAtItsPriority() async {
+        // Given: a queue made by a high priority task, the consumer of what it produces.
+        let observed = Box<[_Concurrency.TaskPriority]>([])
+
+        let queue = await _Concurrency.Task(priority: .high) {
+            Internals.AsyncQueue()
+        }.value
+
+        // When: operations are enqueued from a low priority one.
+        await _Concurrency.Task.detached(priority: .background) {
+            for _ in 0..<3 {
+                queue.addOperation {
+                    observed.withLock { $0.append(_Concurrency.Task.currentPriority) }
+                }
+            }
+        }.value
+
+        await queue.waitUntilIdle()
+
+        // Then: they ran at the creator's priority, not at a fixed low one.
+        #expect(observed.withLock { $0 } == Array(repeating: .high, count: 3))
+        #expect(queue.priorityForTesting == .high)
+    }
+
+    @Test
+    func asyncQueue_whenGivenAPriority_shouldRunOperationsAtIt() async {
+        // Given
+        let observed = Box<_Concurrency.TaskPriority?>(nil)
+
+        let queue = await _Concurrency.Task(priority: .high) {
+            Internals.AsyncQueue(priority: .utility)
+        }.value
+
+        // When
+        queue.addOperation {
+            observed.withLock { $0 = _Concurrency.Task.currentPriority }
+        }
+
+        await queue.waitUntilIdle()
+
+        // Then
+        #expect(observed.withLock { $0 } == .utility)
+    }
 }

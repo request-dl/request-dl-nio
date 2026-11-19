@@ -28,10 +28,12 @@ extension Internals {
             // that feeds it, so a second lock on top would only add a critical section that
             // dispatching resumes continuations inside of.
             //
-            // `.utility` rather than `.background`: somebody is awaiting these elements, and
-            // background QoS is deferred under thermal or low power pressure. Producing at the
-            // lowest priority for a consumer that is usually higher is a priority inversion.
-            private let queue = AsyncQueue(priority: .utility)
+            // At the priority of whoever creates the buffer, not a fixed low one: somebody is
+            // awaiting these elements, and that is usually the task that made the buffer.
+            // Producing at a lower priority than a consumer that waits for it is a priority
+            // inversion: under load, a fixed `.utility` queue stayed unscheduled while the
+            // consumer's own tasks kept running.
+            private let queue = AsyncQueue()
 
             // The Knuth-Morris-Pratt "longest proper prefix that's also a suffix" table for the
             // separator, computed once up front. It lets `_appendBySeparator` backtrack a failed
@@ -140,6 +142,10 @@ extension Internals {
                 queue.addOperation {
                     self._failed(error)
                 }
+            }
+
+            package var queuePriorityForTesting: _Concurrency.TaskPriority {
+                queue.priorityForTesting
             }
 
             /// Suspends until every queued operation has run.
@@ -533,6 +539,11 @@ extension Internals {
         /// Suspends until every queued operation has run. Meant for tests.
         package func waitUntilIdle() async {
             await storage.waitUntilIdle()
+        }
+
+        /// The priority the buffer's operations run at. Meant for tests.
+        package var queuePriorityForTesting: _Concurrency.TaskPriority {
+            storage.queuePriorityForTesting
         }
     }
 }
