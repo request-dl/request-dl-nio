@@ -25,7 +25,7 @@ struct CookieJarCacheTests {
 
     typealias Executor = CookieJarTests.Executor
 
-    private static let port: UInt = 8953
+    private static let port: UInt = 8955
 
     private struct Fixture {
         let server: LocalServer
