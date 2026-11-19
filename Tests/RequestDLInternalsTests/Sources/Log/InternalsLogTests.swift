@@ -73,6 +73,28 @@ struct InternalsLogTests {
         #expect(log.metadata == nil)
     }
 
+    // MARK: - systemProxySOCKSCredentialsIgnored
+
+    @Test(arguments: [
+        (Internals.Proxy.Authorization.Mismatch.socksUsernameLength(0), "the user name is empty"),
+        (.socksUsernameLength(256), "the user name is longer than 255 bytes"),
+        (.socksPasswordLength(256), "the password is longer than 255 bytes"),
+        (.socksCredentialContainsNUL, "the user name or the password has a NUL character"),
+        (.httpShapeOnSOCKSProxy, "they are not a user name and a password"),
+        (.socksShapeOnHTTPProxy, "they are not a user name and a password"),
+    ])
+    func systemProxySOCKSCredentialsIgnored_namesTheReasonAndNothingElse(
+        _ mismatch: Internals.Proxy.Authorization.Mismatch,
+        _ reason: String
+    ) {
+        // When
+        let log = Internals.Log.systemProxySOCKSCredentialsIgnored(mismatch: mismatch)
+
+        // Then
+        #expect(log.message().description.contains(reason))
+        #expect(log.metadata?()["reason"] == .string(reason))
+    }
+
     // MARK: - init(_:) without metadata
 
     @Test

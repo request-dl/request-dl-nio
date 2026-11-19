@@ -5,6 +5,7 @@
 import Testing
 
 @testable import RequestDL
+@testable import RequestDLInternals
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -261,6 +262,35 @@ struct ProxyTests {
 
         // Then
         #expect(resolved.session.configuration.proxy?.authorization == .socks(username: username, password: password))
+    }
+
+    @Test(arguments: [
+        (ProxyAuthorizationError.Reason.socksRequiresUsernameAndPassword, "user name and a password"),
+        (.socksUsernameLength(actual: 0), "user name has 0 bytes"),
+        (.socksPasswordLength(actual: 300), "password has 300 bytes"),
+        (.socksCredentialsContainNUL, "NUL character"),
+    ])
+    func proxyAuthorizationError_descriptionSaysWhatIsWrong(
+        _ reason: ProxyAuthorizationError.Reason,
+        _ fragment: String
+    ) throws {
+        // Given
+        let mismatch: Internals.Proxy.Authorization.Mismatch
+
+        switch reason {
+        case .socksRequiresUsernameAndPassword: mismatch = .httpShapeOnSOCKSProxy
+        case .socksUsernameLength(let actual): mismatch = .socksUsernameLength(actual)
+        case .socksPasswordLength(let actual): mismatch = .socksPasswordLength(actual)
+        case .socksCredentialsContainNUL: mismatch = .socksCredentialContainsNUL
+        }
+
+        // When
+        let error = ProxyAuthorizationError(mismatch)
+
+        // Then
+        #expect(error.reason == reason)
+        #expect(error.description.contains(fragment))
+        #expect(error.description.hasSuffix("The request was not sent."))
     }
 
     @Test
