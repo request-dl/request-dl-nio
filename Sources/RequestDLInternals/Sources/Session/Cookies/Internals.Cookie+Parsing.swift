@@ -77,7 +77,7 @@ extension Internals.Cookie {
             switch attributeName {
             case "domain":
                 let cleaned = rawValue.hasPrefix(".") ? String(rawValue.dropFirst()) : rawValue
-                domain = cleaned.isEmpty ? nil : cleaned.lowercased()
+                domain = cleaned.isEmpty ? nil : Internals.HostName.ascii(cleaned)
             case "path":
                 path = rawValue.hasPrefix("/") ? rawValue : nil
             case "secure":

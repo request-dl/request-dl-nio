@@ -76,7 +76,8 @@ struct CookieJarCacheTests {
         fixture: Fixture,
         executor: Executor,
         jar: CookieJar?,
-        cached: Bool = true
+        cached: Bool = true,
+        strategy: CacheStrategy = .returnCachedDataElseLoad
     ) async throws -> HTTPResult<String> {
         let data = try await DataTask {
             BaseURL(fixture.server.baseURL)
@@ -90,7 +91,7 @@ struct CookieJarCacheTests {
             if cached {
                 base
                     .cachePolicy(.all)
-                    .cacheStrategy(.returnCachedDataElseLoad)
+                    .cacheStrategy(strategy)
                     .cache(
                         memoryCapacity: 8 * 1_024 * 1_024,
                         diskCapacity: 8 * 1_024 * 1_024,
@@ -134,6 +135,49 @@ struct CookieJarCacheTests {
         #expect(sameAccount.receivedCookieHeader == "session=a")
         #expect(otherAccount.receivedCookieHeader == "session=b")
         #expect(noJar.receivedCookieHeader == nil)
+
+        await fixture.dataCache.removeAll()
+    }
+
+    /// The answer to the conditional request that revalidates a stored response can renew a
+    /// session: its `Set-Cookie` has to reach the jar even though it carries no body.
+    @Test(arguments: CookieJarTests.executors)
+    func revalidation_whenTheServerAnswers304WithACookie_storesIt(executor: Executor) async throws {
+        // Given: a response stored with a validator.
+        let fixture = try await Self.makeFixture(resourceResponses: 0)
+        defer {
+            fixture.paths.forEach(fixture.server.cleanup(at:))
+        }
+
+        fixture.server.insert(
+            .init(headers: .init([("ETag", "\"v1\"")]), data: Data("\"resource\"".utf8)),
+            at: fixture.resourcePath
+        )
+
+        let jar = CookieJar()
+        _ = try await Self.get(fixture.resourcePath, fixture: fixture, executor: executor, jar: jar)
+        #expect(jar.storage.snapshot().isEmpty)
+
+        // When: it is revalidated, and the server confirms it and renews the session.
+        fixture.server.insert(
+            .init(
+                status: .notModified,
+                headers: .init([("ETag", "\"v1\""), ("Set-Cookie", "renewed=1")]),
+                data: Data()
+            ),
+            at: fixture.resourcePath
+        )
+
+        _ = try await Self.get(
+            fixture.resourcePath,
+            fixture: fixture,
+            executor: executor,
+            jar: jar,
+            strategy: .reloadAndValidateCachedData
+        )
+
+        // Then
+        #expect(jar.storage.snapshot().map(\.name) == ["renewed"])
 
         await fixture.dataCache.removeAll()
     }

@@ -258,6 +258,28 @@ struct InternalsCookieStorageTests {
         #expect(storage.snapshot(now: now).map(\.name) == ["b"])
     }
 
+    /// The cookie that would reach every site below a suffix, spelled so that it would not be
+    /// recognised: the name of the suffix in Unicode, in a list that has it in either spelling.
+    @Test(arguments: ["рф", "xn--p1ai", "РФ"])
+    func store_whenDomainIsAnInternationalPublicSuffix_rejectsItInEverySpelling(domain: String) throws {
+        let list = try Internals.PublicSuffixList("рф\n")
+        let storage = Internals.CookieStorage(publicSuffixList: list)
+
+        storage.store(setCookieValues: ["a=1; Domain=\(domain)"], for: url("https://example.xn--p1ai/"), now: now)
+
+        #expect(storage.snapshot(now: now).isEmpty)
+    }
+
+    @Test
+    func store_whenDomainNamesTheSameHostInAnotherSpelling_matchesIt() {
+        let storage = Internals.CookieStorage()
+
+        storage.store(setCookieValues: ["a=1; Domain=münchen.de"], for: url("https://www.xn--mnchen-3ya.de/"), now: now)
+
+        #expect(storage.snapshot(now: now).first?.domain == "xn--mnchen-3ya.de")
+        #expect(header(storage, "https://shop.xn--mnchen-3ya.de/") == "a=1")
+    }
+
     @Test
     func store_whenThereIsNoList_stillRejectsASingleLabelDomain() {
         let storage = Internals.CookieStorage()

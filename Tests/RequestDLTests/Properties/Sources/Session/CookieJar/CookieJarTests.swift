@@ -32,6 +32,9 @@ struct CookieJarTests {
         #if canImport(NIOCore)
         case nio
         #endif
+        #if canImport(NIOCore) && canImport(Darwin)
+        case nioTransportServices
+        #endif
 
         var testDescription: String { rawValue }
 
@@ -44,6 +47,10 @@ struct CookieJarTests {
             #if canImport(NIOCore)
             case .nio:
                 return session.requiredExecutor(.nio)
+            #endif
+            #if canImport(NIOCore) && canImport(Darwin)
+            case .nioTransportServices:
+                return session.requiredExecutor(.nioTransportServices)
             #endif
             }
         }
@@ -74,6 +81,9 @@ struct CookieJarTests {
         #endif
         #if canImport(NIOCore)
         executors.append(.nio)
+        #endif
+        #if canImport(NIOCore) && canImport(Darwin)
+        executors.append(.nioTransportServices)
         #endif
         return executors
     }()

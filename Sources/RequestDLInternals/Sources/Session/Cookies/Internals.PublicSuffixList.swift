@@ -35,7 +35,7 @@ extension Internals {
                     continue
                 }
 
-                let rule = token.lowercased()
+                let rule = Internals.HostName.ascii(String(token))
 
                 if rule.hasPrefix("!") {
                     exceptions.insert(String(rule.dropFirst()))
@@ -59,7 +59,7 @@ extension Internals {
 
         /// Whether `domain` is, itself, a public suffix: a name nobody may set a cookie for.
         package func isPublicSuffix(_ domain: String) -> Bool {
-            let domain = domain.lowercased()
+            let domain = Internals.HostName.ascii(domain)
 
             if exceptions.contains(domain) {
                 return false

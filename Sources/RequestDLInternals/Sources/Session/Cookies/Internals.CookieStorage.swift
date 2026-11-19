@@ -191,7 +191,7 @@ extension Internals {
         // MARK: - Private static methods
 
         private static func origin(of url: URL) -> Cookie.Origin? {
-            guard var host = url.host?.lowercased(), !host.isEmpty else {
+            guard var host = url.host.map(HostName.ascii), !host.isEmpty else {
                 return nil
             }
 

@@ -39,4 +39,14 @@ struct InternalsPublicSuffixListTests {
             try Internals.PublicSuffixList("// only comments\n\n")
         }
     }
+
+    /// A list is written in Unicode and a host or a `Domain` may arrive in either spelling.
+    @Test(arguments: ["рф", "xn--p1ai", "РФ"])
+    func isPublicSuffix_whenTheListIsUnicode_matchesEverySpellingOfTheName(spelling: String) throws {
+        let list = try Internals.PublicSuffixList("рф\n公司.cn\n")
+
+        #expect(list.isPublicSuffix(spelling))
+        #expect(list.isPublicSuffix("xn--55qx5d.cn"))
+        #expect(!list.isPublicSuffix("пример.рф"))
+    }
 }
