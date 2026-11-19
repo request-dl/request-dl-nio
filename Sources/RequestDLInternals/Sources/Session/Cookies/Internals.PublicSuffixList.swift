@@ -35,6 +35,10 @@ extension Internals {
                     continue
                 }
 
+                guard Self.isRule(token) else {
+                    throw ParseError.malformed
+                }
+
                 let rule = Internals.HostName.ascii(String(token))
 
                 if rule.hasPrefix("!") {
@@ -53,6 +57,19 @@ extension Internals {
             self.exact = exact
             self.wildcards = wildcards
             self.exceptions = exceptions
+        }
+
+        // MARK: - Private static methods
+
+        /// Whether `token` can be the rule of a list: a name, optionally with a `!` or a leading
+        /// `*.`. What is not (the `<!DOCTYPE` of an HTML page a failed download saved in its place)
+        /// is reported instead of being read as a list of one rule that protects from nothing.
+        private static func isRule(_ token: Substring) -> Bool {
+            token.unicodeScalars.allSatisfy { scalar in
+                !scalar.isASCII
+                    || ("a"..."z").contains(Character(scalar)) || ("A"..."Z").contains(Character(scalar))
+                    || ("0"..."9").contains(Character(scalar)) || "-._*!".unicodeScalars.contains(scalar)
+            }
         }
 
         // MARK: - Internal methods
@@ -84,5 +101,9 @@ extension Internals.PublicSuffixList {
 
         /// The contents hold no rule, so they are not a Public Suffix List.
         case noRules
+
+        /// A line starts with something that cannot be a rule, so the contents are not a Public
+        /// Suffix List: an HTML page or an error message saved where the list should be.
+        case malformed
     }
 }

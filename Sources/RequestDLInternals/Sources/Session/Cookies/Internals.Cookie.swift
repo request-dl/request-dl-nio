@@ -157,8 +157,16 @@ extension Internals {
         }
 
         /// Whether a connection to `host` is one a `Secure` cookie may travel on without TLS.
+        ///
+        /// Only what is loopback whatever DNS says: `localhost` itself and the loopback IP literals.
+        /// `127.victim.com` starts with the same four characters as `127.0.0.1` and is a name an
+        /// attacker can have resolved to wherever they like, as is anything under `.localhost`.
         package static func isLoopback(_ host: String) -> Bool {
-            host == "localhost" || host.hasSuffix(".localhost") || host == "::1" || host.hasPrefix("127.")
+            if host == "localhost" || host == "::1" {
+                return true
+            }
+
+            return isIPAddress(host) && !host.contains(":") && host.hasPrefix("127.")
         }
     }
 }

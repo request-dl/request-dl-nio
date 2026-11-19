@@ -1643,7 +1643,9 @@ extension Internals.URLSessionClient {
 
                     return (name: name, value: value)
                 },
-                for: url
+                for: url,
+                // `allHeaderFields` joins repeated headers with ", ".
+                areFolded: true
             )
         }
 

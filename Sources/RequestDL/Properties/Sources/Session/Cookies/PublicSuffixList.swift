@@ -34,7 +34,8 @@ public struct PublicSuffixList: Sendable {
     /// Parses the contents of a `public_suffix_list.dat` file.
     ///
     /// - Parameter data: The UTF-8 contents of the file.
-    /// - Throws: ``PublicSuffixListError`` when `data` is not text or has no rule in it.
+    /// - Throws: ``PublicSuffixListError`` when `data` is not text, has no rule in it, or has a line
+    ///   that cannot be a rule.
     public init(data: Data) throws {
         guard let contents = String(data: data, encoding: .utf8) else {
             throw PublicSuffixListError.notText
@@ -56,6 +57,8 @@ public struct PublicSuffixList: Sendable {
     private static func parse(_ contents: String) throws -> Internals.PublicSuffixList {
         do {
             return try Internals.PublicSuffixList(contents)
+        } catch Internals.PublicSuffixList.ParseError.malformed {
+            throw PublicSuffixListError.malformed
         } catch {
             throw PublicSuffixListError.noRules
         }
@@ -70,4 +73,8 @@ public enum PublicSuffixListError: Error, Sendable, Equatable {
 
     /// The text has no rule in it, so it is not a Public Suffix List.
     case noRules
+
+    /// The text has a line that cannot be a rule, so it is not a Public Suffix List: an HTML page
+    /// or an error message saved where the list should be.
+    case malformed
 }

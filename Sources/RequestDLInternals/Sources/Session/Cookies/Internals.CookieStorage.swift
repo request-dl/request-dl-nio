@@ -26,6 +26,11 @@ extension Internals {
         /// RFC 6265bis section 5.4's total limit.
         package static let maximumCookies = 3_000
 
+        /// The most cookies one response may set. One response from a host with many labels can
+        /// otherwise set the per-domain limit's worth for every parent domain it may name, and
+        /// evict the cookies of every other site to make room.
+        package static let maximumCookiesPerResponse = 50
+
         // MARK: - Private properties
 
         private let lock = NSLock()
@@ -42,18 +47,24 @@ extension Internals {
 
         /// Stores the cookies of the `Set-Cookie` values of the response to a request to `url`.
         ///
-        /// Every element may itself be several cookies folded together by the transport.
+        /// - Parameter areFolded: Whether a transport joined repeated `Set-Cookie` headers into one
+        ///   value, as `HTTPURLResponse.allHeaderFields` does, so each of `setCookieValues` may be
+        ///   several cookies. `false` for a transport that keeps them apart: a comma in one of
+        ///   those is part of the cookie.
         package func store(
             setCookieValues: [String],
             for url: URL,
+            areFolded: Bool = false,
             now: Date = Date()
         ) {
             guard let origin = Self.origin(of: url) else {
                 return
             }
 
-            let parsed = setCookieValues
-                .flatMap(SetCookieSplitter.split)
+            let values = areFolded ? setCookieValues.flatMap(SetCookieSplitter.split) : setCookieValues
+
+            let parsed = values
+                .prefix(Self.maximumCookiesPerResponse)
                 .compactMap { Cookie.parse($0, from: origin, now: now, publicSuffixList: publicSuffixList) }
 
             guard !parsed.isEmpty else {
@@ -93,11 +104,16 @@ extension Internals {
                 return nil
             }
 
+            // Cookies set by one response share a creation time, and `sort` is not stable: the
+            // position in the store, which is the order they were stored in, breaks the tie.
             matching.sort {
                 let (lhs, rhs) = (cookies[$0], cookies[$1])
-                return lhs.path.count != rhs.path.count
-                    ? lhs.path.count > rhs.path.count
-                    : lhs.creation < rhs.creation
+
+                if lhs.path.count != rhs.path.count {
+                    return lhs.path.count > rhs.path.count
+                }
+
+                return lhs.creation != rhs.creation ? lhs.creation < rhs.creation : $0 < $1
             }
 
             for index in matching {
@@ -131,8 +147,12 @@ extension Internals {
                     && $0.hostOnly == cookie.hostOnly
             }
 
-            // A response over an insecure connection cannot replace, or delete, a Secure cookie.
-            if let existing, cookies[existing].secure, !origin.isSecure {
+            // A response over an insecure connection cannot replace, delete or shadow a Secure cookie
+            // (RFC 6265bis section 5.7, step 16): not only the one it would replace, but any that
+            // has the name, whose domain it may be a parent or a child of, and whose path it
+            // reaches. Otherwise `sid=evil; Domain=example.com; Path=/app` from plaintext would sit
+            // beside a Secure `sid` and be sent first.
+            if !origin.isSecure, cookies.contains(where: { isSecureCookie($0, shadowedBy: cookie) }) {
                 return
             }
 
@@ -155,6 +175,14 @@ extension Internals {
             }
 
             enforceLimits(domain: cookie.domain, now: now)
+        }
+
+        private func isSecureCookie(_ existing: Cookie, shadowedBy new: Cookie) -> Bool {
+            existing.secure
+                && existing.name == new.name
+                && (Cookie.domainMatches(host: existing.domain, domain: new.domain)
+                    || Cookie.domainMatches(host: new.domain, domain: existing.domain))
+                && Cookie.pathMatches(requestPath: new.path, cookiePath: existing.path)
         }
 
         /// Drops expired cookies, then the least recently used, until the limits hold.
@@ -203,7 +231,10 @@ extension Internals {
             let scheme = url.scheme?.lowercased()
             let isSecure = scheme == "https" || scheme == "wss" || Cookie.isLoopback(host)
 
-            let path = url.path.isEmpty ? "/" : url.path
+            // The path as it was written: `URL.path` drops a trailing slash, which makes `/app/` look
+            // like `/app`, and decodes escapes.
+            let encodedPath = URLComponents(url: url, resolvingAgainstBaseURL: false)?.percentEncodedPath ?? url.path
+            let path = encodedPath.isEmpty ? "/" : encodedPath
             return .init(host: host, path: path, isSecure: isSecure)
         }
     }

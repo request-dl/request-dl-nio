@@ -77,7 +77,10 @@ extension Internals.Cookie {
             switch attributeName {
             case "domain":
                 let cleaned = rawValue.hasPrefix(".") ? String(rawValue.dropFirst()) : rawValue
-                domain = cleaned.isEmpty ? nil : Internals.HostName.ascii(cleaned)
+                // An empty `Domain` is ignored, as RFC 6265bis says: it does not undo an earlier one.
+                if !cleaned.isEmpty {
+                    domain = Internals.HostName.ascii(cleaned)
+                }
             case "path":
                 path = rawValue.hasPrefix("/") ? rawValue : nil
             case "secure":
@@ -154,7 +157,11 @@ extension Internals.Cookie {
             return attribute == origin.host ? (origin.host, true) : nil
         }
 
-        let isPublicSuffix = publicSuffixList?.isPublicSuffix(attribute) ?? !attribute.contains(".")
+        // A single label is never allowed, with a list or without one: the Public Suffix List's own
+        // algorithm treats an unlisted label as a suffix (its implicit `*` rule), and a list that
+        // is out of date, or has a TLD only as a wildcard, would otherwise let `Domain=corp`, or
+        // `Domain=ck`, through. A list adds the multi-label suffixes (`co.uk`) to that.
+        let isPublicSuffix = !attribute.contains(".") || (publicSuffixList?.isPublicSuffix(attribute) ?? false)
 
         if isPublicSuffix {
             // `Domain=localhost` from localhost itself is the one harmless case.

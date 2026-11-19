@@ -307,6 +307,7 @@ struct InternalsCookieStorageTests {
                 "a=1; Expires=Wed, 01 Jan 2031 00:00:00 GMT; Path=/, b=2; Path=/, c=3"
             ],
             for: url("https://example.com/"),
+            areFolded: true,
             now: now
         )
 
@@ -321,5 +322,95 @@ struct InternalsCookieStorageTests {
         storage.removeAll()
 
         #expect(header(storage, "https://example.com/") == nil)
+    }
+
+    // MARK: - Review findings
+
+    @Test
+    func isLoopback_onlyTrustsWhatIsLoopbackWhateverDNSSays() {
+        #expect(Internals.Cookie.isLoopback("localhost"))
+        #expect(Internals.Cookie.isLoopback("127.0.0.1"))
+        #expect(Internals.Cookie.isLoopback("::1"))
+        #expect(!Internals.Cookie.isLoopback("127.victim.com"))
+        #expect(!Internals.Cookie.isLoopback("evil.localhost"))
+        #expect(!Internals.Cookie.isLoopback("localhost.example.com"))
+    }
+
+    @Test
+    func cookieHeader_whenHostLooksLikeLoopbackButIsAName_neverSendsASecureCookieOverHTTP() {
+        let storage = Internals.CookieStorage()
+        storage.store(setCookieValues: ["sid=1; Secure; Domain=victim.com"], for: url("https://victim.com/"), now: now)
+
+        #expect(header(storage, "http://127.victim.com/") == nil)
+    }
+
+    @Test
+    func store_whenAListIsGiven_stillRefusesASingleLabelDomainItDoesNotKnow() throws {
+        let list = try Internals.PublicSuffixList("com\n*.ck\n")
+        let storage = Internals.CookieStorage(publicSuffixList: list)
+
+        storage.store(setCookieValues: ["a=1; Domain=corp"], for: url("https://a.corp/"), now: now)
+        storage.store(setCookieValues: ["b=1; Domain=ck"], for: url("https://a.ck/"), now: now)
+
+        #expect(storage.snapshot(now: now).isEmpty)
+    }
+
+    @Test
+    func store_whenAnInsecureOriginSetsACookieThatShadowsASecureOne_ignoresIt() {
+        let storage = Internals.CookieStorage()
+        storage.store(setCookieValues: ["sid=real; Secure"], for: url("https://example.com/"), now: now)
+
+        storage.store(setCookieValues: ["sid=evil; Domain=example.com; Path=/app"], for: url("http://example.com/"), now: now)
+
+        #expect(header(storage, "https://example.com/app") == "sid=real")
+    }
+
+    @Test
+    func store_whenAResponseSetsMoreCookiesThanTheLimit_keepsOnlyTheFirstOnes() {
+        let storage = Internals.CookieStorage()
+        let values = (0..<(Internals.CookieStorage.maximumCookiesPerResponse + 10)).map { "c\($0)=1" }
+
+        storage.store(setCookieValues: values, for: url("https://example.com/"), now: now)
+
+        #expect(storage.snapshot(now: now).count == Internals.CookieStorage.maximumCookiesPerResponse)
+    }
+
+    @Test
+    func store_keepsTheTrailingSlashOfThePathItWasSetFrom() {
+        let storage = Internals.CookieStorage()
+        storage.store(setCookieValues: ["a=1"], for: url("https://example.com/dir/"), now: now)
+        storage.store(setCookieValues: ["b=1; Path=/app/"], for: url("https://example.com/"), now: now)
+
+        #expect(storage.snapshot(now: now).first { $0.name == "a" }?.path == "/dir")
+        #expect(header(storage, "https://example.com/app/") == "b=1")
+        #expect(header(storage, "https://example.com/app") == nil)
+    }
+
+    @Test
+    func store_whenALaterDomainAttributeIsEmpty_keepsTheEarlierOne() {
+        let storage = Internals.CookieStorage()
+        storage.store(setCookieValues: ["a=1; Domain=example.com; Domain="], for: url("https://www.example.com/"), now: now)
+
+        #expect(storage.snapshot(now: now).first?.hostOnly == false)
+    }
+
+    @Test
+    func store_whenTheTransportDoesNotFold_aCommaBelongsToTheCookie() {
+        let storage = Internals.CookieStorage()
+        storage.store(setCookieValues: ["a=x,y=z"], for: url("https://example.com/"), now: now)
+
+        let cookies = storage.snapshot(now: now)
+        #expect(cookies.map(\.name) == ["a"])
+        #expect(cookies.first?.value == "x,y=z")
+    }
+
+    @Test
+    func cookieHeader_whenCookiesAreSetByOneResponse_keepsTheOrderTheyWereSetIn() {
+        let storage = Internals.CookieStorage()
+        let names = (0..<20).map { "c\($0)" }
+
+        storage.store(setCookieValues: names.map { "\($0)=1" }, for: url("https://example.com/"), now: now)
+
+        #expect(header(storage, "https://example.com/") == names.map { "\($0)=1" }.joined(separator: "; "))
     }
 }

@@ -49,4 +49,15 @@ struct InternalsPublicSuffixListTests {
         #expect(list.isPublicSuffix("xn--55qx5d.cn"))
         #expect(!list.isPublicSuffix("пример.рф"))
     }
+
+    @Test
+    func init_whenContentsAreNotAList_throws() {
+        #expect(throws: Internals.PublicSuffixList.ParseError.malformed) {
+            try Internals.PublicSuffixList("<!DOCTYPE html><html><body>404 Not Found</body></html>")
+        }
+
+        #expect(throws: Internals.PublicSuffixList.ParseError.malformed) {
+            try Internals.PublicSuffixList("com\nHTTP/1.1 503 Service Unavailable\n")
+        }
+    }
 }

@@ -36,7 +36,13 @@ extension Internals {
         ///
         /// Each hop is stored with the URL of its own request: a cookie set by a redirect's target
         /// belongs to the target's host, not to the host the request started at.
-        package func store(headerFields fields: some Sequence<(name: String, value: String)>, for url: URL) {
+        ///
+        /// - Parameter areFolded: See ``Internals/CookieStorage/store(setCookieValues:for:areFolded:now:)``.
+        package func store(
+            headerFields fields: some Sequence<(name: String, value: String)>,
+            for url: URL,
+            areFolded: Bool = false
+        ) {
             let values = fields
                 .filter { $0.name.lowercased() == "set-cookie" }
                 .map(\.value)
@@ -45,7 +51,7 @@ extension Internals {
                 return
             }
 
-            storage.store(setCookieValues: values, for: url)
+            storage.store(setCookieValues: values, for: url, areFolded: areFolded)
         }
 
         /// The `Cookie` header value a request to `url` is owed right now, when the jar owns the
