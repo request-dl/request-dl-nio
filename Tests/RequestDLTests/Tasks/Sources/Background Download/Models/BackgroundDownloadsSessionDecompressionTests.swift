@@ -374,7 +374,10 @@ struct BackgroundDownloadsSessionDecompressionTests {
 
         let algorithms = try BackgroundDownloads.Session.takingOverAcceptEncoding(
             of: &request,
-            for: .enabled(algorithms: [Self.algorithm(GzipAlgorithm()), Self.algorithm(DeflateAlgorithm())], limit: .none)
+            for: .enabled(
+                algorithms: [Self.algorithm(GzipAlgorithm()), Self.algorithm(DeflateAlgorithm())],
+                limit: .none
+            )
         )
 
         #expect(algorithms == nil)
@@ -391,9 +394,11 @@ struct BackgroundDownloadsSessionDecompressionTests {
         #expect(request.value(forHTTPHeaderField: "Accept-Encoding") == nil)
     }
 
-    @Test(arguments: [
-        ["gzip"], ["deflate"], ["br"], ["gzip", "rle"], ["rle", "deflate"],
-    ] as [[String]])
+    @Test(
+        arguments: [
+            ["gzip"], ["deflate"], ["br"], ["gzip", "rle"], ["rle", "deflate"],
+        ] as [[String]]
+    )
     func aSystemDecodedAlgorithmNextToACustomOne_isRefused(_ names: [String]) throws {
         var request = URLRequest(url: try #require(URL(string: "https://example.invalid")))
         let algorithms: [any Internals.DecompressionAlgorithm] = names.map {
@@ -502,14 +507,16 @@ struct BackgroundDownloadsSessionDecompressionTests {
 
     // MARK: - Content-Encoding
 
-    @Test(arguments: [
-        (nil, []),
-        ("", []),
-        ("identity", []),
-        ("RLE", ["rle"]),
-        (" rle , Identity ", ["rle"]),
-        ("rle,zstd", ["rle", "zstd"]),
-    ] as [(String?, [String])])
+    @Test(
+        arguments: [
+            (nil, []),
+            ("", []),
+            ("identity", []),
+            ("RLE", ["rle"]),
+            (" rle , Identity ", ["rle"]),
+            ("rle,zstd", ["rle", "zstd"]),
+        ] as [(String?, [String])]
+    )
     func contentEncodings_areLowercasedAndWithoutIdentity(_ header: String?, _ expected: [String]) throws {
         let response = HTTPURLResponse(
             url: try #require(URL(string: "https://example.invalid")),
@@ -587,7 +594,8 @@ struct BackgroundDownloadsSessionDecompressionTests {
 
     /// Whatever the decoding left beside `destination` besides `destination` itself.
     private static func leftovers(beside destination: URL) -> [String] {
-        let names = (try? FileManager.default.contentsOfDirectory(atPath: destination.deletingLastPathComponent().path)) ?? []
+        let names =
+            (try? FileManager.default.contentsOfDirectory(atPath: destination.deletingLastPathComponent().path)) ?? []
         return names.filter { $0 != destination.lastPathComponent }
     }
 

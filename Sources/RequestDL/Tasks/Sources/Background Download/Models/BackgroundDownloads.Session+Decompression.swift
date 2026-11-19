@@ -190,7 +190,8 @@ extension BackgroundDownloads.Session {
             return []
         }
 
-        return value
+        return
+            value
             .split(separator: ",")
             .map { $0.trimmingCharacters(in: .whitespaces).lowercased() }
             .filter { !$0.isEmpty && $0 != "identity" }
