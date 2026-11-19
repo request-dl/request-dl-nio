@@ -67,6 +67,30 @@ import struct Foundation.URL
 /// a `POST` that answers with the file, cannot be a background download: use ``DownloadTask``
 /// for it, in the foreground.
 ///
+/// ## Response decompression
+///
+/// ``Session/decompressionAlgorithms(_:limit:)`` works here, custom ``Decompressor``s included.
+/// The system decodes gzip, deflate and brotli by itself, so a list with only those leaves it to
+/// do that, as it always did. Once the list has an algorithm of your own, the request carries an
+/// `Accept-Encoding` naming all of them, which turns the system's decoding off for every one, and
+/// the file is decoded when it has finished downloading: read in pieces, decoded, and written
+/// beside `destination` before it takes its place, so it is never held whole in memory. Nothing
+/// is at `destination` until that has worked, and ``BackgroundDownloads/Event/completed(id:destination:)``
+/// follows it. A response encoded in something that is not on the list fails the download with
+/// ``UnsupportedContentEncodingError``, and a corrupt or truncated body with whatever your
+/// decompressor throws.
+///
+/// The system may finish the download in a launch of the app that has none of `content`. Register
+/// your decompressors with ``BackgroundDownloads/registerDecompressors(_:)`` early in every launch,
+/// or such a download fails with ``BackgroundDownloadMissingDecompressorError``. The progress is
+/// in the encoded bytes, as that is what travels.
+///
+/// ``GzipAlgorithm``, ``DeflateAlgorithm`` and ``BrotliURLSessionOnlyAlgorithm`` can't be listed next
+/// to an algorithm of your own: they only stand for the system's decoding, which taking over
+/// `Accept-Encoding` turns off, so a response encoded with one of them could not be decoded.
+/// ``result()`` refuses such a list with ``BackgroundDownloadUnsupportedConfigurationError``, and
+/// not later, when the download is done. Leave them out and the server is asked for yours alone.
+///
 /// ## Client certificates
 ///
 /// A client certificate (mTLS) works too, as long as both ``Certificate`` and ``PrivateKey`` come
@@ -147,8 +171,9 @@ public struct BackgroundDownloadTask<Content: Property> {
     ///
     /// - Throws: `CocoaError.fileWriteUnsupportedScheme` if `destination` is not a file URL.
     ///   ``BackgroundDownloadUnsupportedConfigurationError`` if `content` configures a
-    ///   client certificate or SPKI pin this executor can't rebuild after a relaunch (see its own
-    ///   documentation for the specific cases), or any error `content` itself throws while being
+    ///   client certificate or SPKI pin this executor can't rebuild after a relaunch, or lists a
+    ///   system-decoded algorithm next to one of your own (see its own documentation for the
+    ///   specific cases), or any error `content` itself throws while being
     ///   resolved into a request (an invalid URL, a certificate file that can't be read, etc.),
     ///   the same errors any other task can throw at this stage.
     public func result() async throws {
@@ -182,7 +207,14 @@ public struct BackgroundDownloadTask<Content: Property> {
             throw BackgroundDownloadUnsupportedConfigurationError(error)
         }
 
-        let request = try resolved.requestConfiguration.buildURLRequestWithoutBody()
+        var request = try resolved.requestConfiguration.buildURLRequestWithoutBody()
+
+        // See `BackgroundDownloads.Session.takingOverAcceptEncoding`. What then comes back is decoded
+        // when the download finishes, see `BackgroundDownloads.Session.decodedFile`.
+        let decompression = try BackgroundDownloads.Session.takingOverAcceptEncoding(
+            of: &request,
+            for: resolved.session.configuration.decompression
+        )
 
         if let resumeData {
             BackgroundDownloads.Session.shared.schedule(
@@ -191,7 +223,8 @@ public struct BackgroundDownloadTask<Content: Property> {
                 destination: destination,
                 serverTrust: serverTrust,
                 clientIdentity: clientIdentity,
-                host: request.url?.host
+                host: request.url?.host,
+                decompression: decompression
             )
             return
         }
@@ -201,7 +234,8 @@ public struct BackgroundDownloadTask<Content: Property> {
             id: id,
             destination: destination,
             serverTrust: serverTrust,
-            clientIdentity: clientIdentity
+            clientIdentity: clientIdentity,
+            decompression: decompression
         )
     }
 }
