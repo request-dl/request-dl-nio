@@ -339,7 +339,8 @@ extension Internals {
                         transferControl: transferControl,
                         policy: policy,
                         logger: logger,
-                        metrics: metrics
+                        metrics: metrics,
+                        cookies: cookies
                     )
                 }
             }

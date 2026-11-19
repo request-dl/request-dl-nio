@@ -1052,6 +1052,11 @@ extension Internals {
                 }
 
                 let taskDelegate = continuationDelegate(continuation)
+
+                // The request this continues was sent with the cookies of the moment it started.
+                // What its response set, or deleted, since is in the jar and not in that header.
+                continuation = taskDelegate.applyingCookies(to: continuation)
+
                 var deliveredBytes = state.deliveredBytes
                 var attemptTask: URLSessionTask?
 
@@ -1652,7 +1657,7 @@ extension Internals.URLSessionClient {
         /// `request` with the `Cookie` header the jar owes that hop, when the jar owns the header
         /// (the caller did not set one). What `URLSession` copied over from the previous hop is
         /// replaced even when the jar has nothing to send, since it may be what a redirect deleted.
-        private func applyingCookies(to request: URLRequest) -> URLRequest {
+        func applyingCookies(to request: URLRequest) -> URLRequest {
             guard let cookies, cookies.managesHeader, let url = request.url else {
                 return request
             }

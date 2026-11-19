@@ -53,6 +53,7 @@ extension Internals {
         private let transferControl: Internals.TransferControl
         private let logger: Internals.TaskLogger?
         private let metrics: Internals.RequestMetricsCollector?
+        private let cookies: Internals.CookieContext?
         private let lock = Lock()
 
         // MARK: - Unsafe properties
@@ -78,8 +79,10 @@ extension Internals {
             transferControl: Internals.TransferControl,
             policy: Internals.DownloadResumptionPolicy,
             logger: Internals.TaskLogger?,
-            metrics: Internals.RequestMetricsCollector? = nil
+            metrics: Internals.RequestMetricsCollector? = nil,
+            cookies: Internals.CookieContext? = nil
         ) {
+            self.cookies = cookies
             self.client = client
             self.request = request
             self.url = url
@@ -249,11 +252,22 @@ extension Internals {
                 continuation.headers.replaceOrAdd(name: header.name, value: header.value)
             }
 
+            // The original request carried the cookies of the moment it started. The response may
+            // have set or deleted some since, so a continuation is sent what the jar holds now.
+            if let cookies, cookies.managesHeader {
+                continuation.headers.remove(name: "Cookie")
+
+                if let value = cookies.cookieHeader(for: continuation.url) {
+                    continuation.headers.add(name: "Cookie", value: value)
+                }
+            }
+
             let receiver = ResumedResponseReceiver(
                 url: url,
                 download: download,
                 attempt: attempt,
-                reconnection: self
+                reconnection: self,
+                cookies: cookies
             )
 
             // `execute` now throws when the request is rejected before dispatch; that ends this
