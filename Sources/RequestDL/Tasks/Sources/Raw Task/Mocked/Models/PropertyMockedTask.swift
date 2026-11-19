@@ -88,7 +88,7 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
 
     private func mockRequest(
         resolved: Resolved,
-        cache: ((Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
+        cache: ((Internals.ResponseHead) -> Internals.AsyncStream<Internals.Chunk>?)?,
         logger: Internals.TaskLogger?
     ) async throws -> Internals.AsyncResponse {
         let downloadBuffer = await Internals.DownloadBuffer(
@@ -143,17 +143,8 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
         _Concurrency.Task {
             do {
                 for try await chunk in body.bytesSequence {
-                    let byteURL = Internals.ByteURL()
-                    byteURL.replace(with: chunk)
-                    // Routed through `makeMockedDataBuffer`, not called inline. Swift's
-                    // async-overload resolution commits to `Internals.DataBuffer(_ url:) async`
-                    // for any call made from an `async` context, whether or not it awaits. Only
-                    // a genuinely non-`async` context leaves that overload out of the running and
-                    // falls back to the synchronous one `Internals.ClientResponseReceiver
-                    // .didReceiveBodyPart` already relies on, which for a `ByteURL` has nothing
-                    // to suspend for in the first place (see that init's own doc comment).
-                    // `makeMockedDataBuffer` is that non-`async` context.
-                    buffer.append(makeMockedDataBuffer(byteURL))
+                    var chunk = chunk
+                    buffer.append(Internals.Chunk(chunk.asData()))
                 }
             } catch {
                 buffer.failed(error)
@@ -161,12 +152,6 @@ struct PropertyMockedTask<Content: Property>: MockedTaskPayload {
 
             buffer.close()
         }
-    }
-
-    /// Calls `Internals.DataBuffer`'s synchronous, suspension-free `init(_ url:)` overload. See
-    /// ``mockBodyResponse(buffer:body:)``'s own comment for why this can't just be inlined there.
-    private func makeMockedDataBuffer(_ byteURL: Internals.ByteURL) -> Internals.DataBuffer {
-        Internals.DataBuffer(byteURL)
     }
 
     private func mockResponseHead(_ resolved: Resolved) -> Internals.ResponseHead {

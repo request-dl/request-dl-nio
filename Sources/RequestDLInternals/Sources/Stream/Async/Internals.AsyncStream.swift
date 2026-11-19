@@ -337,7 +337,7 @@ extension Internals {
 
 // MARK: - Flow control
 
-extension Internals.AsyncStream where Element == Internals.DataBuffer {
+extension Internals.AsyncStream where Element == Internals.Chunk {
 
     /// Creates a single-reader stream of body chunks metered by `flowControl`: every chunk
     /// appended charges its `readableBytes`, and the reader credits the same amount back as it

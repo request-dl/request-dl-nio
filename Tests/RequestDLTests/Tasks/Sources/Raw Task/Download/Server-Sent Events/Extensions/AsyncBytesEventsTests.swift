@@ -19,7 +19,7 @@ struct AsyncBytesEventsTests {
     @Test
     func events_whenBytesArriveSplitAcrossChunks_shouldYieldParsedEvents() async throws {
         // Given
-        let stream = Internals.AsyncStream<Internals.DataBuffer>()
+        let stream = Internals.AsyncStream<Internals.Chunk>()
 
         let part1 = Data("id: 1\nevent: greeting\ndata: hel".utf8)
         let part2 = Data("lo\n\nretry: 2000\ndata: world\n\n".utf8)
@@ -33,8 +33,8 @@ struct AsyncBytesEventsTests {
         let bytes = AsyncBytes(seed: .withoutCancellation, bytes: internalBytes)
 
         // When
-        await stream.append(.success(Internals.DataBuffer(part1)))
-        await stream.append(.success(Internals.DataBuffer(part2)))
+        await stream.append(.success(Internals.Chunk(part1)))
+        await stream.append(.success(Internals.Chunk(part2)))
         stream.close()
 
         var events: [ServerSentEvent] = []
@@ -55,7 +55,7 @@ struct AsyncBytesEventsTests {
     @Test
     func events_whenStreamEndsWithoutTrailingBlankLine_shouldStillYieldLastEvent() async throws {
         // Given
-        let stream = Internals.AsyncStream<Internals.DataBuffer>()
+        let stream = Internals.AsyncStream<Internals.Chunk>()
         let part = Data("data: hello".utf8)
 
         let internalBytes = Internals.AsyncBytes(
@@ -67,7 +67,7 @@ struct AsyncBytesEventsTests {
         let bytes = AsyncBytes(seed: .withoutCancellation, bytes: internalBytes)
 
         // When
-        await stream.append(.success(Internals.DataBuffer(part)))
+        await stream.append(.success(Internals.Chunk(part)))
         stream.close()
 
         var events: [ServerSentEvent] = []
@@ -87,7 +87,7 @@ struct AsyncBytesEventsTests {
     @Test
     func events_whenALineOutgrowsTheMaximum_failsAfterTheEarlierEvents() async throws {
         // Given: one complete event, then a line that never ends.
-        let stream = Internals.AsyncStream<Internals.DataBuffer>()
+        let stream = Internals.AsyncStream<Internals.Chunk>()
         let parts = [
             Data("data: first\n\n".utf8),
             Data("data: ".utf8),
@@ -103,7 +103,7 @@ struct AsyncBytesEventsTests {
         let bytes = AsyncBytes(seed: .withoutCancellation, bytes: internalBytes)
 
         for part in parts {
-            await stream.append(.success(Internals.DataBuffer(part)))
+            await stream.append(.success(Internals.Chunk(part)))
         }
 
         stream.close()
@@ -122,13 +122,13 @@ struct AsyncBytesEventsTests {
 
     @Test
     func events_whenTheLastLineWithoutABreakOutgrowsTheMaximum_fails() async throws {
-        let stream = Internals.AsyncStream<Internals.DataBuffer>()
+        let stream = Internals.AsyncStream<Internals.Chunk>()
         let part = Data("data: 0123456789".utf8)
 
         let internalBytes = Internals.AsyncBytes(logger: nil, totalSize: part.count, stream: stream)
         let bytes = AsyncBytes(seed: .withoutCancellation, bytes: internalBytes)
 
-        await stream.append(.success(Internals.DataBuffer(part)))
+        await stream.append(.success(Internals.Chunk(part)))
         stream.close()
 
         await #expect(throws: AsyncBytesItemTooLargeError(maximumLength: 10)) {
@@ -138,14 +138,14 @@ struct AsyncBytesEventsTests {
 
     @Test
     func events_withoutAMaximum_stillReadsAVeryLongLine() async throws {
-        let stream = Internals.AsyncStream<Internals.DataBuffer>()
+        let stream = Internals.AsyncStream<Internals.Chunk>()
         let payload = String(repeating: "x", count: 200_000)
         let part = Data("data: \(payload)\n\n".utf8)
 
         let internalBytes = Internals.AsyncBytes(logger: nil, totalSize: part.count, stream: stream)
         let bytes = AsyncBytes(seed: .withoutCancellation, bytes: internalBytes)
 
-        await stream.append(.success(Internals.DataBuffer(part)))
+        await stream.append(.success(Internals.Chunk(part)))
         stream.close()
 
         var events: [ServerSentEvent] = []

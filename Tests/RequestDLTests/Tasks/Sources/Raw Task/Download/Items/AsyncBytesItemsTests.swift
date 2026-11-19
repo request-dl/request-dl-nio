@@ -24,7 +24,7 @@ struct AsyncBytesItemsTests {
     }
 
     private func makeBytes(_ chunks: [Data], onCancel: @escaping @Sendable () -> Void = {}) async -> AsyncBytes {
-        let stream = Internals.AsyncStream<Internals.DataBuffer>()
+        let stream = Internals.AsyncStream<Internals.Chunk>()
 
         let internalBytes = Internals.AsyncBytes(
             logger: nil,
@@ -33,7 +33,7 @@ struct AsyncBytesItemsTests {
         )
 
         for chunk in chunks {
-            await stream.append(.success(Internals.DataBuffer(chunk)))
+            await stream.append(.success(Internals.Chunk(chunk)))
         }
 
         stream.close()
@@ -225,7 +225,7 @@ struct AsyncBytesItemsTests {
     @Test
     func readingModeItemTooLarge_cancelsTheTransferWhileTheCallerStillHoldsTheBytes() async throws {
         let cancelled = CancelFlag()
-        let stream = Internals.AsyncStream<Internals.DataBuffer>()
+        let stream = Internals.AsyncStream<Internals.Chunk>()
         let internalBytes = Internals.AsyncBytes(logger: nil, totalSize: 0, stream: stream)
         let bytes = AsyncBytes(seed: Internals.TaskSeed { cancelled.set() }, bytes: internalBytes)
 

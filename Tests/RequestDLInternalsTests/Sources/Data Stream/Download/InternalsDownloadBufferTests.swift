@@ -490,22 +490,24 @@ struct InternalsDownloadBufferTests {
     @Test
     func download_whenPassthrough_doesNotCopyAnInMemoryPart() async throws {
         // Given
-        let part = await Internals.DataBuffer(Data(repeating: 7, count: 4_096))
+        let part = Internals.Chunk(Data(repeating: 7, count: 4_096))
         let download = await Internals.DownloadBuffer(readingMode: .passthrough)
 
         // When
-        await download.append(part)
+        download.append(part)
         download.close()
 
-        // Then: the very store that was appended comes out of the stream, not a copy of it, which
-        // a write straight to that store shows.
+        // Then: the very bytes that were appended come out of the stream, not a copy of them.
         var iterator = download.stream.makeAsyncIterator()
-        var forwarded = try #require(await iterator.next())
-
-        try await part.setData(Data([9]), at: 0)
+        let forwarded = try #require(await iterator.next())
 
         #expect(forwarded.readableBytes == 4_096)
-        #expect(await forwarded.readData(1) == Data([9]))
+        #expect(forwarded == part)
+        #expect(address(of: forwarded) == address(of: part))
+    }
+
+    private func address(of chunk: Internals.Chunk) -> UnsafeRawPointer? {
+        chunk.data.withUnsafeBytes { $0.baseAddress }
     }
 
     @Test
@@ -576,14 +578,13 @@ struct InternalsDownloadBufferTests {
 
     /// Reads a cache stream to its end, keeping what arrived and how it ended.
     private func drain(
-        _ cacheStream: Internals.AsyncStream<Internals.DataBuffer>
+        _ cacheStream: Internals.AsyncStream<Internals.Chunk>
     ) async -> (received: Int, error: (any Error)?) {
         var received = 0
 
         do {
-            for try await var chunk in cacheStream {
+            for try await chunk in cacheStream {
                 received += chunk.readableBytes
-                _ = await chunk.readData(chunk.readableBytes)
             }
 
             return (received, nil)
@@ -596,7 +597,7 @@ struct InternalsDownloadBufferTests {
     func cacheStream_whenTheWriterNeverReads_givesUpAtItsWindowInsteadOfBufferingTheBody() async throws {
         // Given: a tee whose window holds 4 KiB, and a writer that has not started reading.
         let window = Internals.FlowControlWindow(highWatermark: 4_096, lowWatermark: 2_048)
-        let cacheStream = Internals.AsyncStream<Internals.DataBuffer>(flowControl: window)
+        let cacheStream = Internals.AsyncStream<Internals.Chunk>(flowControl: window)
         let download = await Internals.DownloadBuffer(readingMode: .length(1_024))
         download.cacheStream(cacheStream)
 
@@ -623,7 +624,7 @@ struct InternalsDownloadBufferTests {
     func cacheStream_whenTheWriterKeepsUp_receivesTheWholeBody() async throws {
         // Given
         let window = Internals.FlowControlWindow(highWatermark: 4_096, lowWatermark: 2_048)
-        let cacheStream = Internals.AsyncStream<Internals.DataBuffer>(flowControl: window)
+        let cacheStream = Internals.AsyncStream<Internals.Chunk>(flowControl: window)
         let download = await Internals.DownloadBuffer(readingMode: .length(1_024))
         download.cacheStream(cacheStream)
 
@@ -653,7 +654,7 @@ struct InternalsDownloadBufferTests {
     func cacheStream_whenGivenUp_leavesTheDownloadFlowingAndTheLaterPartsUncounted() async throws {
         // Given
         let window = Internals.FlowControlWindow(highWatermark: 2_048, lowWatermark: 1_024)
-        let cacheStream = Internals.AsyncStream<Internals.DataBuffer>(flowControl: window)
+        let cacheStream = Internals.AsyncStream<Internals.Chunk>(flowControl: window)
         let download = await Internals.DownloadBuffer(readingMode: .length(1_024))
         download.cacheStream(cacheStream)
 

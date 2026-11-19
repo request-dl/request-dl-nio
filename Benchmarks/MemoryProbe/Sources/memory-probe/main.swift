@@ -17,9 +17,11 @@ import Glibc
 //
 //   memory-probe <scenario> <port> <nio|urlSession> <arguments>
 //
-//   download <MiB> <data|stream>
+//   download <MiB> <data|stream|separator>
 //       One download of that many MiB, after a warm-up: through `DataTask`, which keeps the body,
-//       or through `DownloadTask`, which hands it out in pieces.
+//       or through `DownloadTask`, which hands it out in pieces. `separator` is the latter with the
+//       body cut on a newline (the server answers lines of 128 bytes for it); `run.py` does not run
+//       it, it is for counting allocations.
 //   upload <MiB>
 //       One upload of a body of that many MiB, after a warm-up.
 //   small <count> <concurrency>
@@ -169,6 +171,28 @@ case "download":
             .result()
 
             return result.payload.count
+        }
+
+        if mode == "separator" {
+            // Cut on a newline: the server answers lines of 128 bytes, so this is the path that scans
+            // the body for the separator (`Internals.DownloadBuffer`'s `.separator` reading mode).
+            let result = try await DownloadTask {
+                Session().requiredExecutor(executor)
+                BaseURL(.http, host: "127.0.0.1:\(port)")
+                Path("/download")
+                Query(name: "bytes", value: bytes)
+                Query(name: "lines", value: 1)
+                ReadingMode(separator: "\n")
+            }
+            .result()
+
+            var received = 0
+
+            for try await chunk in result.payload {
+                received += chunk.count
+            }
+
+            return received
         }
 
         let result = try await DownloadTask {

@@ -90,7 +90,7 @@ extension Internals {
 
             // MARK: - Private properties
 
-            private let lock = AsyncLock(watchdog: watchdog)
+            private let lock: AsyncLock
             /// `fileprivate`, not `private`: `Internals.Buffer.wholeFileURL` (below, `Stream ==
             /// Internals.FileStreamBuffer` only) reads this directly rather than adding an async
             /// round trip through this actor-less class for a value that never changes after init.
@@ -139,6 +139,12 @@ extension Internals {
 
             package init(_ url: Stream.URL) {
                 self.url = url
+
+                // The watchdog exists to flag I/O that stalls (a read, write or close on a file).
+                // A storage with nothing to tear down is in memory: its critical sections cannot
+                // block on I/O, and the watchdog costs a sleeping task per lock acquisition, which
+                // is every chunk of every in-memory download in a development build.
+                self.lock = AsyncLock(watchdog: url.requiresTeardownOnDeinit ? Self.watchdog : nil)
             }
 
             deinit {
