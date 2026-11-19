@@ -138,11 +138,14 @@ struct RawTask<Content: Property>: RequestTask {
             logger: logger
         )
 
-        let cacheControl = Internals.CacheControl(
+        var cacheControl = Internals.CacheControl(
             requestConfiguration: resolved.requestConfiguration,
             dataCache: resolved.dataCache,
             logger: logger
         )
+
+        cacheControl.isURLSessionExecutor = isURLSessionExecutor
+        cacheControl.completenessProbeClient = resolved.requestConfiguration.probesCacheCompleteness ? client : nil
 
         let idle = transferControl?.observer?.idle
         idle?.start()

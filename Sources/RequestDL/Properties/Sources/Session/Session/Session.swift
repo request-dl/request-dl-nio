@@ -288,13 +288,13 @@ public struct Session: Property {
     ///
     /// Pinning to ``Session/Executor/urlSession`` with a client certificate configured
     /// (``Certificate``/``PrivateKey`` on ``SecureConnection``) has one further requirement
-    /// ``ExecutorRequirementError`` can't check ahead of time: building that certificate into a
-    /// `URLSession`-presentable identity is a Keychain round-trip that needs the Keychain Sharing
-    /// capability, a one-time Xcode project setting. A request missing it throws
-    /// ``ClientIdentityError`` instead. See <doc:Using-a-Client-Certificate-with-URLSession>
-    /// for the full walkthrough. This also applies without pinning anything, since `.urlSession`
-    /// is already ``preferredExecutor(_:)``'s own default choice on Darwin whenever the rest of
-    /// the configuration supports it.
+    /// ``ExecutorRequirementError`` can't check ahead of time: the certificate and the private key
+    /// have to form a `URLSession`-presentable identity (the key is the certificate's, in a
+    /// supported format). A request whose pair does not throws ``ClientIdentityError`` instead.
+    /// The identity is built in memory, so no Keychain Sharing capability or signed app is needed.
+    /// See <doc:Using-a-Client-Certificate-with-URLSession> for the walkthrough. This also applies
+    /// without pinning anything, since `.urlSession` is already ``preferredExecutor(_:)``'s own
+    /// default choice on Darwin whenever the rest of the configuration supports it.
     ///
     /// A `SecureConnection` minimum or maximum TLS version is neither caught nor dropped under
     /// `.urlSession`: both are carried through as

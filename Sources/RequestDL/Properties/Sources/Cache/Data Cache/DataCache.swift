@@ -76,7 +76,12 @@ public struct DataCache: Sendable, Equatable {
         }
 
         /// Cache writes started and not yet finished.
-        let pendingWrites = Internals.PendingTasks(priority: .background)
+        ///
+        /// Each write runs at the priority of the request that made it (see
+        /// ``DataCache/trackWrite(priority:_:)``), not a fixed low one. A write is the reader of a
+        /// stream the response feeds, and a lagging one makes the response give up on the cache
+        /// (`CacheBacklogExceededError`); while it is unfinished, the key reads as a miss.
+        let pendingWrites = Internals.PendingTasks()
 
         /// Held while a revalidated entry is rewritten and read back, one at a time: see
         /// ``DataCache/renewCached(key:cachedResponse:expecting:policy:)``.
@@ -118,7 +123,9 @@ public struct DataCache: Sendable, Equatable {
                     return
                 }
 
-                pendingWrites.run {
+                // Housekeeping nobody waits for: low priority on purpose, and not inherited from
+                // whoever happens to set the capacity.
+                pendingWrites.run(priority: .background) {
                     await diskStorage.freeSpace(newValue)
                 }
             }
@@ -958,8 +965,15 @@ public struct DataCache: Sendable, Equatable {
     }
 
     /// Runs a cache write and keeps track of it, so `waitUntilIdle()` can join it later.
-    func trackWrite(_ operation: @escaping @Sendable () async -> Void) {
-        storage.pendingWrites.run(operation)
+    ///
+    /// - Parameter priority: The priority of the request the write belongs to. Without it the
+    /// write inherits the priority of the caller, which is what a caller that is itself a task
+    /// wants; one that runs on an event loop has to pass the priority it captured instead.
+    func trackWrite(
+        priority: _Concurrency.TaskPriority? = nil,
+        _ operation: @escaping @Sendable () async -> Void
+    ) {
+        storage.pendingWrites.run(priority: priority, operation)
     }
 
     /// Suspends until every cache write started so far has finished.

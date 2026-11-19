@@ -19,6 +19,7 @@ import Testing
 ///
 /// That leaves nothing RequestDL could check on `.urlSession`, and, since the body looks complete,
 /// no reconnection either. These tests pin down the difference so it is a known, documented one.
+/// What the cache does about it is in `ChunkedCacheCompletenessTests`.
 @Suite(.serialized, .concurrent(watchdogAffectedPlatformConcurrencyLimit), .nonFatalWatchdog)
 struct ChunkedTruncationTests {
 

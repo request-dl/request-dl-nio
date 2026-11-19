@@ -24,7 +24,8 @@ import SwiftAsyncStream
 /// So every `interval` this probes, from a thread of its own (an OS thread, which neither pool
 /// can starve), how long it takes for
 /// - a closure handed to `Internals.FileSystemManager.run`, and
-/// - a `Task.detached` (the same hop the watchdog itself makes)
+/// - a `Task.detached` (the same hop the watchdog itself makes), at the default priority and at
+///   the two lower ones this package runs lock-holding work at (`.utility`, `.background`)
 ///
 /// to *begin* running, and remembers the worst of the last `retention` seconds. A probe that has
 /// not begun yet counts for however long it has been waiting, so a pool that is stuck right now
@@ -36,11 +37,17 @@ import SwiftAsyncStream
 ///   the next probes begin on time. What does show is the monitor's own thread waking late: it
 ///   asks for a wake-up every `interval`, so a gap far beyond that is a freeze. The gap counts
 ///   while it is still open, too (from the last wake-up until now), so a watchdog report that
-///   wakes up from the same freeze *before* the monitor does already sees it. This is the
-///   stall the URLSession-only and iPadOS CI jobs hit: a dozen independent locks all reported
-///   at once, each held by one `Internals.Buffer.write`, with no pool late.
+///   wakes up from the same freeze *before* the monitor does already sees it.
 /// - A file system that accepts work on time but takes ages to finish it. One probe therefore
 ///   writes (and removes) a one-byte file on the file pool, and counts until that is done.
+///
+/// The probes at a lower priority are what the URLSession-only and iPadOS CI jobs needed: a
+/// dozen independent locks reported at once, each held by one `Internals.Buffer.write` with
+/// nobody waiting behind it, while the default-priority probe and the monitor's own thread were
+/// both on time. On Darwin a priority is only given a cooperative thread once no higher one has
+/// work waiting, so a busy run of `.medium` tests can keep `.background` work (such as
+/// `DataCache`'s writes) off the pool for longer than the lock's budget, without anything at
+/// `.medium` ever starting late.
 ///
 /// The monitor never waits on a probe, so it cannot itself hang, and it never has more than one
 /// probe of each kind in flight, so a stalled pool does not make it pile work onto that pool.
@@ -50,13 +57,15 @@ package final class PoolLagMonitor: @unchecked Sendable {
     package enum Source: String, Sendable, CaseIterable {
         case filePool = "file pool"
         case cooperativePool = "cooperative pool"
+        case utilityTasks = "cooperative pool at utility priority"
+        case backgroundTasks = "cooperative pool at background priority"
         case monitorThread = "lag monitor's own thread"
         case fileWrite = "file write"
 
         /// What a lag of `seconds` from this source means, for a report to say.
         package func symptom(seconds: Int) -> String {
             switch self {
-            case .filePool, .cooperativePool:
+            case .filePool, .cooperativePool, .utilityTasks, .backgroundTasks:
                 return "work handed to the \(rawValue) started about \(seconds)s late"
             case .monitorThread:
                 return "the \(rawValue) woke about \(seconds)s late"
@@ -73,6 +82,20 @@ package final class PoolLagMonitor: @unchecked Sendable {
         package var source: Source?
 
         package static let none = Lag(seconds: 0, source: nil)
+
+        /// The worst of `lags`, each source's worst lag, or ``none`` if there is none.
+        package static func worst(of lags: [Source: Double]) -> Lag {
+            var worst = Lag.none
+
+            // In `allCases` order, so a tie names the same source every time.
+            for source in Source.allCases {
+                if let seconds = lags[source], seconds > worst.seconds {
+                    worst = Lag(seconds: seconds, source: source)
+                }
+            }
+
+            return worst
+        }
     }
 
     /// One thing to probe: `enqueue` must hand the closure it is given to whatever it measures,
@@ -99,6 +122,19 @@ package final class PoolLagMonitor: @unchecked Sendable {
             },
             Probe(source: .cooperativePool) { began in
                 Task.detached { began() }
+            },
+            // The probe above runs at `.medium`, the priority the tests themselves run at, and
+            // on Darwin a lower priority only gets a cooperative thread once no higher priority
+            // work is waiting: a steady stream of short `.medium` jobs, each of which the probe
+            // above sees begin on time, can keep `.background` work from running at all for
+            // longer than the lock's budget. That is where the locks that outlast it are held:
+            // `DataCache`'s writes and a cached body's replay run at `.background`, and a
+            // download's bytes go through a `.utility` `Internals.AsyncQueue`.
+            Probe(source: .utilityTasks) { began in
+                Task.detached(priority: .utility) { began() }
+            },
+            Probe(source: .backgroundTasks) { began in
+                Task.detached(priority: .background) { began() }
             },
             Probe(source: .fileWrite) { began in
                 Task.detached {
@@ -261,20 +297,28 @@ package final class PoolLagMonitor: @unchecked Sendable {
     /// The worst lag seen within the last `window` seconds, counting any probe that has been
     /// waiting to begin for that long so far. ``Lag/none`` if there is none.
     package func worstLag(within window: Double) -> Lag {
+        Lag.worst(of: lags(within: window))
+    }
+
+    /// The worst lag of each source within the last `window` seconds, counted the way
+    /// ``worstLag(within:)`` counts it. A source with nothing late is missing.
+    package func lags(within window: Double) -> [Source: Double] {
         let windowNanoseconds = Self.nanoseconds(window)
 
         return lock.withLock {
             // Under the lock: a heartbeat or a tick stamped after a `now()` read outside it would
             // be later than `current`, and `current &- it` would wrap to a huge, false lag.
             let current = now()
-            var worst = Lag.none
+            var lags: [Source: Double] = [:]
+
+            func note(_ seconds: Double, from source: Source) {
+                if seconds > lags[source, default: 0] {
+                    lags[source] = seconds
+                }
+            }
 
             for sample in _state.samples where current &- sample.recordedAt <= windowNanoseconds {
-                let seconds = Double(sample.nanoseconds) / 1_000_000_000
-
-                if seconds > worst.seconds {
-                    worst = Lag(seconds: seconds, source: sample.source)
-                }
+                note(Double(sample.nanoseconds) / 1_000_000_000, from: sample.source)
             }
 
             if let last = _state.lastHeartbeat, !_state.isStopped {
@@ -282,23 +326,15 @@ package final class PoolLagMonitor: @unchecked Sendable {
                 let intervalNanoseconds = Self.nanoseconds(interval)
 
                 if overdue > intervalNanoseconds {
-                    let seconds = Double(overdue - intervalNanoseconds) / 1_000_000_000
-
-                    if seconds > worst.seconds {
-                        worst = Lag(seconds: seconds, source: .monitorThread)
-                    }
+                    note(Double(overdue - intervalNanoseconds) / 1_000_000_000, from: .monitorThread)
                 }
             }
 
             for (source, startedAt) in _state.pending {
-                let seconds = Double(current &- startedAt) / 1_000_000_000
-
-                if seconds > worst.seconds {
-                    worst = Lag(seconds: seconds, source: source)
-                }
+                note(Double(current &- startedAt) / 1_000_000_000, from: source)
             }
 
-            return worst
+            return lags
         }
     }
 

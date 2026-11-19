@@ -160,12 +160,9 @@ struct InternalsClientIdentityDescriptorTests {
     /// authenticate against a real server requiring a client certificate, not just hold the right
     /// bytes in memory.
     ///
-    /// The Keychain round trip this needs succeeds on real macOS (bare `swift test` or an
-    /// Xcode-run macOS test bundle) because `Internals.RawBytesIdentityBuilder
-    /// .makeIdentity(_:_:)` sets `kSecAttrApplicationLabel` correctly. Every other Apple
-    /// platform's Simulator, reached only via `xcodebuild test` against SwiftPM's auto-generated
-    /// scheme, has no `.entitlements` file to add Keychain Sharing to at all, so `SecItemAdd`
-    /// there fails with `errSecMissingEntitlement` before identity pairing is ever reached.
+    /// The identity is built in memory (`SecIdentityCreate`), so this needs no Keychain access and
+    /// no entitlement: it runs the same on macOS, and on every Simulator reached via `xcodebuild
+    /// test` against SwiftPM's auto-generated scheme.
     @Test
     func rebuiltIdentity_whenPresentedToServerRequiringClientCertificate_completesHandshake() async throws {
         // `LocalServer.TLSOption.client(_:)` (server-side mTLS verification, needed to even
@@ -240,15 +237,7 @@ struct InternalsClientIdentityDescriptorTests {
                 #expect(decodedBody.response == output)
             }
 
-            #if os(macOS) || !canImport(Darwin)
             try await verify()
-            #else
-            await withKnownIssue(
-                "no Keychain Sharing entitlement on this platform's SwiftPM-generated Xcode scheme; see this test's own doc comment"
-            ) {
-                try await verify()
-            }
-            #endif
         }
 
         #if canImport(NIOCore)
