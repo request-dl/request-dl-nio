@@ -316,6 +316,38 @@ struct CookieJarTests {
         #expect(result.receivedCookieHeader == "old=1; new=2")
     }
 
+    /// A `Location` that is only a relative reference (`next`): AsyncHTTPClient resolves it against
+    /// the URL it came from, and the jar has to read the URL that results.
+    @Test(arguments: executors, [Mode.follow, .strategy])
+    func dataTask_whenARedirectLocationIsRelative_sendsTheCookiesOfTheResolvedURL(
+        executor: Executor,
+        mode: Mode
+    ) async throws {
+        // Given
+        let server = try await Self.server(port: 8951)
+        let directory = "/" + UUID().uuidString
+        let (seedPath, startPath) = (Self.uniquePath(), directory + "/start")
+        let finalPath = directory + "/next"
+        defer { [seedPath, startPath, finalPath].forEach(server.cleanup(at:)) }
+
+        server.insert(.init(headers: Self.setCookie("seed=1; Path=/"), data: Data("\"seed\"".utf8)), at: seedPath)
+        server.insert(
+            .init(status: .found, headers: ["Location": "next"], data: Data()),
+            at: startPath
+        )
+        server.insert(try .init(jsonObject: "reached"), at: finalPath)
+
+        let jar = CookieJar()
+        _ = try await Self.get(server, seedPath, executor: executor, jar: jar)
+
+        // When
+        let result = try await Self.get(server, startPath, executor: executor, mode: mode, jar: jar)
+
+        // Then
+        #expect(result.response == "reached")
+        #expect(result.receivedCookieHeader == "seed=1")
+    }
+
     /// A logout redirect deletes the cookie: the hop it leads to must not carry it any more.
     @Test(arguments: executors, [Mode.follow, .strategy])
     func dataTask_whenARedirectDeletesACookie_doesNotSendItOnTheHop(

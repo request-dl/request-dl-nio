@@ -413,4 +413,23 @@ struct InternalsCookieStorageTests {
 
         #expect(header(storage, "https://example.com/") == names.map { "\($0)=1" }.joined(separator: "; "))
     }
+
+    /// AsyncHTTPClient hands over the target of a redirect as a URL relative to the one it came from.
+    @Test(arguments: ["next", "?page=2", "../up/next", "/absolute/next"])
+    func cookieHeader_whenTheURLIsRelativeToABase_usesTheURLItResolvesTo(location: String) throws {
+        let storage = Internals.CookieStorage()
+        let base = url("https://example.com/a/b/start")
+        let relative = try #require(URL(string: location, relativeTo: base))
+
+        storage.store(setCookieValues: ["root=1; Path=/", "deep=2; Path=/a/b"], for: base, now: now)
+
+        let sent = storage.cookieHeader(for: relative, now: now)
+        #expect(sent?.contains("root=1") == true)
+
+        // What the hop sets without a `Path` is scoped to where the hop is, not to `/`.
+        storage.store(setCookieValues: ["hop=3"], for: relative, now: now)
+        let hop = try #require(storage.snapshot(now: now).first { $0.name == "hop" })
+        #expect(hop.path == Internals.Cookie.defaultPath(of: relative.absoluteURL.path))
+        #expect(hop.path != "/" || relative.absoluteURL.path.split(separator: "/").count <= 1)
+    }
 }

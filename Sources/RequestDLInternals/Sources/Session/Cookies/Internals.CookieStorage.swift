@@ -218,7 +218,12 @@ extension Internals {
 
         // MARK: - Private static methods
 
-        private static func origin(of url: URL) -> Cookie.Origin? {
+        private static func origin(of relativeURL: URL) -> Cookie.Origin? {
+            // AsyncHTTPClient resolves the `Location` of a redirect against the URL it came from and
+            // hands the result over as it is: a URL relative to a base. Read as it is, its path is
+            // only the relative part (`next`, or nothing for `?page=2`).
+            let url = relativeURL.absoluteURL
+
             guard var host = url.host.map(HostName.ascii), !host.isEmpty else {
                 return nil
             }
