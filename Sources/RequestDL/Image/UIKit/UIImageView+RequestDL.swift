@@ -20,7 +20,7 @@ private nonisolated(unsafe) var rdlLoadTaskKey: UInt8 = 0
 extension UIImageView: RDLCompatible {}
 
 /// `@MainActor`-isolated because `UIImageView.image` is: setting it synchronously from
-/// `setImage` (the `placeholder` assignment, ahead of the actual load) needs the compiler to
+/// `setImage` (the `placeholder` assignment or clearing, ahead of the actual load) needs the compiler to
 /// know it's already on the main actor, not just that it happens to run there in practice.
 @MainActor
 extension RDLWrapper where Base: UIImageView {
@@ -47,14 +47,24 @@ extension RDLWrapper where Base: UIImageView {
     ///
     /// Loads the image at `url` and sets it on this image view once it arrives.
     ///
+    /// The current image is replaced with `placeholder` right away, or cleared when it is
+    /// `nil`, unless `keepsCurrentImageWhileLoading` is `true`.
+    ///
     /// Cancels any load already in flight on this image view before starting, so it is safe to
     /// call from `tableView(_:cellForRowAt:)`/`collectionView(_:cellForItemAt:)` even when cells
     /// are reused faster than their previous image finishes loading.
     ///
     /// - Parameters:
     ///    - url: The URL of the image.
-    ///    - placeholder: The image to set immediately, shown until the load finishes.
+    ///    - placeholder: The image to set immediately, shown until the load finishes. Passing
+    ///    `nil` (the default) clears the image view instead, so a reused view never keeps
+    ///    showing the image of its previous owner while the new one loads. Ignored when
+    ///    `keepsCurrentImageWhileLoading` is `true`.
     ///    - loader: The ``RDLImageLoader`` performing the request. Defaults to ``RDLImageLoader/shared``.
+    ///    - keepsCurrentImageWhileLoading: Pass `true` to leave whatever the image view is
+    ///    showing untouched until the new image arrives, instead of replacing it with
+    ///    `placeholder` (or clearing it). Defaults to `false`. Only useful when the same view reloads the *same*
+    ///    content, e.g. refreshing an avatar, since otherwise the old image is wrong for a moment.
     ///    - completion: Called once the load finishes, on the main actor. Not called if the load
     ///    is cancelled by a later `setImage`/`cancel()` call on this image view.
     ///
@@ -62,11 +72,12 @@ extension RDLWrapper where Base: UIImageView {
         with url: URL,
         placeholder: UIImage? = nil,
         loader: RDLImageLoader = .shared,
+        keepsCurrentImageWhileLoading: Bool = false,
         completion: (@Sendable (Result<UIImage, Error>) -> Void)? = nil
     ) {
         cancel()
 
-        if let placeholder {
+        if !keepsCurrentImageWhileLoading {
             base.image = placeholder
         }
 
@@ -81,6 +92,9 @@ extension RDLWrapper where Base: UIImageView {
     /// ``DataTask`` is built. Any ``RequestTask`` producing a ``TaskResult`` of `Data` works, so a
     /// ``MockedTask`` also drops in directly.
     ///
+    /// The current image is replaced with `placeholder` right away, or cleared when it is
+    /// `nil`, unless `keepsCurrentImageWhileLoading` is `true`.
+    ///
     /// Cancels any load already in flight on this image view before starting, so it is safe to
     /// call from `tableView(_:cellForRowAt:)`/`collectionView(_:cellForItemAt:)` even when cells
     /// are reused faster than their previous image finishes loading.
@@ -90,8 +104,15 @@ extension RDLWrapper where Base: UIImageView {
     ///    can't be derived automatically from an arbitrary ``RequestTask``, so callers supply it
     ///    explicitly, typically the URL or endpoint the request resolves to.
     ///    - task: The task that performs the request, e.g. a ``DataTask``.
-    ///    - placeholder: The image to set immediately, shown until the load finishes.
+    ///    - placeholder: The image to set immediately, shown until the load finishes. Passing
+    ///    `nil` (the default) clears the image view instead, so a reused view never keeps
+    ///    showing the image of its previous owner while the new one loads. Ignored when
+    ///    `keepsCurrentImageWhileLoading` is `true`.
     ///    - loader: The ``RDLImageLoader`` performing the request. Defaults to ``RDLImageLoader/shared``.
+    ///    - keepsCurrentImageWhileLoading: Pass `true` to leave whatever the image view is
+    ///    showing untouched until the new image arrives, instead of replacing it with
+    ///    `placeholder` (or clearing it). Defaults to `false`. Only useful when the same view reloads the *same*
+    ///    content, e.g. refreshing an avatar, since otherwise the old image is wrong for a moment.
     ///    - completion: Called once the load finishes, on the main actor. Not called if the load
     ///    is cancelled by a later `setImage`/`cancel()` call on this image view.
     ///
@@ -100,11 +121,12 @@ extension RDLWrapper where Base: UIImageView {
         task: ImageTask,
         placeholder: UIImage? = nil,
         loader: RDLImageLoader = .shared,
+        keepsCurrentImageWhileLoading: Bool = false,
         completion: (@Sendable (Result<UIImage, Error>) -> Void)? = nil
     ) {
         cancel()
 
-        if let placeholder {
+        if !keepsCurrentImageWhileLoading {
             base.image = placeholder
         }
 

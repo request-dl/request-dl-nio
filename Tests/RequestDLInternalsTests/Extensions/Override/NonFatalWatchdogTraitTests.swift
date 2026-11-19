@@ -269,6 +269,75 @@ struct NonFatalWatchdogTraitTests {
         #expect(recorded.first?.message == Self.heldLock)
     }
 
+    /// What the URLSession-only job saw after the freeze theory was ruled out: the monitor's
+    /// thread and the default-priority pool both on time, while `.background` work (where
+    /// `DataCache` writes, holding a buffer's lock) never got a thread. That is a warning naming
+    /// the starved priority, and the report shows every source's lag.
+    @Test
+    func aHeldLock_whileOnlyBackgroundWorkIsStarved_isAWarningThatNamesIt() {
+        // Given
+        let clock = FakeClock()
+        let probes = PoolLagMonitor.Source.allCases.map { source in
+            PoolLagMonitor.Probe(source: source) { began in
+                if source != .backgroundTasks {
+                    began()
+                }
+            }
+        }
+        let monitor = PoolLagMonitor(interval: 0.25, probes: probes, now: { clock.now })
+
+        // When: its probe was handed over on the first wake-up, 15.75s before the report.
+        Self.keepWaking(monitor, clock: clock, for: 16)
+
+        let lags = monitor.lags(within: NonFatalWatchdogTrait.lagWindow)
+        var recorded: Recorded = []
+        NonFatalWatchdogTrait.report(Self.heldLock, lag: .worst(of: lags), lags: lags) {
+            recorded.append(($0, $1))
+        }
+
+        // Then
+        #expect(Set(lags.keys) == [.backgroundTasks])
+        #expect(recorded.map(\.severity) == [.warning])
+
+        let message = recorded.first?.message ?? ""
+        #expect(message.contains("Lag in the last 20s: cooperative pool at background priority 15.8s"))
+        #expect(message.contains("work handed to the cooperative pool at background priority started about 16s late"))
+    }
+
+    /// A held lock that stays an error still says what the monitor measured, so a report from CI
+    /// shows which pools were on time.
+    @Test
+    func aHeldLock_thatStaysAnError_carriesEachSourcesLag() {
+        // When
+        var recorded: Recorded = []
+        let lags: [PoolLagMonitor.Source: Double] = [.utilityTasks: 1.5, .cooperativePool: 0.5]
+        NonFatalWatchdogTrait.report(Self.heldLock, lag: .worst(of: lags), lags: lags) {
+            recorded.append(($0, $1))
+        }
+
+        // Then
+        #expect(recorded.map(\.severity) == [.error])
+        #expect(
+            recorded.first?.message
+                == "\(Self.heldLock)\n\nLag in the last 20s: cooperative pool 0.5s, cooperative pool at utility priority 1.5s"
+        )
+    }
+
+    /// The worst lag is the one ``PoolLagMonitor/lags(within:)`` holds highest, and a tie always
+    /// names the same source.
+    @Test
+    func worst_takesTheHighestLag_andBreaksTiesInCaseOrder() {
+        #expect(PoolLagMonitor.Lag.worst(of: [:]) == .none)
+        #expect(
+            PoolLagMonitor.Lag.worst(of: [.fileWrite: 3, .backgroundTasks: 9, .filePool: 2])
+                == .init(seconds: 9, source: .backgroundTasks)
+        )
+        #expect(
+            PoolLagMonitor.Lag.worst(of: [.fileWrite: 7, .filePool: 7])
+                == .init(seconds: 7, source: .filePool)
+        )
+    }
+
     /// A probe for every source that begins as soon as it is handed over.
     private static let instantProbes: [PoolLagMonitor.Probe] = PoolLagMonitor.Source.allCases.map { source in
         .init(source: source) { began in began() }

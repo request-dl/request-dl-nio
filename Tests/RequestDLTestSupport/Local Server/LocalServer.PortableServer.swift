@@ -37,8 +37,8 @@ extension LocalServer {
         private let queue: DispatchQueue
         private let responseQueue: ResponseQueue
 
-        // Keeps the `SecIdentity`'s backing Keychain items alive for as long as this listener is:
-        // `Internals.IdentityHandle.deinit` removes them once nothing references it anymore.
+        // Keeps the in-memory `SecIdentity` (and the private key it holds) alive for as long as
+        // this listener is.
         private let identityHandle: Internals.IdentityHandle
 
         private let connectionsLock = Lock()

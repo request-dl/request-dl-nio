@@ -17,7 +17,7 @@ extension Internals {
         // MARK: - Private properties
 
         private let lock = Lock()
-        private let priority: _Concurrency.TaskPriority
+        private let priority: _Concurrency.TaskPriority?
 
         // MARK: - Unsafe properties
 
@@ -34,13 +34,28 @@ extension Internals {
 
         // MARK: - Inits
 
-        package init(priority: _Concurrency.TaskPriority = .background) {
+        /// - Parameter priority: The priority tracked work runs at. `nil`, the default, makes
+        /// each piece of work inherit the priority of the context that starts it (see
+        /// ``run(priority:_:)``), which is what work somebody ends up waiting for needs: a fixed
+        /// low priority under load starves it behind the very callers that depend on it. Pass
+        /// one only for work that really is background, such as a shutdown nobody waits for.
+        package init(priority: _Concurrency.TaskPriority? = nil) {
             self.priority = priority
         }
 
         // MARK: - Internal methods
 
-        package func run(_ operation: @escaping @Sendable () async -> Void) {
+        /// Starts `operation` and tracks it until it finishes.
+        ///
+        /// - Parameter priority: Overrides the priority for this one operation. Without it, the
+        /// operation runs at the priority given to ``init(priority:)`` or, when there is none, at
+        /// the priority of the calling context. A caller that is not a task itself (an event
+        /// loop callback, say) has no priority worth inheriting, and passes the one of the task
+        /// it works for, captured while it was still running in that task.
+        package func run(
+            priority: _Concurrency.TaskPriority? = nil,
+            _ operation: @escaping @Sendable () async -> Void
+        ) {
             lock.withLock {
                 _count += 1
 
@@ -50,7 +65,7 @@ extension Internals {
                 }
             }
 
-            _Concurrency.Task(priority: priority) {
+            _Concurrency.Task(priority: priority ?? self.priority) {
                 await operation()
                 self.finish()
             }

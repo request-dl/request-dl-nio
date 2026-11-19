@@ -129,6 +129,11 @@ public struct RequestConfiguration: Sendable {
     var compressionDuplicateHeaderBehavior: Internals.Compression.DuplicateHeaderBehavior = .error
     var shouldCompressBodyData: (@Sendable (Int) -> Bool)?
 
+    /// Whether a `.urlSession` response with no `Content-Length` is checked with a `Range` request
+    /// before it is cached, instead of being left out of the cache. Set by
+    /// ``Property/cacheCompletenessProbe(_:)``.
+    var probesCacheCompleteness = false
+
     /// Whether the requests of a resumable upload that go to another origin than this one, where
     /// the server sent them, keep the headers that identify the caller. Set by the upload itself
     /// from `forwardsCredentialsToOtherOrigins`, never by a node.

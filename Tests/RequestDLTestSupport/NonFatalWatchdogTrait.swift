@@ -41,9 +41,10 @@ import Testing
 /// holder, with nobody waiting behind it. One recorded issue fails the job, so this trait records
 /// an "AsyncLock held" report as a *warning* when ``PoolLagMonitor`` has seen the machine run
 /// more than ``lagThreshold`` seconds late within the last ``lagWindow`` seconds (a pool starting
-/// work late, its own thread waking late, or a tiny file write taking that long), and says so in
-/// the message. With healthy pools it stays an error, since that is what a real deadlock
-/// looks like.
+/// work late, at any of the priorities it probes, its own thread waking late, or a tiny file
+/// write taking that long), and says so in the message. With healthy pools it stays an error,
+/// since that is what a real deadlock looks like. Either way the report ends with the lag the
+/// monitor saw from each source, so a report that stays an error still shows what was measured.
 package struct NonFatalWatchdogTrait: TestTrait, SuiteTrait, TestScoping {
 
     /// How late work has to have started, at worst, for a held lock to be put down to the machine.
@@ -59,7 +60,9 @@ package struct NonFatalWatchdogTrait: TestTrait, SuiteTrait, TestScoping {
         PoolLagMonitor.shared.start()
 
         Internals.Override.AssertionFailure.installGlobally { message, _, _ in
-            report(message, lag: PoolLagMonitor.shared.worstLag(within: lagWindow)) {
+            let lags = PoolLagMonitor.shared.lags(within: lagWindow)
+
+            report(message, lag: .worst(of: lags), lags: lags) {
                 Issue.record(Comment(rawValue: $0), severity: $1)
             }
         }
@@ -68,21 +71,36 @@ package struct NonFatalWatchdogTrait: TestTrait, SuiteTrait, TestScoping {
     /// Turns a watchdog report into a recorded issue: an error, unless it is a held lock and
     /// `lag` says the machine itself was late, in which case a warning that carries the lag.
     ///
+    /// `lags`, each source's worst lag, is appended to a held lock's report either way, so a
+    /// report that stays an error still shows what the monitor saw.
+    ///
     /// The recording is a parameter so a test can see what would be recorded without the test
     /// itself being failed by it.
     package static func report(
         _ message: String,
         lag: PoolLagMonitor.Lag,
+        lags: [PoolLagMonitor.Source: Double] = [:],
         record: (String, Issue.Severity) -> Void
     ) {
-        guard message.contains("AsyncLock held"), lag.seconds > lagThreshold, let source = lag.source else {
+        guard message.contains("AsyncLock held") else {
             record(message, .error)
+            return
+        }
+
+        let seen = PoolLagMonitor.Source.allCases.compactMap { source in
+            lags[source].map { "\(source.rawValue) \(($0 * 10).rounded() / 10)s" }
+        }
+        let detailed =
+            seen.isEmpty ? message : "\(message)\n\nLag in the last \(Int(lagWindow))s: \(seen.joined(separator: ", "))"
+
+        guard lag.seconds > lagThreshold, let source = lag.source else {
+            record(detailed, .error)
             return
         }
 
         record(
             """
-            \(message)
+            \(detailed)
 
             Downgraded to a warning: \(source.symptom(seconds: Int(lag.seconds.rounded()))) \
             in the last \(Int(lagWindow))s (more than \(Int(lagThreshold))s), so this runner is \

@@ -32,8 +32,20 @@ extension Internals {
 
         // MARK: - Inits
 
-        package init(priority: _Concurrency.TaskPriority = .utility) {
-            self.priority = priority
+        /// - Parameter priority: The priority the operations run at. `nil`, the default, is the
+        /// priority of the task creating the queue, captured here: operations are enqueued from
+        /// wherever the producer happens to be (an event loop, which is not a task and has no
+        /// priority worth inheriting), so it is the creator, who is usually also the consumer of
+        /// what the operations produce, that the work has to keep up with.
+        package init(priority: _Concurrency.TaskPriority? = nil) {
+            self.priority = priority ?? _Concurrency.Task.currentPriority
+        }
+
+        // MARK: - Internal properties
+
+        /// The priority the operations run at. Meant for tests.
+        package var priorityForTesting: _Concurrency.TaskPriority {
+            priority
         }
 
         // MARK: - Internal methods

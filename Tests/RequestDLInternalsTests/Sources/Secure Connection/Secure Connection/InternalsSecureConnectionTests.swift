@@ -129,7 +129,7 @@ extension InternalsSecureConnectionTests {
 
     /// Executor compatibility is not a strict hierarchy, made concrete: these four fields are
     /// excluded from `networkFrameworkIncompatibilityReasons()`'s counterpart list but reachable under
-    /// URLSession (via a Keychain round-trip for the identity fields, `SecTrust`/`SecPolicy` for
+    /// URLSession (via an in-memory `SecIdentity` for the identity fields, `SecTrust`/`SecPolicy` for
     /// trust roots and hostname verification), so they must never appear in the URLSession
     /// reason list.
     @Test(
