@@ -40,9 +40,11 @@ let list = try PublicSuffixList(contentsOf: bundledListURL)
 let jar = CookieJar(publicSuffixList: list)
 ```
 
+Parse the list once and reuse it. A file that is not a list, such as the HTML or JSON error page a failed download saved in its place, is refused with a ``PublicSuffixListError`` instead of being taken for a list that protects from nothing. A plain-text body made only of words cannot be told from a list of one-label names, so bundle the list, or check the status of the download. Names are compared in their Punycode form, so a list written in Unicode covers a host in either spelling.
+
 ### Limits
 
-A response may set at most 50 cookies, a domain holds at most 50, and a jar at most 3000. When a limit is reached the least recently used cookies go first.
+A domain holds at most 50 cookies and a jar at most 3000, and when one of those limits is reached the least recently used cookies go first. A single response may set at most 50: the first 50 `Set-Cookie` headers are read and the rest are ignored. The limit is per response, and every hop of a redirect is a response of its own.
 
 ### What it does not do
 

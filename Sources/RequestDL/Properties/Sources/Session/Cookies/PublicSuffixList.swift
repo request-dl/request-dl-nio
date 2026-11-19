@@ -23,8 +23,10 @@ import Foundation
 /// ```
 ///
 /// Parsing a list costs a few milliseconds, so keep the value and reuse it for every jar. A file that
-/// is not a list, such as the error page a failed download saved in its place, is refused with a
-/// ``PublicSuffixListError`` instead of being taken for a list that protects from nothing. Names are
+/// is not a list, such as the HTML or JSON error page a failed download saved in its place, is refused
+/// with a ``PublicSuffixListError`` instead of being taken for a list that protects from nothing. A
+/// plain-text body made only of words cannot be told from a list of one-label names, so download the
+/// list over HTTPS, check the status, and bundle it rather than fetching it blindly. Names are
 /// compared in their Punycode form, so a list written in Unicode covers a host in either spelling.
 public struct PublicSuffixList: Sendable {
 
@@ -77,7 +79,7 @@ public enum PublicSuffixListError: Error, Sendable, Equatable {
     /// The text has no rule in it, so it is not a Public Suffix List.
     case noRules
 
-    /// The text has a line that cannot be a rule, so it is not a Public Suffix List: an HTML page
-    /// or an error message saved where the list should be.
+    /// The text has a line that cannot be a rule, so it is not a Public Suffix List: an HTML or JSON
+    /// page, or HTTP headers, saved where the list should be.
     case malformed
 }
