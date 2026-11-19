@@ -15,6 +15,7 @@ import FoundationEssentials
 #else
 import struct Foundation.Data
 import struct Foundation.Date
+import struct Foundation.URL
 import struct Foundation.UUID
 #endif
 
@@ -237,6 +238,36 @@ struct CacheRevalidationTests {
     }
 
     // MARK: - A 304 renews the entry, whether or not it repeats the headers
+
+    /// The conditional request was redirected, and the jar sent the hop cookies the request did not
+    /// carry: that 304 is about another set of credentials than the entry was stored for.
+    @Test
+    func revalidation_whenARedirectHopWasSentCookies_doesNotRenewTheEntry() async throws {
+        // Given
+        let dataCache = makeCache()
+        var configuration = makeConfiguration(strategy: .reloadAndValidateCachedData)
+        let headers = [("ETag", "\"v1\""), ("Cache-Control", "public, max-age=3600")]
+
+        await store(response(headers, age: 7_200), key: configuration.url, in: dataCache)
+
+        let storage = Internals.CookieStorage()
+        let target = try #require(URL(string: configuration.url))
+        storage.store(setCookieValues: ["session=1"], for: target)
+
+        let context = Internals.CookieContext(storage: storage, managesHeader: true, initialCookieHeader: nil)
+        configuration.cookies = context
+
+        // The server redirects the conditional request, and the jar fills the hop in.
+        let client = Client(head: head(status: 304, [("Cache-Control", "public, max-age=3600")])) {
+            _ = context.cookieHeaderForHop(to: target)
+        }
+
+        // When
+        let output = await decide(configuration, in: dataCache, client: client)
+
+        // Then: the entry was not served on the strength of that 304.
+        #expect(sources(output) != [.revalidation, .cache])
+    }
 
     @Test
     func revalidation_whenA304RepeatsTheSameCacheControl_servesTheEntryInsteadOfGoingToTheNetwork() async throws {

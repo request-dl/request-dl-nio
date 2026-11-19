@@ -584,6 +584,14 @@ extension Internals {
                 )
             else { return nil }
 
+            // A redirect hop of the conditional request was sent cookies the request did not carry:
+            // what it confirms is about other credentials than the ones the entry was stored for,
+            // and must not extend the life of the shared entry.
+            if requestConfiguration.cookies?.hasSentCookiesTheRequestDidNot ?? false {
+                logger?.log(level: .info, "Cache not validated - a redirect carried cookies the request did not")
+                return nil
+            }
+
             if head.status.code == 304 {
                 logger?.log(level: .info, "Cache validated (304 Not Modified), reusing cached data")
                 // The fresh 304 response's own headers, not the stale cached ones: a 304 is where
