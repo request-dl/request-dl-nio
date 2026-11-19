@@ -87,6 +87,19 @@ extension RequestConfiguration {
             }
         }
 
+        // A request the jar writes the `Cookie` header of is owed what the jar holds for the URL it
+        // is going to, which is not what the request this was built from was sent with: it may have
+        // gone to another path, or another origin, and an earlier answer may have set cookies since.
+        // The jar only ever answers for the host it is asked about, so this is safe at another
+        // origin, unlike a header the caller wrote.
+        if let cookies = self.cookies, cookies.managesHeader {
+            configuration.headers.remove(name: "Cookie")
+
+            if let target = URL(string: url), let value = cookies.cookieHeader(for: target) {
+                configuration.headers.add(name: "Cookie", value: value)
+            }
+        }
+
         return configuration
     }
 
