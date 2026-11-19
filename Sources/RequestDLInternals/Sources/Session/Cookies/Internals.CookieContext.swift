@@ -23,11 +23,50 @@ extension Internals {
         /// the jar still stores what the responses set, but never replaces what was asked for.
         package let managesHeader: Bool
 
+        /// The `Cookie` header the request itself was sent with, which is what a cached response is
+        /// recorded as having been fetched with.
+        package let initialCookieHeader: String?
+
+        private let trace = Trace()
+
         // MARK: - Inits
 
-        package init(storage: CookieStorage, managesHeader: Bool) {
+        package init(storage: CookieStorage, managesHeader: Bool, initialCookieHeader: String? = nil) {
             self.storage = storage
             self.managesHeader = managesHeader
+            self.initialCookieHeader = initialCookieHeader
+        }
+
+        // MARK: - Internal properties
+
+        /// Whether a redirect hop was sent cookies that the request itself was not: the response
+        /// at the end of the chain was fetched with credentials the cache never saw.
+        ///
+        /// A cache that records the request's credentials with a stored response, and gives it
+        /// only to a request that sends them, would store this one as the response of whoever sent
+        /// none, and hand it to anyone, so it is not stored.
+        package var hasSentCookiesTheRequestDidNot: Bool {
+            trace.value
+        }
+
+        // MARK: - Private types
+
+        private final class Trace: @unchecked Sendable {
+
+            private let lock = NSLock()
+            private var _value = false
+
+            var value: Bool {
+                lock.lock()
+                defer { lock.unlock() }
+                return _value
+            }
+
+            func mark() {
+                lock.lock()
+                defer { lock.unlock() }
+                _value = true
+            }
         }
 
         // MARK: - Internal methods
@@ -52,6 +91,18 @@ extension Internals {
             }
 
             storage.store(setCookieValues: values, for: url, areFolded: areFolded)
+        }
+
+        /// The `Cookie` header value a redirect hop to `url` is owed, when the jar owns the header,
+        /// remembering when it is something the request itself did not send.
+        package func cookieHeaderForHop(to url: URL) -> String? {
+            let value = cookieHeader(for: url)
+
+            if let value, value != initialCookieHeader {
+                trace.mark()
+            }
+
+            return value
         }
 
         /// The `Cookie` header value a request to `url` is owed right now, when the jar owns the

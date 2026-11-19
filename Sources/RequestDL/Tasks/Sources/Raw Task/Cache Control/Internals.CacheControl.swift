@@ -768,6 +768,16 @@ extension Internals {
                     return nil
                 }
 
+                // A redirect hop the jar sent cookies the request did not: this response was
+                // fetched with credentials that are not the ones recorded with it below.
+                guard !(requestConfiguration.cookies?.hasSentCookiesTheRequestDidNot ?? false) else {
+                    logger?.log(
+                        level: .info,
+                        "Response will not be cached - a redirect carried cookies the request did not"
+                    )
+                    return nil
+                }
+
                 // What nothing says is whole is only stored when the probe can be asked.
                 let probe: CompletenessProbe?
 

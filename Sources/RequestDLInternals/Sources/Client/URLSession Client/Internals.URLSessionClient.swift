@@ -1658,7 +1658,7 @@ extension Internals.URLSessionClient {
             }
 
             var request = request
-            request.setValue(cookies.cookieHeader(for: url), forHTTPHeaderField: "Cookie")
+            request.setValue(cookies.cookieHeaderForHop(to: url), forHTTPHeaderField: "Cookie")
             return request
         }
 

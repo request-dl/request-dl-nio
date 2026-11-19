@@ -181,4 +181,42 @@ struct CookieJarCacheTests {
 
         await fixture.dataCache.removeAll()
     }
+
+    /// The request goes out with no cookie, and the jar adds one on the redirect hop (the redirect
+    /// itself set it): the response at the end of the chain belongs to that session, but the cache
+    /// would record it as the response of a request that sent none, and give it to everyone.
+    @Test(arguments: CookieJarTests.executors)
+    func cachedResponse_whenARedirectHopWasSentCookies_isNotStoredForAnyone(executor: Executor) async throws {
+        // Given
+        let fixture = try await Self.makeFixture(resourceResponses: 0)
+        let finalPath = "/" + UUID().uuidString
+        defer {
+            (fixture.paths + [finalPath]).forEach(fixture.server.cleanup(at:))
+        }
+
+        for session in ["login=1", "login=2"] {
+            fixture.server.insert(
+                .init(
+                    status: .found,
+                    headers: .init([
+                        ("Set-Cookie", session),
+                        ("Location", "https://\(fixture.server.baseURL)\(finalPath)")
+                    ]),
+                    data: Data()
+                ),
+                at: fixture.resourcePath
+            )
+            fixture.server.insert(try .init(jsonObject: "account page"), at: finalPath)
+        }
+
+        // When: two sessions with their own, empty, jars ask for the same URL.
+        let first = try await Self.get(fixture.resourcePath, fixture: fixture, executor: executor, jar: CookieJar())
+        let second = try await Self.get(fixture.resourcePath, fixture: fixture, executor: executor, jar: CookieJar())
+
+        // Then: the second one got its own page, not the first one's from the cache.
+        #expect(first.receivedCookieHeader == "login=1")
+        #expect(second.receivedCookieHeader == "login=2")
+
+        await fixture.dataCache.removeAll()
+    }
 }

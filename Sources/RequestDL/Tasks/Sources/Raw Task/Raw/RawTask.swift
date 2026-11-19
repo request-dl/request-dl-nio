@@ -202,7 +202,11 @@ struct RawTask<Content: Property>: RequestTask {
             configuration.headers.add(name: "Cookie", value: value)
         }
 
-        configuration.cookies = .init(storage: storage, managesHeader: !hasExplicitCookie)
+        configuration.cookies = .init(
+            storage: storage,
+            managesHeader: !hasExplicitCookie,
+            initialCookieHeader: configuration.headers["Cookie"]?.first
+        )
 
         return Resolved(
             session: resolved.session,
