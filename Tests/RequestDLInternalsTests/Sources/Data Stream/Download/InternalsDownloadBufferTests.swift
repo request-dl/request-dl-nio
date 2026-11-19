@@ -667,4 +667,19 @@ struct InternalsDownloadBufferTests {
 
         download.close()
     }
+
+    // MARK: - Priority
+
+    /// Whoever reads the body is waiting for what the buffer produces, and is usually the task
+    /// that made it: a fixed low priority would be a priority inversion under load.
+    @Test
+    func download_whenCreatedByAHighPriorityTask_shouldProduceAtItsPriority() async {
+        // When
+        let download = await _Concurrency.Task(priority: .high) {
+            await Internals.DownloadBuffer(readingMode: .length(1_024))
+        }.value
+
+        // Then
+        #expect(download.queuePriorityForTesting == .high)
+    }
 }

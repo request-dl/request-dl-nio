@@ -32,6 +32,18 @@ public struct ExecutorRequirementError: Error, Sendable {
         case decompressionRequiresURLSession
         case maximumTLSVersionUnderURLSession
         case applicationProtocolsUnderURLSession
+
+        /// Not thrown any more, and deprecated: a client certificate chain with intermediates is
+        /// presented in full under `.nioTransportServices` (Network.framework), so it no longer
+        /// rules that executor out. The case stays so that code that names it keeps compiling,
+        /// and a `switch` can drop it. `Internals.ExecutorIncompatibilityReason` no longer has a
+        /// counterpart, so nothing maps to it.
+        @available(
+            *,
+            deprecated,
+            message:
+                "A client certificate chain with intermediates now runs on .nioTransportServices, so this is never thrown. Remove it from your switch."
+        )
         case multipleClientCertificatesUnderNetworkFramework
 
         /// Not thrown any more: a client certificate with a proxy runs on `.nioTransportServices`.
@@ -78,8 +90,6 @@ public struct ExecutorRequirementError: Error, Sendable {
                 self = .maximumTLSVersionUnderURLSession
             case .applicationProtocolsUnderURLSession:
                 self = .applicationProtocolsUnderURLSession
-            case .multipleClientCertificatesUnderNetworkFramework:
-                self = .multipleClientCertificatesUnderNetworkFramework
             case .clientIdentityWithProxyUnderNetworkFramework:
                 self = .clientIdentityWithProxyUnderNetworkFramework
             }

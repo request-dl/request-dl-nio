@@ -48,14 +48,24 @@ extension RDLWrapper where Base: WKInterfaceImage {
     ///
     /// Loads the image at `url` and sets it on this interface image once it arrives.
     ///
+    /// The current image is replaced with `placeholder` right away, or cleared when it is
+    /// `nil`, unless `keepsCurrentImageWhileLoading` is `true`.
+    ///
     /// Cancels any load already in flight on this interface image before starting, so it is safe
     /// to call from a `WKInterfaceTable` row controller even when rows are reused faster than
     /// their previous image finishes loading.
     ///
     /// - Parameters:
     ///    - url: The URL of the image.
-    ///    - placeholder: The image to set immediately, shown until the load finishes.
+    ///    - placeholder: The image to set immediately, shown until the load finishes. Passing
+    ///    `nil` (the default) clears the interface image instead, so a reused view never keeps
+    ///    showing the image of its previous owner while the new one loads. Ignored when
+    ///    `keepsCurrentImageWhileLoading` is `true`.
     ///    - loader: The ``RDLImageLoader`` performing the request. Defaults to ``RDLImageLoader/shared``.
+    ///    - keepsCurrentImageWhileLoading: Pass `true` to leave whatever the interface image is
+    ///    showing untouched until the new image arrives, instead of replacing it with
+    ///    `placeholder` (or clearing it). Defaults to `false`. Only useful when the same view reloads the *same*
+    ///    content, e.g. refreshing an avatar, since otherwise the old image is wrong for a moment.
     ///    - completion: Called once the load finishes, on the main actor. Not called if the load
     ///    is cancelled by a later `setImage`/`cancel()` call on this interface image.
     ///
@@ -63,11 +73,12 @@ extension RDLWrapper where Base: WKInterfaceImage {
         with url: URL,
         placeholder: UIImage? = nil,
         loader: RDLImageLoader = .shared,
+        keepsCurrentImageWhileLoading: Bool = false,
         completion: (@Sendable (Result<UIImage, Error>) -> Void)? = nil
     ) {
         cancel()
 
-        if let placeholder {
+        if !keepsCurrentImageWhileLoading {
             base.setImage(placeholder)
         }
 
@@ -82,6 +93,9 @@ extension RDLWrapper where Base: WKInterfaceImage {
     /// ``DataTask`` is built. Any ``RequestTask`` producing a ``TaskResult`` of `Data` works, so a
     /// ``MockedTask`` also drops in directly.
     ///
+    /// The current image is replaced with `placeholder` right away, or cleared when it is
+    /// `nil`, unless `keepsCurrentImageWhileLoading` is `true`.
+    ///
     /// Cancels any load already in flight on this interface image before starting, so it is safe
     /// to call from a `WKInterfaceTable` row controller even when rows are reused faster than
     /// their previous image finishes loading.
@@ -91,8 +105,15 @@ extension RDLWrapper where Base: WKInterfaceImage {
     ///    can't be derived automatically from an arbitrary ``RequestTask``, so callers supply it
     ///    explicitly, typically the URL or endpoint the request resolves to.
     ///    - task: The task that performs the request, e.g. a ``DataTask``.
-    ///    - placeholder: The image to set immediately, shown until the load finishes.
+    ///    - placeholder: The image to set immediately, shown until the load finishes. Passing
+    ///    `nil` (the default) clears the interface image instead, so a reused view never keeps
+    ///    showing the image of its previous owner while the new one loads. Ignored when
+    ///    `keepsCurrentImageWhileLoading` is `true`.
     ///    - loader: The ``RDLImageLoader`` performing the request. Defaults to ``RDLImageLoader/shared``.
+    ///    - keepsCurrentImageWhileLoading: Pass `true` to leave whatever the interface image is
+    ///    showing untouched until the new image arrives, instead of replacing it with
+    ///    `placeholder` (or clearing it). Defaults to `false`. Only useful when the same view reloads the *same*
+    ///    content, e.g. refreshing an avatar, since otherwise the old image is wrong for a moment.
     ///    - completion: Called once the load finishes, on the main actor. Not called if the load
     ///    is cancelled by a later `setImage`/`cancel()` call on this interface image.
     ///
@@ -101,11 +122,12 @@ extension RDLWrapper where Base: WKInterfaceImage {
         task: ImageTask,
         placeholder: UIImage? = nil,
         loader: RDLImageLoader = .shared,
+        keepsCurrentImageWhileLoading: Bool = false,
         completion: (@Sendable (Result<UIImage, Error>) -> Void)? = nil
     ) {
         cancel()
 
-        if let placeholder {
+        if !keepsCurrentImageWhileLoading {
             base.setImage(placeholder)
         }
 

@@ -119,7 +119,7 @@ extension Internals.Session {
         /// - Parameter isCompatibleWithNetworkFramework: Whether the client this builds for will
         /// actually run over Network.framework (`.nioTransportServices`). Forwarded to
         /// `SecureConnection.build(isCompatibleWithNetworkFramework:)` to decide whether it's
-        /// worth paying for the mTLS identity's Keychain round-trip at all.
+        /// worth building the mTLS identity at all.
         ///
         /// Defaults to `true` so every caller that doesn't yet know which executor won (every
         /// test call site, plus any future caller) keeps the original always-build behavior;
@@ -184,9 +184,14 @@ extension Internals.Session {
             }
 
             #if canImport(Darwin)
-            if let secIdentity = secureConnectionOutput?.localIdentityHandle?.identity {
-                configuration.tlsLocalIdentityProviderNetworkFramework = { host, port in
-                    identityOrigins.contains(host: host, port: port) ? secIdentity : nil
+            if let handle = secureConnectionOutput?.localIdentityHandle {
+                let identity = HTTPClient.Configuration.NetworkFrameworkClientIdentity(
+                    identity: handle.identity,
+                    certificates: handle.certificates
+                )
+
+                configuration.tlsLocalIdentityChainProviderNetworkFramework = { host, port in
+                    identityOrigins.contains(host: host, port: port) ? identity : nil
                 }
             }
             #endif
@@ -225,8 +230,7 @@ extension Internals.Session.Configuration {
     /// plus (on Darwin) the mTLS identity's `Internals.IdentityHandle`, if any. Kept alongside
     /// the configuration rather than folded into it because whoever constructs the actual
     /// `HTTPClient` needs both: the configuration to build it with, and the handle to hold onto
-    /// for as long as that client lives, so `IdentityHandle`'s own `deinit` can release the
-    /// identity's Keychain items once the client itself goes away. See `Internals.Client`.
+    /// for as long as that client lives. See `Internals.Client`.
     package struct Output: Sendable {
         package let httpClientConfiguration: HTTPClient.Configuration
 
