@@ -47,7 +47,7 @@ struct CachePriorityTests {
         func execute(
             configuration: RequestConfiguration,
             decompression: Internals.Decompression,
-            cache: (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
+            cache: (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.Chunk>?)?,
             logger: Internals.TaskLogger?,
             transferControl: Internals.TransferControl?
         ) async throws -> SessionTask {
@@ -122,7 +122,7 @@ struct CachePriorityTests {
 
         // When: the request is made by a high priority task...
         let onHead = await _Concurrency.Task(priority: .high) {
-            () -> (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)? in
+            () -> (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.Chunk>?)? in
             var control = Internals.CacheControl(
                 requestConfiguration: configuration_,
                 dataCache: dataCache,

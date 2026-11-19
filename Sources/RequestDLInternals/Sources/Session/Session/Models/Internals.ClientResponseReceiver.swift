@@ -28,7 +28,7 @@ extension Internals {
         private let upload: Internals.AsyncStream<Int>
         private let head: Internals.AsyncStream<ResponseHead>
         private let download: DownloadBuffer
-        private let cache: ((ResponseHead) -> Internals.AsyncStream<DataBuffer>?)?
+        private let cache: ((ResponseHead) -> Internals.AsyncStream<Chunk>?)?
         private let decompressionDispatch: Internals.ManualDecompressionDispatch
 
         /// What tells a response with no body, to tell its end from a truncated one.
@@ -79,7 +79,7 @@ extension Internals {
             upload: Internals.AsyncStream<Int>,
             head: Internals.AsyncStream<ResponseHead>,
             download: DownloadBuffer,
-            cache: ((ResponseHead) -> Internals.AsyncStream<DataBuffer>?)?,
+            cache: ((ResponseHead) -> Internals.AsyncStream<Chunk>?)?,
             decompressionDispatch: Internals.ManualDecompressionDispatch,
             requestMethod: NIOHTTP1.HTTPMethod = .GET,
             logger: Internals.TaskLogger?,
@@ -243,15 +243,15 @@ extension Internals {
         {
             // Built before the lock, and synchronously.
             //
-            // Wrapping a `ByteBuffer` costs nothing: the store is already in memory and the
-            // synchronous initializer exists precisely because that path never suspends. See
-            // `Internals.Buffer.init(_ url: Internals.ByteURL)`.
+            // A chunk is an immutable value over `Data`, so building one never suspends, and
+            // copying the part out of the `ByteBuffer` here is one `memcpy` (see
+            // `Internals.Chunk.init(_:)`).
             //
             // It must not become a detached task instead. `download.append` enqueues on a queue
             // that runs operations in submission order, and submission is synchronous, so
             // reassembly depends on parts being submitted in the order the event loop delivered
             // them. Two tasks racing to enqueue would corrupt the body.
-            let dataBuffer = Internals.DataBuffer(Internals.ByteURL(buffer))
+            let chunk = Internals.Chunk(buffer)
 
             decide {
                 guard [.head, .downloading].contains(_state) && _phase == .download else {
@@ -267,8 +267,8 @@ extension Internals {
                 return [
                     // Counted as it is handed over: the offset a continuation would resume from
                     // is exactly what the reader gets.
-                    { self.reconnection?.didDeliver(dataBuffer.readableBytes) },
-                    { self.download.append(dataBuffer) },
+                    { self.reconnection?.didDeliver(chunk.readableBytes) },
+                    { self.download.append(chunk) },
                 ]
             }
 

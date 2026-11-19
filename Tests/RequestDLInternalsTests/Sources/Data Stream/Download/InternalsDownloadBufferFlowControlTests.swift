@@ -26,7 +26,7 @@ struct InternalsDownloadBufferFlowControlTests {
         Data(range.map { UInt8(truncatingIfNeeded: $0 % 251) })
     }
 
-    private func readAll(_ stream: Internals.AsyncStream<Internals.DataBuffer>) async throws -> Data {
+    private func readAll(_ stream: Internals.AsyncStream<Internals.Chunk>) async throws -> Data {
         var collected = Data()
 
         for try await chunk in Internals.AsyncBytes(logger: nil, totalSize: .zero, stream: stream) {

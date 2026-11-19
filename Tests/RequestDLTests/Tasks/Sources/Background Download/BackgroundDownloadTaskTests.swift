@@ -81,6 +81,43 @@ struct BackgroundDownloadTaskTests {
         }
     }
 
+    /// Refused before anything is scheduled, so it is covered without a real background session.
+    @Test
+    func result_whenAGzipIsListedNextToACustomDecompressor_throwsUnsupportedConfigurationError() async throws {
+        let task = BackgroundDownloadTask(
+            id: "episode-42",
+            destination: URL(fileURLWithPath: "/tmp/episode-42.mp3")
+        ) {
+            BaseURL("localhost")
+
+            Session()
+                .decompressionAlgorithms([.gzip, UppercaseDecompressor()])
+        }
+
+        do {
+            try await task.result()
+            Issue.record("Expected BackgroundDownloadUnsupportedConfigurationError")
+        } catch let error as BackgroundDownloadUnsupportedConfigurationError {
+            guard case .nativeAlgorithmNextToCustomAlgorithm = error.reason else {
+                Issue.record("Expected .nativeAlgorithmNextToCustomAlgorithm, got \(error.reason)")
+                return
+            }
+            #expect((error as any Error).localizedDescription == error.description)
+            #expect(error.description.contains("decompression"))
+        }
+    }
+
+    private struct UppercaseDecompressor: Decompressor {
+        var contentEncodingValue: String { "upper" }
+
+        func callAsFunction() throws -> any DecompressorStream { Stream() }
+
+        struct Stream: DecompressorStream {
+            mutating func callAsFunction(decompressing bytes: [UInt8]) throws -> [UInt8] { bytes }
+            func finish() throws -> [UInt8] { [] }
+        }
+    }
+
     @Test
     func result_whenPrivateKeyIsPasswordProtected_throwsUnsupportedConfigurationError() async throws {
         // Given

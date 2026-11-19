@@ -14,6 +14,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 
 CHUNK = b"\x00" * 65536
+LINES = (b"A" * 127 + b"\n") * 512
 
 class H(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
@@ -33,12 +34,15 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):
         u = urlparse(self.path)
         if u.path == "/download":
-            n = int(parse_qs(u.query)["bytes"][0])
+            query = parse_qs(u.query)
+            n = int(query["bytes"][0])
+            # `lines=1`: lines of 128 bytes ending in a newline, for a reader that cuts on a separator.
+            chunk = LINES if "lines" in query else CHUNK
             self.send_response(200)
             self.send_header("Content-Length", str(n))
             self.end_headers()
             while n > 0:
-                piece = CHUNK if n >= len(CHUNK) else CHUNK[:n]
+                piece = chunk if n >= len(chunk) else chunk[:n]
                 self.wfile.write(piece)
                 n -= len(piece)
         elif u.path == "/redirect":

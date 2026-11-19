@@ -451,7 +451,7 @@ extension Internals {
             readingMode: Internals.DownloadStep.ReadingMode,
             uploadingBytes: Int,
             decompression: Internals.Decompression,
-            cache: (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
+            cache: (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.Chunk>?)?,
             logger: Internals.TaskLogger?,
             delegate: URLSessionTaskDelegate? = nil,
             flowControl: Internals.FlowControlWindow = .init(),
@@ -491,7 +491,7 @@ extension Internals {
             readingMode: Internals.DownloadStep.ReadingMode,
             uploadingBytes: Int,
             decompression: Internals.Decompression,
-            cache: (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
+            cache: (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.Chunk>?)?,
             logger: Internals.TaskLogger?,
             delegate: URLSessionTaskDelegate? = nil,
             existingUploadFile: URL? = nil,
@@ -565,7 +565,7 @@ extension Internals {
             readingMode: Internals.DownloadStep.ReadingMode,
             uploadingBytes: Int,
             decompression: Internals.Decompression,
-            cache: (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
+            cache: (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.Chunk>?)?,
             logger: Internals.TaskLogger?,
             forwarding delegate: URLSessionTaskDelegate?,
             flowControl: Internals.FlowControlWindow,
@@ -803,7 +803,7 @@ extension Internals {
             continuationDelegate: @Sendable (URLRequest) -> TaskDelegate,
             box: CancellableTaskBox,
             readingMode: Internals.DownloadStep.ReadingMode,
-            cache: (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.DataBuffer>?)?,
+            cache: (@Sendable (Internals.ResponseHead) -> Internals.AsyncStream<Internals.Chunk>?)?,
             decompressionDispatch: Internals.ManualDecompressionDispatch,
             upload: Internals.AsyncStream<Int>,
             head: Internals.AsyncStream<Internals.ResponseHead>,
@@ -1960,16 +1960,12 @@ extension Internals.URLSessionClient {
 
             // Sync, deliberately: `Internals.DownloadBuffer.append(_:)` enqueues onto an
             // ordered queue, and submission order has to match arrival order. Building the
-            // `Internals.DataBuffer` on a detached `Task` (its usual, `async`, in-memory-or-file
-            // generic initializer) would let two chunks race to enqueue and reassemble the body
-            // out of order. `Internals.Buffer`'s own "Synchronous construction, in memory only"
-            // extension exists for precisely this reason (see its doc comment, which calls out a
-            // NIO delegate callback as the original motivating case; this is the same shape of
-            // problem one layer up, for `URLSessionDataDelegate` instead of
-            // `HTTPClientResponseDelegate`).
-            let byteURL = Internals.ByteURL()
-            byteURL.replace(with: data)
-            downloadBuffer.append(Internals.DataBuffer(byteURL))
+            // chunk on a detached `Task` would let two chunks race to enqueue and reassemble the
+            // body out of order.
+            //
+            // The chunk adopts `data` as it is (the delegate is handed a `Data` that starts at
+            // zero), which is what keeps this from copying every part a second time.
+            downloadBuffer.append(Internals.Chunk(data))
         }
 
         /// Resolves `completion`/`headCompletion`: the streamed-upload and streamed-download
