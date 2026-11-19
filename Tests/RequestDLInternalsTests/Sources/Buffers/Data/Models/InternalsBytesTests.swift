@@ -144,6 +144,55 @@ struct InternalsBytesTests {
     }
 
     @Test
+    func bytes_whenSlicingTheWholeReadableRange_isIndependentOfTheOriginalAfterwards() {
+        // Given
+        var bytes = Internals.Bytes()
+        bytes.writeBytes(Data("hello".utf8))
+
+        // When: the range is the whole of the storage, so the slice may share it
+        var slice = bytes.slice()
+        bytes.writeBytes(Data(" world".utf8))
+        bytes.moveReaderIndex(to: 2)
+
+        // Then: whatever happens to the original later, the slice still holds what it was cut from
+        #expect(slice.readerIndex == 0)
+        #expect(slice.writerIndex == 5)
+        #expect(slice.asData() == Data("hello".utf8))
+        #expect(bytes.asData() == Data("llo world".utf8))
+    }
+
+    @Test
+    func bytes_whenSlicingAfterTheWriterWasMovedBack_keepsOnlyWhatIsReadable() {
+        // Given: "lo" is still in the storage, past the writer
+        var bytes = Internals.Bytes()
+        bytes.writeBytes(Data("hello".utf8))
+        bytes.moveWriterIndex(to: 3)
+
+        // When
+        var slice = bytes.slice()
+
+        // Then
+        #expect(slice.writerIndex == 3)
+        #expect(slice.asData() == Data("hel".utf8))
+    }
+
+    @Test
+    func bytes_whenSlicingAValueThatDoesNotStartAtZero_startsTheSliceAtZero() {
+        // Given: a `Data` that is a slice of a larger one keeps the larger one's indices
+        let larger = Data("xxhello".utf8)
+        var bytes = Internals.Bytes(larger[2...])
+
+        // When
+        var slice = bytes.slice()
+
+        // Then
+        #expect(slice.readerIndex == 0)
+        #expect(slice.writerIndex == 5)
+        #expect(slice.asData() == Data("hello".utf8))
+        #expect(bytes.asData() == Data("hello".utf8))
+    }
+
+    @Test
     func bytes_whenClearing_dropsEveryByte() {
         // Given
         var bytes = Internals.Bytes()
