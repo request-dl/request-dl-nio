@@ -162,7 +162,7 @@ try await BackgroundDownloadTask(
 .result()
 ```
 
-None of these need a Keychain round-trip to survive a relaunch — only the certificate bytes themselves, which travel alongside `id`/`destination` in the scheduled task's own state, the same way.
+None of these need anything beyond the certificate bytes themselves to survive a relaunch, which travel alongside `id`/`destination` in the scheduled task's own state, the same way.
 
 ## Presenting a client certificate (mTLS)
 
@@ -184,7 +184,7 @@ try await BackgroundDownloadTask(
 .result()
 ```
 
-Only the file path is persisted alongside `id`/`destination` — never the key material itself. The identity is rebuilt from that file via a fresh Keychain round-trip on every challenge, live or after a relaunch alike, the same way it would be for a foreground request. This is exactly why the path has to be stable: a certificate/key backed by in-memory bytes has nothing left to rebuild from once the process that held them is gone. See ``BackgroundDownloadUnsupportedConfigurationError`` for the specific cases that still aren't supported (in-memory bytes, a pre-built certificate, or a password-protected private key).
+Only the file path is persisted alongside `id`/`destination` — never the key material itself. The identity is rebuilt in memory from that file on every challenge, live or after a relaunch alike, the same way it would be for a foreground request; nothing is stored in the Keychain. This is exactly why the path has to be stable: a certificate/key backed by in-memory bytes has nothing left to rebuild from once the process that held them is gone. See ``BackgroundDownloadUnsupportedConfigurationError`` for the specific cases that still aren't supported (in-memory bytes, a pre-built certificate, or a password-protected private key).
 
 ## What's not supported yet
 

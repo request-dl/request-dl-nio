@@ -44,13 +44,9 @@ extension BackgroundDownloads {
 
         /// A `ClientIdentityDescriptor`'s already-built identity, kept for the rest of this
         /// process's lifetime once challenged once, so a redirect chain (or several downloads
-        /// sharing one client certificate) doesn't pay `ClientIdentityDescriptor.makeIdentity()`'s
-        /// full Keychain round trip on every challenge: two `SecItemAdd` calls, then a
-        /// `kSecMatchLimitAll` scan of the *entire* keychain, since `kSecClassIdentity` supports no
-        /// label-based query. `Internals.IdentityManager`'s weak-reference deduplication can't do
-        /// this on its own, because `handleClientCertificateChallenge`'s handle isn't retained past
-        /// the completion handler it answers, so the weak reference is gone before the *next*
-        /// challenge in the same chain arrives.
+        /// sharing one client certificate) doesn't re-read the two files and re-parse the key on
+        /// every challenge, which `ClientIdentityDescriptor.makeIdentity()` otherwise does. Nothing
+        /// is stored in a Keychain either way: this only saves that work.
         private struct CachedIdentity {
             let descriptor: Internals.ClientIdentityDescriptor
             let handle: Internals.IdentityHandle
@@ -367,11 +363,8 @@ extension BackgroundDownloads {
         /// Gated on `challengedHost`, which is how a challenge from a redirect target is turned
         /// away. See `decodeClientIdentity(_:challengedBy:)` for why.
         ///
-        /// The cached `handle` outliving any single challenge is safe, as a freshly built,
-        /// unretained one already was: once `SecItemCopyMatching` has handed back a `SecIdentity`,
-        /// the in-memory object keeps working even if the Keychain entry backing it is later
-        /// deleted (e.g. once every cached reference to this certificate/key pair goes away at
-        /// process exit).
+        /// The cached `handle` outliving any single challenge is safe: the identity is built in
+        /// memory and holds its own key, so it depends on nothing outside this process.
         private func handleClientCertificateChallenge(
             task: URLSessionTask,
             challengedHost: String,
@@ -405,11 +398,9 @@ extension BackgroundDownloads {
         /// The identity for `descriptor`, from `_cachedIdentities` if this exact descriptor was
         /// already resolved before in this process, or freshly built (and then cached) otherwise.
         ///
-        /// `descriptor.makeIdentity()`'s Keychain round trip runs while `lock` is held, like every
-        /// other access to this instance's state. Serializing it against a concurrently-arriving
-        /// challenge for a different descriptor is an acceptable cost, since
-        /// `Internals.IdentityManager.shared`'s own lock already serializes every identity build
-        /// process-wide.
+        /// `descriptor.makeIdentity()` (two small file reads and a key parse) runs while `lock` is
+        /// held, like every other access to this instance's state. Serializing it against a
+        /// concurrently-arriving challenge for a different descriptor is an acceptable cost.
         ///
         /// Not `private`, so unit tests (`@testable import`) can confirm a repeat resolution reuses
         /// the exact same `Internals.IdentityHandle` instance without needing a real, entitled

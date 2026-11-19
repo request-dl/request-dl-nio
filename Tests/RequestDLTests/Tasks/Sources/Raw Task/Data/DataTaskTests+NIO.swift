@@ -24,16 +24,10 @@ import struct Foundation.Data
 
 extension DataTaskTests {
 
-    /// Pinned to `.nio`: a real client-certificate handshake over `.urlSession` is a confirmed,
-    /// unconditional `withKnownIssue` on this SwiftPM test harness (no Keychain Sharing
-    /// entitlement on any platform; see `RequestConfigurationURLSessionClientMTLSTests`'s type
-    /// doc comment, which already tracks this exact gap at the `Internals.URLSessionClient`
-    /// layer).
-    ///
-    /// Since `resolveExecutor()` decides which backend a real `DataTask` runs over, this test
-    /// would otherwise hit that same unconditional gap by default and fail for a reason that has
-    /// nothing to do with what it's actually verifying: that mTLS client-cert auth works end to
-    /// end through the public `DataTask` API, which NIO already does reliably.
+    /// Pinned to `.nio`, so what it verifies is NIOSSL's own client-certificate handshake through
+    /// the public `DataTask` API. The `.urlSession` and `.nioTransportServices` counterparts
+    /// (`dataTask_whenCAEnabledUnderURLSession`, `dataTask_whenCAEnabledUnderNIOTransportServices`)
+    /// cover the same handshake over those executors.
     @Test
     func dataTask_whenCAEnabled() async throws {
         // Given
@@ -153,7 +147,7 @@ extension DataTaskTests {
     /// `certificateChain`/`privateKey` must not land on the `TLSConfiguration` that
     /// AsyncHTTPClient's NIOTransportServices bridge also reads, which `preconditionFailure`s the
     /// instant either is non-empty, regardless of the Network.framework-native identity also
-    /// being supplied correctly via `tlsLocalIdentityNetworkFramework`
+    /// being supplied correctly via `tlsLocalIdentityChainProviderNetworkFramework`
     /// (`Internals.SecureConnection.build(isCompatibleWithNetworkFramework:)`).
     ///
     /// Reachable in practice via `enableNetworkFramework(true)`/
@@ -161,15 +155,8 @@ extension DataTaskTests {
     /// `requiredExecutor(.nioTransportServices)` any time mTLS is also configured, since mTLS is
     /// genuinely supported there, just through a different channel.
     ///
-    /// The Keychain round trip this needs succeeds on real macOS (bare `swift test` or an Xcode-run
-    /// macOS test bundle) because `Internals.RawBytesIdentityBuilder .makeIdentity(_:_:)` sets
-    /// `kSecAttrApplicationLabel` correctly. Every other Apple platform's Simulator, reached only
-    /// via `xcodebuild test` against SwiftPM's auto-generated scheme, has no `.entitlements` file
-    /// to add Keychain Sharing to at all (there is nowhere in a `Package.swift`-only project to
-    /// configure one; see
-    /// `Sources/RequestDL/Documentation.docc/Advanced/Using-a-Client-Certificate-with-URLSession.md`,
-    /// written for a real app target's Signing & Capabilities tab), so `SecItemAdd` there fails
-    /// with `errSecMissingEntitlement` before identity pairing is ever reached.
+    /// The client identity is built in memory (`SecIdentityCreate`), so this needs no Keychain
+    /// access and no entitlement, and runs the same on macOS and on every Simulator.
     @Test
     func dataTask_whenCAEnabledUnderNIOTransportServices() async throws {
         // Given
@@ -219,43 +206,22 @@ extension DataTaskTests {
             #expect(result.response == output)
         }
 
-        #if os(macOS) || !canImport(Darwin)
         try await verify()
-        #else
-        await withKnownIssue(
-            "no Keychain Sharing entitlement on this platform's SwiftPM-generated Xcode scheme; see this test's own doc comment"
-        ) {
-            try await verify()
-        }
-        #endif
     }
 
-    /// Positive control for `Internals.ExecutorIncompatibilityReason
-    /// .multipleClientCertificatesUnderNetworkFramework`: pinned to `.nio` specifically (not
-    /// `.nioTransportServices`), a real three-level client chain (root CA -> intermediate CA ->
-    /// leaf) against a server that trusts only the root completes the handshake successfully,
-    /// proving NIOSSL's own `TLSConfiguration.certificateChain` carries every certificate, which
-    /// is what a configuration like this falls back to.
+    /// Pinned to `.nio`, a real three-level client chain (root CA -> intermediate CA -> leaf)
+    /// against a server that trusts only the root completes the handshake: NIOSSL's own
+    /// `TLSConfiguration.certificateChain` carries every certificate.
     ///
-    /// The mirror case is `Internals.SecureConnection.makeLocalIdentityForNetworkFramework()`,
-    /// which only ever builds its `SecIdentity` from the chain's first certificate: the identical
-    /// chain presented under `.nioTransportServices` fails the handshake with "-9831: unknown Cert
-    /// Authority" (the server can't complete the chain from a leaf-only presentation, exactly as
-    /// `openssl verify -CAfile root.crt leaf.crt` without `-untrusted intermediate.crt` also
-    /// fails). `resolveExecutor()`/`requireExecutor(_:)` steer a configuration like this away from
-    /// `.nioTransportServices` automatically. See
-    /// `dataTask_whenClientCertificateChainHasIntermediateAndNIOTransportServicesRequired_throwsExecutorError`
-    /// right below for that half, and `InternalsSessionConfigurationExecutorTests+NIO`'s own
-    /// `resolveExecutor_whenMultipleClientCertificatesSetAndNIOTransportServicesPreferred_fallsBackToNIO`
-    /// for the resolution logic itself, proven without needing a live network round trip.
+    /// `dataTask_whenClientCertificateChainHasIntermediateUnderNIOTransportServicesRequired_completesHandshake`
+    /// below is the same chain over Network.framework, which presents the intermediates through
+    /// `tlsLocalIdentityChainProviderNetworkFramework`, and
+    /// `dataTask_whenOnlyTheLeafIsConfiguredUnderNIOTransportServicesForAServerTrustingOnlyTheRoot_failsTheHandshake`
+    /// its control: the leaf alone does not get through.
     ///
-    /// Unlike `dataTask_whenCAEnabledUnderNIOTransportServices` above, this one needs no
-    /// `withKnownIssue`/Keychain-entitlement caveat on iOS/tvOS/watchOS/Catalyst Simulator:
-    /// `.requiredExecutor(.nio)` reads the identity straight off NIOSSL's own
-    /// `TLSConfiguration.certificateChain`/`privateKey`, with no `SecIdentity`/Keychain round
-    /// trip involved, so there's no entitlement gap to hit. Wrapping its body in
-    /// `withKnownIssue` would fail with "Known issue was not recorded", since the body
-    /// unconditionally succeeds.
+    /// Unlike `dataTask_whenCAEnabledUnderNIOTransportServices` above, `.requiredExecutor(.nio)`
+    /// reads the identity straight off NIOSSL's own `TLSConfiguration.certificateChain`/
+    /// `privateKey`, with no `SecIdentity` involved.
     @Test
     func dataTask_whenClientCertificateChainHasIntermediateUnderNIORequired_completesHandshake() async throws {
         // Given
@@ -311,50 +277,111 @@ extension DataTaskTests {
         try await verify()
     }
 
-    /// The hard-pin counterpart to the fallback test above:
-    /// `.requiredExecutor(.nioTransportServices)` must refuse a multi-certificate client chain
-    /// outright, the same way
-    /// `dataTask_whenRequiredExecutorIsIncompatible_throwsActionableErrorBeforeAnyNetworkIO`
-    /// already proves for an unrelated field, rather than silently attempting the handshake and
-    /// failing with an opaque `unknown_ca` TLS alert.
+    /// The same three-level chain, over Network.framework, to a server that trusts only the
+    /// root: `.requiredExecutor(.nioTransportServices)` is no longer refused, and the handshake
+    /// completes because the identity is presented together with its intermediate
+    /// (`tlsLocalIdentityChainProviderNetworkFramework`). This used to fail with
+    /// "-9831: unknown Cert Authority", as `openssl verify -CAfile root.crt leaf.crt` without
+    /// `-untrusted intermediate.crt` also does, and the session refused the executor outright
+    /// (`ExecutorRequirementError.Reason.multipleClientCertificatesUnderNetworkFramework`).
     ///
-    /// No `LocalServer` needed: `requireExecutor(_:)` throws before any client is built or
-    /// network I/O starts.
+    /// The server's own view of the chain is asserted too: it only answers when the certificate
+    /// it received verifies up to its root, which it can do only with the intermediate in hand.
     @Test
-    func dataTask_whenClientCertificateChainHasIntermediateAndNIOTransportServicesRequired_throwsExecutorError()
+    func dataTask_whenClientCertificateChainHasIntermediateUnderNIOTransportServicesRequired_completesHandshake()
         async throws
     {
         // Given
+        let server = Certificates().server()
         let intermediate = CertificateResource("client_chain_intermediate", format: .pem)
+        let root = CertificateResource("client_chain_root", format: .pem)
         let leaf = CertificateResource("client_chain_leaf", format: .pem)
 
-        let task = DataTask {
-            BaseURL("localhost")
+        let uri = "/" + UUID().uuidString
 
-            Session()
+        let localServer = try await LocalServer(
+            LocalServer.Configuration(
+                host: "localhost",
+                port: 8953,
+                option: .client(root)
+            )
+        )
+
+        let output = "Hello World"
+        localServer.cleanup(at: uri)
+        localServer.insert(try LocalServer.ResponseConfiguration(jsonObject: output), at: uri)
+        defer { localServer.cleanup(at: uri) }
+
+        // When
+        let data = try await DataTask {
+            BaseURL(localServer.baseURL)
+            Path(uri)
+
+            Session.localServer
                 .requiredExecutor(.nioTransportServices)
 
             SecureConnection {
+                TrustRoots(server.certificateURL.absolutePath(percentEncoded: false))
                 RequestDL.Certificates {
                     Certificate(leaf.certificateURL.absolutePath(percentEncoded: false), format: .pem)
                     Certificate(intermediate.certificateURL.absolutePath(percentEncoded: false), format: .pem)
                 }
                 PrivateKey(leaf.privateKeyURL.absolutePath(percentEncoded: false))
             }
+            .verification(.fullVerification)
         }
         .extractPayload()
+        .result()
+
+        // Then
+        let result = try HTTPResult<String>(data)
+        #expect(result.response == output)
+    }
+
+    /// The control of the test above, and what makes it prove something: the same server, which
+    /// trusts only the root, with only the leaf configured, is rejected. The intermediate is the
+    /// whole difference between the two.
+    @Test
+    func dataTask_whenOnlyTheLeafIsConfiguredUnderNIOTransportServicesForAServerTrustingOnlyTheRoot_failsTheHandshake()
+        async throws
+    {
+        // Given
+        let server = Certificates().server()
+        let root = CertificateResource("client_chain_root", format: .pem)
+        let leaf = CertificateResource("client_chain_leaf", format: .pem)
+
+        let uri = "/" + UUID().uuidString
+
+        let localServer = try await LocalServer(
+            LocalServer.Configuration(
+                host: "localhost",
+                port: 8954,
+                option: .client(root)
+            )
+        )
+
+        localServer.cleanup(at: uri)
+        localServer.insert(try LocalServer.ResponseConfiguration(jsonObject: "Hello World"), at: uri)
+        defer { localServer.cleanup(at: uri) }
 
         // When / Then
-        await #expect(throws: ExecutorRequirementError.self) {
-            try await task.result()
-        }
+        await #expect(throws: (any Error).self) {
+            _ = try await DataTask {
+                BaseURL(localServer.baseURL)
+                Path(uri)
 
-        do {
-            _ = try await task.result()
-            Issue.record("Not expecting success")
-        } catch let error as ExecutorRequirementError {
-            #expect(error.requiredExecutor == .nioTransportServices)
-            #expect(error.reasons == [.multipleClientCertificatesUnderNetworkFramework])
+                Session.localServer
+                    .requiredExecutor(.nioTransportServices)
+
+                SecureConnection {
+                    TrustRoots(server.certificateURL.absolutePath(percentEncoded: false))
+                    RequestDL.Certificates(leaf.certificateURL.absolutePath(percentEncoded: false))
+                    PrivateKey(leaf.privateKeyURL.absolutePath(percentEncoded: false))
+                }
+                .verification(.fullVerification)
+            }
+            .extractPayload()
+            .result()
         }
     }
 
@@ -368,8 +395,7 @@ extension DataTaskTests {
     /// every connection of the client is proxied, so the identity that is used is the NIOSSL one
     /// and the Network.framework one is not needed. `Internals.SecureConnection.build(
     /// isCompatibleWithNetworkFramework:isProxied:)` builds the NIOSSL one in that case, a read of
-    /// the PEM files and no Keychain round trip, which is why this needs no `withKnownIssue`
-    /// caveat for the Keychain entitlement either.
+    /// the PEM files and no `SecIdentity`.
     ///
     /// The server verifies the client certificate (`LocalServer.TLSOption.client(_:)`), so the
     /// handshake only completes if the certificate reached the tunnel. Both ways of asking for the

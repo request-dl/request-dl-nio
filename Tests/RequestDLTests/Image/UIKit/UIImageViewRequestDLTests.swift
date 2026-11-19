@@ -15,6 +15,15 @@ import UIKit
 @MainActor
 struct UIImageViewRequestDLTests {
 
+    /// A real, distinct image: UIKit treats two empty `UIImage()` as equal and may keep the old
+    /// instance on assignment, which defeats the identity checks below.
+    private static func makeImage(_ color: UIColor) -> UIImage {
+        UIGraphicsImageRenderer(size: CGSize(width: 2, height: 2)).image { context in
+            color.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 2, height: 2))
+        }
+    }
+
     @Test
     func setImageAppliesTheLoadedImage() async throws {
         // Given
@@ -35,7 +44,7 @@ struct UIImageViewRequestDLTests {
     func placeholderIsAppliedImmediately() {
         // Given
         let imageView = UIImageView()
-        let placeholder = UIImage()
+        let placeholder = Self.makeImage(.blue)
 
         // When
         imageView.rdl.setImage(
@@ -50,6 +59,108 @@ struct UIImageViewRequestDLTests {
         // Then
         #expect(imageView.image === placeholder)
         imageView.rdl.cancel()
+    }
+
+    @Test
+    func startingALoadClearsTheCurrentImageWhenThereIsNoPlaceholder() {
+        // Given
+        let imageView = UIImageView()
+        imageView.image = Self.makeImage(.red)
+
+        // When
+        imageView.rdl.setImage(
+            id: "clears",
+            task: StubImageTask {
+                try await Task.sleep(nanoseconds: 200_000_000)
+                return .init(head: .stub, payload: .onePixelPNG)
+            }
+        )
+
+        // Then
+        #expect(imageView.image == nil)
+        imageView.rdl.cancel()
+    }
+
+    @Test
+    func startingALoadByURLClearsTheCurrentImage() {
+        // Given
+        let imageView = UIImageView()
+        imageView.image = Self.makeImage(.red)
+
+        // When
+        imageView.rdl.setImage(with: URL(string: "https://invalid.invalid/image.png")!)
+
+        // Then
+        #expect(imageView.image == nil)
+        imageView.rdl.cancel()
+    }
+
+    @Test
+    func placeholderReplacesTheCurrentImage() {
+        // Given
+        let imageView = UIImageView()
+        imageView.image = Self.makeImage(.red)
+        let placeholder = Self.makeImage(.blue)
+
+        // When
+        imageView.rdl.setImage(
+            id: "replaces",
+            task: StubImageTask {
+                try await Task.sleep(nanoseconds: 200_000_000)
+                return .init(head: .stub, payload: .onePixelPNG)
+            },
+            placeholder: placeholder
+        )
+
+        // Then
+        #expect(imageView.image === placeholder)
+        imageView.rdl.cancel()
+    }
+
+    @Test
+    func keepingTheCurrentImageLeavesTheViewUntouchedWhileLoading() {
+        // Given
+        let imageView = UIImageView()
+        let current = Self.makeImage(.red)
+        imageView.image = current
+
+        // When
+        imageView.rdl.setImage(
+            id: "keeps",
+            task: StubImageTask {
+                try await Task.sleep(nanoseconds: 200_000_000)
+                return .init(head: .stub, payload: .onePixelPNG)
+            },
+            placeholder: Self.makeImage(.blue),
+            keepsCurrentImageWhileLoading: true
+        )
+
+        // Then
+        #expect(imageView.image === current)
+        imageView.rdl.cancel()
+    }
+
+    @Test
+    func keepingTheCurrentImageStillAppliesTheLoadedImage() async throws {
+        // Given
+        let imageView = UIImageView()
+        let current = Self.makeImage(.red)
+        imageView.image = current
+        let signal = AsyncSignal()
+
+        // When
+        imageView.rdl.setImage(
+            id: "keeps-then-applies",
+            task: StubImageTask { .init(head: .stub, payload: .onePixelPNG) },
+            keepsCurrentImageWhileLoading: true
+        ) { _ in
+            signal.signal()
+        }
+        try await signal.wait()
+
+        // Then
+        #expect(imageView.image != nil)
+        #expect(imageView.image !== current)
     }
 
     @Test

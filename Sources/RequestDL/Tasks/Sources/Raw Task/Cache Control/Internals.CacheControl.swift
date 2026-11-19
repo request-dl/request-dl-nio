@@ -34,6 +34,14 @@ extension Internals {
         let dataCache: DataCache
         let logger: Internals.TaskLogger?
 
+        /// Whether the request runs on `.urlSession`, the one executor that cannot tell a chunked
+        /// body that ended from one that was cut (see ``lacksProofOfCompleteness(_:)``).
+        var isURLSessionExecutor = false
+
+        /// What runs the completeness probe of a response `.urlSession` cannot vouch for. `nil`
+        /// leaves such a response out of the cache without asking.
+        var completenessProbeClient: (any RequestExecutingClient)?
+
         /// Awaited by the cache writer before it allocates its buffer, and so before it reads the
         /// first chunk. Nothing sets it outside the tests, which hold the writer back with it to
         /// have a download run far ahead of the cache without depending on how the two happen to
@@ -353,10 +361,10 @@ extension Internals {
             let dataCache = dataCache
             let key = requestConfiguration.url
 
-            _Concurrency.Task(priority: .background) {
-                await Self.replay(body, startingWith: firstPiece, into: download, window: window) {
-                    await dataCache.remove(forKey: key)
-                }
+            // At the priority of the request, not a low one: the response is read by the caller of
+            // this request, which is waiting on exactly what this feeds it.
+            Self.startReplay(body, startingWith: firstPiece, into: download, window: window) {
+                await dataCache.remove(forKey: key)
             }
 
             // Nothing crossed the wire for this response, but it is still part of what happened to
@@ -404,6 +412,24 @@ extension Internals {
         /// Large enough that a big entry is not read one reading-mode chunk (1 KiB by default)
         /// per trip to the file system, and small enough that the window is consulted often.
         static let replayPieceSize = 65_536
+
+        /// Starts ``replay(_:startingWith:into:window:onUnreadable:)`` as an unstructured task.
+        ///
+        /// Not detached, and with no priority of its own: it inherits the one of the caller. The
+        /// reader of `download` waits for what the replay feeds it, so a fixed low priority here
+        /// is a priority inversion, a cached response stalled behind unrelated background work.
+        @discardableResult
+        static func startReplay(
+            _ body: Internals.AnyBuffer,
+            startingWith firstPiece: [UInt8] = [],
+            into download: Internals.DownloadBuffer,
+            window: Internals.FlowControlWindow,
+            onUnreadable: (@Sendable () async -> Void)? = nil
+        ) -> _Concurrency.Task<Void, Never> {
+            _Concurrency.Task {
+                await replay(body, startingWith: firstPiece, into: download, window: window, onUnreadable: onUnreadable)
+            }
+        }
 
         /// Feeds a cached body into `download`, one piece at a time, and waits for room in `window`
         /// between pieces.
@@ -720,6 +746,11 @@ extension Internals {
                 return nil
             }
 
+            // The closure below runs when the head arrives, on whatever is delivering the response
+            // (an event loop), which is not this request's task. The write is this request's work,
+            // and has to run at its priority.
+            let priority = _Concurrency.Task.currentPriority
+
             return { head -> Internals.AsyncStream<Internals.DataBuffer>? in
                 let headHeaders = RequestDL.HTTPHeaders(head.headers.map { ($0.name, $0.value) })
 
@@ -733,6 +764,33 @@ extension Internals {
                     !isAny(vary)
                 else {
                     return nil
+                }
+
+                // What nothing says is whole is only stored when the probe can be asked.
+                let probe: CompletenessProbe?
+
+                if lacksProofOfCompleteness(head) {
+                    guard
+                        let client = completenessProbeClient,
+                        CompletenessProbe.isApplicable(to: head)
+                    else {
+                        logger?.log(
+                            level: .info,
+                            "Response will not be cached - nothing proves its body arrived whole",
+                            additionalMetadata: [
+                                "status": .stringConvertible(head.status.code)
+                            ]
+                        )
+                        return nil
+                    }
+
+                    probe = CompletenessProbe(
+                        client: client,
+                        requestConfiguration: requestConfiguration,
+                        logger: logger
+                    )
+                } else {
+                    probe = nil
                 }
 
                 // What the response varies on, and, when the request carried credentials, which
@@ -766,7 +824,7 @@ extension Internals {
                 // of a body for a writer that is not keeping up.
                 let asyncBuffers = Internals.DownloadBuffer.makeCacheStream()
 
-                dataCache.trackWrite {
+                dataCache.trackWrite(priority: priority) {
                     // On every exit path. Without it, a task that gives up before reaching the
                     // loop leaves behind a stream nobody will ever drain, and the download goes
                     // on feeding it for the rest of the response. Closing makes every later
@@ -796,6 +854,19 @@ extension Internals {
 
                     do {
                         try await Self.write(asyncBuffers, to: &cacheBuffer)
+
+                        if let probe {
+                            let verdict = await probe.run(response: head, receivedBytes: cacheBuffer.readableBytes)
+
+                            guard verdict == .complete else {
+                                logger?.log(
+                                    level: .info,
+                                    "Response will not be cached - the completeness probe said \(verdict)"
+                                )
+                                await dataCache.discardFailedWrite(cacheBuffer, forKey: requestConfiguration.url)
+                                return
+                            }
+                        }
 
                         // Corrects the usage estimate `allocateBuffer` above set from
                         // `contentLength` (a pre-write hint, `0` for chunked/unknown-length
@@ -855,6 +926,28 @@ extension Internals {
             }
         }
 
+        /// Whether this response was delivered by an executor that cannot say its body is whole,
+        /// and has nothing else that does.
+        ///
+        /// A body with a `Content-Length` is checked against it, on every executor. The NIO
+        /// executors end a chunked body with its terminating chunk and fail the request when the
+        /// connection closes before it. CFNetwork, under `.urlSession`, reports a chunked body that
+        /// was cut between two chunks as a complete one. It shows the chunked framing as
+        /// `Transfer-Encoding: Identity` (and nothing else about it), which, with no
+        /// `Content-Length`, is what is left to go by. An HTTP/2 response has neither header, and a
+        /// stream that ends early fails there.
+        private func lacksProofOfCompleteness(_ head: Internals.ResponseHead) -> Bool {
+            guard isURLSessionExecutor else {
+                return false
+            }
+
+            guard head.headerValues(named: "Content-Length").isEmpty else {
+                return false
+            }
+
+            return !head.headerValues(named: "Transfer-Encoding").isEmpty
+        }
+
         private func isCachedDataValid(_ cachedData: CachedData) -> Bool {
             let headers = cachedData.response.headers
 
@@ -869,6 +962,10 @@ extension Internals {
             // truncated by something other than a stream error (already handled by the write
             // path's own error handling). That's an acceptable trade: the alternative was every
             // chunked or compressed response permanently missing the cache.
+            //
+            // One truncation does not raise a stream error: `.urlSession` reports a chunked body
+            // cut between two chunks as complete. Those never get here, because
+            // `lacksProofOfCompleteness(_:)` keeps them out of the cache when they are written.
             if let contentLength = contentLength(headers: headers["Content-Length"] ?? []),
                 (headers["Content-Encoding"] ?? []).isEmpty,
                 cachedData.buffer.readableBytes != contentLength
