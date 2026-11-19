@@ -29,7 +29,8 @@ import RequestDLInternals
 /// redirects a request follows, where the cookies each hop sets are in time for the next one.
 ///
 /// - Important: A request that sets a `Cookie` header itself keeps it, and is not given the jar's
-///   cookies. The jar still stores what its responses set.
+///   cookies. The jar still stores what its responses set. A jar does not make a ``DataCache``
+///   private to it: see <doc:Using-Cookies>.
 ///
 /// - Note: Cookies are not saved to disk. `SameSite` is ignored, as in any client that has no
 ///   notion of a site making the request, and `HttpOnly` cookies are sent like any other.
@@ -45,8 +46,8 @@ public final class CookieJar: Sendable {
     ///
     /// - Parameter publicSuffixList: The list the jar consults to refuse a cookie whose `Domain`
     ///   is a public suffix, such as `co.uk`, which would otherwise be sent to every site below
-    ///   it. Without one, the jar still refuses a `Domain` that is a single label (`com`), but a
-    ///   multi-label suffix like `co.uk` gets through.
+    ///   it. The jar refuses a `Domain` that is a single label (`com`) with a list or without
+    ///   one; without a list, a multi-label suffix like `co.uk` gets through.
     public init(publicSuffixList: PublicSuffixList? = nil) {
         storage = Internals.CookieStorage(publicSuffixList: publicSuffixList?.list)
     }

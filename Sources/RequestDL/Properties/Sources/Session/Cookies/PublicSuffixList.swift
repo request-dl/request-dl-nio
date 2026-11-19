@@ -22,7 +22,10 @@ import Foundation
 /// let jar = CookieJar(publicSuffixList: list)
 /// ```
 ///
-/// Parsing a list costs a few milliseconds, so keep the value and reuse it for every jar.
+/// Parsing a list costs a few milliseconds, so keep the value and reuse it for every jar. A file that
+/// is not a list, such as the error page a failed download saved in its place, is refused with a
+/// ``PublicSuffixListError`` instead of being taken for a list that protects from nothing. Names are
+/// compared in their Punycode form, so a list written in Unicode covers a host in either spelling.
 public struct PublicSuffixList: Sendable {
 
     // MARK: - Internal properties
