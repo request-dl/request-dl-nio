@@ -48,8 +48,9 @@ extension Internals {
             storage.store(setCookieValues: values, for: url)
         }
 
-        /// The `Cookie` header value a redirect hop to `url` is owed, when the jar owns it.
-        package func cookieHeaderForRedirect(to url: URL) -> String? {
+        /// The `Cookie` header value a request to `url` is owed right now, when the jar owns the
+        /// header: for a redirect hop, and for a request sent after the first one finished.
+        package func cookieHeader(for url: URL) -> String? {
             managesHeader ? storage.cookieHeader(for: url) : nil
         }
     }

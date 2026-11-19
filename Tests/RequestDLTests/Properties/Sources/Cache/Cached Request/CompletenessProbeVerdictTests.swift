@@ -8,6 +8,12 @@ import Testing
 @testable import RequestDL
 @testable import RequestDLTestSupport
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.URL
+#endif
+
 /// How the answer to the completeness probe is read.
 struct CompletenessProbeVerdictTests {
 

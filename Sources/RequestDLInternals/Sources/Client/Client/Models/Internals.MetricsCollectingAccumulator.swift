@@ -85,7 +85,7 @@ extension Internals {
 
             request.headers.remove(name: "Cookie")
 
-            if let value = cookies.cookieHeaderForRedirect(to: request.url) {
+            if let value = cookies.cookieHeader(for: request.url) {
                 request.headers.add(name: "Cookie", value: value)
             }
         }
