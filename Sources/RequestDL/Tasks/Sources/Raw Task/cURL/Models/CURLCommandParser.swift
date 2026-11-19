@@ -495,8 +495,8 @@ enum CURLCommandParser {
 
             case .socks:
                 guard
-                    let decodedUsername = username.removingPercentEncoding,
-                    let decodedPassword = password.removingPercentEncoding
+                    let decodedUsername = username.removingPercentEscapes,
+                    let decodedPassword = password.removingPercentEscapes
                 else {
                     throw CURLParsingError(.malformedArgument, token: flag)
                 }

@@ -93,12 +93,12 @@ extension Internals.SystemProxyResolver {
         guard
             let components = URLComponents(url: proxy, resolvingAgainstBaseURL: false),
             let encodedUsername = components.percentEncodedUser,
-            let username = encodedUsername.removingPercentEncoding
+            let username = encodedUsername.removingPercentEscapes
         else {
             return nil
         }
 
-        let password = components.percentEncodedPassword?.removingPercentEncoding ?? ""
+        let password = components.percentEncodedPassword?.removingPercentEscapes ?? ""
 
         return .socks(username: username, password: password)
     }

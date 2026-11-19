@@ -165,6 +165,80 @@ extension StringProtocol {
     }
 }
 
+extension StringProtocol {
+
+    /// This text with its `%XX` escapes decoded, or `nil` when it is not valid percent-encoded
+    /// text.
+    ///
+    /// Written by hand because `String.removingPercentEncoding` is a Foundation method that
+    /// `FoundationEssentials` (Linux, Android, static SDK) does not have. It keeps what
+    /// Foundation's does:
+    ///
+    /// - a `%` that is not followed by two hexadecimal digits is invalid, so it is `nil`, never
+    ///   a literal `%`;
+    /// - the decoded bytes must be valid UTF-8, so a lone `%FF` is `nil`;
+    /// - `%00` decodes to a NUL character, and the caller decides what to do with it.
+    package var removingPercentEscapes: String? {
+        var bytes: [UInt8] = []
+        bytes.reserveCapacity(utf8.count)
+
+        var iterator = utf8.makeIterator()
+
+        while let byte = iterator.next() {
+            guard byte == UInt8(ascii: "%") else {
+                bytes.append(byte)
+                continue
+            }
+
+            guard
+                let high = iterator.next().flatMap(Self.hexValue),
+                let low = iterator.next().flatMap(Self.hexValue)
+            else {
+                return nil
+            }
+
+            bytes.append(high << 4 | low)
+        }
+
+        return String(validatingUTF8Bytes: bytes)
+    }
+
+    private static func hexValue(_ byte: UInt8) -> UInt8? {
+        switch byte {
+        case UInt8(ascii: "0")...UInt8(ascii: "9"):
+            return byte - UInt8(ascii: "0")
+        case UInt8(ascii: "a")...UInt8(ascii: "f"):
+            return byte - UInt8(ascii: "a") + 10
+        case UInt8(ascii: "A")...UInt8(ascii: "F"):
+            return byte - UInt8(ascii: "A") + 10
+        default:
+            return nil
+        }
+    }
+}
+
+extension String {
+
+    /// `nil` when the bytes are not valid UTF-8, instead of repairing them with U+FFFD.
+    fileprivate init?(validatingUTF8Bytes bytes: [UInt8]) {
+        var decoder = UTF8()
+        var iterator = bytes.makeIterator()
+        var scalars = String.UnicodeScalarView()
+
+        while true {
+            switch decoder.decode(&iterator) {
+            case .scalarValue(let scalar):
+                scalars.append(scalar)
+            case .emptyInput:
+                self.init(scalars)
+                return
+            case .error:
+                return nil
+            }
+        }
+    }
+}
+
 extension Array where Element == String {
 
     /// Joins path components with single separators, dropping empties, in the form that goes on
