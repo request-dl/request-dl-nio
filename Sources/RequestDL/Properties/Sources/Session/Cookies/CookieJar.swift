@@ -41,7 +41,7 @@ import Foundation
 /// Read what a jar holds with ``cookies`` and ``cookies(for:)``, add one with ``insert(_:)``, remove
 /// some with ``remove(name:domain:path:)``, ``remove(_:)``, ``removeAll(forHost:includingSubdomains:)``
 /// or ``removeAll()``, and keep a jar across launches with ``snapshot(includingSessionCookies:)``
-/// and ``init(restoring:publicSuffixList:)``. All of them are safe to call from any thread, while
+/// and ``init(restoring:publicSuffixList:)``, and find out when it changes with ``changes``. All of them are safe to call from any thread, while
 /// requests are using the jar.
 ///
 /// - Note: Cookies are not saved by RequestDL: a snapshot is yours to keep, and to protect (see
@@ -85,6 +85,36 @@ public final class CookieJar: Sendable {
     /// not change which one the jar evicts first when it is full.
     public var cookies: [Cookie] {
         storage.snapshot().map(Cookie.init)
+    }
+
+    /// A stream that gets an element each time what the jar holds changes: a response set or deleted
+    /// a cookie, or you inserted, removed or restored some, or the jar's limits evicted one. Use it
+    /// to save a ``snapshot(includingSessionCookies:)`` when something changed.
+    ///
+    /// ```swift
+    /// let changes = jar.changes
+    /// Task {
+    ///     for await _ in changes {
+    ///         try save(jar.snapshot())
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// An element says that the jar changed, not what changed or how many times: changes that
+    /// happen while you are busy are merged into one, so read the jar again (``cookies`` or
+    /// ``snapshot(includingSessionCookies:)``) when you get one, and you see every change that
+    /// happened before. It carries no cookie, so it cannot leak one.
+    ///
+    /// Every read of this property is a new stream, and each is registered when you read it, not when
+    /// you start iterating: take it before you read the jar to not miss a change in between. A
+    /// stream ends when the jar is deallocated, and stops being tracked when you cancel it or stop
+    /// iterating.
+    ///
+    /// These are not changes: a cookie expiring (nothing happens at that instant; it stops being
+    /// listed), a cookie being sent, a response that sets a cookie just as it already is, and a
+    /// ``removeAll()`` of an empty jar.
+    public var changes: AsyncStream<Void> {
+        storage.changes()
     }
 
     // MARK: - Public methods

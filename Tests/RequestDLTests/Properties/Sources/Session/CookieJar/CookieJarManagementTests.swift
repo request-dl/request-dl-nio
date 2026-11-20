@@ -293,4 +293,44 @@ struct CookieJarManagementTests {
         #expect(refused == 0)
         #expect(result.receivedCookieHeader == "sid=abc; tab=1")
     }
+
+    // MARK: - Observing
+
+    /// Whether the stream gets an element within `seconds`.
+    private static func receivesChange(_ stream: AsyncStream<Void>, within seconds: Double = 5) async -> Bool {
+        await withTaskGroup(of: Bool.self) { group in
+            group.addTask {
+                var iterator = stream.makeAsyncIterator()
+                return await iterator.next() != nil
+            }
+            group.addTask {
+                try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+                return false
+            }
+
+            let first = await group.next() ?? false
+            group.cancelAll()
+            return first
+        }
+    }
+
+    @Test(arguments: executors)
+    func changes_whenAResponseSetsACookie_signalsBeforeTheCallerSeesTheResponse(executor: Executor) async throws {
+        // Given
+        let server = try await Self.server()
+        let setPath = "/" + UUID().uuidString
+        defer { server.cleanup(at: setPath) }
+
+        server.insert(.init(headers: Self.setCookie("sid=abc; Max-Age=3600"), data: Data("\"set\"".utf8)), at: setPath)
+
+        let jar = CookieJar()
+        let changes = jar.changes
+
+        // When
+        _ = try await Self.get(server, setPath, executor: executor, jar: jar)
+
+        // Then: the signal is there already, and the jar has what it announced.
+        #expect(await Self.receivesChange(changes, within: 0.5))
+        #expect(jar.cookies.map(\.name) == ["sid"])
+    }
 }

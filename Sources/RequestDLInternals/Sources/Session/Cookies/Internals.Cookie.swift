@@ -85,6 +85,16 @@ extension Internals {
             name == other.name && domain == other.domain && path == other.path && hostOnly == other.hostOnly
         }
 
+        /// Whether `other` is the same cookie in everything a caller can see: not when it was
+        /// created (a replacement keeps the first one's), nor when it was last used.
+        package func hasSameContent(as other: Cookie) -> Bool {
+            hasSameIdentity(as: other)
+                && value == other.value
+                && secure == other.secure
+                && httpOnly == other.httpOnly
+                && expires == other.expires
+        }
+
         /// Whether this cookie belongs on a request to `host`/`path` over a connection that is, or
         /// is not, `isSecure`. RFC 6265 section 5.4, step 1.
         package func matches(host: String, path requestPath: String, isSecure: Bool) -> Bool {

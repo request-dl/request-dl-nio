@@ -206,6 +206,57 @@ struct CookieJarSnapshotTests {
         #expect(CookieJar(restoring: snapshot, publicSuffixList: list).cookies.isEmpty)
     }
 
+    // MARK: - Observing
+
+    @Test
+    func changes_signalsEachKindOfChangeAndNotWhatIsNot() async throws {
+        let jar = CookieJar()
+        var iterator = jar.changes.makeAsyncIterator()
+
+        try jar.insert(cookie())
+        #expect(await iterator.next() != nil)
+
+        jar.remove(cookie())
+        #expect(await iterator.next() != nil)
+
+        jar.restore(CookieJar.Snapshot(cookies: [cookie()]))
+        #expect(await iterator.next() != nil)
+
+        jar.removeAll(forHost: "example.com")
+        #expect(await iterator.next() != nil)
+
+        try jar.insert(cookie())
+        #expect(await iterator.next() != nil)
+
+        jar.removeAll()
+        #expect(await iterator.next() != nil)
+
+        // None of these is a change, so the next element is the one of the insert after them.
+        jar.removeAll()
+        jar.remove(cookie())
+        try jar.insert(cookie("last"))
+        _ = jar.cookies
+        _ = jar.snapshot()
+        #expect(await iterator.next() != nil)
+        #expect(jar.cookies.map(\.name) == ["last"])
+    }
+
+    @Test
+    func changes_whenTheJarIsReleased_theStreamEnds() async throws {
+        var jar: CookieJar? = CookieJar()
+        let stream = try #require(jar?.changes)
+
+        try jar?.insert(cookie())
+        jar = nil
+
+        var count = 0
+        for await _ in stream {
+            count += 1
+        }
+
+        #expect(count == 1)
+    }
+
     // MARK: - Never in logs
 
     @Test

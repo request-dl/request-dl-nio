@@ -19,7 +19,7 @@ struct MyAppConfiguration: Property {
 }
 ```
 
-The jar is yours: keep it for as long as the cookies should live, share it between sessions that should share a login, and call ``CookieJar/removeAll()`` to sign out. To look at what it holds, change it, or keep it across launches, see <doc:Using-Cookies#Managing-the-cookies> and <doc:Using-Cookies#Keeping-a-jar-across-launches>. Two sessions with different jars never see each other's cookies, even when they share a connection.
+The jar is yours: keep it for as long as the cookies should live, share it between sessions that should share a login, and call ``CookieJar/removeAll()`` to sign out. To look at what it holds, change it, watch it, or keep it across launches, see <doc:Using-Cookies#Managing-the-cookies> and <doc:Using-Cookies#Keeping-a-jar-across-launches>. Two sessions with different jars never see each other's cookies, even when they share a connection.
 
 The jar does not make a ``DataCache`` private to it. A response kept in a cache shared by several sessions is still kept with the `Set-Cookie` it came with, and a later request served from it does not feed that header into its own jar. A response fetched through a redirect that was sent cookies the first request did not carry is never stored in the cache, because the cache could not tell whose it is.
 
@@ -88,6 +88,26 @@ jar.removeAll()
 Each call is atomic, but a read followed by a change is two calls, and a response can be stored between them.
 
 Cookies convert to and from Foundation's `HTTPCookie` with `CookieJar.Cookie(_:)` and ``CookieJar/Cookie/httpCookie``, to move them from `HTTPCookieStorage` or a web view's cookie store. `HTTPCookie` has no creation time, and a host-only cookie is one whose domain has no leading dot. A converted cookie is still checked when you insert it.
+
+### Observing changes
+
+``CookieJar/changes`` is a stream that gets an element each time what the jar holds changes: a response set or deleted a cookie, you inserted, removed or restored some, or a limit evicted one. The usual use is to save the jar when something changed:
+
+```swift
+let changes = jar.changes
+
+Task {
+    for await _ in changes {
+        try save(jar.snapshot())
+    }
+}
+```
+
+An element says that the jar changed, not what changed or how many times. Changes that happen while you are busy are merged into one, so read the jar again when you get an element and you see all of them. The element carries no cookie, so there is nothing in it to leak.
+
+Every read of `changes` is a new stream, registered when you read it, not when you start iterating: take it before you read the jar, so a change in between is not missed. It ends when the jar is deallocated, and the jar stops tracking it when you cancel the task.
+
+A cookie expiring is not a change (nothing happens at that instant: it stops being listed), nor is a cookie being sent, a response that sets a cookie just as it already is, or clearing an empty jar.
 
 ### Keeping a jar across launches
 

@@ -37,10 +37,23 @@ extension Internals {
         private let publicSuffixList: PublicSuffixList?
         private var cookies: [Cookie] = []
 
+        /// Whoever is observing `changes()`. Its own lock, never held with `lock`: a signal is sent
+        /// after a change, once the storage's lock is released.
+        private let observersLock = NSLock()
+        private var observers: [UInt64: Swift.AsyncStream<Void>.Continuation] = [:]
+        private var nextObserverID: UInt64 = 0
+
         // MARK: - Inits
 
         package init(publicSuffixList: PublicSuffixList? = nil) {
             self.publicSuffixList = publicSuffixList
+        }
+
+        deinit {
+            // A stream outliving its jar must end, not wait for a change that cannot come.
+            for continuation in observers.values {
+                continuation.finish()
+            }
         }
 
         // MARK: - Internal methods
@@ -72,11 +85,18 @@ extension Internals {
                 return
             }
 
-            lock.lock()
-            defer { lock.unlock() }
+            let changed = withLock {
+                var changed = false
 
-            for cookie in parsed {
-                insert(cookie, from: origin, now: now)
+                for cookie in parsed where insert(cookie, from: origin, now: now) {
+                    changed = true
+                }
+
+                return changed
+            }
+
+            if changed {
+                notifyObservers()
             }
         }
 
@@ -110,10 +130,17 @@ extension Internals {
                 .joined(separator: "; ")
         }
 
-        package func removeAll() {
-            lock.lock()
-            defer { lock.unlock() }
-            cookies.removeAll()
+        package func removeAll(now: Date = Date()) {
+            let changed = withLock {
+                // Cookies that expired and were not purged yet are not something anyone could see go.
+                let changed = cookies.contains { !$0.isExpired(at: now) }
+                cookies.removeAll()
+                return changed
+            }
+
+            if changed {
+                notifyObservers()
+            }
         }
 
         /// The stored cookies that have not expired, in the order they were first stored.
@@ -121,6 +148,44 @@ extension Internals {
             lock.lock()
             defer { lock.unlock() }
             return cookies.filter { !$0.isExpired(at: now) }
+        }
+
+        /// A stream that gets one element each time the cookies this storage holds change, whether
+        /// a response set or deleted one, a caller inserted, removed or restored some, or the limits
+        /// evicted one. Carries nothing of the cookies.
+        ///
+        /// It is registered when this is called, not when the first element is asked for, so a
+        /// change that happens in between is not lost. Changes that happen while the consumer is
+        /// busy are coalesced by default (`.bufferingNewest(1)`): one element means "look again",
+        /// not "one change". It ends when the storage is deallocated, and stops being tracked when
+        /// the consumer is cancelled or stops iterating.
+        ///
+        /// Not changes: a cookie expiring (nothing happens at that instant; it stops being
+        /// listed), a cookie being used, a cookie set again just as it was, a response that sets
+        /// nothing.
+        ///
+        /// - Parameter bufferingPolicy: `.unbounded` is for tests, which count the changes.
+        package func changes(
+            bufferingPolicy: Swift.AsyncStream<Void>.Continuation.BufferingPolicy = .bufferingNewest(1)
+        ) -> Swift.AsyncStream<Void> {
+            Swift.AsyncStream(bufferingPolicy: bufferingPolicy) { continuation in
+                observersLock.lock()
+                let id = nextObserverID
+                nextObserverID += 1
+                observers[id] = continuation
+                observersLock.unlock()
+
+                continuation.onTermination = { [weak self] _ in
+                    self?.removeObserver(id)
+                }
+            }
+        }
+
+        /// How many streams from `changes()` are being tracked, for tests.
+        package var observerCount: Int {
+            observersLock.lock()
+            defer { observersLock.unlock() }
+            return observers.count
         }
 
         /// The cookies a request to `url` would be sent, in the order they would be sent.
@@ -156,10 +221,9 @@ extension Internals {
             // The caller has just used it, whatever `creation` they gave.
             cookie.lastAccess = now
 
-            lock.lock()
-            defer { lock.unlock() }
-
-            insert(cookie, from: nil, now: now)
+            if withLock({ insert(cookie, from: nil, now: now) }) {
+                notifyObservers()
+            }
         }
 
         /// Adds the cookies of a persisted snapshot, and returns how many it did not.
@@ -171,26 +235,31 @@ extension Internals {
         /// ``maximumCookies`` are considered, so that a snapshot cannot cost more than a jar holds.
         @discardableResult
         package func restore(_ restored: [Cookie], now: Date = Date()) -> Int {
-            var added = 0
+            let added = withLock {
+                var added = 0
 
-            lock.lock()
-            defer { lock.unlock() }
+                for var cookie in restored.prefix(Self.maximumCookies) {
+                    cookie.domain = Cookie.normalizedDomain(cookie.domain)
+                    cookie.lastAccess = cookie.creation
 
-            for var cookie in restored.prefix(Self.maximumCookies) {
-                cookie.domain = Cookie.normalizedDomain(cookie.domain)
-                cookie.lastAccess = cookie.creation
+                    guard
+                        !cookie.isExpired(at: now),
+                        Cookie.rejection(of: cookie, publicSuffixList: publicSuffixList) == nil,
+                        !cookies.contains(where: { $0.hasSameIdentity(as: cookie) })
+                    else {
+                        continue
+                    }
 
-                guard
-                    !cookie.isExpired(at: now),
-                    Cookie.rejection(of: cookie, publicSuffixList: publicSuffixList) == nil,
-                    !cookies.contains(where: { $0.hasSameIdentity(as: cookie) })
-                else {
-                    continue
+                    cookies.append(cookie)
+                    added += 1
+                    enforceLimits(domain: cookie.domain, now: now)
                 }
 
-                cookies.append(cookie)
-                added += 1
-                enforceLimits(domain: cookie.domain, now: now)
+                return added
+            }
+
+            if added > 0 {
+                notifyObservers()
             }
 
             return restored.count - added
@@ -201,10 +270,7 @@ extension Internals {
         package func remove(name: String, domain: String, path: String) -> Bool {
             let domain = Cookie.normalizedDomain(domain)
 
-            lock.lock()
-            defer { lock.unlock() }
-
-            return removeMatching { $0.name == name && $0.domain == domain && $0.path == path } > 0
+            return removeAndNotify { $0.name == name && $0.domain == domain && $0.path == path } > 0
         }
 
         /// Removes the cookie that `cookie` would replace.
@@ -213,10 +279,7 @@ extension Internals {
             var cookie = cookie
             cookie.domain = Cookie.normalizedDomain(cookie.domain)
 
-            lock.lock()
-            defer { lock.unlock() }
-
-            return removeMatching { $0.hasSameIdentity(as: cookie) } > 0
+            return removeAndNotify { $0.hasSameIdentity(as: cookie) } > 0
         }
 
         /// Removes the cookies a request to `host` would match by domain, whatever their path or
@@ -231,10 +294,7 @@ extension Internals {
             // An address has no hosts below it: `5.127.0.0.1` is not under `127.0.0.1`.
             let includingSubdomains = includingSubdomains && !Cookie.isIPAddress(host)
 
-            lock.lock()
-            defer { lock.unlock() }
-
-            removeMatching { cookie in
+            removeAndNotify { cookie in
                 let matches =
                     cookie.hostOnly
                     ? cookie.domain == host
@@ -247,7 +307,12 @@ extension Internals {
         // MARK: - Private methods
 
         /// RFC 6265 section 5.3, steps 11 and 12. Expects the lock to be held.
-        private func insert(_ cookie: Cookie, from origin: Cookie.Origin?, now: Date) {
+        ///
+        /// - Returns: Whether the cookies the storage holds are now different: one was added, one
+        ///   was replaced by one that is not the same, or one was deleted. A cookie set again as it
+        ///   already is changes nothing, which is what a server does on most responses.
+        @discardableResult
+        private func insert(_ cookie: Cookie, from origin: Cookie.Origin?, now: Date) -> Bool {
             let existing = cookies.firstIndex { $0.hasSameIdentity(as: cookie) }
 
             // A response over an insecure connection cannot replace, delete or shadow a Secure cookie
@@ -256,21 +321,24 @@ extension Internals {
             // reaches. Otherwise `sid=evil; Domain=example.com; Path=/app` from plaintext would sit
             // beside a Secure `sid` and be sent first.
             if let origin, !origin.isSecure, cookies.contains(where: { isSecureCookie($0, shadowedBy: cookie) }) {
-                return
+                return false
             }
 
             // An already-expired cookie is a deletion: it evicts its match and is not kept.
             if cookie.isExpired(at: now) {
                 if let existing {
                     cookies.remove(at: existing)
+                    return true
                 }
 
-                return
+                return false
             }
 
             var cookie = cookie
+            var changed = true
 
             if let existing {
+                changed = !cookies[existing].hasSameContent(as: cookie)
                 cookie.creation = cookies[existing].creation
                 cookies[existing] = cookie
             } else {
@@ -278,6 +346,42 @@ extension Internals {
             }
 
             enforceLimits(domain: cookie.domain, now: now)
+            return changed
+        }
+
+        private func withLock<Result>(_ body: () -> Result) -> Result {
+            lock.lock()
+            defer { lock.unlock() }
+            return body()
+        }
+
+        @discardableResult
+        private func removeAndNotify(_ predicate: (Cookie) -> Bool) -> Int {
+            let removed = withLock { removeMatching(predicate) }
+
+            if removed > 0 {
+                notifyObservers()
+            }
+
+            return removed
+        }
+
+        /// Sends a change to every observer. Called with no lock held: `yield` does not block, but
+        /// a consumer's termination handler may take `observersLock`.
+        private func notifyObservers() {
+            observersLock.lock()
+            let continuations = Array(observers.values)
+            observersLock.unlock()
+
+            for continuation in continuations {
+                continuation.yield()
+            }
+        }
+
+        private func removeObserver(_ id: UInt64) {
+            observersLock.lock()
+            observers[id] = nil
+            observersLock.unlock()
         }
 
         /// The indices of the unexpired cookies that belong on a request from `origin`, in the order
