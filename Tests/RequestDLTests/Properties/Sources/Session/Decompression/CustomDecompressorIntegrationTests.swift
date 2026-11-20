@@ -175,7 +175,7 @@ struct CustomDecompressorIntegrationTests {
 
                 let head = Array(headers.utf8)
                 var noDelay: Int32 = 1
-                setsockopt(client, IPPROTO_TCP, TCP_NODELAY, &noDelay, socklen_t(MemoryLayout<Int32>.size))
+                setsockopt(client, Int32(IPPROTO_TCP), TCP_NODELAY, &noDelay, socklen_t(MemoryLayout<Int32>.size))
 
                 // A client that gave up on the response (it already failed) closes while later
                 // chunks are still to be written; that must be an `EPIPE`, not a `SIGPIPE`
