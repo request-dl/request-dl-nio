@@ -2,21 +2,12 @@
 // See LICENSE for this package's licensing information.
 //
 
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
+// `HTTPCookie` lives in `FoundationNetworking` off Apple platforms, and importing that links the full
+// `Foundation`, which the package avoids there. The bridge is for web views and `HTTPCookieStorage`,
+// both Apple's, so it is only there.
+#if canImport(Darwin)
+
 import Foundation
-#endif
-
-#if canImport(FoundationNetworking)
-import FoundationNetworking
-#endif
-
-#if canImport(FoundationNetworking) || canImport(Darwin)
-
-#if !canImport(FoundationNetworking)
-import Foundation
-#endif
 
 extension CookieJar.Cookie {
 

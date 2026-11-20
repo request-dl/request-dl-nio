@@ -2,7 +2,13 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(Darwin)
 import Foundation
+#else
+// The standard library's own NFC, since `precomposedStringWithCanonicalMapping` belongs to the full
+// `Foundation`, and linking that is what the package avoids off Apple platforms.
+@_spi(_Unicode) import Swift
+#endif
 
 extension Internals {
 
@@ -29,9 +35,17 @@ extension Internals {
                 return lowercased
             }
 
-            return labels(of: lowercased.precomposedStringWithCanonicalMapping)
+            return labels(of: normalized(lowercased))
                 .map { encode(label: $0) }
                 .joined(separator: ".")
+        }
+
+        private static func normalized(_ name: String) -> String {
+            #if canImport(Darwin)
+            name.precomposedStringWithCanonicalMapping
+            #else
+            String(String.UnicodeScalarView(name._nfc))
+            #endif
         }
 
         /// RFC 3492 section 6.3 for one label: `label` unchanged when it is ASCII.

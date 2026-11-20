@@ -2,7 +2,13 @@
 // See LICENSE for this package's licensing information.
 //
 
+import SwiftAsyncStream
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
 import Foundation
+#endif
 
 extension Internals {
 
@@ -33,13 +39,13 @@ extension Internals {
 
         // MARK: - Private properties
 
-        private let lock = NSLock()
+        private let lock = Lock()
         private let publicSuffixList: PublicSuffixList?
         private var cookies: [Cookie] = []
 
         /// Whoever is observing `changes()`. Its own lock, never held with `lock`: a signal is sent
         /// after a change, once the storage's lock is released.
-        private let observersLock = NSLock()
+        private let observersLock = Lock()
         private var observers: [UInt64: Swift.AsyncStream<Void>.Continuation] = [:]
         private var nextObserverID: UInt64 = 0
 

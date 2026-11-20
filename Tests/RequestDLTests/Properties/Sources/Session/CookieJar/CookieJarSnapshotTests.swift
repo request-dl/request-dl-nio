@@ -7,10 +7,6 @@ import Testing
 
 @testable import RequestDL
 
-#if canImport(FoundationNetworking)
-import FoundationNetworking
-#endif
-
 /// The value types of the jar's public API, which need no server: what `CookieJar.Cookie` and
 /// `CookieJar.Snapshot` encode, describe, convert to, and refuse.
 struct CookieJarSnapshotTests {
@@ -307,7 +303,7 @@ struct CookieJarSnapshotTests {
 
     // MARK: - HTTPCookie
 
-    #if canImport(FoundationNetworking) || canImport(Darwin)
+    #if canImport(Darwin)
 
     @Test
     func httpCookie_roundTripsTheFieldsItCarries() throws {

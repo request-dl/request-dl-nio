@@ -87,7 +87,7 @@ jar.removeAll()
 
 Each call is atomic, but a read followed by a change is two calls, and a response can be stored between them.
 
-Cookies convert to and from Foundation's `HTTPCookie` with `CookieJar.Cookie(_:)` and ``CookieJar/Cookie/httpCookie``, to move them from `HTTPCookieStorage` or a web view's cookie store. `HTTPCookie` has no creation time, and a host-only cookie is one whose domain has no leading dot. A converted cookie is still checked when you insert it.
+On Apple platforms, cookies convert to and from Foundation's `HTTPCookie` with `CookieJar.Cookie(_:)` and ``CookieJar/Cookie/httpCookie``, to move them from `HTTPCookieStorage` or a web view's cookie store. `HTTPCookie` has no creation time, and a host-only cookie is one whose domain has no leading dot. A converted cookie is still checked when you insert it.
 
 ### Observing changes
 
