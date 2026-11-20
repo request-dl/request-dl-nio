@@ -632,6 +632,206 @@ struct CURLCommandParserTests {
         #expect(proxy.authorization == nil)
     }
 
+    // MARK: - SOCKS5 credentials
+
+    private func proxy(_ command: String) async throws -> Internals.Proxy {
+        let parsed = try await CURLCommandParser.parseCommand(command)
+
+        var sessionConfiguration = Internals.Session.Configuration()
+        let edit = try #require(parsed.sessionConfigurationEdit)
+        edit(&sessionConfiguration)
+
+        return try #require(sessionConfiguration.proxy)
+    }
+
+    @Test
+    func socksProxyURLCredentialsAreSOCKSCredentials() async throws {
+        let proxy = try await proxy("curl -x socks5://john:secret@proxy.example.com:1081 https://example.com")
+
+        #expect(proxy.connectionProtocol == .socks)
+        #expect(proxy.port == 1081)
+        #expect(proxy.authorization == .socks(username: "john", password: "secret"))
+    }
+
+    @Test
+    func socksProxyURLCredentialsArePercentDecoded() async throws {
+        let proxy = try await proxy("curl -x socks5h://us%40er:p%3Ass%C3%A9%25@proxy.example.com https://example.com")
+
+        #expect(proxy.authorization == .socks(username: "us@er", password: "p:ssé%"))
+    }
+
+    @Test
+    func socksProxyURLWithEmptyPasswordHasAnEmptyPassword() async throws {
+        let colon = try await proxy("curl -x socks5://john:@proxy.example.com https://example.com")
+        let bare = try await proxy("curl -x socks5://john@proxy.example.com https://example.com")
+
+        #expect(colon.authorization == .socks(username: "john", password: ""))
+        #expect(bare.authorization == .socks(username: "john", password: ""))
+    }
+
+    @Test
+    func httpProxyURLCredentialsAreStillTakenAsWritten() async throws {
+        let proxy = try await proxy("curl -x http://us%40er:p%3Ass@proxy.example.com https://example.com")
+
+        #expect(proxy.authorization == .basic(username: "us%40er", password: "p%3Ass"))
+    }
+
+    @Test
+    func socks5FlagNamesASOCKSProxy() async throws {
+        let proxy = try await proxy("curl --socks5 proxy.example.com:1090 https://example.com")
+
+        #expect(proxy.host == "proxy.example.com")
+        #expect(proxy.port == 1090)
+        #expect(proxy.connectionProtocol == .socks)
+        #expect(proxy.authorization == nil)
+    }
+
+    @Test
+    func socks5HostnameFlagWithoutPortDefaultsTo1080() async throws {
+        let proxy = try await proxy("curl --socks5-hostname proxy.example.com https://example.com")
+
+        #expect(proxy.port == 1080)
+        #expect(proxy.connectionProtocol == .socks)
+    }
+
+    @Test
+    func proxyUserFlagGivesTheSOCKSCredentialsAsWritten() async throws {
+        let proxy = try await proxy("curl --socks5 proxy.example.com -U 'us%40er:p:ss' https://example.com")
+
+        // Not percent-decoded (curl decodes only what is inside a URL), and the password is
+        // everything after the first colon.
+        #expect(proxy.authorization == .socks(username: "us%40er", password: "p:ss"))
+    }
+
+    @Test
+    func proxyUserFlagBeforeTheProxyAndWithAnEmptyPassword() async throws {
+        let proxy = try await proxy("curl --proxy-user john: -x socks5://proxy.example.com https://example.com")
+
+        #expect(proxy.authorization == .socks(username: "john", password: ""))
+    }
+
+    @Test
+    func proxyUserFlagOnAnHTTPProxyIsBasicAuthorization() async throws {
+        let proxy = try await proxy("curl -x http://proxy.example.com:8080 -U john:secret https://example.com")
+
+        #expect(proxy.connectionProtocol == .http)
+        #expect(proxy.authorization == .basic(username: "john", password: "secret"))
+    }
+
+    @Test
+    func credentialsInTheProxyURLWinOverProxyUser() async throws {
+        let proxy = try await proxy("curl -x socks5://url:one@proxy.example.com -U flag:two https://example.com")
+
+        #expect(proxy.authorization == .socks(username: "url", password: "one"))
+    }
+
+    @Test
+    func proxyUserFlagWithoutAProxyThrows() async throws {
+        let error = await #expect(throws: CURLParsingError.self) {
+            try await CURLCommandParser.parse("curl -U john:secret https://example.com")
+        }
+
+        #expect(error?.context == .unsupportedFlag)
+        #expect(error?.token == "-U")
+    }
+
+    @Test(arguments: [
+        "curl --socks5 proxy.example.com -U john https://example.com",
+        "curl --socks5 proxy.example.com -U :secret https://example.com",
+        "curl -x socks5://:secret@proxy.example.com https://example.com",
+        "curl -x socks5://john:%zz@proxy.example.com https://example.com",
+    ])
+    func invalidSOCKSCredentialsThrowWithoutTheSecret(_ command: String) async throws {
+        let error = await #expect(throws: CURLParsingError.self) {
+            try await CURLCommandParser.parse(command)
+        }
+
+        #expect(error?.context == .malformedArgument)
+        #expect(error?.token?.contains("secret") == false)
+        #expect(error?.token?.contains("%zz") == false)
+    }
+
+    @Test
+    func socksCredentialsOver255BytesThrow() async throws {
+        let password = String(repeating: "p", count: 256)
+
+        let error = await #expect(throws: CURLParsingError.self) {
+            try await CURLCommandParser.parse("curl --socks5 proxy.example.com -U john:\(password) https://example.com")
+        }
+
+        #expect(error?.context == .malformedArgument)
+        #expect(error?.token == "-U")
+    }
+
+    @Test(arguments: [
+        ("curl -x socks5://user:secret@proxy.example.com:99999 https://example.com", "-x"),
+        ("curl --proxy socks5://user:secret@proxy.example.com:99999 https://example.com", "--proxy"),
+        ("curl -x socks5://user:secret@ https://example.com", "-x"),
+        ("curl --socks5 user:secret@host:70000 https://example.com", "--socks5"),
+        ("curl --socks5-hostname user:secret@host:70000 https://example.com", "--socks5-hostname"),
+        ("curl -x http://user:secret@proxy.example.com:99999 https://example.com", "-x"),
+        ("curl -x http://user:secret@ https://example.com", "-x"),
+        ("curl --socks5 socks5h://user:secret@host https://example.com", "--socks5"),
+        ("curl -x socks5://user:%FFsecret@host https://example.com", "-x"),
+        ("curl --proxy socks5://user:%00secret@host https://example.com", "--proxy"),
+        ("curl --socks5 host -U user https://example.com", "-U"),
+        ("curl --socks5 host --proxy-user :secret https://example.com", "--proxy-user"),
+        ("curl --socks5 host -U user:\(String(repeating: "secret", count: 50)) https://example.com", "-U"),
+    ])
+    func aMalformedProxyThrowsNamingTheFlagAndNeverTheCredentials(_ command: String, _ flag: String) async throws {
+        let error = await #expect(throws: CURLParsingError.self) {
+            try await CURLCommandParser.parse(command)
+        }
+
+        #expect(error?.context == .malformedArgument)
+        #expect(error?.token == flag)
+        #expect(error?.description.contains("secret") == false)
+    }
+
+    @Test
+    func socksProxyURLCredentialsWithANULAreRejected() async throws {
+        for command in [
+            "curl -x socks5://user:%00@proxy.example.com https://example.com",
+            "curl -x socks5://%00:pass@proxy.example.com https://example.com",
+        ] {
+            let error = await #expect(throws: CURLParsingError.self) {
+                try await CURLCommandParser.parse(command)
+            }
+
+            #expect(error?.context == .malformedArgument)
+            #expect(error?.token == "-x")
+        }
+    }
+
+    @Test
+    func proxyUserFlagWithANULIsRejected() async throws {
+        let error = await #expect(throws: CURLParsingError.self) {
+            try await CURLCommandParser.parse("curl --socks5 host -U 'user:pa\u{0}ss' https://example.com")
+        }
+
+        #expect(error?.token == "-U")
+    }
+
+    @Test
+    func socks5FlagTakesCredentialsInFrontOfTheHost() async throws {
+        let proxy = try await proxy("curl --socks5 user:pass@proxy.example.com:1090 https://example.com")
+
+        #expect(proxy.host == "proxy.example.com")
+        #expect(proxy.port == 1090)
+        #expect(proxy.authorization == .socks(username: "user", password: "pass"))
+    }
+
+    /// Brackets are not handled by the proxy parser, for HTTP and SOCKS alike (this was so before
+    /// credentials existed): the host keeps them, and the port is still found after the last `:`.
+    @Test
+    func socksProxyURLWithAnIPv6HostKeepsTheBracketsAsItAlwaysDid() async throws {
+        let proxy = try await proxy("curl -x socks5://u:p@[::1]:1080 https://example.com")
+
+        #expect(proxy.host == "[::1]")
+        #expect(proxy.port == 1080)
+        #expect(proxy.authorization == .socks(username: "u", password: "p"))
+    }
+
     @Test
     func resolveFlagOverridesDNSForTheGivenHost() async throws {
         // Given

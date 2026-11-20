@@ -25,6 +25,10 @@ struct CURLTaskCapabilitiesTests {
         ("curl --insecure https://example.com", "--insecure"),
         ("curl -x http://proxy.example.com:8080 https://example.com", "-x"),
         ("curl --proxy socks5://proxy.example.com https://example.com", "--proxy"),
+        ("curl --socks5 proxy.example.com https://example.com", "--socks5"),
+        ("curl --socks5-hostname proxy.example.com https://example.com", "--socks5-hostname"),
+        ("curl -U user:pass https://example.com", "-U"),
+        ("curl --proxy-user user:pass https://example.com", "--proxy-user"),
         ("curl --resolve example.com:443:127.0.0.1 https://example.com", "--resolve"),
     ])
     func emptyCapabilities_refuseTheFlag(_ command: String, _ flag: String) async {

@@ -9,7 +9,17 @@ import NIOCore
 import NIOPosix
 import SwiftAsyncStream
 
-/// A minimal SOCKS5 proxy (RFC 1928), no authentication.
+/// A minimal SOCKS5 proxy (RFC 1928), with optional username/password authentication (RFC 1929).
+///
+/// With no `credentials` it offers no-authentication only (`0x00`), as it always did. With
+/// `credentials` it demands method `0x02`, then runs the RFC 1929 sub-negotiation
+/// (`VER=0x01 ULEN UNAME PLEN PASSWD`, answered `01 00` or `01 01`), and every byte it actually
+/// received is kept in `observations`, so a test proves what a client really put on the wire
+/// rather than what it was asked to.
+///
+/// `redirect` makes every accepted `CONNECT` dial that address instead of the requested one: a
+/// client then asks for a name that is not loopback (macOS bypasses a configured proxy for
+/// loopback destinations) and still reaches a local server.
 ///
 /// Exists for the same reason `LocalHTTPConnectProxy` does: no pre-existing NIO-backend fixture
 /// proves a proxied connection actually carries traffic, only that `Internals.Proxy`'s config
@@ -38,6 +48,9 @@ struct LocalSOCKSProxy: Sendable {
     /// same purpose as `LocalHTTPConnectProxy.connectAttempts`.
     let connectAttempts: ConnectAttemptCounter
 
+    /// Everything the proxy saw of each client's greeting and sub-negotiation.
+    let observations: Observations
+
     // MARK: - Private properties
 
     private let group: EventLoopGroup
@@ -45,14 +58,26 @@ struct LocalSOCKSProxy: Sendable {
 
     // MARK: - Internal static methods
 
-    static func start() async throws -> LocalSOCKSProxy {
+    static func start(
+        credentials: Credentials? = nil,
+        redirect: Destination? = nil
+    ) async throws -> LocalSOCKSProxy {
         let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         let connectAttempts = ConnectAttemptCounter()
+        let observations = Observations()
 
         let channel = try await ServerBootstrap(group: group)
             .serverChannelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
             .childChannelInitializer { channel in
-                channel.pipeline.addHandler(SOCKSHandler(group: group, connectAttempts: connectAttempts))
+                channel.pipeline.addHandler(
+                    SOCKSHandler(
+                        group: group,
+                        connectAttempts: connectAttempts,
+                        observations: observations,
+                        credentials: credentials,
+                        redirect: redirect
+                    )
+                )
             }
             .bind(host: "127.0.0.1", port: 0)
             .get()
@@ -62,7 +87,13 @@ struct LocalSOCKSProxy: Sendable {
             throw MissingLocalPortError()
         }
 
-        return LocalSOCKSProxy(port: port, connectAttempts: connectAttempts, group: group, channel: channel)
+        return LocalSOCKSProxy(
+            port: port,
+            connectAttempts: connectAttempts,
+            observations: observations,
+            group: group,
+            channel: channel
+        )
     }
 
     // MARK: - Internal methods
@@ -70,6 +101,69 @@ struct LocalSOCKSProxy: Sendable {
     func shutdown() async throws {
         try await channel.close()
         try await group.shutdownGracefully()
+    }
+}
+
+// MARK: - Models
+
+extension LocalSOCKSProxy {
+
+    /// The username/password the proxy accepts, as the raw bytes RFC 1929 puts on the wire.
+    struct Credentials: Sendable {
+        let username: [UInt8]
+        let password: [UInt8]
+
+        init(username: String, password: String) {
+            self.username = Array(username.utf8)
+            self.password = Array(password.utf8)
+        }
+
+        init(username: [UInt8], password: [UInt8]) {
+            self.username = username
+            self.password = password
+        }
+    }
+
+    struct Destination: Sendable {
+        let host: String
+        let port: Int
+    }
+
+    /// One RFC 1929 sub-negotiation as received, whether or not it was accepted.
+    struct AuthenticationAttempt: Sendable, Equatable {
+        let username: [UInt8]
+        let password: [UInt8]
+        let accepted: Bool
+    }
+
+    /// Thread-safe record of what clients sent.
+    final class Observations: @unchecked Sendable {
+
+        private let lock = Lock()
+        private var _greetings: [[UInt8]] = []
+        private var _attempts: [AuthenticationAttempt] = []
+        private var _requested: [Destination] = []
+
+        /// Every greeting received, whole (`VER NMETHODS METHODS`).
+        var greetings: [[UInt8]] { lock.withLock { _greetings } }
+
+        /// Every RFC 1929 sub-negotiation received.
+        var authenticationAttempts: [AuthenticationAttempt] { lock.withLock { _attempts } }
+
+        /// The destination each `CONNECT` asked for, before any `redirect`.
+        var requestedDestinations: [Destination] { lock.withLock { _requested } }
+
+        func record(requested destination: Destination) {
+            lock.withLock { _requested.append(destination) }
+        }
+
+        func record(greeting: [UInt8]) {
+            lock.withLock { _greetings.append(greeting) }
+        }
+
+        func record(_ attempt: AuthenticationAttempt) {
+            lock.withLock { _attempts.append(attempt) }
+        }
     }
 }
 
@@ -92,6 +186,7 @@ private final class SOCKSHandler: ChannelInboundHandler, @unchecked Sendable {
 
     private enum Mode {
         case awaitingGreeting
+        case awaitingAuthentication
         case awaitingRequest
         case relaying(Channel)
     }
@@ -100,6 +195,9 @@ private final class SOCKSHandler: ChannelInboundHandler, @unchecked Sendable {
 
     private let group: EventLoopGroup
     private let connectAttempts: ConnectAttemptCounter
+    private let observations: LocalSOCKSProxy.Observations
+    private let credentials: LocalSOCKSProxy.Credentials?
+    private let redirect: LocalSOCKSProxy.Destination?
 
     // MARK: - Unsafe properties
 
@@ -108,9 +206,18 @@ private final class SOCKSHandler: ChannelInboundHandler, @unchecked Sendable {
 
     // MARK: - Inits
 
-    init(group: EventLoopGroup, connectAttempts: ConnectAttemptCounter) {
+    init(
+        group: EventLoopGroup,
+        connectAttempts: ConnectAttemptCounter,
+        observations: LocalSOCKSProxy.Observations,
+        credentials: LocalSOCKSProxy.Credentials?,
+        redirect: LocalSOCKSProxy.Destination?
+    ) {
         self.group = group
         self.connectAttempts = connectAttempts
+        self.observations = observations
+        self.credentials = credentials
+        self.redirect = redirect
     }
 
     // MARK: - Internal methods
@@ -122,7 +229,7 @@ private final class SOCKSHandler: ChannelInboundHandler, @unchecked Sendable {
         case .relaying(let destination):
             destination.writeAndFlush(incoming, promise: nil)
 
-        case .awaitingGreeting, .awaitingRequest:
+        case .awaitingGreeting, .awaitingAuthentication, .awaitingRequest:
             buffer.writeBuffer(&incoming)
             processBuffer(context: context)
         }
@@ -144,6 +251,8 @@ private final class SOCKSHandler: ChannelInboundHandler, @unchecked Sendable {
         switch mode {
         case .awaitingGreeting:
             processGreeting(context: context)
+        case .awaitingAuthentication:
+            processAuthentication(context: context)
         case .awaitingRequest:
             processRequest(context: context)
         case .relaying:
@@ -151,10 +260,10 @@ private final class SOCKSHandler: ChannelInboundHandler, @unchecked Sendable {
         }
     }
 
-    /// `VER(1)=0x05 NMETHODS(1) METHODS(NMETHODS)`. Refuses (`05 FF`, then closes) if
-    /// no-authentication (`0x00`) isn't among the offered methods; this proxy supports nothing
-    /// else, matching the NIO backend's own `.socksServer(host:port:)`, which takes no credentials
-    /// either.
+    /// `VER(1)=0x05 NMETHODS(1) METHODS(NMETHODS)`. Without `credentials` it picks no-authentication
+    /// (`0x00`) and refuses (`05 FF`, then closes) when that is not offered. With `credentials` it
+    /// picks username/password (`0x02`) and refuses when that is not offered: a client that
+    /// offers only `0x00` is not let through a proxy that demands authentication.
     private func processGreeting(context: ChannelHandlerContext) {
         guard
             let version = buffer.getInteger(at: buffer.readerIndex, as: UInt8.self),
@@ -166,17 +275,58 @@ private final class SOCKSHandler: ChannelInboundHandler, @unchecked Sendable {
         let messageLength = 2 + Int(methodCount)
         guard buffer.readableBytes >= messageLength else { return }
 
+        if let greeting = buffer.getBytes(at: buffer.readerIndex, length: messageLength) {
+            observations.record(greeting: greeting)
+        }
+
+        let wantedMethod: UInt8 = credentials == nil ? 0x00 : 0x02
+
         guard
             version == 0x05,
             let methods = buffer.getBytes(at: buffer.readerIndex + 2, length: Int(methodCount)),
-            methods.contains(0x00)
+            methods.contains(wantedMethod)
         else {
             reply(channel: context.channel, bytes: [0x05, 0xFF], thenClose: true)
             return
         }
 
         buffer.moveReaderIndex(forwardBy: messageLength)
-        reply(channel: context.channel, bytes: [0x05, 0x00], thenClose: false)
+        reply(channel: context.channel, bytes: [0x05, wantedMethod], thenClose: false)
+
+        mode = credentials == nil ? .awaitingRequest : .awaitingAuthentication
+        processBuffer(context: context)
+    }
+
+    /// RFC 1929: `VER(1)=0x01 ULEN(1) UNAME(ULEN) PLEN(1) PASSWD(PLEN)`, answered `01 00` on
+    /// success and `01 01` (then close) on failure.
+    private func processAuthentication(context: ChannelHandlerContext) {
+        let base = buffer.readerIndex
+
+        guard
+            let version = buffer.getInteger(at: base, as: UInt8.self),
+            let usernameLength = buffer.getInteger(at: base + 1, as: UInt8.self).map(Int.init),
+            buffer.readableBytes >= 2 + usernameLength + 1,
+            let passwordLength = buffer.getInteger(at: base + 2 + usernameLength, as: UInt8.self).map(Int.init),
+            buffer.readableBytes >= 3 + usernameLength + passwordLength,
+            let username = buffer.getBytes(at: base + 2, length: usernameLength),
+            let password = buffer.getBytes(at: base + 3 + usernameLength, length: passwordLength)
+        else {
+            return
+        }
+
+        buffer.moveReaderIndex(forwardBy: 3 + usernameLength + passwordLength)
+
+        let accepted =
+            version == 0x01 && username == credentials?.username && password == credentials?.password
+
+        observations.record(.init(username: username, password: password, accepted: accepted))
+
+        guard accepted else {
+            reply(channel: context.channel, bytes: [0x01, 0x01], thenClose: true)
+            return
+        }
+
+        reply(channel: context.channel, bytes: [0x01, 0x00], thenClose: false)
 
         mode = .awaitingRequest
         processBuffer(context: context)
@@ -237,8 +387,13 @@ private final class SOCKSHandler: ChannelInboundHandler, @unchecked Sendable {
             return
         }
 
-        let destinationHost = Self.host(fromAddressType: addressType, bytes: addressBytes)
-        let destinationPort = Int(portHighByte) << 8 | Int(portLowByte)
+        let requestedHost = Self.host(fromAddressType: addressType, bytes: addressBytes)
+        let requestedPort = Int(portHighByte) << 8 | Int(portLowByte)
+
+        observations.record(requested: .init(host: requestedHost, port: requestedPort))
+
+        let destinationHost = redirect?.host ?? requestedHost
+        let destinationPort = redirect?.port ?? requestedPort
 
         connectAttempts.increment()
 

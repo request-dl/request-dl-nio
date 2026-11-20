@@ -218,6 +218,37 @@ extension Internals.Log {
 
 extension Internals.Log {
 
+    /// The credentials of a SOCKS proxy that the system settings or the environment named could
+    /// not be sent, so the proxy is used without them. Only why is reported, never the credentials.
+    package static func systemProxySOCKSCredentialsIgnored(
+        mismatch: Internals.Proxy.Authorization.Mismatch
+    ) -> Internals.Log {
+        let reason: String
+
+        switch mismatch {
+        case .socksUsernameLength(let count) where count == 0:
+            reason = "the user name is empty"
+        case .socksUsernameLength:
+            reason = "the user name is longer than 255 bytes"
+        case .socksPasswordLength:
+            reason = "the password is longer than 255 bytes"
+        case .socksCredentialContainsNUL:
+            reason = "the user name or the password has a NUL character"
+        case .httpShapeOnSOCKSProxy, .socksShapeOnHTTPProxy:
+            reason = "they are not a user name and a password"
+        }
+
+        return Internals.Log(
+            """
+            The user name and password of the system's SOCKS proxy were ignored, because \(reason) \
+            (SOCKS5 takes a user name of 1 to 255 bytes and a password of 0 to 255). The request \
+            goes to the proxy without credentials, which fails if the proxy requires them. To \
+            authenticate, declare Proxy(host:port:connection:authorization:).
+            """,
+            metadata: ["reason": .string(reason)]
+        )
+    }
+
     /// A request used the last answer a PAC script gave, because the script could not be asked now.
     ///
     /// The answer can be out of date, which is why it is reported. Only the origin and path of the

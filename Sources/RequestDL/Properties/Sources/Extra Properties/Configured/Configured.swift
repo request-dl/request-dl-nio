@@ -58,8 +58,11 @@ import Crypto
 /// - `proxy` (scoped, optional): passed to ``Proxy``. Reads `proxy.enabled` (default `false`;
 ///   skipped entirely when not `true`), `proxy.host` (required), `proxy.port` (required for
 ///   `"http"`, defaults to `1080` for `"socks"`), and `proxy.type` (`"http"` or `"socks"`, default
-///   `"http"`). For `"http"` proxies only, also reads `proxy.authorization` (same shape as the
-///   top-level `authorization` key) and `proxy.connectHeaders` (string array, colon-separated
+///   `"http"`). Also reads `proxy.authorization` (same shape as the top-level `authorization`
+///   key; for a `"socks"` proxy only `scheme: "basic"` with `username` and `password`, which are
+///   the SOCKS5 user name and password sent in clear text; sizes ``Proxy`` does not allow are
+///   not a ``ConfiguredError`` but a ``ProxyAuthorizationError``, thrown when the request is built)
+///   and, for `"http"` proxies only, `proxy.connectHeaders` (string array, colon-separated
 ///   pairs, sent only on the proxy's `CONNECT` request).
 /// - `cachePolicy` (string, optional): `"memory"`, `"disk"`, or `"all"`, passed to
 ///   ``Property/cachePolicy(_:)``.
@@ -130,8 +133,8 @@ import Crypto
 ///   specified but invalid, if the fields the specified scheme requires are missing, if
 ///   `proxy.enabled` is `true`
 ///   but `proxy.host` is missing or `proxy.type` is unknown, if `proxy.port` is missing for an
-///   `"http"` proxy, if `proxy.authorization`/`proxy.connectHeaders` is specified for a `"socks"`
-///   proxy, if `cachePolicy`/`cacheStrategy` is specified but is none of the recognized values, if
+///   `"http"` proxy, if `proxy.connectHeaders`, or a `proxy.authorization` that is not
+///   `scheme: "basic"` with `username` and `password`, is specified for a `"socks"` proxy, if `cachePolicy`/`cacheStrategy` is specified but is none of the recognized values, if
 ///   `secureConnection.privateKey.format` is specified but is neither `"pem"` nor `"der"`, if
 ///   `secureConnection.tlsMinimumVersion`/`secureConnection.tlsMaximumVersion` is specified but is
 ///   none of the recognized values, if `secureConnection.spkiPinning.pins` is specified but empty
@@ -554,7 +557,7 @@ public struct Configured: Property {
             throw ConfiguredError(context: .invalidProxyConfiguration)
         }
 
-        let authorization = try await Self.proxyAuthorization(reader.scoped(to: "authorization"))
+        let credentials = try await Self.credentials(reader.scoped(to: "authorization"))
         let connectHeaderPairs = try await Self.stringArray(
             reader,
             "connectHeaders",
@@ -567,6 +570,8 @@ public struct Configured: Property {
             guard let port = try await Self.int(reader, "port", context: .invalidProxyConfiguration) else {
                 throw ConfiguredError(context: .invalidProxyConfiguration)
             }
+
+            let authorization = credentials.map(Self.proxyAuthorization)
 
             let connectHeaders =
                 try connectHeaderPairs.map {
@@ -586,15 +591,30 @@ public struct Configured: Property {
                 }
             )
         case "socks":
-            guard authorization == nil, connectHeaderPairs == nil else {
+            // SOCKS5 has no `CONNECT` request to carry headers, and takes a user name and a
+            // password (RFC 1929) rather than an HTTP header: `scheme: "basic"` with
+            // `username`/`password` is that, and `credentials` (an encoded header value) and
+            // `bearer` are not.
+            guard connectHeaderPairs == nil else {
+                throw ConfiguredError(context: .invalidProxyConfiguration)
+            }
+
+            let port = try await Self.int(reader, "port", context: .invalidProxyConfiguration) ?? 1080
+
+            guard let credentials else {
+                return AnyProperty(Proxy(host: host, port: port, connection: .socks))
+            }
+
+            guard case .basic = credentials else {
                 throw ConfiguredError(context: .invalidProxyConfiguration)
             }
 
             return AnyProperty(
                 Proxy(
                     host: host,
-                    port: try await Self.int(reader, "port", context: .invalidProxyConfiguration) ?? 1080,
-                    connection: .socks
+                    port: port,
+                    connection: .socks,
+                    authorization: Self.proxyAuthorization(credentials)
                 )
             )
         default:
@@ -604,13 +624,7 @@ public struct Configured: Property {
 
     private typealias ProxyConnectHeaders = PropertyForEach<[String: String], String, CustomHeader>
 
-    private static func proxyAuthorization(
-        _ reader: ConfigReader
-    ) async throws -> ProxyAuthorization? {
-        guard let credentials = try await Self.credentials(reader) else {
-            return nil
-        }
-
+    private static func proxyAuthorization(_ credentials: Credentials) -> ProxyAuthorization {
         switch credentials {
         case .basic(let username, let password):
             return .basic(username: username, password: password)
