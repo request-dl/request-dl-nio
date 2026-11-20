@@ -193,4 +193,10 @@ struct LocalServer: Sendable {
     var baseURL: String {
         serverConfiguration.host + ":" + String(serverConfiguration.port)
     }
+
+    /// Where the server listens, for a test that has to reach it by another route (a proxy that
+    /// redirects what it is asked for, say).
+    var address: (host: String, port: Int) {
+        (serverConfiguration.host, Int(serverConfiguration.port))
+    }
 }

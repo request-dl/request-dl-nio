@@ -26,6 +26,22 @@ import RequestDLInternals
 ///     )
 /// }
 /// ```
+/// A SOCKS5 proxy takes the same user name and password with
+/// ``Proxy/init(host:port:connection:authorization:)``:
+///
+/// ```swift
+/// Proxy(
+///     host: "socks-proxy.com",
+///     port: 1080,
+///     connection: .socks,
+///     authorization: .basic(username: "user", password: "pass")
+/// )
+/// ```
+///
+/// For SOCKS5 the user name and the password are the ones of RFC 1929, not an HTTP header: only
+/// ``basic(username:password:)`` is accepted, and ``basic(credentials:)`` and
+/// ``bearer(tokens:)`` are refused with a ``ProxyAuthorizationError``. See ``Proxy`` for the
+/// limits and for what is sent on the wire.
 ///
 public struct ProxyAuthorization: Sendable {
 
@@ -68,7 +84,27 @@ public struct ProxyAuthorization: Sendable {
         .init(authorization: .bearer(tokens: tokens))
     }
 
-    func build() -> Internals.Proxy.Authorization {
-        authorization
+    /// The authorization in the shape a proxy of `connectionProtocol` takes.
+    ///
+    /// For SOCKS that is `.socks(username:password:)`, made from `.basic(username:password:)`
+    /// only; the sizes RFC 1929 allows are checked here too, so the failure is the request's
+    /// and not a connection's.
+    func build(for connectionProtocol: Internals.Proxy.ConnectionProtocol) throws -> Internals.Proxy.Authorization {
+        let resolved: Internals.Proxy.Authorization
+
+        switch (connectionProtocol, authorization) {
+        case (.socks, .basic(let username, let password)):
+            resolved = .socks(username: username, password: password)
+        default:
+            resolved = authorization
+        }
+
+        do {
+            try resolved.validate(for: connectionProtocol)
+        } catch let mismatch as Internals.Proxy.Authorization.Mismatch {
+            throw ProxyAuthorizationError(mismatch)
+        }
+
+        return resolved
     }
 }

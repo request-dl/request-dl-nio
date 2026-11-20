@@ -396,13 +396,15 @@ extension Internals {
             /// line before a `.separator`) for the rest of the connection, which reusing one
             /// accumulator for every chunk did unless it was cleared.
             private func _emit() {
-                guard let pending = _pending else {
-                    return
+                // `_pending` is only `nil` once the stream has ended, and `_append` stops before
+                // cutting anything then, so this is always taken; it stays a check because the
+                // alternative to skipping an emit would be to dispatch bytes of a stream that has
+                // already finished.
+                if let pending = _pending {
+                    _pending = Data()
+
+                    _dispatch(.success(Chunk(pending)))
                 }
-
-                _pending = Data()
-
-                _dispatch(.success(Chunk(pending)))
             }
 
             private func _close() {

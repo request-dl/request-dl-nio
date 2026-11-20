@@ -220,6 +220,7 @@ Learn more in:
 - ``RequestDL/Session``
 - ``RequestDL/Proxy``
 - ``RequestDL/ProxyAuthorization``
+- ``RequestDL/ProxyAuthorizationError``
 - ``RequestDL/SystemProxy``
 - ``RequestDL/ProxyAutoConfigurationError``
 - ``RequestDL/DNSOverride``

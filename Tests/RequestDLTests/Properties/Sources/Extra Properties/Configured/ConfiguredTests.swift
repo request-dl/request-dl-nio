@@ -644,6 +644,108 @@ struct ConfiguredTests {
 
     @Test
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func socksProxyWithBasicCredentials() async throws {
+        // Given
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "proxy.enabled": true,
+                "proxy.host": "socks-proxy.example.com",
+                "proxy.type": "socks",
+                "proxy.authorization.scheme": "basic",
+                "proxy.authorization.username": "user",
+                "proxy.authorization.password": "",
+            ])
+        )
+
+        // When
+        let resolved = try await resolve(
+            TestProperty {
+                Configured(reader)
+            }
+        )
+
+        // Then
+        #expect(resolved.session.configuration.proxy?.connectionProtocol == .socks)
+        #expect(resolved.session.configuration.proxy?.authorization == .socks(username: "user", password: ""))
+    }
+
+    @Test
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func socksProxyWithEncodedBasicCredentialsThrows() async throws {
+        // Given
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "proxy.enabled": true,
+                "proxy.host": "socks-proxy.example.com",
+                "proxy.type": "socks",
+                "proxy.authorization.scheme": "basic",
+                "proxy.authorization.credentials": "dXNlcjpwYXNz",
+            ])
+        )
+
+        // Then
+        await #expect(throws: ConfiguredError.self) {
+            // When
+            try await resolve(
+                TestProperty {
+                    Configured(reader)
+                }
+            )
+        }
+    }
+
+    @Test
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func socksProxyWithTooLongPasswordThrowsProxyAuthorizationError() async throws {
+        // Given
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "proxy.enabled": true,
+                "proxy.host": "socks-proxy.example.com",
+                "proxy.type": "socks",
+                "proxy.authorization.scheme": "basic",
+                "proxy.authorization.username": "user",
+                "proxy.authorization.password": .init(.string(String(repeating: "p", count: 256)), isSecret: true),
+            ])
+        )
+
+        // Then
+        await #expect(throws: ProxyAuthorizationError.self) {
+            // When
+            try await resolve(
+                TestProperty {
+                    Configured(reader)
+                }
+            )
+        }
+    }
+
+    @Test
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    func socksProxyWithConnectHeadersThrows() async throws {
+        // Given
+        let reader = ConfigReader(
+            provider: InMemoryProvider(values: [
+                "proxy.enabled": true,
+                "proxy.host": "socks-proxy.example.com",
+                "proxy.type": "socks",
+                "proxy.connectHeaders": .init(.stringArray(["X-Token: 1"]), isSecret: true),
+            ])
+        )
+
+        // Then
+        await #expect(throws: ConfiguredError.self) {
+            // When
+            try await resolve(
+                TestProperty {
+                    Configured(reader)
+                }
+            )
+        }
+    }
+
+    @Test
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     func socksProxy() async throws {
         // Given
         let reader = ConfigReader(

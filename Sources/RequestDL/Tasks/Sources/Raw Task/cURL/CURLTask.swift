@@ -24,8 +24,8 @@ import struct Foundation.Data
 /// (repeatable), `-d`/`--data`/`--data-raw`/`--data-binary`, `-F`/`--form` (repeatable),
 /// `--form-string` (repeatable),
 /// `-u`/`--user`, `--url` (or a bare trailing URL), `-G`/`--get`, `-L`/`--location` (with
-/// `--max-redirs`), `-k`/`--insecure`, `-x`/`--proxy`, `--resolve`, `--compressed`, `--cacert`,
-/// and `--cert`/`-E`/`--key`. A small set of flags that only shape curl's own CLI output
+/// `--max-redirs`), `-k`/`--insecure`, `-x`/`--proxy`, `--socks5`/`--socks5-hostname`,
+/// `-U`/`--proxy-user`, `--resolve`, `--compressed`, `--cacert`, and `--cert`/`-E`/`--key`. A small set of flags that only shape curl's own CLI output
 /// (`-s`/`--silent`, `-S`/`--show-error`, `-v`/`--verbose`, `-i`/`--include`,
 /// `-#`/`--progress-bar`, `-o`/`--output`, `-w`/`--write-out`) is accepted and ignored
 /// outright, since none of them affect the request or response.
@@ -82,7 +82,8 @@ public struct CURLTask: RequestTask {
         /// Turning certificate verification off: `-k`/`--insecure`.
         public static let disabledTLSVerification = Capabilities(rawValue: 1 << 1)
 
-        /// Sending the request through a proxy: `-x`/`--proxy`.
+        /// Sending the request through a proxy: `-x`/`--proxy`, `--socks5`/`--socks5-hostname` and
+        /// `-U`/`--proxy-user`.
         public static let proxy = Capabilities(rawValue: 1 << 2)
 
         /// Sending the request to an address other than the one DNS gives for the host:
