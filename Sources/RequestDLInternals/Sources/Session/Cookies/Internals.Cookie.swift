@@ -79,6 +79,12 @@ extension Internals {
             return expires <= now
         }
 
+        /// Whether `other` is the cookie this one replaces: RFC 6265 section 5.3, step 11, plus the
+        /// host-only flag, which makes a host-only and a domain cookie two cookies.
+        package func hasSameIdentity(as other: Cookie) -> Bool {
+            name == other.name && domain == other.domain && path == other.path && hostOnly == other.hostOnly
+        }
+
         /// Whether this cookie belongs on a request to `host`/`path` over a connection that is, or
         /// is not, `isSecure`. RFC 6265 section 5.4, step 1.
         package func matches(host: String, path requestPath: String, isSecure: Bool) -> Bool {

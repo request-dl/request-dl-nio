@@ -4,6 +4,12 @@
 
 import RequestDLInternals
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
+
 /// A store of cookies that a ``Session`` fills from the `Set-Cookie` headers of its responses and
 /// reads from to set the `Cookie` header of its requests.
 ///
@@ -32,8 +38,15 @@ import RequestDLInternals
 ///   cookies. The jar still stores what its responses set. A jar does not make a ``DataCache``
 ///   private to it: see <doc:Using-Cookies>.
 ///
-/// - Note: Cookies are not saved to disk. `SameSite` is ignored, as in any client that has no
-///   notion of a site making the request, and `HttpOnly` cookies are sent like any other.
+/// Read what a jar holds with ``cookies`` and ``cookies(for:)``, add one with ``insert(_:)``, remove
+/// some with ``remove(name:domain:path:)``, ``remove(_:)``, ``removeAll(forHost:includingSubdomains:)``
+/// or ``removeAll()``, and keep a jar across launches with ``snapshot(includingSessionCookies:)``
+/// and ``init(restoring:publicSuffixList:)``. All of them are safe to call from any thread, while
+/// requests are using the jar.
+///
+/// - Note: Cookies are not saved by RequestDL: a snapshot is yours to keep, and to protect (see
+///   <doc:Using-Cookies>). `SameSite` is ignored, as in any client that has no notion of a site
+///   making the request, and `HttpOnly` cookies are sent like any other.
 public final class CookieJar: Sendable {
 
     // MARK: - Internal properties
@@ -52,10 +65,141 @@ public final class CookieJar: Sendable {
         storage = Internals.CookieStorage(publicSuffixList: publicSuffixList?.list)
     }
 
+    /// Creates a jar that holds the cookies of a snapshot.
+    ///
+    /// The cookies are checked as ``restore(_:)`` checks them, and the ones that fail are left out.
+    ///
+    /// - Parameters:
+    ///   - snapshot: What ``snapshot(includingSessionCookies:)`` returned, possibly in another launch.
+    ///   - publicSuffixList: See ``init(publicSuffixList:)``.
+    public convenience init(restoring snapshot: Snapshot, publicSuffixList: PublicSuffixList? = nil) {
+        self.init(publicSuffixList: publicSuffixList)
+        restore(snapshot)
+    }
+
+    // MARK: - Public properties
+
+    /// Every cookie that has not expired, in the order the jar first stored them.
+    ///
+    /// A copy: it does not change when the jar does. Reading it is not a use of the cookies and does
+    /// not change which one the jar evicts first when it is full.
+    public var cookies: [Cookie] {
+        storage.snapshot().map(Cookie.init)
+    }
+
     // MARK: - Public methods
+
+    /// The cookies a request to `url` would be sent, in the order they would be sent: longer paths
+    /// first, then the ones created earlier.
+    ///
+    /// It applies the rules the `Cookie` header does: the host, the path, `Secure` (over HTTPS, or
+    /// to a loopback address), and expiry. `HttpOnly` cookies are included. Like ``cookies``, it
+    /// is a copy, and reading it is not a use of the cookies.
+    ///
+    /// - Parameter url: The URL of the request. One without a host has no cookies.
+    public func cookies(for url: URL) -> [Cookie] {
+        storage.cookies(for: url).map(Cookie.init)
+    }
+
+    /// Stores a cookie, as if a response had set it.
+    ///
+    /// A cookie with the same name, domain, path and host-only flag is replaced, and keeps the
+    /// ``Cookie/creation`` of the one it replaces. A cookie that has already expired deletes the one it
+    /// would have replaced and is not stored. A domain over its 50 cookies, or the jar over its
+    /// 3000, evicts the least recently used.
+    ///
+    /// The cookie must pass the checks a received one does: no control character, name and value
+    /// of 4096 bytes at most, the `__Secure-` and `__Host-` rules, and, when it is not host-only,
+    /// a domain that is not a single label or a public suffix of the jar's ``PublicSuffixList``.
+    /// It has no response to come from, so these are left out:
+    ///
+    /// - that its domain covers the host that sent it: the domain you give is its origin;
+    /// - that a `Secure` cookie came over HTTPS: you may insert one, and it is still only sent over
+    ///   HTTPS;
+    /// - that plaintext cannot shadow a `Secure` cookie, and the limit of 50 cookies per response.
+    ///
+    /// And these are stricter, because the grammar of a `Set-Cookie` header enforced them for a
+    /// received cookie: a name with `;` or `=`, a value with `;` (it would put a second cookie in the
+    /// `Cookie` header), blanks around either, and a path that does not start with `/` (there is
+    /// no request to take a default from) are refused.
+    ///
+    /// - Parameter cookie: The cookie to store. Its domain is normalized first.
+    /// - Throws: ``CookieJarError``, and the jar is left as it was.
+    public func insert(_ cookie: Cookie) throws {
+        do {
+            try storage.insert(cookie.internalCookie)
+        } catch {
+            throw CookieJarError(error)
+        }
+    }
+
+    /// Removes the cookies with this name, domain and path, whether they are host-only or not.
+    ///
+    /// - Parameters:
+    ///   - name: The name of the cookie.
+    ///   - domain: Its domain. It is normalized the way ``insert(_:)`` does.
+    ///   - path: Its path.
+    /// - Returns: Whether a cookie was removed.
+    @discardableResult
+    public func remove(name: String, domain: String, path: String) -> Bool {
+        storage.remove(name: name, domain: domain, path: path)
+    }
+
+    /// Removes the cookie that has the name, domain, path and host-only flag of `cookie`.
+    ///
+    /// - Returns: Whether a cookie was removed.
+    @discardableResult
+    public func remove(_ cookie: Cookie) -> Bool {
+        storage.remove(cookie.internalCookie)
+    }
+
+    /// Removes the cookies a request to `host` is sent, whatever their path and `Secure` flag: the host-only
+    /// cookies of `host` itself and the cookies of a domain `host` belongs to. A cookie set for
+    /// `example.com` is one of `api.example.com` too, so clearing `api.example.com` removes it.
+    ///
+    /// - Parameters:
+    ///   - host: A host name or an IP address, not a URL. Unicode names are compared in Punycode.
+    ///   - includingSubdomains: Whether to remove the cookies of the hosts below `host` as well,
+    ///     such as the host-only cookies of `api.example.com` when clearing `example.com`. An IP address
+    ///     has none.
+    public func removeAll(forHost host: String, includingSubdomains: Bool = false) {
+        storage.removeAll(forHost: host, includingSubdomains: includingSubdomains)
+    }
 
     /// Removes every cookie, for example when the user signs out.
     public func removeAll() {
         storage.removeAll()
+    }
+
+    /// What the jar holds now, to keep and give back to a jar later.
+    ///
+    /// - Parameter includingSessionCookies: Whether to include the cookies that have no expiry. A
+    ///   session cookie is one the server asked a client to drop when its session ends, and a
+    ///   snapshot that keeps it makes it last until the server's own timeout: leave it out unless
+    ///   you know that is what you want.
+    /// - Returns: The cookies that have not expired. Keep it as you would a password: see
+    ///   ``Snapshot``.
+    public func snapshot(includingSessionCookies: Bool = false) -> Snapshot {
+        Snapshot(
+            cookies: storage.snapshot()
+                .filter { includingSessionCookies || $0.expires != nil }
+                .map(Cookie.init)
+        )
+    }
+
+    /// Adds the cookies of a snapshot to the jar.
+    ///
+    /// Each cookie is checked as ``insert(_:)`` checks it, with this jar's public suffix list, and
+    /// one that fails is skipped: a snapshot written under another list, or edited, cannot bring in
+    /// what the jar would refuse. Unlike ``insert(_:)`` it never deletes (an expired cookie is
+    /// skipped) and never replaces: a cookie the jar already holds is newer than one that was kept.
+    /// Call ``removeAll()`` first for the other behavior. Only the first 3000 cookies of a
+    /// snapshot are considered, and the per-domain limit applies.
+    ///
+    /// - Parameter snapshot: What ``snapshot(includingSessionCookies:)`` returned.
+    /// - Returns: How many cookies of the snapshot were not added, for any of those reasons.
+    @discardableResult
+    public func restore(_ snapshot: Snapshot) -> Int {
+        storage.restore(snapshot.cookies.map(\.internalCookie))
     }
 }
