@@ -67,14 +67,6 @@ extension Internals {
             self.data = Data(bytes)
         }
 
-        /// A chunk of its own, holding a copy of `range` of `block`.
-        ///
-        /// For a piece cut out of a block that is about to be dropped: the copy is what lets the
-        /// block go.
-        package init(copying range: Range<Int>, of block: Data) {
-            self.data = block.subdata(in: range)
-        }
-
         /// Cuts `range` out of `block`, sharing the block's storage when that does not pin more
         /// of it than is worth keeping.
         ///
