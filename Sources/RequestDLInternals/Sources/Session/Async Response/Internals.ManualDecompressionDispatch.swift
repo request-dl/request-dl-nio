@@ -24,6 +24,11 @@ extension Internals {
     /// transparently but does *not* strip `Content-Encoding` from the headers it hands back
     /// (confirmed empirically), so this can never be reduced to "dispatch whenever the header is
     /// present" without risking a second, corrupting decode pass over already-decoded bytes.
+    ///
+    /// For the same reason `.urlSession` never dispatches a list that has a native algorithm in
+    /// it: it dispatches only the custom ones (`Internals.Decompression.urlSessionManualAlgorithms`),
+    /// and announces only those, so a native encoding that arrives anyway is an unsolicited one
+    /// that fails as unsupported, whether or not CFNetwork already decoded it.
     package enum ManualDecompressionDispatch: Sendable {
         case skip
 
@@ -33,8 +38,8 @@ extension Internals {
         ///
         ///   Neither transport strips `Content-Encoding` after decoding natively, so the header
         ///   alone can't tell the two apart; this is the only thing that can. Empty for
-        ///   `.urlSession`, which suppresses CFNetwork's transparent decoding outright whenever
-        ///   it dispatches at all, and non-empty only for `.nio`'s mixed case, where
+        ///   `.urlSession`, which dispatches only algorithms CFNetwork does not decode (see
+        ///   above), and non-empty only for `.nio`'s mixed case, where
         ///   `NIOHTTPResponseDecompressor` handles the gzip/deflate half of a list while manual
         ///   dispatch handles the rest.
         case dispatch(

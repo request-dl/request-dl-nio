@@ -422,21 +422,25 @@ public struct Session: Property {
     /// them, and in the common case where `algorithms` contains only those, nothing in this
     /// package ever touches the response bytes at all.
     ///
-    /// A genuinely custom `Decompressor` changes that on `.urlSession`: CFNetwork's transparent
-    /// decoding can only be switched off entirely, for every encoding at once, by taking over
-    /// `Accept-Encoding` ourselves, so as soon as `algorithms` contains anything beyond the
-    /// three natives, this session sets `Accept-Encoding` itself (every configured algorithm,
-    /// listed) and decodes all of it manually, including gzip/deflate if they're in the same
-    /// list. `.nio`/`.nioTransportServices` have no such constraint: `async-http-client`'s own
+    /// A genuinely custom `Decompressor` changes that on `.urlSession`: this session then sets
+    /// `Accept-Encoding` itself and announces **only the custom algorithms**, never
+    /// gzip/deflate/br, even if they're in the same list, so native compression is not requested
+    /// in that configuration. How CFNetwork treats an `Accept-Encoding` the caller set isn't
+    /// something this relies on (current systems decode a native encoding by themselves even then),
+    /// so a native encoding that arrives anyway is unsolicited: it is not passed through, nor
+    /// decoded, but fails with ``UnsupportedContentEncodingError`` like any other encoding
+    /// outside the list. Use `.nio`/`.nioTransportServices` to have gzip/deflate and a custom
+    /// algorithm announced together. Those have no such constraint: `async-http-client`'s own
     /// gzip/deflate handling can stay on alongside manual dispatch for whatever it leaves
     /// untouched, and `Accept-Encoding` announces the algorithms listed here, unless the request
     /// sets its own (sessions that list the same algorithms in another order share their
     /// connections, so the order is not promised). It decodes `gzip` and `deflate` whichever of them is
     /// listed, and decides from the first encoding a response names.
     ///
-    /// A response whose `Content-Encoding` matches none of `algorithms` throws
-    /// ``UnsupportedContentEncodingError``, which is only reachable once this session has already
-    /// taken over decoding itself, per the paragraph above.
+    /// A response whose `Content-Encoding` matches none of the algorithms this session decodes
+    /// itself throws ``UnsupportedContentEncodingError``, which is only reachable once this
+    /// session has already taken over decoding itself, per the paragraphs above (on `.urlSession`
+    /// those are only the custom algorithms).
     ///
     /// - Parameters:
     ///   - algorithms: The decompressors this session accepts. Passing `[]` is equivalent to

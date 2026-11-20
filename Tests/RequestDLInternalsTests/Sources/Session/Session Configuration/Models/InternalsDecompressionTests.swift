@@ -76,6 +76,29 @@ struct InternalsDecompressionTests {
         #expect(decompression.requiresManualURLSessionHandling)
     }
 
+    /// What `.urlSession` announces and dispatches once it takes over `Accept-Encoding`: only the
+    /// algorithms CFNetwork does not decode, in configured order, never a native one.
+    @Test
+    func urlSessionManualAlgorithms_keepsOnlyTheNonNativeOnesInOrder() {
+        let decompression = Internals.Decompression.enabled(
+            algorithms: [
+                MockGzipAlgorithm(),
+                MockCustomAlgorithm(),
+                MockDeflateAlgorithm(),
+                MockCustomAlgorithmNamedGzip(),
+            ],
+            limit: .none
+        )
+
+        #expect(decompression.urlSessionManualAlgorithms.map(\.contentEncodingValue) == ["zstd", "gzip"])
+        #expect(decompression.urlSessionManualAlgorithms.allSatisfy { !$0.isNativelyDecodedByURLSession })
+    }
+
+    @Test
+    func urlSessionManualAlgorithms_whenDisabled_isEmpty() {
+        #expect(Internals.Decompression.disabled.urlSessionManualAlgorithms.isEmpty)
+    }
+
     @Test
     func decompression_whenEquals() {
         // Given

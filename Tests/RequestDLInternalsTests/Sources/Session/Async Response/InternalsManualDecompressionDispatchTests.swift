@@ -488,6 +488,27 @@ struct InternalsManualDecompressionDispatchTests {
         #expect(!dispatch.requiresManualDecoding(for: responseHead(contentEncoding: "gzip")))
     }
 
+    /// `.urlSession` dispatches only its custom algorithms, so a native encoding (which CFNetwork
+    /// may or may not have decoded already) is unsolicited: it fails as unsupported, and, being
+    /// still to be handled by this package, is not cached.
+    @Test
+    func requiresManualDecoding_whenDispatchingOnlyCustomAndANativeEncodingArrives_isTrueAndItFails() throws {
+        let dispatch = Internals.ManualDecompressionDispatch.dispatch(algorithms: [TagAlgorithm()])
+
+        for encoding in ["gzip", "deflate", "br"] {
+            let head = responseHead(contentEncoding: encoding)
+
+            #expect(dispatch.requiresManualDecoding(for: head))
+            #expect(throws: Internals.UnsupportedContentEncodingError.self) {
+                _ = try dispatch.resolvedStream(
+                    for: head,
+                    source: Internals.AsyncStream<Internals.Chunk>(),
+                    readingMode: .passthrough
+                )
+            }
+        }
+    }
+
     // MARK: - What the transport decoded is its first encoding
 
     private struct TagAlgorithm: Internals.DecompressionAlgorithm {

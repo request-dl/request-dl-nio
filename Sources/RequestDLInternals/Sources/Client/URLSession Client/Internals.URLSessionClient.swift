@@ -593,12 +593,16 @@ extension Internals {
                 throw CancellationError()
             }
 
-            // CFNetwork's transparent `Content-Encoding` decoding can only be switched off by
-            // taking over `Accept-Encoding` ourselves, and doing so suppresses it entirely, for
-            // every encoding, not just the one added. So this is all-or-nothing: either every
-            // configured algorithm is one CFNetwork already decodes natively and this stays
-            // quiet, or `Accept-Encoding` is set here and this package decodes everything in the
-            // list itself, manually, including the natives. `.disabled` reaches the same
+            // Either every configured algorithm is one CFNetwork decodes natively, and this stays
+            // quiet, or at least one is custom and `Accept-Encoding` is set here, announcing only
+            // the custom ones: this package decodes those itself, and never asks the server for
+            // `gzip`/`deflate`/`br`, so there is nothing for CFNetwork to decode (or to leave
+            // encoded) behind this package's back. How CFNetwork treats an `Accept-Encoding` set
+            // by the caller is not something this relies on; it has been seen to decode a
+            // response whatever the header says, so a native encoding in a mixed list is not
+            // dispatched to its placeholder: it is a response nobody asked for, and fails as one
+            // (`Internals.UnsupportedContentEncodingError`), see
+            // `Internals.Decompression.urlSessionManualAlgorithms`. `.disabled` reaches the same
             // `identity` override; see `Internals.Decompression.requiresManualURLSessionHandling`.
             let decompressionDispatch: Internals.ManualDecompressionDispatch
             var request = request
@@ -617,7 +621,8 @@ extension Internals {
                 }
                 decompressionDispatch = .skip
 
-            case .enabled(let algorithms, _) where decompression.requiresManualURLSessionHandling:
+            case .enabled where decompression.requiresManualURLSessionHandling:
+                let algorithms = decompression.urlSessionManualAlgorithms
                 request.setValue(
                     algorithms.map(\.contentEncodingValue).joined(separator: ", "),
                     forHTTPHeaderField: "Accept-Encoding"
