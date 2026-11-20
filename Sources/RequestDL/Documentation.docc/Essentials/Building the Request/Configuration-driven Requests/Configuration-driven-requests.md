@@ -64,6 +64,19 @@ DataTask {
 
 Unlike the properties in the basic setup above, these two — along with `secureConnection.privateKey` and `redirect` — validate what they read: an unrecognized `authorization.scheme`, a `proxy.enabled` without a `proxy.host`, and similar genuinely-invalid combinations throw ``RequestDL/ConfiguredError`` rather than silently doing nothing.
 
+A SOCKS5 proxy that requires a user name and a password takes them under the same `proxy.authorization` key, with `proxy.type` set to `"socks"`. Only `scheme: "basic"` with `username` and `password` is meaningful there (the password may be empty); the SOCKS5 user name and password are sent in clear text, 1 to 255 and 0 to 255 bytes in UTF-8 respectively, and are marked as secrets like every other credential. See ``RequestDL/Proxy`` for the limits.
+
+```swift
+let provider = InMemoryProvider(values: [
+    "proxy.enabled": true,
+    "proxy.type": "socks",
+    "proxy.host": "socks.example.com",
+    "proxy.authorization.scheme": "basic",
+    "proxy.authorization.username": "user",
+    "proxy.authorization.password": password,
+])
+```
+
 ### Secure connection
 
 `secureConnection.trustRoots`, `.additionalTrustRoots`, and `.certificates` each take a path to a `PEM` file and delegate straight to ``RequestDL/TrustRoots``, ``RequestDL/AdditionalTrustRoots``, and ``RequestDL/Certificates`` — none of which require nesting inside a ``RequestDL/SecureConnection`` wrapper. `secureConnection.tlsMinimumVersion`/`.tlsMaximumVersion` are the exception: configuring `SecureConnection` itself, rather than a certificate, does need that wrapper.

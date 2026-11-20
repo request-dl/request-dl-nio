@@ -59,6 +59,86 @@ struct InternalsSystemProxyResolverPACTests {
     }
 
     @Test
+    func resolve_whenTheScriptAnswersASOCKSProxyWithCredentialsItCannotCarry_dropsThem() async throws {
+        // Given: an empty user name, which RFC 1929 does not allow.
+        let answered = Internals.Proxy(
+            host: "proxy.example.com",
+            port: 1_080,
+            connection: .socks,
+            authorization: .socks(username: "", password: "p")
+        )
+        let cache = cache { _, _, _ in answered }
+
+        // When
+        let resolved = try await Internals.SystemProxyResolver.resolve(
+            target,
+            among: pacList,
+            pac: .init(onFailure: .direct),
+            logger: nil,
+            cache: cache
+        )
+
+        // Then: still the proxy, without the credentials.
+        #expect(
+            resolved
+                == Internals.Proxy(host: "proxy.example.com", port: 1_080, connection: .socks, authorization: nil)
+        )
+    }
+
+    @Test
+    func resolve_whenTheSystemListNamesASOCKSProxyWithCredentialsItCarries_keepsThem() async throws {
+        // Given
+        let list: [[String: Any]] = [
+            [
+                kCFProxyTypeKey as String: kCFProxyTypeSOCKS,
+                kCFProxyHostNameKey as String: "proxy.example.com",
+                kCFProxyPortNumberKey as String: 1_080,
+                kCFProxyUsernameKey as String: "user",
+                kCFProxyPasswordKey as String: "",
+            ]
+        ]
+
+        // When
+        let resolved = try await Internals.SystemProxyResolver.resolve(
+            target,
+            among: list,
+            pac: .init(onFailure: .direct),
+            logger: nil,
+            cache: cache { _, _, _ in nil }
+        )
+
+        // Then
+        #expect(resolved?.authorization == .socks(username: "user", password: ""))
+    }
+
+    @Test
+    func resolve_whenTheSystemListNamesASOCKSProxyWithAUserTooLong_dropsThem() async throws {
+        // Given
+        let list: [[String: Any]] = [
+            [
+                kCFProxyTypeKey as String: kCFProxyTypeSOCKS,
+                kCFProxyHostNameKey as String: "proxy.example.com",
+                kCFProxyPortNumberKey as String: 1_080,
+                kCFProxyUsernameKey as String: String(repeating: "u", count: 256),
+                kCFProxyPasswordKey as String: "p",
+            ]
+        ]
+
+        // When
+        let resolved = try await Internals.SystemProxyResolver.resolve(
+            target,
+            among: list,
+            pac: .init(onFailure: .direct),
+            logger: nil,
+            cache: cache { _, _, _ in nil }
+        )
+
+        // Then
+        #expect(resolved?.connectionProtocol == .socks)
+        #expect(resolved?.authorization == nil)
+    }
+
+    @Test
     func resolve_whenTheScriptCannotBeAskedAndThePolicyIsDirect_goesDirect() async throws {
         // Given
         let cache = cache { _, _, _ in throw EvaluationFailed() }

@@ -107,6 +107,30 @@ struct InternalsSystemProxyResolverTests {
     }
 
     @Test
+    func firstResolution_whenSOCKSEntryCarriesCredentials_includesSOCKSAuthorization() async throws {
+        // Given
+        let proxies: [[String: Any]] = [
+            [
+                kCFProxyTypeKey as String: kCFProxyTypeSOCKS,
+                kCFProxyHostNameKey as String: "127.0.0.1",
+                kCFProxyPortNumberKey as String: 1_080,
+                kCFProxyUsernameKey as String: "user",
+                kCFProxyPasswordKey as String: "secret",
+            ]
+        ]
+
+        // When
+        let resolution = Internals.SystemProxyResolver.firstResolution(in: proxies)
+
+        // Then
+        guard case .proxy(let proxy) = resolution else {
+            Issue.record("Expected .proxy, got \(String(describing: resolution))")
+            return
+        }
+        #expect(proxy.authorization == .socks(username: "user", password: "secret"))
+    }
+
+    @Test
     func firstResolution_whenEntryCarriesCredentials_includesBasicAuthorization() async throws {
         // Given
         let proxies: [[String: Any]] = [

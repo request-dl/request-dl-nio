@@ -21,7 +21,8 @@ public struct ConfiguredError: Error {
         /// A `proxy` key holds a value of the wrong type (`proxy.enabled` as a string, say), or
         /// `proxy.enabled` is `true` but `proxy.host` is missing, `proxy.type` is neither
         /// `"http"` nor `"socks"`, `proxy.port` is missing for an `"http"` proxy, or
-        /// `proxy.authorization`/`proxy.connectHeaders` is specified for a `"socks"` proxy.
+        /// `proxy.connectHeaders`, or a `proxy.authorization` other than `scheme: "basic"` with
+        /// `username` and `password`, is specified for a `"socks"` proxy.
         case invalidProxyConfiguration
 
         /// `cachePolicy` was specified but is neither `"memory"`, `"disk"`, nor `"all"`.

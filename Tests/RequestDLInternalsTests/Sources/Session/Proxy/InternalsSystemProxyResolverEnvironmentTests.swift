@@ -2,9 +2,12 @@
 // See LICENSE for this package's licensing information.
 //
 
+import Logging
+import SwiftAsyncStream
 import Testing
 
 @testable import RequestDLInternals
+@testable import RequestDLTestSupport
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -73,7 +76,89 @@ struct InternalsSystemProxyResolverEnvironmentTests {
 
         #expect(proxy?.connectionProtocol == .socks)
         #expect(proxy?.port == 1_080)
-        #expect(proxy?.authorization == .basic(username: "user", password: "secret"))
+        #expect(proxy?.authorization == .socks(username: "user", password: "secret"))
+    }
+
+    @Test
+    func aSocksProxy_percentDecodesItsCredentials() throws {
+        let proxy = try proxy("http://example.com", ["http_proxy": "socks5://us%40er:p%3Ass%C3%A9@socks.example"])
+
+        #expect(proxy?.authorization == .socks(username: "us@er", password: "p:ssé"))
+    }
+
+    @Test
+    func aSocksProxy_withAUserAndNoPassword_hasAnEmptyPassword() throws {
+        let proxy = try proxy("http://example.com", ["http_proxy": "socks5://user@socks.example"])
+
+        #expect(proxy?.authorization == .socks(username: "user", password: ""))
+    }
+
+    @Test
+    func aSocks5hProxy_keepsItsCredentials() throws {
+        let proxy = try proxy("http://example.com", ["http_proxy": "socks5h://u:p@h"])
+
+        #expect(proxy?.connectionProtocol == .socks)
+        #expect(proxy?.authorization == .socks(username: "u", password: "p"))
+    }
+
+    /// Credentials RFC 1929 cannot carry were dropped before this change (the proxy ran without
+    /// them) and still are, instead of failing a request the user did not configure; and said so.
+    @Test(arguments: [
+        ("socks5://:p@h", "the user name is empty"),
+        ("socks5://\(String(repeating: "u", count: 256)):p@h", "the user name is longer than 255 bytes"),
+        ("socks5://u:\(String(repeating: "p", count: 256))@h", "the password is longer than 255 bytes"),
+        ("socks5://u:p%00q@h", "the user name or the password has a NUL character"),
+    ])
+    func aSocksProxy_withCredentialsItCannotCarry_dropsThemAndSaysWhy(_ value: String, _ reason: String) async throws {
+        let records = EnvironmentLogRecords()
+        let url = try #require(URL(string: "http://example.com"))
+
+        let proxy = await Logger.withTestHandler(recorded: records.append) { logger in
+            Internals.SystemProxyResolver.proxy(forURL: url, environment: ["http_proxy": value], logger: logger)
+        }
+
+        #expect(proxy?.host == "h")
+        #expect(proxy?.connectionProtocol == .socks)
+        #expect(proxy?.authorization == nil)
+
+        let recorded = records.all
+        #expect(recorded.count == 1)
+        #expect(recorded.first?.level == .warning)
+        #expect(recorded.first?.metadata["reason"] == .string(reason))
+        // Why, never the credentials.
+        let text = recorded.map(\.description).joined()
+        #expect(!text.contains("uuuu") && !text.contains("pppp") && !text.contains(":p@"))
+    }
+
+    @Test
+    func aSocksProxy_withCredentialsItCarries_logsNothing() async throws {
+        let records = EnvironmentLogRecords()
+        let url = try #require(URL(string: "http://example.com"))
+
+        await Logger.withTestHandler(recorded: records.append) { logger in
+            _ = Internals.SystemProxyResolver.proxy(
+                forURL: url,
+                environment: ["http_proxy": "socks5://u:p@h"],
+                logger: logger
+            )
+        }
+
+        #expect(records.all.isEmpty)
+    }
+
+    @Test
+    func anHTTPProxy_withEmptyUser_isLeftAlone() throws {
+        // The drop is for SOCKS only: an HTTP proxy never validated its credentials.
+        let proxy = try proxy("http://example.com", ["http_proxy": "http://:p@h"])
+
+        #expect(proxy?.authorization == .basic(username: "", password: "p"))
+    }
+
+    @Test
+    func aSocksProxy_withoutAUser_hasNoCredentials() throws {
+        let proxy = try proxy("http://example.com", ["http_proxy": "socks5://socks.example"])
+
+        #expect(proxy?.authorization == nil)
     }
 
     // MARK: - no_proxy
@@ -238,5 +323,19 @@ struct InternalsSystemProxyResolverEnvironmentTests {
     ])
     func noProxy_ipv6WrittenInFull(_ url: String, _ noProxy: String, _ expectedProxied: Bool) throws {
         #expect(try isProxied(url, noProxy: noProxy) == expectedProxied)
+    }
+}
+
+private final class EnvironmentLogRecords: @unchecked Sendable {
+
+    private let lock = Lock()
+    private var records: [TestLogHandler.LogRecord] = []
+
+    var all: [TestLogHandler.LogRecord] {
+        lock.withLock { records }
+    }
+
+    var append: @Sendable (TestLogHandler.LogRecord) -> Void {
+        { record in self.lock.withLock { self.records.append(record) } }
     }
 }

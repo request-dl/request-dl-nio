@@ -184,6 +184,20 @@ struct InternalsChunkTests {
     }
 
     @Test
+    func separator_whenEmpty_hasNothingToCutOnAndKeepsEverythingForTheEnd() async throws {
+        // Matching an empty separator would cut once per byte, so everything is remainder, and
+        // comes out as one chunk when the body ends.
+        let download = await Internals.DownloadBuffer(readingMode: .separator([]))
+        download.append(Internals.Chunk(Data("one".utf8)))
+        download.append(Internals.Chunk(Data("two".utf8)))
+        download.close()
+
+        let items = try await chunks(of: download)
+
+        #expect(items.map(\.data) == [Data("onetwo".utf8)])
+    }
+
+    @Test
     func separator_splitAcrossPackets_isFoundWhereverTheCutFalls() async throws {
         let separator = Array("<->".utf8)
         let input = Array("one<->two<->three<->tail".utf8)

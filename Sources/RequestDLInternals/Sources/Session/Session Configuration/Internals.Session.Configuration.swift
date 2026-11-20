@@ -152,7 +152,7 @@ extension Internals.Session {
                 redirectConfiguration: redirectConfiguration?.build(urlOverrides: urlOverrides),
                 timeout: timeout.build(),
                 connectionPool: connectionPool.build(),
-                proxy: proxy?.build(),
+                proxy: try proxy?.build(),
                 decompression: decompression.build(),
                 tracing: .init()
             )
@@ -343,6 +343,13 @@ extension Internals.Session.Configuration {
 
             if case .bearer = proxy.authorization {
                 reasons.append(.proxyBearerAuthorizationUnderURLSession)
+            }
+
+            if let credentials = proxy.authorization?.socksCredentials,
+                max(credentials.username.utf8.count, credentials.password.utf8.count)
+                    > Internals.Proxy.Authorization.urlSessionSOCKSCredentialByteLimit
+            {
+                reasons.append(.proxySOCKSCredentialsTooLongUnderURLSession)
             }
         }
 
@@ -602,7 +609,7 @@ extension Internals.Session.Configuration {
     /// `connectionPool`, `ignoreUncleanSSLShutdown`, `networkFrameworkWaitForConnectivity`) is
     /// either NIO/NIOTS-specific with nothing to translate to or already excluded from resolving
     /// to `.urlSession` by `urlSessionIncompatibilityReasons()` (like `dnsOverride`,
-    /// `httpVersion == .http1Only`, `proxy.connectHeaders`, `.socks`, `.bearer`,
+    /// `httpVersion == .http1Only`, `proxy.connectHeaders`, `.bearer`, SOCKS credentials over 254 bytes,
     /// `decompression == .disabled`), so nothing is left for a compatible configuration to lose.
     ///
     /// Compression isn't translated here: `RequestConfiguration.applyCompression()` compresses
