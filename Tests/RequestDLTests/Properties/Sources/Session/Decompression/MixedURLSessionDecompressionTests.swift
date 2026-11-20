@@ -2,6 +2,8 @@
 // See LICENSE for this package's licensing information.
 //
 
+#if canImport(Darwin)
+
 import Testing
 
 @testable import RequestDL
@@ -286,3 +288,5 @@ struct MixedURLSessionDecompressionTests {
         #expect(acceptEncoding(in: server.request) == "identity")
     }
 }
+
+#endif
