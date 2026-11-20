@@ -90,7 +90,8 @@ extension Internals {
                     var k = base
 
                     while true {
-                        let threshold = k <= bias ? minimumThreshold : (k >= bias + maximumThreshold ? maximumThreshold : k - bias)
+                        let threshold =
+                            k <= bias ? minimumThreshold : (k >= bias + maximumThreshold ? maximumThreshold : k - bias)
 
                         guard quotient >= threshold else {
                             break

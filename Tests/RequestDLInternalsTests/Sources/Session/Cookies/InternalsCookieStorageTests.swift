@@ -90,9 +90,21 @@ struct InternalsCookieStorageTests {
     func cookieHeader_whenSeveralCookiesMatch_putsLongerPathsFirstThenOlderOnes() {
         let storage = Internals.CookieStorage()
         storage.store(setCookieValues: ["root=1; Path=/"], for: url("https://example.com/"), now: now)
-        storage.store(setCookieValues: ["deep=2; Path=/a/b"], for: url("https://example.com/"), now: now.addingTimeInterval(1))
-        storage.store(setCookieValues: ["mid=3; Path=/a"], for: url("https://example.com/"), now: now.addingTimeInterval(2))
-        storage.store(setCookieValues: ["root2=4; Path=/"], for: url("https://example.com/"), now: now.addingTimeInterval(3))
+        storage.store(
+            setCookieValues: ["deep=2; Path=/a/b"],
+            for: url("https://example.com/"),
+            now: now.addingTimeInterval(1)
+        )
+        storage.store(
+            setCookieValues: ["mid=3; Path=/a"],
+            for: url("https://example.com/"),
+            now: now.addingTimeInterval(2)
+        )
+        storage.store(
+            setCookieValues: ["root2=4; Path=/"],
+            for: url("https://example.com/"),
+            now: now.addingTimeInterval(3)
+        )
 
         #expect(header(storage, "https://example.com/a/b/c") == "deep=2; mid=3; root=1; root2=4")
     }
@@ -179,7 +191,11 @@ struct InternalsCookieStorageTests {
         storage.store(setCookieValues: ["a=1"], for: url("https://example.com/"), now: now)
         storage.store(setCookieValues: ["a=; Max-Age=0"], for: url("https://example.com/"), now: now)
         storage.store(setCookieValues: ["b=1"], for: url("https://example.com/"), now: now)
-        storage.store(setCookieValues: ["b=; Expires=Thu, 01 Jan 1970 00:00:00 GMT"], for: url("https://example.com/"), now: now)
+        storage.store(
+            setCookieValues: ["b=; Expires=Thu, 01 Jan 1970 00:00:00 GMT"],
+            for: url("https://example.com/"),
+            now: now
+        )
 
         #expect(storage.snapshot(now: now).isEmpty)
     }
@@ -236,7 +252,11 @@ struct InternalsCookieStorageTests {
         let total = Internals.CookieStorage.maximumCookiesPerDomain + 5
 
         for index in 0..<total {
-            storage.store(setCookieValues: ["c\(index)=1"], for: target, now: now.addingTimeInterval(TimeInterval(index)))
+            storage.store(
+                setCookieValues: ["c\(index)=1"],
+                for: target,
+                now: now.addingTimeInterval(TimeInterval(index))
+            )
         }
 
         let names = Set(storage.snapshot(now: now).map(\.name))
@@ -360,7 +380,11 @@ struct InternalsCookieStorageTests {
         let storage = Internals.CookieStorage()
         storage.store(setCookieValues: ["sid=real; Secure"], for: url("https://example.com/"), now: now)
 
-        storage.store(setCookieValues: ["sid=evil; Domain=example.com; Path=/app"], for: url("http://example.com/"), now: now)
+        storage.store(
+            setCookieValues: ["sid=evil; Domain=example.com; Path=/app"],
+            for: url("http://example.com/"),
+            now: now
+        )
 
         #expect(header(storage, "https://example.com/app") == "sid=real")
     }
@@ -389,7 +413,11 @@ struct InternalsCookieStorageTests {
     @Test
     func store_whenALaterDomainAttributeIsEmpty_keepsTheEarlierOne() {
         let storage = Internals.CookieStorage()
-        storage.store(setCookieValues: ["a=1; Domain=example.com; Domain="], for: url("https://www.example.com/"), now: now)
+        storage.store(
+            setCookieValues: ["a=1; Domain=example.com; Domain="],
+            for: url("https://www.example.com/"),
+            now: now
+        )
 
         #expect(storage.snapshot(now: now).first?.hostOnly == false)
     }

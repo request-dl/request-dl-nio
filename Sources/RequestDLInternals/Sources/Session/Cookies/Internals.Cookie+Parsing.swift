@@ -100,22 +100,26 @@ extension Internals.Cookie {
             return nil
         }
 
-        guard let (cookieDomain, hostOnly) = resolveDomain(
-            attribute: domain,
-            origin: origin,
-            publicSuffixList: publicSuffixList
-        ) else {
+        guard
+            let (cookieDomain, hostOnly) = resolveDomain(
+                attribute: domain,
+                origin: origin,
+                publicSuffixList: publicSuffixList
+            )
+        else {
             return nil
         }
 
         let cookiePath = path ?? defaultPath(of: origin.path)
 
-        guard satisfiesPrefixRules(
-            name: name,
-            secure: secure,
-            hasDomainAttribute: !hostOnly,
-            path: cookiePath
-        ) else {
+        guard
+            satisfiesPrefixRules(
+                name: name,
+                secure: secure,
+                hasDomainAttribute: !hostOnly,
+                path: cookiePath
+            )
+        else {
             return nil
         }
 

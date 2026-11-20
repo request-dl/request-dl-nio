@@ -9,15 +9,15 @@ import Testing
 struct InternalsPublicSuffixListTests {
 
     private let contents = """
-    // ===BEGIN ICANN DOMAINS===
-    com
-    co.uk   // trailing comment
-    *.ck
-    !www.ck
+        // ===BEGIN ICANN DOMAINS===
+        com
+        co.uk   // trailing comment
+        *.ck
+        !www.ck
 
-    // ===BEGIN PRIVATE DOMAINS===
-    blogspot.com
-    """
+        // ===BEGIN PRIVATE DOMAINS===
+        blogspot.com
+        """
 
     @Test
     func isPublicSuffix_matchesExactWildcardAndExceptionRules() throws {

@@ -144,7 +144,10 @@ struct CookieJarTests {
         let (setPath, echoPath) = (Self.uniquePath(), Self.uniquePath())
         defer { [setPath, echoPath].forEach(server.cleanup(at:)) }
 
-        server.insert(.init(headers: Self.setCookie("sid=abc; Path=/", "theme=dark"), data: Data("\"set\"".utf8)), at: setPath)
+        server.insert(
+            .init(headers: Self.setCookie("sid=abc; Path=/", "theme=dark"), data: Data("\"set\"".utf8)),
+            at: setPath
+        )
         server.insert(try .init(jsonObject: "echo"), at: echoPath)
 
         let jar = CookieJar()
@@ -401,7 +404,11 @@ struct CookieJarTests {
 
         // When
         let result = try await Self.get(
-            server, startPath, executor: executor, jar: CookieJar(), explicitCookie: "mine=1"
+            server,
+            startPath,
+            executor: executor,
+            jar: CookieJar(),
+            explicitCookie: "mine=1"
         )
 
         // Then

@@ -63,7 +63,8 @@ extension Internals {
 
             let values = areFolded ? setCookieValues.flatMap(SetCookieSplitter.split) : setCookieValues
 
-            let parsed = values
+            let parsed =
+                values
                 .prefix(Self.maximumCookiesPerResponse)
                 .compactMap { Cookie.parse($0, from: origin, now: now, publicSuffixList: publicSuffixList) }
 
@@ -120,7 +121,8 @@ extension Internals {
                 cookies[index].lastAccess = now
             }
 
-            return matching
+            return
+                matching
                 .map { "\(cookies[$0].name)=\(cookies[$0].value)" }
                 .joined(separator: "; ")
         }
@@ -191,7 +193,10 @@ extension Internals {
 
             if cookies.filter(sameDomain).count > Self.maximumCookiesPerDomain {
                 cookies.removeAll { sameDomain($0) && $0.isExpired(at: now) }
-                evictLeastRecentlyUsed(while: { $0.filter(sameDomain).count > Self.maximumCookiesPerDomain }, where: sameDomain)
+                evictLeastRecentlyUsed(
+                    while: { $0.filter(sameDomain).count > Self.maximumCookiesPerDomain },
+                    where: sameDomain
+                )
             }
 
             if cookies.count > Self.maximumCookies {
@@ -205,9 +210,10 @@ extension Internals {
             where isCandidate: (Cookie) -> Bool
         ) {
             while exceeds(cookies) {
-                guard let oldest = cookies.indices
-                    .filter({ isCandidate(cookies[$0]) })
-                    .min(by: { cookies[$0].lastAccess < cookies[$1].lastAccess })
+                guard
+                    let oldest = cookies.indices
+                        .filter({ isCandidate(cookies[$0]) })
+                        .min(by: { cookies[$0].lastAccess < cookies[$1].lastAccess })
                 else {
                     return
                 }

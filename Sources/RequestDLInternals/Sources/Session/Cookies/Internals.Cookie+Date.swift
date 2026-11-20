@@ -24,7 +24,9 @@ extension Internals.Cookie {
                 dayOfMonth = parsed
             } else if month == nil, token.count >= 3, let index = months.firstIndex(of: token.prefix(3).lowercased()) {
                 month = index + 1
-            } else if year == nil, let parsed = leadingNumber(token, maximumDigits: 4), token.prefix(while: \.isNumber).count >= 2 {
+            } else if year == nil, let parsed = leadingNumber(token, maximumDigits: 4),
+                token.prefix(while: \.isNumber).count >= 2
+            {
                 year = parsed
             }
         }
@@ -68,9 +70,9 @@ extension Internals.Cookie {
         let fields = token.split(separator: ":", omittingEmptySubsequences: false)
 
         guard fields.count == 3,
-              let hour = leadingNumber(String(fields[0]), maximumDigits: 2, exact: true),
-              let minute = leadingNumber(String(fields[1]), maximumDigits: 2, exact: true),
-              let second = leadingNumber(String(fields[2]), maximumDigits: 2)
+            let hour = leadingNumber(String(fields[0]), maximumDigits: 2, exact: true),
+            let minute = leadingNumber(String(fields[1]), maximumDigits: 2, exact: true),
+            let second = leadingNumber(String(fields[2]), maximumDigits: 2)
         else {
             return nil
         }

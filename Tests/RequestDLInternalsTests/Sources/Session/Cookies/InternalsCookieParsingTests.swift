@@ -15,7 +15,7 @@ struct InternalsCookieParsingTests {
         ("Wed Jun  9 10:18:14 2021", 1_623_233_894.0),
         ("Thu, 01 Jan 1970 00:00:00 GMT", 0.0),
         ("Sun, 06 Nov 94 08:49:37 GMT", 784_111_777.0),
-        ("Fri, 31-Dec-2038 23:59:59 GMT", 2_177_452_799.0)
+        ("Fri, 31-Dec-2038 23:59:59 GMT", 2_177_452_799.0),
     ])
     func parseDate_acceptsTheFormatsServersSend(string: String, expected: Double) {
         #expect(Internals.Cookie.parseDate(string)?.timeIntervalSince1970 == expected)
@@ -27,7 +27,7 @@ struct InternalsCookieParsingTests {
         "Wed, 32 Jun 2021 10:18:14 GMT",
         "Wed, 09 Jun 2021 25:18:14 GMT",
         "Wed, 09 Jun 1600 10:18:14 GMT",
-        "Wed, 09 Foo 2021 10:18:14 GMT"
+        "Wed, 09 Foo 2021 10:18:14 GMT",
     ])
     func parseDate_whenInvalid_returnsNil(string: String) {
         #expect(Internals.Cookie.parseDate(string) == nil)
@@ -46,7 +46,7 @@ struct InternalsCookieParsingTests {
             Internals.SetCookieSplitter.split(value) == [
                 "a=1; Expires=Wed, 09 Jun 2021 10:18:14 GMT",
                 "b=2",
-                "c=3; HttpOnly"
+                "c=3; HttpOnly",
             ]
         )
     }

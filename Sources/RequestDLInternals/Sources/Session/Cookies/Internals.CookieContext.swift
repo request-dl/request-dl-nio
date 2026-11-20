@@ -82,7 +82,8 @@ extension Internals {
             for url: URL,
             areFolded: Bool = false
         ) {
-            let values = fields
+            let values =
+                fields
                 .filter { $0.name.lowercased() == "set-cookie" }
                 .map(\.value)
 

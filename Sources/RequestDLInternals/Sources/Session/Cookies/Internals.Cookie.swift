@@ -151,9 +151,10 @@ extension Internals {
             }
 
             let parts = host.split(separator: ".", omittingEmptySubsequences: false)
-            return parts.count == 4 && parts.allSatisfy { part in
-                !part.isEmpty && part.count <= 3 && part.allSatisfy { $0.isASCII && $0.isNumber }
-            }
+            return parts.count == 4
+                && parts.allSatisfy { part in
+                    !part.isEmpty && part.count <= 3 && part.allSatisfy { $0.isASCII && $0.isNumber }
+                }
         }
 
         /// Whether a connection to `host` is one a `Secure` cookie may travel on without TLS.

@@ -62,9 +62,9 @@ extension Internals {
     }
 }
 
-private extension String {
+extension String {
 
-    func trimmingWhitespace() -> String {
+    fileprivate func trimmingWhitespace() -> String {
         var substring = Substring(self)
 
         while substring.first == " " || substring.first == "\t" {

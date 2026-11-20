@@ -200,7 +200,7 @@ struct CookieJarCacheTests {
                     status: .found,
                     headers: .init([
                         ("Set-Cookie", session),
-                        ("Location", "https://\(fixture.server.baseURL)\(finalPath)")
+                        ("Location", "https://\(fixture.server.baseURL)\(finalPath)"),
                     ]),
                     data: Data()
                 ),
