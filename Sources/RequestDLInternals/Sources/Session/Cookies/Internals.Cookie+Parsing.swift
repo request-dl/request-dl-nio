@@ -50,12 +50,7 @@ extension Internals.Cookie {
         let name = trimmed(pair[..<equals])
         let value = trimmed(pair[pair.index(after: equals)...])
 
-        guard
-            !name.isEmpty,
-            name.utf8.count + value.utf8.count <= maximumNameValueLength,
-            !hasControlCharacters(name),
-            !hasControlCharacters(value)
-        else {
+        guard nameValueRejection(name: name, value: value) == nil else {
             return nil
         }
 
@@ -165,9 +160,7 @@ extension Internals.Cookie {
         // algorithm treats an unlisted label as a suffix (its implicit `*` rule), and a list that
         // is out of date, or has a TLD only as a wildcard, would otherwise let `Domain=corp`, or
         // `Domain=ck`, through. A list adds the multi-label suffixes (`co.uk`) to that.
-        let isPublicSuffix = !attribute.contains(".") || (publicSuffixList?.isPublicSuffix(attribute) ?? false)
-
-        if isPublicSuffix {
+        if isPublicSuffixOrSingleLabel(attribute, publicSuffixList: publicSuffixList) {
             // `Domain=localhost` from localhost itself is the one harmless case.
             return attribute == origin.host ? (origin.host, true) : nil
         }
@@ -180,7 +173,7 @@ extension Internals.Cookie {
     }
 
     /// RFC 6265bis section 4.1.3.
-    private static func satisfiesPrefixRules(
+    static func satisfiesPrefixRules(
         name: String,
         secure: Bool,
         hasDomainAttribute: Bool,
@@ -209,10 +202,6 @@ extension Internals.Cookie {
         }
 
         return (trimmed(attribute[..<equals]), trimmed(attribute[attribute.index(after: equals)...]))
-    }
-
-    private static func hasControlCharacters(_ string: String) -> Bool {
-        string.utf8.contains { $0 < 0x20 || $0 == 0x7F }
     }
 
     /// `[-] 1*DIGIT`, per section 5.2.2: a leading `+` is not allowed, even though `Int` takes it.
