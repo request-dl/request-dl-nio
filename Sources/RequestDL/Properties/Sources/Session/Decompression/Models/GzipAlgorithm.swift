@@ -7,8 +7,9 @@
 /// As a ``Decompressor``, this is a placeholder standing in for decoding always performed
 /// natively by the OS (`.urlSession`) or `async-http-client` (`.nio`/`.nioTransportServices`),
 /// never by this type. The `Decompressor` `callAsFunction()` throws ``NativeOnlyAlgorithmError``
-/// if it's ever actually invoked, which only happens when mixed into the same list as a
-/// genuinely custom algorithm. See ``Session/decompressionAlgorithms(_:limit:)``.
+/// if it's ever invoked, which a session never does: in a list that also holds a genuinely
+/// custom algorithm, `.urlSession` announces and decodes only the custom ones, and `.nio` leaves
+/// this to `async-http-client`. See ``Session/decompressionAlgorithms(_:limit:)``.
 ///
 /// As a ``Compressor``, though, this does real work: there is no OS-provided shortcut for
 /// compressing an outgoing body the way there is for decoding an incoming one. With NIO

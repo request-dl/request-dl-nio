@@ -139,6 +139,13 @@ struct CustomDecompressorIntegrationTests {
         /// file-level `#if canImport(FoundationEssentials)` above). `Dispatch` is portable
         /// either way.
         func respondOnce(headers: String, body: [UInt8]) {
+            respondOnce(headers: headers, chunks: [body], interval: .zero)
+        }
+
+        /// Same, but writes `chunks` one after the other, `interval` apart, with Nagle off so each
+        /// goes out as a segment of its own: what the client reads can then be cut at the places
+        /// the chunks are cut, not only wherever one big write happens to be split.
+        func respondOnce(headers: String, chunks: [[UInt8]], interval: Duration) {
             let listenSocket = listenSocket
             let received = received
             DispatchQueue.global(qos: .userInitiated).async {
@@ -167,8 +174,28 @@ struct CustomDecompressorIntegrationTests {
                 received.withLockedValue { $0 = String(decoding: requestBytes, as: UTF8.self) }
 
                 let head = Array(headers.utf8)
+                var noDelay: Int32 = 1
+                setsockopt(client, IPPROTO_TCP, TCP_NODELAY, &noDelay, socklen_t(MemoryLayout<Int32>.size))
+
+                // A client that gave up on the response (it already failed) closes while later
+                // chunks are still to be written; that must be an `EPIPE`, not a `SIGPIPE`
+                // taking the whole test process down.
+                #if canImport(Darwin)
+                var noSigPipe: Int32 = 1
+                setsockopt(client, SOL_SOCKET, SO_NOSIGPIPE, &noSigPipe, socklen_t(MemoryLayout<Int32>.size))
+                #else
+                signal(SIGPIPE, SIG_IGN)
+                #endif
+
                 head.withUnsafeBufferPointer { _ = write(client, $0.baseAddress, $0.count) }
-                body.withUnsafeBufferPointer { _ = write(client, $0.baseAddress, $0.count) }
+
+                for chunk in chunks {
+                    chunk.withUnsafeBufferPointer { _ = write(client, $0.baseAddress, $0.count) }
+
+                    if interval > .zero {
+                        usleep(UInt32(interval.components.attoseconds / 1_000_000_000_000))
+                    }
+                }
             }
         }
 

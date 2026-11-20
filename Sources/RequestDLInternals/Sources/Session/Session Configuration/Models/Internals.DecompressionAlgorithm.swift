@@ -21,8 +21,9 @@ extension Internals {
         /// what configuring one of these actually does to executor resolution.
         var requiresURLSession: Bool { get }
 
-        /// Whether CFNetwork decodes this *specific algorithm* transparently under `.urlSession`,
-        /// with no way to opt out short of taking over `Accept-Encoding` entirely. See
+        /// Whether CFNetwork decodes this *specific algorithm* transparently under `.urlSession`.
+        /// A list with an algorithm that does not has `.urlSession` take over `Accept-Encoding`
+        /// and announce only those (`Internals.Decompression.urlSessionManualAlgorithms`); see
         /// `Internals.Decompression.requiresManualURLSessionHandling`.
         ///
         /// Deliberately a per-conformer answer, not a check against `contentEncodingValue`.

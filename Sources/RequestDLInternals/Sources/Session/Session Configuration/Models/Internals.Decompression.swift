@@ -17,7 +17,8 @@ extension Internals {
 
         /// Whether resolving this configuration to `.urlSession` requires this package to set its
         /// own `Accept-Encoding` header on every request: whether any configured algorithm isn't
-        /// one CFNetwork already decodes transparently on its own (`gzip`/`deflate`/`br`).
+        /// one CFNetwork already decodes transparently on its own (`gzip`/`deflate`/`br`). What
+        /// it then announces is `urlSessionManualAlgorithms`, not the whole list.
         ///
         /// `.disabled` also needs this: URLSession's automatic decoding can only be switched off
         /// by taking over `Accept-Encoding` ourselves (`identity`), the same mechanism a genuinely
@@ -29,6 +30,22 @@ extension Internals {
             case .enabled(let algorithms, _):
                 return !algorithms.allSatisfy(\.isNativelyDecodedByURLSession)
             }
+        }
+
+        /// What `.urlSession` announces and decodes itself once it takes over `Accept-Encoding`:
+        /// the algorithms CFNetwork does *not* decode natively, in configured order.
+        ///
+        /// Never `gzip`/`deflate`/`br`, even when listed next to a custom algorithm: how CFNetwork
+        /// treats a caller-set `Accept-Encoding` is not something to build on (on current systems
+        /// it still decodes whatever native encoding arrives, whatever the header says), so
+        /// announcing one would leave it unknown whether the bytes that reach manual dispatch are
+        /// still encoded. Not asking for them makes that question moot: a native encoding in a
+        /// response is then unsolicited, matches nothing in this list, and fails as
+        /// `Internals.UnsupportedContentEncodingError` rather than being passed through on a guess.
+        ///
+        /// Meant for `requiresManualURLSessionHandling`'s `.enabled` case; `[]` for `.disabled`.
+        package var urlSessionManualAlgorithms: [any Internals.DecompressionAlgorithm] {
+            algorithms.filter { !$0.isNativelyDecodedByURLSession }
         }
 
         /// The full set of configured algorithms, `[]` for `.disabled`. Used both to build
