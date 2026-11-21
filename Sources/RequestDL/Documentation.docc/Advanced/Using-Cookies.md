@@ -33,7 +33,9 @@ A request that sets a `Cookie` header itself keeps it on every hop to the same o
 
 ### Public suffixes
 
-Without help, a server could set a cookie for `Domain=co.uk` and have it sent to every site below it. The jar always refuses a `Domain` that is a single label, with a list or without one. To refuse multi-label suffixes too, give it a Public Suffix List, which RequestDL does not bundle because it keeps changing:
+Without help, a server could set a cookie for `Domain=co.uk` and have it sent to every site below it. The jar always refuses a `Domain` that is a single label, with a list or without one. To refuse multi-label suffixes too, give it a Public Suffix List, which RequestDL does not bundle because it keeps changing.
+
+The jar has **no list by default**, and that matters beyond country suffixes. Platforms that host many unrelated sites under one name are public suffixes too, and without a list one tenant can plant a cookie on all the others. `attacker.github.io` can answer with `Set-Cookie: sid=attacker; Domain=github.io`, and the jar then sends that cookie to every other `*.github.io` site it visits (session fixation, or a cookie bomb that breaks the others). The same holds for `*.herokuapp.com`, `*.vercel.app`, `*.netlify.app`, `*.pages.dev`, `*.azurewebsites.net`, S3 buckets under `*.s3.amazonaws.com`, and every other name in the private section of the list. If the jar talks to hosts you do not control, give it a list:
 
 ```swift
 let list = try PublicSuffixList(contentsOf: bundledListURL)
@@ -45,6 +47,8 @@ Parse the list once and reuse it. A file that is not a list, such as the HTML or
 ### Limits
 
 A domain holds at most 50 cookies and a jar at most 3000, and when one of those limits is reached the least recently used cookies go first. A single response may set at most 50: the first 50 `Set-Cookie` headers are read and the rest are ignored. The limit is per response, and every hop of a redirect is a response of its own.
+
+Those limits count cookies, not bytes, and a cookie may have up to 4096, so a server could still set 50 large cookies that make every later request to its domain too big for any server to accept. The `Cookie` header a request is sent therefore has at most 8000 bytes (under the 8 KB a header line may have by default in common servers, such as nginx, Apache and Tomcat). When the cookies that match do not fit, the ones that come last in the order RFC 6265 gives are left out, which are the ones with the shortest paths and the newest ones, and none after the first that does not fit is sent. A cookie that is left out stays in the jar and is not counted as used. ``CookieJar/cookies(for:)`` lists what would be sent, so it leaves them out too.
 
 ### Managing the cookies
 
@@ -141,4 +145,5 @@ A ``CookieJar/Cookie`` and a ``CookieJar/Snapshot`` print without their values (
 
 - Cookies are not saved by RequestDL: a snapshot is yours to keep, and to protect.
 - `SameSite` is ignored: a client has no notion of the site that made a request.
+- A comma never separates cookies, as RFC 6265 says: `Set-Cookie: a=1,b=2` is one cookie, `a`, on every executor. The one case `.urlSession` cannot get right is a value that holds a comma, a space and something that looks like `name=` (`a=1, b=2` in a single header): the system joins repeated `Set-Cookie` headers with exactly that, and the jar cannot tell the two apart, so there it stores two cookies where the other executors store one.
 - Background downloads are not covered, because the system sends those requests itself.

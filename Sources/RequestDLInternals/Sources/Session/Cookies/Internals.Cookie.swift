@@ -120,7 +120,14 @@ extension Internals {
         // MARK: - Internal static methods
 
         /// RFC 6265 section 5.1.3.
+        ///
+        /// Both are expected canonical (see ``Internals/Cookie/withoutTrailingDot(_:)``): one that
+        /// still ends in a dot never matches, so `evil.com.` is not taken for a host under `com.`.
         package static func domainMatches(host: String, domain: String) -> Bool {
+            guard !host.hasSuffix("."), !domain.hasSuffix(".") else {
+                return false
+            }
+
             if host == domain {
                 return true
             }

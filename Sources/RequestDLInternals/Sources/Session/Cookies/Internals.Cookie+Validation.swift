@@ -99,6 +99,16 @@ extension Internals.Cookie {
         return domain
     }
 
+    /// `host` without the one trailing dot of a fully qualified name: `evil.com.` is `evil.com`.
+    ///
+    /// Not stripped, `Domain=com.` would count as more than one label and `co.uk.` would not match
+    /// the rule `co.uk`, both getting past the single-label and public suffix guards, and
+    /// `evil.com.` would be a different host from `evil.com`. Only one dot goes: `com..` keeps an
+    /// empty label, which `isHostName` refuses.
+    static func withoutTrailingDot(_ host: String) -> String {
+        host.hasSuffix(".") ? String(host.dropLast()) : host
+    }
+
     // MARK: - Shared with `parse`
 
     static func nameValueRejection(name: String, value: String) -> Rejection? {
@@ -188,7 +198,7 @@ extension Internals.Cookie {
     }
 
     /// Letters, digits, `-`, `_` and `.` in labels that are not empty, or an IPv6 literal.
-    private static func isHostName(_ domain: String) -> Bool {
+    static func isHostName(_ domain: String) -> Bool {
         if domain.contains(":") {
             return domain.utf8.allSatisfy { byte in
                 (0x30...0x39).contains(byte) || (0x61...0x66).contains(byte) || byte == 0x3A || byte == 0x2E

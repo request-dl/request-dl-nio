@@ -335,6 +335,23 @@ struct InternalsCookieStorageTests {
         #expect(header(storage, "https://example.com/") == "a=1; b=2; c=3")
     }
 
+    /// A comma does not separate cookies (RFC 6265 section 3): the folding `.urlSession` does
+    /// (`", "`) is undone, and a comma with no space after it is the cookie's own. Both executors
+    /// must store the same cookie for the same `Set-Cookie`, whether or not it went through the
+    /// splitter.
+    @Test(arguments: ["a=1,b=2", "a=1,b=2; Path=/", "a=\"1,b=2\"", "a=x,y,z=1"])
+    func store_whenAValueHasACommaWithNoSpace_isOneCookieWhetherOrNotTheTransportFolds(value: String) {
+        let folded = Internals.CookieStorage()
+        let kept = Internals.CookieStorage()
+
+        folded.store(setCookieValues: [value], for: url("https://example.com/"), areFolded: true, now: now)
+        kept.store(setCookieValues: [value], for: url("https://example.com/"), areFolded: false, now: now)
+
+        #expect(folded.snapshot(now: now).count == 1)
+        #expect(folded.snapshot(now: now) == kept.snapshot(now: now))
+        #expect(header(folded, "https://example.com/") == header(kept, "https://example.com/"))
+    }
+
     @Test
     func removeAll_clearsEveryCookie() {
         let storage = Internals.CookieStorage()

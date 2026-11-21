@@ -53,9 +53,33 @@ extension Internals.Cookie {
             return nil
         }
 
-        let days = daysFromCivil(year: year, month: month, day: dayOfMonth)
-        let seconds = days * 86_400 + time.hour * 3_600 + time.minute * 60 + time.second
+        let seconds = secondsSinceEpoch(
+            year: year,
+            month: month,
+            day: dayOfMonth,
+            hour: time.hour,
+            minute: time.minute,
+            second: time.second
+        )
+
         return Date(timeIntervalSince1970: TimeInterval(seconds))
+    }
+
+    /// Seconds since 1970-01-01T00:00:00Z of a proleptic Gregorian date and time.
+    ///
+    /// Computed in `Int64` on purpose. `Int` is 32 bits on watchOS `arm64_32`, where `days * 86_400`
+    /// no longer fits for any date after 2038-01-19 or before 1901-12-13, and the parser accepts
+    /// every year from 1601 to 9999: a trap, from one `Expires` a server sent.
+    static func secondsSinceEpoch(
+        year: Int,
+        month: Int,
+        day: Int,
+        hour: Int,
+        minute: Int,
+        second: Int
+    ) -> Int64 {
+        let days = Internals.GregorianCalendar.daysFromCivil(year: Int64(year), month: Int64(month), day: Int64(day))
+        return days * 86_400 + Int64(hour) * 3_600 + Int64(minute) * 60 + Int64(second)
     }
 
     // MARK: - Private static methods
@@ -98,16 +122,5 @@ extension Internals.Cookie {
         }
 
         return Int(digits)
-    }
-
-    /// Days since 1970-01-01 of a proleptic Gregorian date (Howard Hinnant's algorithm).
-    private static func daysFromCivil(year: Int, month: Int, day: Int) -> Int {
-        let adjustedYear = month <= 2 ? year - 1 : year
-        let era = (adjustedYear >= 0 ? adjustedYear : adjustedYear - 399) / 400
-        let yearOfEra = adjustedYear - era * 400
-        let monthIndex = (month + 9) % 12
-        let dayOfYear = (153 * monthIndex + 2) / 5 + day - 1
-        let dayOfEra = yearOfEra * 365 + yearOfEra / 4 - yearOfEra / 100 + dayOfYear
-        return era * 146_097 + dayOfEra - 719_468
     }
 }

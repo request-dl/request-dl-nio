@@ -50,7 +50,10 @@ import RequestDLInternals
 /// - A proxy found by ``SystemProxy`` (the environment, or the system settings) can carry
 ///   credentials too, and is used with them. Credentials of that kind that SOCKS5 cannot carry
 ///   (by the limits above) are ignored with a warning in the log, never an error, and the proxy
-///   is used without them.
+///   is used without them. The one exception is credentials of 255 bytes, which are within
+///   those limits and so are kept, but which `.urlSession` cannot send intact (see the last
+///   item): a session that does not name an executor runs such a system proxy on a NIO executor, and
+///   one that requires `.urlSession` throws an ``ExecutorRequirementError``.
 /// - SOCKS5 authenticates with a user name and a password and nothing else:
 ///   ``ProxyAuthorization/basic(credentials:)`` and ``ProxyAuthorization/bearer(tokens:)`` are
 ///   HTTP header values, and are refused with a ``ProxyAuthorizationError``. Nothing is
