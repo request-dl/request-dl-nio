@@ -38,8 +38,7 @@ extension Internals {
 
         // MARK: - Private static properties
 
-        /// Flags a `client(provider:sessionConfiguration:)` or `cleanupIfNeeded()` that is still
-        /// running after 45s. Set higher than the other `AsyncLock`s in `Internals`: a client
+        /// Flags a `client(provider:sessionConfiguration:)` that is still running after 45s. Set higher than the other `AsyncLock`s in `Internals`: a client
         /// resolution can build an HTTP client, read a TLS identity off disk and, for mTLS, build the
         /// identity (parsing a certificate and a private key), so a wide margin is needed to avoid flagging a legitimately
         /// busy one. Development builds only. See `AsyncLock.Watchdog`.
@@ -198,10 +197,11 @@ extension Internals {
         }
 
         func isExpired(_ item: Item, at now: UInt64) -> Bool {
-            // `now` is the instant the sweep *started* (a default argument, evaluated before it
-            // waits for ``lock``), and a client resolved while it waited is stamped later than
-            // that. An unsigned `now - readAt` then underflows, which traps. An item newer than
-            // the instant being judged is, by definition, not old enough to expire.
+            // `now` is the instant the sweep was asked to run at (a default argument, evaluated
+            // before it takes ``tableLock``), and a client resolved in the meantime, or one a
+            // test stamps after choosing the instant, is stamped later than that. An unsigned
+            // `now - readAt` then underflows, which traps. An item newer than the instant being
+            // judged is, by definition, not old enough to expire.
             guard now > item.readAt else {
                 return false
             }
@@ -232,56 +232,63 @@ extension Internals {
         /// would close it out from under that caller instead of merely un-pooling it, which is the
         /// same hazard `_evictIfNeeded(protecting:)`'s doc comment describes for the ceiling path.
         ///
+        /// Does not take ``lock``, only ``tableLock``. The whole sweep is one synchronous pass over
+        /// the table, atomic under ``tableLock`` like every other read and write of it, so it has
+        /// nothing to serialize against that ``lock`` would add: a resolution stamps `readAt` and
+        /// appends or evicts under ``tableLock`` too, and what ``lock`` orders (one resolution
+        /// checking the table, building a client and adding it before the next looks) is not
+        /// something a sweep takes part in. Queued behind it, a sweep (which runs at `.utility`)
+        /// would sit in the line every client resolution waits in, and `AsyncLock` does not raise
+        /// the priority of the task ahead of a waiting one: an interactive request would wait for
+        /// the scheduling of a low priority task that has nothing to do with it.
+        ///
         /// - Parameter now: Defaults to the monotonic clock. Not `private` and not fixed to it, so a
         /// test can run one sweep at an instant of its choosing, and so decide what is "idle for
         /// longer than `lifetime`" without waiting that long for it.
         package func cleanupIfNeeded(at now: MonotonicInstant = ClientManager.monotonicNow()) async {
-            await lock.withLock {
+            // Dropped off `tableLock`, below: a client that nobody else holds retires itself
+            // when its last reference goes, which can mean tearing down its connections and
+            // identity, and that does not belong under a mutex every lookup also takes.
+            let expired = tableLock.withLock { () -> [Item] in
+                var expired = [Item]()
 
-                // Dropped off `tableLock`, below: a client that nobody else holds retires itself
-                // when its last reference goes, which can mean tearing down its connections and
-                // identity, and that does not belong under a mutex every lookup also takes.
-                let expired = tableLock.withLock { () -> [Item] in
-                    var expired = [Item]()
+                for (key, items) in _table {
+                    var surviving = [Item]()
 
-                    for (key, items) in _table {
-                        var surviving = [Item]()
-
-                        for item in items {
-                            if item.client.isRunning {
-                                surviving.append(item.updatingReadAt())
-                                continue
-                            }
-
-                            // An operation completed since this item was last touched (e.g. between
-                            // two sequential calls on the same resolved client, such as cache
-                            // revalidation's `HEAD` followed by the real `GET`), so this client was
-                            // active more recently than `readAt` alone suggests, even though
-                            // `isRunning` just read `false` above. Refreshing `readAt` here stops a
-                            // caller mid-way through such a sequence from having its client un-pooled
-                            // in the gap between the two calls, and so from losing the reuse it
-                            // expects. See `Internals.ClientOperationQueue.generation`'s own doc
-                            // comment.
-                            if item.client.operationGeneration != item.lastKnownOperationGeneration {
-                                surviving.append(item.updatingReadAt())
-                                continue
-                            }
-
-                            if isExpired(item, at: now) {
-                                expired.append(item)
-                            } else {
-                                surviving.append(item)
-                            }
+                    for item in items {
+                        if item.client.isRunning {
+                            surviving.append(item.updatingReadAt())
+                            continue
                         }
 
-                        _table[key] = surviving.isEmpty ? nil : surviving
+                        // An operation completed since this item was last touched (e.g. between
+                        // two sequential calls on the same resolved client, such as cache
+                        // revalidation's `HEAD` followed by the real `GET`), so this client was
+                        // active more recently than `readAt` alone suggests, even though
+                        // `isRunning` just read `false` above. Refreshing `readAt` here stops a
+                        // caller mid-way through such a sequence from having its client un-pooled
+                        // in the gap between the two calls, and so from losing the reuse it
+                        // expects. See `Internals.ClientOperationQueue.generation`'s own doc
+                        // comment.
+                        if item.client.operationGeneration != item.lastKnownOperationGeneration {
+                            surviving.append(item.updatingReadAt())
+                            continue
+                        }
+
+                        if isExpired(item, at: now) {
+                            expired.append(item)
+                        } else {
+                            surviving.append(item)
+                        }
                     }
 
-                    return expired
+                    _table[key] = surviving.isEmpty ? nil : surviving
                 }
 
-                withExtendedLifetime(expired) {}
+                return expired
             }
+
+            withExtendedLifetime(expired) {}
         }
 
         // MARK: - Unsafe methods
