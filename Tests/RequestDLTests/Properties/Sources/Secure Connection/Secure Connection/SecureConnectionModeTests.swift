@@ -315,6 +315,77 @@ struct SecureConnectionModeTests {
         #expect(sut?.tlsPins?.count == 1)
     }
 
+    // MARK: - Cipher suites
+
+    // `cipherSuites(_:)` only exists under `canImport(NIOCore)`.
+    #if canImport(NIOCore)
+
+    /// `cipherSuites(String...)` and `cipherSuites(TLSCipher...)` write different fields, and NIOSSL
+    /// lets the `TLSCipher` list overwrite the string, so the one declared first used to win.
+    @Test
+    func default_whenStringCipherSuitesFollowTLSCipherValues_theLaterOneWins() async throws {
+        let sut = try await resolve(
+            TestProperty {
+                RequestDL.SecureConnection {}
+                    .cipherSuites(.TLS_RSA_WITH_AES_128_CBC_SHA)
+
+                RequestDL.SecureConnection {}
+                    .cipherSuites("ECDHE-ECDSA-AES256-GCM-SHA384")
+            }
+        ).session.configuration.secureConnection
+
+        #expect(sut?.cipherSuites == "ECDHE-ECDSA-AES256-GCM-SHA384")
+        #expect(sut?.cipherSuiteValues == nil)
+    }
+
+    @Test
+    func default_whenTLSCipherValuesFollowStringCipherSuites_theLaterOneWins() async throws {
+        let sut = try await resolve(
+            TestProperty {
+                RequestDL.SecureConnection {}
+                    .cipherSuites("ECDHE-ECDSA-AES256-GCM-SHA384")
+
+                RequestDL.SecureConnection {}
+                    .cipherSuites(.TLS_RSA_WITH_AES_128_CBC_SHA)
+            }
+        ).session.configuration.secureConnection
+
+        #expect(sut?.cipherSuites == nil)
+        #expect(sut?.cipherSuiteValues == [TLSCipher.TLS_RSA_WITH_AES_128_CBC_SHA.build()])
+    }
+
+    @Test
+    func default_whenTheSameWrapperSetsBothKindsOfCipherSuites_theLastCallWins() async throws {
+        let sut = try await resolve(
+            TestProperty {
+                RequestDL.SecureConnection {}
+                    .cipherSuites(.TLS_RSA_WITH_AES_128_CBC_SHA)
+                    .cipherSuites("ECDHE-ECDSA-AES256-GCM-SHA384")
+            }
+        ).session.configuration.secureConnection
+
+        #expect(sut?.cipherSuites == "ECDHE-ECDSA-AES256-GCM-SHA384")
+        #expect(sut?.cipherSuiteValues == nil)
+    }
+
+    /// The suite list that ends up in the NIOSSL configuration is the later declaration's.
+    @Test
+    func default_whenStringCipherSuitesFollowTLSCipherValues_theBuiltConfigurationUsesTheLaterOne() async throws {
+        let sut = try await resolve(
+            TestProperty {
+                RequestDL.SecureConnection {}
+                    .cipherSuites(.TLS_RSA_WITH_AES_128_CBC_SHA)
+
+                RequestDL.SecureConnection {}
+                    .cipherSuites("ECDHE-ECDSA-AES256-GCM-SHA384")
+            }
+        ).session.configuration.secureConnection
+
+        let built = try #require(sut).build()
+        #expect(built.tlsConfiguration.cipherSuites == "ECDHE-ECDSA-AES256-GCM-SHA384")
+    }
+    #endif
+
     // MARK: - Nested
 
     @Test
