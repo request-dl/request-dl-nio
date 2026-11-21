@@ -651,6 +651,21 @@ extension Internals {
                 throw error
             }
 
+            // Writing the body does not look at cancellation, and `exchange` below is a `Task` of
+            // its own, which does not inherit it from this call: a body whose source ignores
+            // cancellation (a file read, the caller's own sequence) finishes however long the
+            // caller was cancelled ago, and without this the request would be sent all the same.
+            // Everything that was claimed so far goes back first, the temporary file included:
+            // nothing past this point will, since `exchange` never starts.
+            guard !Task.isCancelled else {
+                if case .file(let bufferURL) = uploadBody {
+                    await bufferURL.removeIfTemporary()
+                }
+                release()
+                operation.complete()
+                throw CancellationError()
+            }
+
             let makeBodyStream: (@Sendable () -> InputStream?)?
             let uploadPump: Internals.URLSessionUploadBodyPump?
             do {
