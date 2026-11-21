@@ -889,7 +889,11 @@ extension Internals {
                     do {
                         try await Self.write(asyncBuffers, to: &cacheBuffer)
 
-                        if let probe {
+                        // Not asked when no tier kept the body: there is nothing to complete, and the
+                        // byte count it would be asked about (0, once both tiers were given up on)
+                        // is not the length of anything stored. The probe would send a request for
+                        // nothing and log a truncation that did not happen.
+                        if let probe, !cacheBuffer.hasNowhereToWrite {
                             let verdict = await probe.run(response: head, receivedBytes: cacheBuffer.readableBytes)
 
                             guard verdict == .complete else {
