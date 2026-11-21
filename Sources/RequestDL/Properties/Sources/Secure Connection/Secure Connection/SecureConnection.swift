@@ -441,12 +441,18 @@ public struct SecureConnection<Content: Property>: Property {
     /// instead of silently dropping it.
     ///
     /// - Parameter suites: The cipher suites to use as string representations.
-    /// - Returns: A modified `SecureConnection` with the cipher suites set.
+    /// - Returns: A modified `SecureConnection` with the cipher suites set. It replaces any cipher
+    /// suites set before, whether as strings or as `TLSCipher` values.
     public func cipherSuites(_ suites: String...) -> Self {
         for suite in suites {
             precondition(!suite.contains(":"))
         }
-        return configure { $0.cipherSuites = suites.joined(separator: ":") }
+        // NIOSSL lets a `TLSCipher` list overwrite the string, so the sibling field is cleared:
+        // otherwise, with `.merging`, a list declared before this call would beat it.
+        return configure {
+            $0.cipherSuites = suites.joined(separator: ":")
+            $0.cipherSuiteValues = nil
+        }
     }
 
     /// Sets the cipher suites for the secure connection using `TLSCipher` values.
@@ -457,10 +463,12 @@ public struct SecureConnection<Content: Property>: Property {
     /// - Parameter suites: The cipher suites to use as `TLSCipher` values.
     /// - Returns: A modified `SecureConnection` with the cipher suites set.
     public func cipherSuites(_ suites: TLSCipher...) -> Self {
+        // The sibling string field is cleared for the same reason as in the `String` overload.
         configure {
             $0.cipherSuiteValues = suites.map {
                 $0.build()
             }
+            $0.cipherSuites = nil
         }
     }
     #endif

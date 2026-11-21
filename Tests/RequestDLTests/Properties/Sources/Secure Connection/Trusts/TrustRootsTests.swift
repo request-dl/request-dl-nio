@@ -2,6 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
+import RequestDLInternals
 import Testing
 
 @testable import RequestDL
@@ -134,6 +135,82 @@ struct TrustRootsTests {
         #expect(
             resolved.session.configuration.secureConnection?.trustRoots
                 == .certificates([.init(bytes, format: .pem)])
+        )
+    }
+
+    /// `TrustRoots` replaces the system roots. With no certificate left it used to resolve fine and
+    /// leave the system store in use, the same fail-open an empty `SPKIPinning` had.
+    @Test
+    func trustRoots_whenEveryCertificateIsBehindAFalseCondition_throws() async throws {
+        let isEnabled = false
+
+        await #expect(throws: Internals.EmptyTrustRootsError.self) {
+            _ = try await resolve(
+                TestProperty {
+                    RequestDL.SecureConnection {
+                        RequestDL.TrustRoots {
+                            if isEnabled {
+                                RequestDL.Certificate([0, 1, 2])
+                            }
+                        }
+                    }
+                }
+            )
+        }
+    }
+
+    @Test
+    func trustRoots_whenEmptyPropertyForEach_throws() async throws {
+        await #expect(throws: Internals.EmptyTrustRootsError.self) {
+            _ = try await resolve(
+                TestProperty {
+                    RequestDL.SecureConnection {
+                        RequestDL.TrustRoots {
+                            PropertyForEach([[UInt8]](), id: \.self) {
+                                RequestDL.Certificate($0)
+                            }
+                        }
+                    }
+                }
+            )
+        }
+    }
+
+    @Test
+    func trustRoots_whenUsedStandaloneWithoutCertificates_throws() async throws {
+        await #expect(throws: Internals.EmptyTrustRootsError.self) {
+            _ = try await resolve(
+                TestProperty {
+                    RequestDL.TrustRoots {
+                        PropertyForEach([[UInt8]](), id: \.self) {
+                            RequestDL.Certificate($0)
+                        }
+                    }
+                }
+            )
+        }
+    }
+
+    @Test
+    func trustRoots_whenAtLeastOneCertificateIsEnabled_shouldBeValid() async throws {
+        let isEnabled = true
+
+        let resolved = try await resolve(
+            TestProperty {
+                RequestDL.SecureConnection {
+                    RequestDL.TrustRoots {
+                        if isEnabled {
+                            RequestDL.Certificate([0, 1, 2])
+                        }
+                    }
+                }
+            }
+        )
+
+        #expect(!(resolved.session.configuration.secureConnection?.useDefaultTrustRoots ?? true))
+        #expect(
+            resolved.session.configuration.secureConnection?.trustRoots
+                == .certificates([.init([0, 1, 2], format: .pem)])
         )
     }
 
