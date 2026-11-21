@@ -209,29 +209,44 @@ extension Internals {
             delegate: Delegate,
             logger: TaskLogger?
         ) async throws -> UnsafeTask<Delegate.Response> {
+            // Registered before the wait for a slot below, not after it, the same order
+            // `Internals.URLSessionClient.execute` keeps: the client counts as busy from the
+            // moment it is asked to do anything, queued callers included. `Internals.ClientManager`'s
+            // idle sweep and its ceiling eviction treat `isRunning == false` as "idle", and when a
+            // slot is handed on from one request to the next in line there is an instant in which
+            // the request that finished is no longer counted and the one that was waiting was not
+            // counted yet. A sweep landing there would un-pool a client that still has callers
+            // queued on it, the next request would create a second one with a semaphore of its
+            // own, and the limit would be exceeded.
+            let operation = manager.operation()
+
             // Waited on before anything else, so a session configured with a limit never opens
             // more connections than that, whether or not one is free to reuse.
             //
             // Throws `CancellationError` if the caller's `Task` is cancelled while it waits, without
-            // having taken a slot.
-            let release = try await throttledExecutor.acquire()
+            // having taken a slot, in which case the operation registered above is over too.
+            let release: @Sendable () -> Void
+
+            do {
+                release = try await throttledExecutor.acquire()
+            } catch {
+                operation.complete()
+                throw error
+            }
 
             // A caller cancelled just after it was handed a slot, or one with no limit to wait
             // for, still gets here. Without this check its request would be dispatched onto the
-            // wire all the same. The slot is handed back first, since it was already claimed and
-            // nothing past this point will release it otherwise.
+            // wire all the same. The slot and the operation are handed back first, since both
+            // were already claimed and nothing past this point will release them otherwise.
             guard !Task.isCancelled else {
                 release()
+                operation.complete()
                 throw CancellationError()
             }
 
             // Before the request goes out: the identity provider is asked when its connection is
             // opened, and answers only for origins recorded here.
             identityOrigins?.register(host: request.host, port: request.port)
-
-            // Registered before the request goes out, so the client counts as busy from the
-            // moment it is asked to do anything.
-            let operation = manager.operation()
 
             let task: HTTPClient.Task<Delegate.Response>
 

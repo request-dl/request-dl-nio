@@ -225,9 +225,10 @@ extension Internals {
         /// Only un-pools, for both backends: a client retires itself once the last reference to it
         /// goes (`Internals.Client.deinit`, `Internals.URLSessionClient.deinit`), including one a
         /// caller was handed just before this sweep ran and has not started using yet. `isRunning`
-        /// only flips once `execute()` registers an operation, *after* it clears
-        /// `throttledExecutor.acquire()`, so a client stuck on that wait, or one that has not been
-        /// asked anything yet, still reads as idle here. Shutting it down explicitly from here
+        /// flips as soon as `execute()` registers an operation, which both executors do *before*
+        /// they wait on `throttledExecutor.acquire()`, so a client with callers queued behind its
+        /// limit reads as busy here. One that has been handed out but not asked anything yet still
+        /// reads as idle. Shutting it down explicitly from here
         /// would close it out from under that caller instead of merely un-pooling it, which is the
         /// same hazard `_evictIfNeeded(protecting:)`'s doc comment describes for the ceiling path.
         ///
