@@ -600,41 +600,31 @@ extension Internals {
                 throw CancellationError()
             }
 
-            // Either every configured algorithm is one CFNetwork decodes natively, and this stays
-            // quiet, or at least one is custom and `Accept-Encoding` is set here, announcing only
-            // the custom ones: this package decodes those itself, and never asks the server for
-            // `gzip`/`deflate`/`br`, so there is nothing for CFNetwork to decode (or to leave
-            // encoded) behind this package's back. How CFNetwork treats an `Accept-Encoding` set
-            // by the caller is not something this relies on; it has been seen to decode a
-            // response whatever the header says, so a native encoding in a mixed list is not
-            // dispatched to its placeholder: it is a response nobody asked for, and fails as one
-            // (`Internals.UnsupportedContentEncodingError`), see
-            // `Internals.Decompression.urlSessionManualAlgorithms`. `.disabled` reaches the same
-            // `identity` override; see `Internals.Decompression.requiresManualURLSessionHandling`.
-            let decompressionDispatch: Internals.ManualDecompressionDispatch
+            // What this client announces for `decompression`, and why, is
+            // `announcedAcceptEncoding(for:)`'s to say.
             var request = request
+
+            // Only when the caller hasn't already set their own, whatever the configuration: a
+            // caller who set `Accept-Encoding` explicitly (e.g. `AcceptEncodingHeader`, documented
+            // as usable exactly when the caller intends to decode the body itself) is relying on
+            // that value reaching the wire unchanged, the same way it does under `.nio`. Without
+            // this guard, `.urlSession` silently overwrote it, defeating that configuration only
+            // under this executor. What the response is decoded with does not depend on it: that
+            // is `decompressionDispatch`, from the configured list alone.
+            if let acceptEncoding = Self.announcedAcceptEncoding(for: decompression),
+                request.value(forHTTPHeaderField: "Accept-Encoding") == nil
+            {
+                request.setValue(acceptEncoding, forHTTPHeaderField: "Accept-Encoding")
+            }
+
+            let decompressionDispatch: Internals.ManualDecompressionDispatch
 
             switch decompression {
             case .disabled:
-                // Only when the caller hasn't already set their own: `.disabled` means this
-                // package leaves `Content-Encoding` handling alone entirely, and a caller who set
-                // `Accept-Encoding` explicitly (e.g. `AcceptEncodingHeader`, documented as usable
-                // exactly when the caller intends to decode the body itself) is relying on that
-                // value reaching the wire unchanged, the same way it does under `.nio`. Without
-                // this guard, `.urlSession` silently overwrote it with `identity` regardless,
-                // defeating that configuration only under this executor.
-                if request.value(forHTTPHeaderField: "Accept-Encoding") == nil {
-                    request.setValue("identity", forHTTPHeaderField: "Accept-Encoding")
-                }
                 decompressionDispatch = .skip
 
             case .enabled where decompression.requiresManualURLSessionHandling:
-                let algorithms = decompression.urlSessionManualAlgorithms
-                request.setValue(
-                    algorithms.map(\.contentEncodingValue).joined(separator: ", "),
-                    forHTTPHeaderField: "Accept-Encoding"
-                )
-                decompressionDispatch = .dispatch(algorithms: algorithms)
+                decompressionDispatch = .dispatch(algorithms: decompression.urlSessionManualAlgorithms)
 
             case .enabled:
                 decompressionDispatch = .skip
@@ -804,6 +794,37 @@ extension Internals {
                 response: response,
                 metrics: metrics
             )
+        }
+
+        /// The `Accept-Encoding` this client sets on a request that doesn't carry one, for
+        /// `decompression`; `nil` when it leaves the header to CFNetwork.
+        ///
+        /// Either every configured algorithm is one CFNetwork decodes natively, and this stays
+        /// quiet (`nil`), or at least one is custom and the header announces only the custom ones:
+        /// this package decodes those itself, and never asks the server for `gzip`/`deflate`/`br`,
+        /// so there is nothing for CFNetwork to decode (or to leave encoded) behind this package's
+        /// back. How CFNetwork treats an `Accept-Encoding` set by the caller is not something this
+        /// relies on; it has been seen to decode a response whatever the header says, so a native
+        /// encoding in a mixed list is not dispatched to its placeholder: it is a response nobody
+        /// asked for, and fails as one (`Internals.UnsupportedContentEncodingError`), see
+        /// `Internals.Decompression.urlSessionManualAlgorithms`. `.disabled` says `identity`; see
+        /// `Internals.Decompression.requiresManualURLSessionHandling`.
+        ///
+        /// A conditional revalidation request is announced with the same value as the request it
+        /// revalidates, so the server answers it for the same representation.
+        static func announcedAcceptEncoding(for decompression: Internals.Decompression) -> String? {
+            switch decompression {
+            case .disabled:
+                return "identity"
+
+            case .enabled where decompression.requiresManualURLSessionHandling:
+                return decompression.urlSessionManualAlgorithms
+                    .map(\.contentEncodingValue)
+                    .joined(separator: ", ")
+
+            case .enabled:
+                return nil
+            }
         }
 
         /// Runs one request for `executeSessionTask`, from sending it to the end of the response
