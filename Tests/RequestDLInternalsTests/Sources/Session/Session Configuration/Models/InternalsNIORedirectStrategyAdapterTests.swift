@@ -299,6 +299,38 @@ extension InternalsNIORedirectStrategyAdapterTests {
             try adapter.redirectDecision(for: context)
         }
     }
+
+    /// A strategy's headers are no more trusted than the caller's, and the error for a rejected
+    /// one must not carry the value: AsyncHTTPClient's own does.
+    @Test
+    func redirectDecision_whenFollowingWithAHeaderValueThatIsNotValid_throwsWithoutTheValue() throws {
+        let strategy = RecordingStrategy { context in
+            var request = context.redirectRequest
+            request.headers.add(name: "X-Token", value: "s3cr3t\u{0000}token")
+            return .follow(request)
+        }
+
+        let adapter = Internals.NIORedirectStrategyAdapter(strategy: strategy)
+
+        let context = HTTPClientRedirectContext(
+            redirectRequest: HTTPClientRequest(url: "https://example.com/redirected"),
+            response: .init(version: .http1_1, status: .found),
+            history: [
+                HTTPClientRequestResponse(
+                    request: HTTPClientRequest(url: "https://example.com/original"),
+                    responseHead: .init(version: .http1_1, status: .found)
+                )
+            ],
+            redirectCount: 0
+        )
+
+        let error = #expect(throws: Internals.InvalidHeaderError.self) {
+            try adapter.redirectDecision(for: context)
+        }
+
+        #expect(error == Internals.InvalidHeaderError(.value, count: 1, headerNames: ["X-Token"]))
+        #expect(!String(describing: error).contains("s3cr3t"))
+    }
 }
 
 private final class RecordingStrategy: Internals.RedirectStrategy, @unchecked Sendable {

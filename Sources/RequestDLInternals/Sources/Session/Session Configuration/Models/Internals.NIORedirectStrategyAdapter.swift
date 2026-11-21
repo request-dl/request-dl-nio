@@ -79,6 +79,10 @@ extension Internals {
                 // a strategy: no more trusted than the caller's own.
                 try Internals.MethodValidation.validate(redirectRequest.method)
 
+                // AsyncHTTPClient refuses a bad header too, but with an error that carries every
+                // offending value.
+                try Internals.HeaderValidation.validate(redirectRequest.headers)
+
                 var request = context.redirectRequest
                 request.url = redirectRequest.url
                 request.method = .init(rawValue: redirectRequest.method)
