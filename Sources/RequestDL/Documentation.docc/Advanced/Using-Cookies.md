@@ -33,7 +33,9 @@ A request that sets a `Cookie` header itself keeps it on every hop to the same o
 
 ### Public suffixes
 
-Without help, a server could set a cookie for `Domain=co.uk` and have it sent to every site below it. The jar always refuses a `Domain` that is a single label, with a list or without one. To refuse multi-label suffixes too, give it a Public Suffix List, which RequestDL does not bundle because it keeps changing:
+Without help, a server could set a cookie for `Domain=co.uk` and have it sent to every site below it. The jar always refuses a `Domain` that is a single label, with a list or without one. To refuse multi-label suffixes too, give it a Public Suffix List, which RequestDL does not bundle because it keeps changing.
+
+The jar has **no list by default**, and that matters beyond country suffixes. Platforms that host many unrelated sites under one name are public suffixes too, and without a list one tenant can plant a cookie on all the others. `attacker.github.io` can answer with `Set-Cookie: sid=attacker; Domain=github.io`, and the jar then sends that cookie to every other `*.github.io` site it visits (session fixation, or a cookie bomb that breaks the others). The same holds for `*.herokuapp.com`, `*.vercel.app`, `*.netlify.app`, `*.pages.dev`, `*.azurewebsites.net`, S3 buckets under `*.s3.amazonaws.com`, and every other name in the private section of the list. If the jar talks to hosts you do not control, give it a list:
 
 ```swift
 let list = try PublicSuffixList(contentsOf: bundledListURL)
