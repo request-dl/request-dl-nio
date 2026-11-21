@@ -87,9 +87,24 @@ extension BackgroundDownloads {
 
         // MARK: - Internal properties
 
+        /// Makes the directory a decoded file is written in, for the destination it is meant to
+        /// replace. The system's own place for that by default; only the tests change it, so that
+        /// they know which directory to look at.
+        let replacementDirectory: @Sendable (_ destination: URL) throws -> URL
+
         var onEvent: (@Sendable (BackgroundDownloads.Event) -> Void)? {
             get { lock.withLock { _onEvent } }
             set { lock.withLock { _onEvent = newValue } }
+        }
+
+        // MARK: - Inits
+
+        init(
+            replacementDirectory: @escaping @Sendable (_ destination: URL) throws -> URL =
+                Session.systemReplacementDirectory
+        ) {
+            self.replacementDirectory = replacementDirectory
+            super.init()
         }
 
         // MARK: - Internal methods
@@ -489,19 +504,23 @@ extension BackgroundDownloads {
                     task: downloadTask,
                     destination: destination
                 )
-                let source = decoded ?? location
+                let source = decoded?.file ?? location
 
                 do {
+                    // Whatever happens next, the directory the decoded file was made in has served:
+                    // it is empty once the file is moved, and useless if the move fails. Gone before
+                    // the event, so that whoever is told the download is over finds nothing behind.
+                    defer {
+                        if let decoded {
+                            try? FileManager.default.removeItem(at: decoded.directory)
+                        }
+                    }
+
                     if FileManager.default.fileExists(atPath: destination.path) {
                         _ = try FileManager.default.replaceItemAt(destination, withItemAt: source)
                     } else {
                         try FileManager.default.moveItem(at: source, to: destination)
                     }
-                } catch {
-                    if let decoded {
-                        try? FileManager.default.removeItem(at: decoded)
-                    }
-                    throw error
                 }
 
                 onEvent?(.completed(id: id, destination: destination))

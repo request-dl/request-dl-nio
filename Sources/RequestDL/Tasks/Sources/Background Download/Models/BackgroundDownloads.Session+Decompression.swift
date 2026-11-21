@@ -26,10 +26,11 @@ extension BackgroundDownloads.Session {
     /// copy across volumes, in `decodingChunkSize` pieces: the file is never held whole, which is
     /// the reason to stream a download to disk in the first place.
     ///
-    /// - Returns: The decoded file, which the caller moves to `destination` and removes if that
-    ///   fails; `nil` when `location` is already what has to be moved: the request did not take
-    ///   over `Accept-Encoding` (the common case, and every download an older version scheduled),
-    ///   or the response carries no encoding to undo.
+    /// - Returns: The decoded file, which the caller moves to `destination`, and the directory it
+    ///   is in, which the caller removes whether or not that worked; `nil` when `location` is
+    ///   already what has to be moved: the request did not take over `Accept-Encoding` (the common
+    ///   case, and every download an older version scheduled), or the response carries no encoding
+    ///   to undo.
     /// - Throws: ``UnsupportedContentEncodingError`` when the encoding is none of those the
     ///   request asked for, or several are stacked; ``BackgroundDownloadMissingDecompressorError``
     ///   when it is one that was asked for but no decompressor for it exists in this process; or
@@ -39,7 +40,7 @@ extension BackgroundDownloads.Session {
         response: URLResponse?,
         task: URLSessionTask,
         destination: URL
-    ) throws -> URL? {
+    ) throws -> (file: URL, directory: URL)? {
         guard let accepted = Self.decodeAcceptedEncodings(task.taskDescription) else {
             return nil
         }
@@ -72,12 +73,7 @@ extension BackgroundDownloads.Session {
         // `destination`, so that moving it there is a rename and not a copy, and one the system
         // sweeps if the app is killed mid-decode, which a file left beside `destination` would
         // never be.
-        let directory = try FileManager.default.url(
-            for: .itemReplacementDirectory,
-            in: .userDomainMask,
-            appropriateFor: destination,
-            create: true
-        )
+        let directory = try replacementDirectory(destination)
         let output = directory.appendingPathComponent(destination.lastPathComponent)
 
         guard FileManager.default.createFile(atPath: output.path, contents: nil) else {
@@ -97,7 +93,18 @@ extension BackgroundDownloads.Session {
             throw error
         }
 
-        return output
+        return (output, directory)
+    }
+
+    /// The system's own place for what is about to replace `destination`, as
+    /// ``decodedFile(from:response:task:destination:)`` uses it: a new directory on the same volume.
+    static let systemReplacementDirectory: @Sendable (URL) throws -> URL = { destination in
+        try FileManager.default.url(
+            for: .itemReplacementDirectory,
+            in: .userDomainMask,
+            appropriateFor: destination,
+            create: true
+        )
     }
 
     /// The pure part of ``decodedFile(from:response:task:destination:)``, kept apart so it can be

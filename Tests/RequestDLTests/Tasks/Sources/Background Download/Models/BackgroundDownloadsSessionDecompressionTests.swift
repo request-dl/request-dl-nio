@@ -54,6 +54,54 @@ struct BackgroundDownloadsSessionDecompressionTests {
         }
     }
 
+    /// The directory the decoded file is made in is the system's own, not beside `destination`, so
+    /// `leftovers(beside:)` cannot see it: a session that records the ones it made can.
+    @Test
+    func theDirectoryTheDecodedFileWasMadeIn_isRemovedWhateverTheOutcome() async throws {
+        try await withTemporaryFileURL("destination.txt") { destination in
+            let directories = LockedValueBox<[URL]>([])
+            let session = Self.session(recording: directories)
+            session.register(Self.algorithm(RLEDecompressor()))
+
+            // Decoded and moved.
+            let completed = try await Self.download(
+                id: "completed",
+                to: destination,
+                encoding: "rle",
+                body: Self.rleEncode("aabb"),
+                session: session
+            )
+            #expect(Self.terminal(completed).count == 1)
+            #expect(directories.withLockedValue { $0 }.count == 1)
+
+            // Decoded and refused, for passing the limit.
+            let refused = try await Self.download(
+                id: "refused",
+                to: destination,
+                encoding: "rle",
+                body: Self.rleEncode(Self.bomb),
+                session: session,
+                limit: .size(10)
+            )
+            #expect(try Self.failure(of: refused) is BackgroundDownloadDecompressionLimitError)
+
+            // Decoded and failed, for ending in the middle of a pair.
+            session.register(Self.algorithm(StrictDecompressor()))
+            let truncated = try await Self.download(
+                id: "truncated",
+                to: destination,
+                encoding: "strict",
+                body: [97],
+                session: session
+            )
+            #expect(try Self.failure(of: truncated) is StrictDecompressor.TruncatedError)
+
+            let made = directories.withLockedValue { $0 }
+            #expect(made.count == 3)
+            #expect(made.allSatisfy { !FileManager.default.fileExists(atPath: $0.path) })
+        }
+    }
+
     /// More than one piece is read, so the decoder is fed across `decodingChunkSize` boundaries.
     @Test
     func aBodyLargerThanOnePiece_isDecodedWhole() async throws {
@@ -804,6 +852,15 @@ struct BackgroundDownloadsSessionDecompressionTests {
             throw CancellationError()
         }
         return error
+    }
+
+    /// A session that makes the directories of its decoded files as the system does, and records them.
+    private static func session(recording directories: LockedValueBox<[URL]>) -> BackgroundDownloads.Session {
+        BackgroundDownloads.Session { destination in
+            let directory = try BackgroundDownloads.Session.systemReplacementDirectory(destination)
+            directories.withLockedValue { $0.append(directory) }
+            return directory
+        }
     }
 
     /// Whatever the decoding left beside `destination` besides `destination` itself.
