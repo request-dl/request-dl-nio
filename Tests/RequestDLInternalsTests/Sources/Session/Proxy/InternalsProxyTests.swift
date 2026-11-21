@@ -239,6 +239,29 @@ struct InternalsProxyTests {
         #expect(http.droppingUnusableSOCKSCredentials(logger: nil) == http)
     }
 
+    /// Credentials of 255 bytes are valid RFC 1929 and the system's proxy keeps them, but
+    /// `.urlSession` cannot send them intact. That is the one way credentials of a system proxy
+    /// keep a session off an executor (an explicit `requiredExecutor(.urlSession)` fails), and
+    /// `Proxy`'s documentation says so.
+    @Test
+    func droppingUnusableSOCKSCredentials_keeps255ByteCredentialsThatURLSessionCannotCarry() {
+        let username = String(repeating: "u", count: 255)
+        let password = String(repeating: "p", count: 255)
+        let proxy = Internals.Proxy(
+            host: "p",
+            port: 1,
+            connection: .socks,
+            authorization: .socks(username: username, password: password)
+        )
+
+        #expect(proxy.droppingUnusableSOCKSCredentials(logger: nil) == proxy)
+
+        var configuration = Internals.Session.Configuration()
+        configuration.proxy = proxy.droppingUnusableSOCKSCredentials(logger: nil)
+
+        #expect(configuration.urlSessionIncompatibilityReasons() == [.proxySOCKSCredentialsTooLongUnderURLSession])
+    }
+
     @Test
     func validate_whenTheShapeDoesNotFitTheProtocol_throws() {
         for authorization in [
