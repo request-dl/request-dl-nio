@@ -533,6 +533,27 @@ struct CacheRevalidationTests {
     }
 
     @Test
+    func freshness_whenMaxAgeIsBeyondTheCeiling_readsAsInt32Max() async throws {
+        // Given: the ceiling is `Int32.max`, so that the constant fits an `Int` on watchOS
+        // arm64_32. An `Age` equal to it uses the whole `max-age` up (RFC 9111 §4.2.3), leaving no
+        // time: with the RFC's 2^31 it would leave one second and the entry would be served.
+        let dataCache = makeCache()
+        let configuration = makeConfiguration(strategy: .returnCachedDataElseLoad)
+
+        await store(
+            response([("Cache-Control", "max-age=99999999999999999999"), ("Age", "\(Int32.max)")]),
+            key: configuration.url,
+            in: dataCache
+        )
+
+        // When
+        let output = await decide(configuration, in: dataCache)
+
+        // Then
+        #expect(isServed(output) == false)
+    }
+
+    @Test
     func freshness_whenMaxAgeIsQuoted_isRead() async throws {
         // Given
         let dataCache = makeCache()

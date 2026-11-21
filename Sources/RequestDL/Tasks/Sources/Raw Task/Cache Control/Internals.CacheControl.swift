@@ -1147,8 +1147,9 @@ extension Internals {
         }
 
         /// What RFC 9111 §1.2.2 calls `delta-seconds`: digits only, optionally in quotes, which a
-        /// recipient ought to accept. A value too large for an `Int` reads as 2^31, as the RFC
-        /// says, which is already more than a cache keeps anything for.
+        /// recipient ought to accept. A value beyond `largestDeltaSeconds` reads as that ceiling
+        /// (the RFC says 2^31, this is one second less), which is already more than a cache keeps
+        /// anything for.
         private static func deltaSeconds(_ value: String) -> Int? {
             var digits = value.trimming(where: \.isWhitespace)
 
@@ -1163,7 +1164,10 @@ extension Internals {
             return min(Int(digits) ?? Self.largestDeltaSeconds, Self.largestDeltaSeconds)
         }
 
-        private static let largestDeltaSeconds = 2_147_483_648
+        /// 2^31 - 1, not the RFC's 2^31: a literal of 2^31 does not fit an `Int` where that is 32
+        /// bits wide (watchOS on arm64_32), and the package would not build for a watch. One
+        /// second short of the RFC's ceiling is still centuries beyond any entry's useful life.
+        private static let largestDeltaSeconds = Int(Int32.max)
 
         /// Flattens header values into individual directives.
         ///
