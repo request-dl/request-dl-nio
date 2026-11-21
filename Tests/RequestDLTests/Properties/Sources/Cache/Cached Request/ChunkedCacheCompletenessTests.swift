@@ -46,6 +46,7 @@ struct ChunkedCacheCompletenessTests {
         against server: TransferServer,
         executor: Executor,
         probes: Bool = false,
+        capacity: Int64 = 8 * 1_024 * 1_024,
         expectingRequests expected: Int = 1
     ) async -> Outcome {
         let dataCache = DataCache(suiteName: UUID().uuidString)
@@ -55,7 +56,7 @@ struct ChunkedCacheCompletenessTests {
             .cachePolicy(.all)
             .cacheStrategy(.returnCachedDataElseLoad)
             .cacheCompletenessProbe(probes)
-            .cache(memoryCapacity: 8 * 1_024 * 1_024, diskCapacity: 8 * 1_024 * 1_024, url: dataCache.directoryURL)
+            .cache(memoryCapacity: capacity, diskCapacity: capacity, url: dataCache.directoryURL)
 
         var bytes: Int?
         var failure: (any Error)?
@@ -174,6 +175,20 @@ struct ChunkedCacheCompletenessTests {
         try await withTransferServer(.init(length: Self.length, supportsRanges: false, isChunked: true)) { server in
             let outcome = await Self.run(against: server, executor: .urlSession, probes: true)
 
+            #expect(outcome.bytes == Self.length)
+            #expect(outcome.requests.count == 1)
+            #expect(outcome.cached == nil)
+        }
+    }
+
+    @Test
+    private func probe_whenNoTierKeptTheBody_doesNotAsk() async throws {
+        // Given: a chunked body that outgrows both tiers, so nothing is left to complete.
+        try await withTransferServer(.init(length: Self.length, isChunked: true)) { server in
+            // When
+            let outcome = await Self.run(against: server, executor: .urlSession, probes: true, capacity: 16_384)
+
+            // Then: the caller has the body, and the one request is the only one made.
             #expect(outcome.bytes == Self.length)
             #expect(outcome.requests.count == 1)
             #expect(outcome.cached == nil)

@@ -167,8 +167,21 @@ extension DataCache {
         /// Closes the disk buffer, so everything written through it is on disk and, with an
         /// encryption key, the final chunk is sealed. Left to the buffer's own teardown, that
         /// happens after the entry is already being served.
+        ///
+        /// A body with no bytes is given a stream to close all the same. The output stream is
+        /// opened by the first write, so without one an encrypted `data.record` stayed a file
+        /// with no bytes at all, which cannot be told from a write that was killed before its
+        /// first chunk: every read of it waited for the whole retry budget and then missed.
         func closeDiskBuffer() async {
-            try? await diskBuffer?.close()
+            guard var diskBuffer else {
+                return
+            }
+
+            if diskBuffer.readableBytes == .zero {
+                await diskBuffer.writeData(Data())
+            }
+
+            try? await diskBuffer.close()
         }
     }
 }

@@ -67,9 +67,9 @@ Responses that are cacheable but this large are best served by a cache that can 
 
 A cache entry that is cut short is worse than no entry: it is served for as long as it stays fresh, and nothing about it says it is incomplete. So RequestDL only stores a response it can tell arrived whole.
 
-On the `.nio` executors that is always the case. A body with a `Content-Length` is checked against it, and a chunked body (`Transfer-Encoding: chunked`, no `Content-Length`) ends with a terminating zero-length chunk: a connection that closes before it fails the request, and a failed response is never stored. Chunked responses are cached as usual.
+On the `.nio` executors that holds for the two kinds of body that say where they end. A body with a `Content-Length` is checked against it, and a chunked body (`Transfer-Encoding: chunked`, no `Content-Length`) ends with a terminating zero-length chunk: a connection that closes before it fails the request, and a failed response is never stored. Chunked responses are cached as usual.
 
-On the `.urlSession` executor they are not. CFNetwork reports a chunked response whose connection was closed exactly between two chunks as a successful, complete one, and gives nothing to tell the two apart. A response without a `Content-Length` is therefore **delivered to the caller as usual and not stored**: the request succeeds, and the next one for that URL is a cache miss. This applies to every `.urlSession` response that has no `Content-Length`, with the exception of `204`, and also to one that did arrive whole, since it looks the same.
+The exception is a body that is delimited by the connection closing: an HTTP/1.0 server, or a proxy, that answers with neither a `Content-Length` nor a `Transfer-Encoding`. The end of such a body is the end of the connection, and a connection that drops half way ends it just the same, so there is nothing that says it was cut. RequestDL treats it as complete and stores it: `.nio` has no way to tell, and `.urlSession` only holds back a response that shows a `Transfer-Encoding`. This is a limit of HTTP/1.x itself, not something the cache can detect. If a server you depend on behaves like this, the completeness probe does not help (it only runs for chunked responses): keep such responses out of the cache with ``RequestDL/Property/cachePolicy(_:)``, or have the server send a `Content-Length`.
 
 If you need these responses cached, you have two ways:
 
@@ -97,7 +97,7 @@ What the answer says:
 | `206` | There is a byte after them: the body was cut. | No |
 | `200`, any other status, a `416` for another length, a failure or no answer in time | The server does not do ranges, or says something else. | No |
 
-The probe only runs when the response advertised `Accept-Ranges: bytes`, which keeps a server that ignores `Range` from answering the probe with the whole body again. It does not decide, and nothing is stored, when:
+The probe only runs when the response advertised `Accept-Ranges: bytes`, which keeps a server that ignores `Range` from answering the probe with the whole body again. A server that answers with the whole body anyway, because the `If-Range` no longer matches, is not read past its headers: the probe stops at the status line and the headers, and cancels the request. It does not decide, and nothing is stored, when:
 
 - the response has a `Content-Encoding`. `.urlSession` hands over the decoded body, and a byte range counts the encoded one, so `n` would point somewhere else;
 - the server does not support ranges for a body that it sends chunked. That is common for responses generated on the fly, and for those the answer is not in the probe's hands: pin them to `.nio`;

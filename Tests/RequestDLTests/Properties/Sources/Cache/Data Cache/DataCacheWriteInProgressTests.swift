@@ -105,6 +105,39 @@ struct DataCacheWriteInProgressTests {
         #expect(await cached.data.count == 1_000)
     }
 
+    /// A response with an empty body and no `Content-Length: 0` (chunked, or HTTP/2) writes no
+    /// chunk, and the output stream opens on the first write. It has to read back as the empty body
+    /// it is, at once, not as a miss after the retries made for a half written file.
+    @Test
+    func getCachedData_afterAnEncryptedWriteOfAnEmptyBody_isASealedHit() async throws {
+        // Given
+        let (dataCache, key) = makeCache(policy: .disk)
+        dataCache.encryptionKey = DataCache.EncryptionKey(SymmetricKey(size: .bits256))
+
+        let buffer = try #require(
+            await dataCache.allocateBuffer(
+                key: key,
+                cachedResponse: response(key, policy: .disk),
+                contentLength: 0
+            )
+        )
+
+        // When: nothing is ever written.
+        await dataCache.finalizeWrite(buffer, contentLengthHint: 0)
+
+        let cached = await dataCache.getCachedData(forKey: key, policy: .disk)
+
+        // Then: sealed, not left as a file with no bytes: a header (13) and the tag of an empty
+        // final chunk (16). A file with no bytes is a miss after the retries made for a half
+        // written one, about 290 ms on every read.
+        let recordURL = try #require(buffer.diskRecordURL)
+        let raw = try Data(contentsOf: recordURL.appendingPathComponent("data.record"))
+        #expect(raw.count == 13 + 16)
+
+        let entry = try #require(cached)
+        #expect(entry.buffer.readableBytes == 0)
+    }
+
     // MARK: - A write that does not finish
 
     @Test(arguments: [DataCache.Policy.Set.memory, .disk])
