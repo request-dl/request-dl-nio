@@ -535,7 +535,9 @@ final class ResumableUploadExecution: @unchecked Sendable {
                 // goes on.
                 try checkNotCancelled()
 
-                download.append(await Internals.DataBuffer(data))
+                // A value that is already in memory: `Internals.DataBuffer` would put each chunk
+                // behind a lock and a handle, for nothing that is read from it.
+                download.append(Internals.Chunk(data))
             }
         } catch {
             exchange.seed()
