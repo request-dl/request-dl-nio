@@ -749,6 +749,10 @@ extension Internals {
             let session = session
             let isResumable = uploadBody == nil
 
+            // What `exchange` hands back at its end, and what a download waiting to reconnect hands
+            // back for the time it waits (see `resumeDownload`).
+            let slot = ThrottleSlot(executor: throttledExecutor, release: release)
+
             // Unstructured on purpose: it runs for as long as the exchange does, well past this
             // method's return, the same way the `URLSessionTask` it replaces did. Owns every
             // ending: the throttle slot, the operation-queue slot and a spilled upload file are
@@ -769,11 +773,12 @@ extension Internals {
                     flowControl: flowControl,
                     transferControl: transferControl,
                     resumption: isResumable ? transferControl?.resumption : nil,
-                    uploadPump: uploadPump
+                    uploadPump: uploadPump,
+                    slot: slot
                 )
 
                 upload.close()
-                release()
+                slot.release()
                 operation.complete()
 
                 // Only now, not once the body finished sending: a redirect or authentication
@@ -821,6 +826,54 @@ extension Internals {
                 response: response,
                 metrics: metrics
             )
+        }
+
+        /// The throttle slot of one exchange, which can be given back and taken again while the
+        /// exchange runs: held from its admission to its end, except while a download waits to
+        /// reconnect (see `resumeDownload`).
+        ///
+        /// `release()` is idempotent and does nothing while the slot is not held, so the end of
+        /// the exchange can hand back whatever it holds then, however it got there.
+        private final class ThrottleSlot: @unchecked Sendable {
+
+            // MARK: - Private properties
+
+            private let executor: Internals.ThrottledExecutor
+            private let lock = Lock()
+
+            // MARK: - Unsafe properties
+
+            /// `nil` while the slot is not held.
+            private var _release: (@Sendable () -> Void)?
+
+            // MARK: - Inits
+
+            /// - Parameter release: What gives back the slot `executor` admitted this exchange with.
+            init(executor: Internals.ThrottledExecutor, release: @escaping @Sendable () -> Void) {
+                self.executor = executor
+                self._release = release
+            }
+
+            // MARK: - Internal methods
+
+            func release() {
+                let release = lock.withLock { () -> (@Sendable () -> Void)? in
+                    defer { _release = nil }
+                    return _release
+                }
+
+                release?()
+            }
+
+            /// Waits for a slot, cancellably, and holds it until ``release()``.
+            ///
+            /// - Throws: `CancellationError` if the current task is cancelled while it waits, in
+            /// which case nothing is held.
+            func acquire() async throws {
+                let release = try await executor.acquire()
+
+                lock.withLock { _release = release }
+            }
         }
 
         /// The `Accept-Encoding` this client sets on a request that doesn't carry one, for
@@ -873,7 +926,8 @@ extension Internals {
             flowControl: Internals.FlowControlWindow,
             transferControl: Internals.TransferControl?,
             resumption: Internals.DownloadResumptionPolicy?,
-            uploadPump: Internals.URLSessionUploadBodyPump?
+            uploadPump: Internals.URLSessionUploadBodyPump?,
+            slot: ThrottleSlot
         ) async {
             // Nothing is produced into the window past this point, whichever way this ends, so
             // it must not be left able to pause anything. The pump stops before the gate opens,
@@ -1023,7 +1077,8 @@ extension Internals {
                         readingMode: wireReadingMode,
                         downloadBuffer: downloadBuffer,
                         flowControl: flowControl,
-                        transferControl: transferControl
+                        transferControl: transferControl,
+                        slot: slot
                     )
                 }
 
@@ -1074,7 +1129,8 @@ extension Internals {
             readingMode: Internals.DownloadStep.ReadingMode,
             downloadBuffer: Internals.DownloadBuffer,
             flowControl: Internals.FlowControlWindow,
-            transferControl: Internals.TransferControl
+            transferControl: Internals.TransferControl,
+            slot: ThrottleSlot
         ) async throws {
             var failure = error
 
@@ -1086,6 +1142,15 @@ extension Internals {
                 else {
                     throw failure
                 }
+
+                // Nothing of this download is on the network until the continuation goes out, and
+                // that can be as long as an execution stays suspended (hours, if the app wants).
+                // Held for all of it, the slot would keep every other request of the session
+                // waiting, when `maximumConcurrentConnections` is what it is for: the limit on
+                // what is open. It is what `.nio` does (`Internals.NIODownloadReconnection` waits
+                // without a slot and asks for a new one when it sends the continuation). Given
+                // back on every pass, since the continuation that follows is taken again below.
+                slot.release()
 
                 // Released by the seed along with everything else when the exchange is cancelled,
                 // which is what ends this wait then; the handler covers any other cancellation.
@@ -1100,6 +1165,16 @@ extension Internals {
                 }
 
                 guard !Task.isCancelled else {
+                    throw URLError(.cancelled)
+                }
+
+                // The continuation is an exchange like any other, and is counted against the limit
+                // like one: it waits its turn behind whoever took the slot meanwhile. The wait is
+                // cancellable, and a cancelled one ends the download the way the check above does.
+                // Held again from here to the end of the exchange, which is what hands it back.
+                do {
+                    try await slot.acquire()
+                } catch {
                     throw URLError(.cancelled)
                 }
 
