@@ -69,6 +69,17 @@
 /// > Note: Two hosts overridden to the *same* destination are, for this check, the same origin:
 /// > both are sent to one place, which already received the credentials.
 ///
+/// A redirect that a rule covers but whose destination cannot be built as a URL fails with an
+/// error instead of being followed to the host the server wrote, which is the one the rule
+/// stands in for.
+///
+/// > Important: The proxy is chosen once, for the destination of the first request, and every hop
+/// > of a redirect goes through that same proxy (or none): neither an explicit ``Proxy`` nor
+/// > ``SystemProxy`` (its bypass list or PAC script included) is consulted again for the host a
+/// > hop is rewritten or redirected to. With rules, a redirect from an overridden host to one no
+/// > rule covers, or the other way round, can therefore reach a host through a proxy that
+/// > would not have been used for it on its own, or around one that would have been.
+///
 /// > Important: A ``BackgroundDownloadTask`` is followed through redirects by the system, which
 /// > gives the app no chance to rewrite a hop: the override applies to the request that starts it.
 ///

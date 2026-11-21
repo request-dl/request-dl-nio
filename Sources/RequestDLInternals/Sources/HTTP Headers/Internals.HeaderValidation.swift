@@ -2,24 +2,22 @@
 // See LICENSE for this package's licensing information.
 //
 
-#if canImport(NIOCore)
-import AsyncHTTPClient
-#endif
-
 extension Internals {
 
     /// The header rules AsyncHTTPClient enforces on every request it sends, for the executor that
     /// does not have it.
     ///
     /// `.nio` rejects a request whose header name is not a token (RFC 9110 §5.1) or whose value
-    /// carries a control character other than HTAB (RFC 9110 §5.5), failing it with
-    /// `HTTPClientError.invalidHeaderFieldNames`/`.invalidHeaderFieldValues`. `URLSession` checks
+    /// carries a control character other than HTAB (RFC 9110 §5.5). `URLSession` checks
     /// neither: a name of `X-A: injected` goes out as the line `X-A: injected: v`, and a NUL in a
     /// value goes out as a NUL, so the same request that fails on one executor reaches the server
     /// on the other, with a header the caller never wrote.
     ///
     /// This is the same check, with the same error, so which of the two runs a request does not
-    /// change whether it is sent. The predicates are AsyncHTTPClient's own (see
+    /// change whether it is sent. The error is ``InvalidHeaderError``, on every platform: it names
+    /// what was wrong and never a header value, since a value is as likely to be a credential as
+    /// anything else, and AsyncHTTPClient's own `HTTPClientError.invalidHeaderFieldValues` carries
+    /// every offending value and prints it. The predicates are AsyncHTTPClient's own (see
     /// `RequestValidation.swift` there), not a stricter reading of the RFC, except for the empty
     /// name that ``isValid(name:)`` refuses: tightening them any further here would make
     /// `.urlSession` refuse what `.nio` sends. `.nio` applies this check too, before AsyncHTTPClient's.
@@ -33,30 +31,23 @@ extension Internals {
 
         // MARK: - Package static methods
 
-        /// - Throws: `HTTPClientError.invalidHeaderFieldNames`/`.invalidHeaderFieldValues` (every
-        /// offender, names first, as AsyncHTTPClient reports them) where AsyncHTTPClient is
-        /// available, ``InvalidHeaderError`` where it is not.
+        /// - Throws: ``InvalidHeaderError``, for the names when any is not a token and otherwise for
+        /// the values, as AsyncHTTPClient reports them, but without the offending values.
         package static func validate<Headers: Sequence>(
             _ headers: Headers
         ) throws where Headers.Element == (name: String, value: String) {
-            let invalidNames = headers.compactMap { isValid(name: $0.name) ? nil : $0.name }
+            let invalidNames = headers.filter { !isValid(name: $0.name) }
 
             guard invalidNames.isEmpty else {
-                #if canImport(NIOCore)
-                throw HTTPClientError.invalidHeaderFieldNames(invalidNames)
-                #else
                 throw InvalidHeaderError(.name, count: invalidNames.count)
-                #endif
             }
 
-            let invalidValues = headers.compactMap { isValid(value: $0.value) ? nil : $0.value }
+            // The name of a header whose value is invalid is a token, so it is safe to report and
+            // says which one to look at; the value is not.
+            let invalidValues = headers.filter { !isValid(value: $0.value) }
 
             guard invalidValues.isEmpty else {
-                #if canImport(NIOCore)
-                throw HTTPClientError.invalidHeaderFieldValues(invalidValues)
-                #else
-                throw InvalidHeaderError(.value, count: invalidValues.count)
-                #endif
+                throw InvalidHeaderError(.value, count: invalidValues.count, headerNames: invalidValues.map(\.name))
             }
         }
 
@@ -100,11 +91,11 @@ extension Internals {
         }
     }
 
-    /// What ``HeaderValidation/validate(_:)`` throws where AsyncHTTPClient, whose own errors
-    /// these are on `.nio`, is not part of the build.
+    /// What ``HeaderValidation/validate(_:)`` throws.
     ///
     /// Says what was wrong, not with what: a rejected value is as likely to be a credential as
-    /// anything else, and an error's description ends up in logs.
+    /// anything else, and an error's description ends up in logs. For a value it also names the
+    /// headers that carried one, which are valid tokens; a rejected name is only counted.
     package struct InvalidHeaderError: Swift.Error, Sendable, Hashable, CustomStringConvertible {
 
         // MARK: - Inner types
@@ -118,21 +109,25 @@ extension Internals {
 
         package let kind: Kind
         package let count: Int
+        /// The names of the headers whose value was rejected. Empty for ``Kind/name``.
+        package let headerNames: [String]
 
         package var description: String {
             switch kind {
             case .name:
                 return "\(count) header field name(s) are not valid tokens."
             case .value:
-                return "\(count) header field value(s) contain a control character."
+                let names = headerNames.isEmpty ? "" : " (\(headerNames.joined(separator: ", ")))"
+                return "\(count) header field value(s) contain a control character\(names)."
             }
         }
 
         // MARK: - Inits
 
-        package init(_ kind: Kind, count: Int) {
+        package init(_ kind: Kind, count: Int, headerNames: [String] = []) {
             self.kind = kind
             self.count = count
+            self.headerNames = headerNames
         }
     }
 }

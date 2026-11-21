@@ -362,6 +362,63 @@ struct URLOverrideRedirectTests {
         #expect(result.response == "reached")
     }
 
+    /// The request went to a server no rule covers (`/v1`), carrying credentials, and the response
+    /// sends it to another path of that same server, which a path-scoped rule maps to a different
+    /// server. The `Location` is on the origin the request already went to, so the executor keeps
+    /// every credential; the destination is another origin, and none of them may get there.
+    @Test(arguments: executors, [Mode.follow, .strategy])
+    func dataTask_whenASameOriginLocationIsMappedToAnotherOrigin_stripsTheCredentials(
+        executor: Executor,
+        mode: Mode
+    ) async throws {
+        // Given
+        let origin = try await LocalServer(.init(host: "localhost", port: 8941, option: .none))
+        let destination = try await LocalServer(.init(host: "localhost", port: 8942, option: .none))
+
+        let first = UUID().uuidString
+        let next = UUID().uuidString
+
+        origin.cleanup(at: "/v1/\(first)")
+        destination.cleanup(at: "/\(next)")
+        defer {
+            origin.cleanup(at: "/v1/\(first)")
+            destination.cleanup(at: "/\(next)")
+        }
+
+        origin.insert(
+            LocalServer.ResponseConfiguration(
+                status: .found,
+                headers: ["Location": "https://\(origin.baseURL)/v2/\(next)"],
+                data: Data()
+            ),
+            at: "/v1/\(first)"
+        )
+        destination.insert(try LocalServer.ResponseConfiguration(jsonObject: "reached"), at: "/\(next)")
+
+        // When: `/v2` of the origin is the only part a rule covers.
+        let data = try await DataTask {
+            BaseURL(origin.baseURL)
+            Path("v1/\(first)")
+            CustomHeader(name: "Cookie", value: "session=abc")
+
+            URLOverride("https://\(destination.baseURL)", from: "https://\(origin.baseURL)/v2")
+
+            mode.apply(to: executor.apply(to: .localServer))
+
+            SecureConnection {
+                TrustRoots(Certificates().server().certificateURL.absolutePath(percentEncoded: false))
+            }
+        }
+        .extractPayload()
+        .result()
+
+        let result = try HTTPResult<String>(data)
+
+        // Then
+        #expect(result.response == "reached")
+        #expect(result.receivedCookieHeader == nil)
+    }
+
     /// A relative `Location` is resolved against the host the request was actually sent to, so it
     /// needs no rule, and the rules have nothing to say about it.
     @Test(arguments: executors, [Mode.follow, .strategy])

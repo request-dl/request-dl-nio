@@ -166,6 +166,50 @@ struct InternalsURLSessionClientRedirectTests {
         }
     }
 
+    /// The server names a host a rule stands in for, but the rule's destination cannot be built:
+    /// the redirect fails with an error of its own instead of going to the host the server named.
+    @Test
+    func execute_whenARuleCoversTheLocationButItsDestinationCannotBeBuilt_throwsInvalidURL() async throws {
+        // Given
+        let localServer = try await LocalServer(.standard)
+        let origin = "/" + UUID().uuidString
+
+        localServer.cleanup(at: origin)
+        localServer.insert(
+            LocalServer.ResponseConfiguration(
+                status: .found,
+                headers: ["Location": "https://staging.example.test/next"],
+                data: Data()
+            ),
+            at: origin
+        )
+        defer { localServer.cleanup(at: origin) }
+
+        let url = try #require(URL(string: "https://\(localServer.baseURL)\(origin)"))
+        let client = try Internals.URLSessionClient(
+            configuration: .ephemeral,
+            redirectConfiguration: .follow(max: 5, allowCycles: false),
+            urlOverrides: .init(rules: [
+                .init(
+                    origin: .init(scheme: "https", host: "staging.example.test", port: nil, pathComponents: []),
+                    destination: .init(scheme: "https", host: "not a host", port: nil, pathComponents: [])
+                )
+            ])
+        )
+
+        // When
+        do {
+            _ = try await client.execute(
+                request: URLRequest(url: url),
+                delegate: AcceptAnyServerTrustDelegate()
+            )
+            Issue.record("Not expecting success")
+        } catch let error as Internals.RedirectError {
+            // Then
+            #expect(error.reason == .invalidURL(nil))
+        }
+    }
+
     @Test
     func execute_whenRedirectAllowsCycles_followsBackToAVisitedURL() async throws {
         // Given: a two-hop cycle (origin -> hop -> origin -> ...), same URIs as the cycle test

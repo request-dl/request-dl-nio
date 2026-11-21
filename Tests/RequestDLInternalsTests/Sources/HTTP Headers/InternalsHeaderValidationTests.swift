@@ -6,10 +6,6 @@ import Testing
 
 @testable import RequestDLInternals
 
-#if canImport(NIOCore)
-import AsyncHTTPClient
-#endif
-
 struct InternalsHeaderValidationTests {
 
     // MARK: - Names
@@ -55,26 +51,39 @@ struct InternalsHeaderValidationTests {
 
     // MARK: - Error
 
-    /// The error AsyncHTTPClient fails a `.nio` request with for the same header, so a caller
-    /// catching one catches the other.
-    #if canImport(NIOCore)
     @Test
-    func validate_whenNameIsInvalid_throwsTheErrorAsyncHTTPClientDoes() {
-        #expect(throws: HTTPClientError.invalidHeaderFieldNames(["X-A: injected"])) {
+    func validate_whenNameIsInvalid_throwsInvalidHeaderErrorWithoutTheName() {
+        let error = #expect(throws: Internals.InvalidHeaderError.self) {
             try Internals.HeaderValidation.validate([(name: "X-A: injected", value: "v")])
         }
+
+        #expect(error == Internals.InvalidHeaderError(.name, count: 1))
+        #expect(!String(describing: error).contains("injected"))
     }
 
     @Test
-    func validate_whenValueIsInvalid_throwsTheErrorAsyncHTTPClientDoes() {
-        #expect(throws: HTTPClientError.invalidHeaderFieldValues(["a\u{0000}b"])) {
-            try Internals.HeaderValidation.validate([(name: "X-A", value: "a\u{0000}b")])
+    func validate_whenValueIsInvalid_throwsInvalidHeaderErrorThatNamesTheHeaderAndNeverTheValue() {
+        let secret = "Bearer s3cr3t\u{0000}token"
+
+        let error = #expect(throws: Internals.InvalidHeaderError.self) {
+            try Internals.HeaderValidation.validate([
+                (name: "X-OK", value: "ok"),
+                (name: "Authorization", value: secret),
+            ])
+        }
+
+        #expect(error == Internals.InvalidHeaderError(.value, count: 1, headerNames: ["Authorization"]))
+
+        // Every way an error ends up in a log or a crash report.
+        for text in [String(describing: error), String(reflecting: error), "\(String(describing: error))"] {
+            #expect(!text.contains("s3cr3t"))
+            #expect(text.contains("Authorization"))
         }
     }
 
     @Test
     func validate_whenNameAndValueAreInvalid_reportsTheNamesFirstAndEveryOffender() {
-        #expect(throws: HTTPClientError.invalidHeaderFieldNames(["X A", "X:B"])) {
+        #expect(throws: Internals.InvalidHeaderError(.name, count: 2)) {
             try Internals.HeaderValidation.validate([
                 (name: "X A", value: "a\u{0000}b"),
                 (name: "X-OK", value: "ok"),
@@ -82,19 +91,4 @@ struct InternalsHeaderValidationTests {
             ])
         }
     }
-    #else
-    @Test
-    func validate_whenNameIsInvalid_throwsInvalidHeaderError() {
-        #expect(throws: Internals.InvalidHeaderError(.name, count: 1)) {
-            try Internals.HeaderValidation.validate([(name: "X-A: injected", value: "v")])
-        }
-    }
-
-    @Test
-    func validate_whenValueIsInvalid_throwsInvalidHeaderError() {
-        #expect(throws: Internals.InvalidHeaderError(.value, count: 1)) {
-            try Internals.HeaderValidation.validate([(name: "X-A", value: "a\u{0000}b")])
-        }
-    }
-    #endif
 }

@@ -172,6 +172,134 @@ struct InternalsNIOFollowRedirectStrategyTests {
         #expect(request.headers.first(name: "Host") == "api.internal")
     }
 
+    /// The leak behind the credential headers: a `Location` on the origin the previous hop went
+    /// to keeps every credential in AsyncHTTPClient's own rewrite, and a path-scoped rule then maps
+    /// it to another origin. What goes there must be what any redirect to another origin carries.
+    @Test
+    func redirectDecision_whenAPathScopedRuleMapsASameOriginLocationToAnotherOrigin_dropsTheCredentials() throws {
+        // Given: `/v1` is not covered, `/v2` is, and goes to `mock.internal`.
+        let strategy = Internals.NIOFollowRedirectStrategy(
+            max: 5,
+            allowCycles: false,
+            urlOverrides: .init(rules: [
+                .init(
+                    origin: .init(scheme: "https", host: "api.example.com", port: nil, pathComponents: ["v2"]),
+                    destination: .init(scheme: "https", host: "mock.internal", port: nil, pathComponents: [])
+                )
+            ])
+        )
+
+        // When: AsyncHTTPClient saw a same-origin redirect and kept everything.
+        let decision = try strategy.redirectDecision(
+            for: context(
+                to: "https://api.example.com/v2/x",
+                history: ["https://api.example.com/v1/x"],
+                headers: [
+                    "Authorization": "Bearer prod",
+                    "Cookie": "s=1",
+                    "Origin": "https://api.example.com",
+                    "Proxy-Authorization": "Basic cHJveHk=",
+                    "Host": "api.example.com",
+                    "X-Custom": "kept",
+                ]
+            )
+        )
+
+        // Then
+        guard case .follow(let request) = decision else {
+            Issue.record("Expected .follow, got \(decision)")
+            return
+        }
+
+        #expect(request.url == "https://mock.internal/x")
+
+        for name in Internals.RedirectSanitizer.crossOriginHeaders {
+            #expect(!request.headers.contains(name: name), "\(name) reached another origin")
+        }
+
+        #expect(request.headers.first(name: "X-Custom") == "kept")
+    }
+
+    /// The other direction, which has to keep working: a `Location` that spells the host an
+    /// override stands in for looks like another origin to AsyncHTTPClient, which took the
+    /// credentials off, and is put back when the rewrite lands on the origin the previous hop
+    /// went to.
+    @Test
+    func redirectDecision_whenTheRuleMapsALocationBackToThePreviousOrigin_keepsTheCredentialsItWasSent() throws {
+        // Given
+        let strategy = Internals.NIOFollowRedirectStrategy(
+            max: 5,
+            allowCycles: false,
+            urlOverrides: .init(rules: [
+                .init(
+                    origin: .init(scheme: "https", host: "staging.example.com", port: nil, pathComponents: []),
+                    destination: .init(scheme: "http", host: "127.0.0.1", port: 8080, pathComponents: [])
+                )
+            ])
+        )
+
+        // When: the previous hop went to the mapped origin, the `Location` names the real one.
+        var previous = HTTPClientRequest(url: "http://127.0.0.1:8080/a")
+        previous.headers = ["Authorization": "Bearer t", "Cookie": "s=1"]
+
+        var candidate = HTTPClientRequest(url: "https://staging.example.com/b")
+        candidate.headers = ["X-Custom": "kept"]
+
+        let decision = try strategy.redirectDecision(
+            for: HTTPClientRedirectContext(
+                redirectRequest: candidate,
+                response: .init(version: .http1_1, status: .found),
+                history: [
+                    HTTPClientRequestResponse(
+                        request: previous,
+                        responseHead: .init(version: .http1_1, status: .found)
+                    )
+                ],
+                redirectCount: 0
+            )
+        )
+
+        // Then
+        guard case .follow(let request) = decision else {
+            Issue.record("Expected .follow, got \(decision)")
+            return
+        }
+
+        #expect(request.url == "http://127.0.0.1:8080/b")
+        #expect(request.headers.first(name: "Authorization") == "Bearer t")
+        #expect(request.headers.first(name: "Cookie") == "s=1")
+    }
+
+    /// A rule covers the `Location` but the URL it maps to cannot be built: following it as the
+    /// server wrote it would reach the host the rule stands in for.
+    @Test
+    func redirectDecision_whenARuleCoversTheLocationButItsDestinationCannotBeBuilt_failsInsteadOfFollowingIt() {
+        // Given
+        let strategy = Internals.NIOFollowRedirectStrategy(
+            max: 5,
+            allowCycles: false,
+            urlOverrides: .init(rules: [
+                .init(
+                    origin: .init(scheme: "https", host: "staging.example.com", port: nil, pathComponents: []),
+                    destination: .init(scheme: "https", host: "not a host", port: nil, pathComponents: [])
+                )
+            ])
+        )
+
+        // When / Then
+        let error = #expect(throws: Internals.RedirectError.self) {
+            try strategy.redirectDecision(
+                for: context(
+                    to: "https://staging.example.com/b",
+                    history: ["https://staging.example.com/a"],
+                    headers: ["Authorization": "Bearer prod"]
+                )
+            )
+        }
+
+        #expect(error?.reason == .invalidURL(nil))
+    }
+
     // MARK: - Private methods
 
     private func context(
