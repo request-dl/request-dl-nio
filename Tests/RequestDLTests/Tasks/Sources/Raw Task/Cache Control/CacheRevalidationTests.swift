@@ -329,6 +329,91 @@ struct CacheRevalidationTests {
         #expect(sources(output) == [.revalidation, .cache])
     }
 
+    /// RFC 9111 §4.3.3: the validated response may answer the request that triggered the
+    /// validation even when its freshness lifetime is already over.
+    @Test
+    func revalidation_whenA304ConfirmsAnEntryThatIsAlwaysStale_stillServesIt() async throws {
+        // Given: `max-age=0`, the usual "revalidate every time", and the strategy that does.
+        let dataCache = makeCache()
+        let configuration = makeConfiguration(strategy: .reloadAndValidateCachedData)
+
+        await store(
+            response([("ETag", "\"v1\""), ("Cache-Control", "max-age=0")]),
+            key: configuration.url,
+            in: dataCache
+        )
+
+        let client = Client(head: head(status: 304, [("Cache-Control", "max-age=0")]))
+
+        // When
+        let output = await decide(configuration, in: dataCache, client: client)
+
+        // Then: the cached body, after the one conditional request, not a second trip.
+        #expect(sources(output) == [.revalidation, .cache])
+        #expect(client.requests == 1)
+    }
+
+    @Test
+    func revalidation_whenA304ConfirmsAnEntryWhoseExpiresIsPast_stillServesIt() async throws {
+        // Given: only an `Expires` that has gone by, which the 304 does not repeat.
+        let dataCache = makeCache()
+        let configuration = makeConfiguration(strategy: .reloadAndValidateCachedData)
+
+        await store(
+            response([("ETag", "\"v1\""), ("Expires", httpDate(-3_600))]),
+            key: configuration.url,
+            in: dataCache
+        )
+
+        let client = Client(head: head(status: 304, []))
+
+        // When
+        let output = await decide(configuration, in: dataCache, client: client)
+
+        // Then
+        #expect(sources(output) == [.revalidation, .cache])
+    }
+
+    @Test
+    func revalidation_whenA304ConfirmsAnEntryThatTheAgeUsedUp_stillServesIt() async throws {
+        // Given
+        let dataCache = makeCache()
+        let configuration = makeConfiguration(strategy: .reloadAndValidateCachedData)
+
+        await store(
+            response([("ETag", "\"v1\""), ("Cache-Control", "max-age=60")]),
+            key: configuration.url,
+            in: dataCache
+        )
+
+        let client = Client(head: head(status: 304, [("Cache-Control", "max-age=60"), ("Age", "120")]))
+
+        // When
+        let output = await decide(configuration, in: dataCache, client: client)
+
+        // Then
+        #expect(sources(output) == [.revalidation, .cache])
+    }
+
+    @Test
+    func revalidation_whenAnEntryIsServedWithoutRevalidating_stillHonoursItsFreshness() async throws {
+        // Given: what skipping the freshness check must not leak into the other strategies.
+        let dataCache = makeCache()
+        let configuration = makeConfiguration(strategy: .returnCachedDataElseLoad)
+
+        await store(
+            response([("ETag", "\"v1\""), ("Cache-Control", "max-age=0")]),
+            key: configuration.url,
+            in: dataCache
+        )
+
+        // When
+        let output = await decide(configuration, in: dataCache)
+
+        // Then
+        #expect(isServed(output) == false)
+    }
+
     // MARK: - Freshness that is there but cannot be read is stale
 
     @Test(arguments: ["0", "-1", "", "yesterday", "Sun 06 Nov 1994"])

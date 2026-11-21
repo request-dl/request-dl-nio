@@ -328,16 +328,30 @@ extension Internals {
                     )
                 else { return nil }
 
-                return await makeCachedSession(cachedData, startedAt: startedAt, revalidation: revalidation)
+                // Just confirmed by the origin, so its freshness lifetime does not decide whether
+                // it is served now: see `isCachedDataValid(_:checkingFreshness:)`.
+                return await makeCachedSession(
+                    cachedData,
+                    startedAt: startedAt,
+                    revalidation: revalidation,
+                    validated: true
+                )
             }
         }
 
+        /// - Parameter validated: The entry was just confirmed by the origin (a `304`, or a
+        ///   response whose validators match). RFC 9111 §4.3.4 lets that response be used for the
+        ///   request that triggered the validation even when its freshness lifetime is already
+        ///   over, as with `max-age=0` or an `Expires` in the past, so only the checks that are
+        ///   about the stored body are applied. Without it such an entry was removed right after
+        ///   it was renewed and the body was downloaded again.
         private func makeCachedSession(
             _ cachedData: CachedData,
             startedAt: Date,
-            revalidation: Internals.RequestMetricsCollector
+            revalidation: Internals.RequestMetricsCollector,
+            validated: Bool = false
         ) async -> SessionTask? {
-            if !isCachedDataValid(cachedData) {
+            if !isCachedDataValid(cachedData, checkingFreshness: !validated) {
                 await dataCache.remove(forKey: requestConfiguration.url)
                 return nil
             }
@@ -967,7 +981,9 @@ extension Internals {
             return !head.headerValues(named: "Transfer-Encoding").isEmpty
         }
 
-        private func isCachedDataValid(_ cachedData: CachedData) -> Bool {
+        /// - Parameter checkingFreshness: Whether the entry also has to be within its freshness
+        ///   lifetime. Its body is always checked against `Content-Length`.
+        private func isCachedDataValid(_ cachedData: CachedData, checkingFreshness: Bool = true) -> Bool {
             let headers = cachedData.response.headers
 
             // The cached byte count is only checked against `Content-Length` when that check can
@@ -990,6 +1006,10 @@ extension Internals {
                 cachedData.buffer.readableBytes != contentLength
             {
                 return false
+            }
+
+            guard checkingFreshness else {
+                return true
             }
 
             // A freshness value that is there and cannot be read is a stale response, not a
