@@ -100,7 +100,8 @@ extension BackgroundDownloads {
             destination: URL,
             serverTrust: Internals.ServerTrustPolicy.Descriptor? = nil,
             clientIdentity: Internals.ClientIdentityDescriptor? = nil,
-            decompression: [any Internals.DecompressionAlgorithm]? = nil
+            decompression: [any Internals.DecompressionAlgorithm]? = nil,
+            decompressionLimit: Internals.Decompression.Limit = .none
         ) {
             let task = urlSession().downloadTask(with: request)
             keepDecompressors(decompression, for: task)
@@ -113,7 +114,8 @@ extension BackgroundDownloads {
                 // follows redirects on its own, and the challenge callback below has no other way
                 // to tell the originally-requested host apart from one a redirect pointed it at.
                 clientIdentityHost: clientIdentity == nil ? nil : request.url?.host,
-                acceptedEncodings: decompression?.map { $0.contentEncodingValue.lowercased() }
+                acceptedEncodings: decompression?.map { $0.contentEncodingValue.lowercased() },
+                decompressionLimit: decompressionLimit
             )
             task.resume()
         }
@@ -128,7 +130,8 @@ extension BackgroundDownloads {
             serverTrust: Internals.ServerTrustPolicy.Descriptor? = nil,
             clientIdentity: Internals.ClientIdentityDescriptor? = nil,
             host: String? = nil,
-            decompression: [any Internals.DecompressionAlgorithm]? = nil
+            decompression: [any Internals.DecompressionAlgorithm]? = nil,
+            decompressionLimit: Internals.Decompression.Limit = .none
         ) {
             let task = Self.makeTask(in: urlSession(), resumingFrom: resumeData, description: nil)
 
@@ -143,7 +146,8 @@ extension BackgroundDownloads {
                 serverTrust: serverTrust,
                 clientIdentity: clientIdentity,
                 clientIdentityHost: clientIdentity == nil ? nil : host,
-                acceptedEncodings: acceptedEncodings
+                acceptedEncodings: acceptedEncodings,
+                decompressionLimit: decompressionLimit
             )
 
             task.resume()
@@ -580,6 +584,13 @@ extension BackgroundDownloads {
             /// the same reason as `clientIdentityHost`, and `nil` also means what an older
             /// version did: the downloaded bytes are moved as they came.
             let acceptedEncodings: [String]?
+
+            /// What the decoded file may grow to, as a number of bytes or as a multiple of the
+            /// bytes downloaded: at most one of the two, and neither when the session set no limit.
+            /// Optional for the same reason as `clientIdentityHost`, and `nil` for both is no limit,
+            /// which is what an older version did.
+            let decodedBytesLimit: Int?
+            let decodedRatioLimit: Int?
         }
 
         // Not `private`: unit-tested directly (`@testable import`) independent of any real
@@ -591,8 +602,21 @@ extension BackgroundDownloads {
             serverTrust: Internals.ServerTrustPolicy.Descriptor? = nil,
             clientIdentity: Internals.ClientIdentityDescriptor? = nil,
             clientIdentityHost: String? = nil,
-            acceptedEncodings: [String]? = nil
+            acceptedEncodings: [String]? = nil,
+            decompressionLimit: Internals.Decompression.Limit = .none
         ) -> String? {
+            var bytesLimit: Int?
+            var ratioLimit: Int?
+
+            switch decompressionLimit {
+            case .none:
+                break
+            case .size(let value):
+                bytesLimit = value
+            case .ratio(let value):
+                ratioLimit = value
+            }
+
             guard
                 let data = try? JSONEncoder().encode(
                     Descriptor(
@@ -601,7 +625,9 @@ extension BackgroundDownloads {
                         serverTrust: serverTrust,
                         clientIdentity: clientIdentity,
                         clientIdentityHost: clientIdentityHost,
-                        acceptedEncodings: acceptedEncodings
+                        acceptedEncodings: acceptedEncodings,
+                        decodedBytesLimit: bytesLimit,
+                        decodedRatioLimit: ratioLimit
                     )
                 )
             else {
@@ -659,6 +685,25 @@ extension BackgroundDownloads {
 
         static func decodeAcceptedEncodings(_ taskDescription: String?) -> [String]? {
             Self.decodeDescriptor(taskDescription)?.acceptedEncodings
+        }
+
+        /// How far the decoded file of this download may grow, which the session that scheduled it
+        /// set. ``Internals/Decompression/Limit/none`` when it set none, or `taskDescription` is not
+        /// one this type encoded.
+        static func decodeDecompressionLimit(_ taskDescription: String?) -> Internals.Decompression.Limit {
+            guard let descriptor = Self.decodeDescriptor(taskDescription) else {
+                return .none
+            }
+
+            if let bytes = descriptor.decodedBytesLimit {
+                return .size(bytes)
+            }
+
+            if let ratio = descriptor.decodedRatioLimit {
+                return .ratio(ratio)
+            }
+
+            return .none
         }
 
         private static func decodeDescriptor(_ taskDescription: String?) -> Descriptor? {

@@ -78,6 +78,8 @@ try await BackgroundDownloadTask(
 
 The file is read in pieces, decoded, and written beside `destination`, so it is never held whole in memory; it takes the place of what was there only once it is complete. ``BackgroundDownloads/Event/completed(id:destination:)`` follows that, and ``BackgroundDownloads/Event/progress(id:destination:bytesWritten:totalBytesExpected:)`` counts the bytes that travel, the encoded ones. A response encoded in something that is not on the list fails the download with ``UnsupportedContentEncodingError``, and a body that is cut short or corrupt fails with what your decompressor throws, leaving what was at `destination` untouched.
 
+The decoding runs in a callback of the system's own queue and writes to the user's disk, so a body that expands far beyond what was downloaded is worth bounding. The `limit` of ``Session/decompressionAlgorithms(_:limit:)`` does that here as well, even for an algorithm of your own, when it is ``DecompressionLimit/size(_:)`` or ``DecompressionLimit/ratio(_:)``: once the decoded file passes it, the download fails with ``BackgroundDownloadDecompressionLimitError`` and what had been written is removed. With ``DecompressionLimit/none``, the default, nothing is checked and your ``Decompressor`` is the one to bound its own output.
+
 ### Registering your decompressors
 
 The system may finish a download while your app is not running. The launch it starts to deliver the event has none of the content above, and a ``Decompressor`` is a value of your own type, not something that can be kept across a launch. Hand them back early in every launch, where you set ``BackgroundDownloads/onEvent``:
@@ -213,3 +215,4 @@ Only the file path is persisted alongside `id`/`destination` — never the key m
 - ``BackgroundDownloadUnsupportedConfigurationError``
 - ``BackgroundDownloadStatusCodeError``
 - ``BackgroundDownloadMissingDecompressorError``
+- ``BackgroundDownloadDecompressionLimitError``

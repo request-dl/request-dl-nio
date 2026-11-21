@@ -366,6 +366,124 @@ struct BackgroundDownloadsSessionDecompressionTests {
         }
     }
 
+    // MARK: - Limit
+
+    /// 1 000 bytes, from 8.
+    private static let bomb = String(repeating: "a", count: 1_000)
+
+    @Test(
+        arguments: [
+            Internals.Decompression.Limit.size(999),
+            .size(0),
+            .ratio(124),
+            .ratio(1),
+        ]
+    )
+    func aLimitThatTheDecodedFilePasses_stopsTheDecoding(_ limit: Internals.Decompression.Limit) async throws {
+        try await withTemporaryFileURL("input.bin") { input in
+            let output = input.deletingLastPathComponent().appendingPathComponent("output.bin")
+            try Data(Self.rleEncode(Self.bomb)).write(to: input)
+            FileManager.default.createFile(atPath: output.path, contents: nil)
+
+            #expect(throws: BackgroundDownloadDecompressionLimitError.self) {
+                try BackgroundDownloads.Session.decode(
+                    from: input,
+                    to: output,
+                    using: Self.algorithm(RLEDecompressor()),
+                    limit: limit
+                )
+            }
+        }
+    }
+
+    /// What is written is never past the limit: the piece that passes it is not written.
+    @Test
+    func aLimitThatTheDecodedFilePasses_writesNothingPastIt() async throws {
+        try await withTemporaryFileURL("input.bin") { input in
+            let output = input.deletingLastPathComponent().appendingPathComponent("output.bin")
+            try Data(Self.rleEncode(Self.bomb)).write(to: input)
+            FileManager.default.createFile(atPath: output.path, contents: nil)
+
+            // Two bytes at a time: one pair, so 255 bytes more on each read.
+            _ = try? BackgroundDownloads.Session.decode(
+                from: input,
+                to: output,
+                using: Self.algorithm(RLEDecompressor()),
+                limit: .size(600),
+                chunkSize: 2
+            )
+
+            #expect(try Data(contentsOf: output).count == 510)
+        }
+    }
+
+    @Test(
+        arguments: [
+            Internals.Decompression.Limit.none,
+            .size(1_000),
+            .size(Int.max),
+            .ratio(125),
+            .ratio(Int.max),
+        ]
+    )
+    func aLimitThatTheDecodedFileDoesNotPass_isDecodedWhole(_ limit: Internals.Decompression.Limit) async throws {
+        try await withTemporaryFileURL("input.bin") { input in
+            let output = input.deletingLastPathComponent().appendingPathComponent("output.bin")
+            try Data(Self.rleEncode(Self.bomb)).write(to: input)
+            FileManager.default.createFile(atPath: output.path, contents: nil)
+
+            try BackgroundDownloads.Session.decode(
+                from: input,
+                to: output,
+                using: Self.algorithm(RLEDecompressor()),
+                limit: limit
+            )
+
+            #expect(try String(contentsOf: output, encoding: .utf8) == Self.bomb)
+        }
+    }
+
+    @Test
+    func aDownloadThatExpandsPastTheLimit_failsAndKeepsWhatWasThere() async throws {
+        try await withTemporaryFileURL("destination.txt") { destination in
+            // Given
+            try Data("previous".utf8).write(to: destination)
+            let session = BackgroundDownloads.Session()
+            session.register(Self.algorithm(RLEDecompressor()))
+
+            // When
+            let events = try await Self.download(
+                id: "bomb",
+                to: destination,
+                encoding: "rle",
+                body: Self.rleEncode(Self.bomb),
+                session: session,
+                limit: .size(500)
+            )
+
+            // Then
+            let error = try Self.failure(of: events)
+            #expect((error as? BackgroundDownloadDecompressionLimitError)?.limit == .size(500))
+            #expect(try String(contentsOf: destination, encoding: .utf8) == "previous")
+            #expect(Self.leftovers(beside: destination).isEmpty)
+        }
+    }
+
+    @Test
+    func theLimit_survivesInTheTaskDescription() {
+        for limit: Internals.Decompression.Limit in [.none, .size(10), .ratio(3)] {
+            let description = BackgroundDownloads.Session.encode(
+                id: "a",
+                destination: URL(fileURLWithPath: "/tmp/a"),
+                decompressionLimit: limit
+            )
+
+            #expect(BackgroundDownloads.Session.decodeDecompressionLimit(description) == limit)
+        }
+
+        #expect(BackgroundDownloads.Session.decodeDecompressionLimit(nil) == .none)
+    }
+
     // MARK: - Accept-Encoding
 
     @Test
@@ -637,7 +755,8 @@ struct BackgroundDownloadsSessionDecompressionTests {
         encoding: String?,
         body: [UInt8],
         session: BackgroundDownloads.Session,
-        acceptedEncodings: [String]? = ["rle", "strict"]
+        acceptedEncodings: [String]? = ["rle", "strict"],
+        limit: Internals.Decompression.Limit = .none
     ) async throws -> [BackgroundDownloads.Event] {
         let bodyFile = destination.deletingLastPathComponent()
             .appendingPathComponent("served-\(UUID().uuidString).bin")
@@ -663,7 +782,8 @@ struct BackgroundDownloadsSessionDecompressionTests {
         task.taskDescription = BackgroundDownloads.Session.encode(
             id: id,
             destination: destination,
-            acceptedEncodings: acceptedEncodings
+            acceptedEncodings: acceptedEncodings,
+            decompressionLimit: limit
         )
 
         task.resume()
