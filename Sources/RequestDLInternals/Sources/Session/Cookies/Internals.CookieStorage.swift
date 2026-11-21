@@ -291,7 +291,7 @@ extension Internals {
         /// Removes the cookies a request to `host` would match by domain, whatever their path or
         /// `Secure`, and with `includingSubdomains` the ones of the hosts below it too.
         package func removeAll(forHost host: String, includingSubdomains: Bool) {
-            let host = Cookie.normalizedDomain(host)
+            let host = Cookie.withoutTrailingDot(Cookie.normalizedDomain(host))
 
             guard !host.isEmpty else {
                 return
@@ -484,6 +484,14 @@ extension Internals {
             // Some Foundations keep the brackets of an IPv6 literal.
             if host.hasPrefix("["), host.hasSuffix("]") {
                 host = String(host.dropFirst().dropLast())
+            }
+
+            // `https://evil.com./` is the same host as `evil.com`, and must be seen as it: kept, the
+            // dot would let `Domain=com.` slip past the single-label guard.
+            host = Cookie.withoutTrailingDot(host)
+
+            guard !host.isEmpty else {
+                return nil
             }
 
             let scheme = url.scheme?.lowercased()
