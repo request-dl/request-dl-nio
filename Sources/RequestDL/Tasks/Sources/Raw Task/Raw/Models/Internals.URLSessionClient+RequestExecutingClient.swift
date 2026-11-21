@@ -40,7 +40,8 @@ extension Internals.URLSessionClient: RequestExecutingClient {
                 cache: cache,
                 logger: logger,
                 existingUploadFile: body.wholeFileURL,
-                transferControl: transferControl
+                transferControl: transferControl,
+                cookies: configuration.cookies
             )
         }
 
@@ -51,7 +52,8 @@ extension Internals.URLSessionClient: RequestExecutingClient {
             decompression: decompression,
             cache: cache,
             logger: logger,
-            transferControl: transferControl
+            transferControl: transferControl,
+            cookies: configuration.cookies
         )
     }
 
@@ -66,7 +68,8 @@ extension Internals.URLSessionClient: RequestExecutingClient {
         let (head, _) = try await execute(
             request: try configuration.buildURLRequestWithoutBody(),
             metrics: metrics,
-            metricsSource: .revalidation
+            metricsSource: .revalidation,
+            cookies: configuration.cookies
         )
 
         return head

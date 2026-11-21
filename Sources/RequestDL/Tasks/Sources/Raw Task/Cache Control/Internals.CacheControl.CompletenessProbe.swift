@@ -8,6 +8,7 @@ import RequestDLInternals
 import FoundationEssentials
 #else
 import struct Foundation.Data
+import struct Foundation.URL
 #endif
 
 extension Internals.CacheControl {
@@ -137,6 +138,17 @@ extension Internals.CacheControl {
             }
 
             configuration.headers.add(name: "Range", value: "bytes=\(receivedBytes)-\(receivedBytes)")
+
+            // The response being cached may have set cookies, and the probe is sent after it: with
+            // the header the request started with, it would ask as someone who never received them,
+            // and a server that rotated the session would answer by deleting the new one.
+            if let cookies = configuration.cookies, cookies.managesHeader, let url = URL(string: configuration.url) {
+                configuration.headers.remove(name: "Cookie")
+
+                if let value = cookies.cookieHeader(for: url) {
+                    configuration.headers.add(name: "Cookie", value: value)
+                }
+            }
 
             if let validator = Self.strongValidator(of: response) {
                 configuration.headers.add(name: "If-Range", value: validator)

@@ -187,7 +187,8 @@ extension Internals {
             request: URLRequest,
             delegate: URLSessionTaskDelegate? = nil,
             metrics: Internals.RequestMetricsCollector? = nil,
-            metricsSource: Internals.TransactionMetrics.Source = .network
+            metricsSource: Internals.TransactionMetrics.Source = .network,
+            cookies: Internals.CookieContext? = nil
         ) async throws -> (head: Internals.ResponseHead, body: Data) {
             // Registered before the throttle wait below, not after: `Internals.ClientManager`'s
             // idle-cleanup sweep and its ceiling eviction path both treat `isRunning == false` as
@@ -220,7 +221,8 @@ extension Internals {
                 tls: tlsDelegate,
                 forwarding: delegate,
                 metrics: metrics,
-                metricsSource: metricsSource
+                metricsSource: metricsSource,
+                cookies: cookies
             )
 
             let box = CancellableTaskBox()
@@ -455,7 +457,8 @@ extension Internals {
             logger: Internals.TaskLogger?,
             delegate: URLSessionTaskDelegate? = nil,
             flowControl: Internals.FlowControlWindow = .init(),
-            transferControl: Internals.TransferControl? = nil
+            transferControl: Internals.TransferControl? = nil,
+            cookies: Internals.CookieContext? = nil
         ) async throws -> SessionTask {
             try await executeSessionTask(
                 request: request,
@@ -467,6 +470,7 @@ extension Internals {
                 forwarding: delegate,
                 flowControl: flowControl,
                 transferControl: transferControl,
+                cookies: cookies,
                 makeUploadBody: nil
             )
         }
@@ -496,7 +500,8 @@ extension Internals {
             delegate: URLSessionTaskDelegate? = nil,
             existingUploadFile: URL? = nil,
             flowControl: Internals.FlowControlWindow = .init(),
-            transferControl: Internals.TransferControl? = nil
+            transferControl: Internals.TransferControl? = nil,
+            cookies: Internals.CookieContext? = nil
         ) async throws -> SessionTask where Body.Element == Internals.Bytes {
             try await executeSessionTask(
                 request: request,
@@ -508,6 +513,7 @@ extension Internals {
                 forwarding: delegate,
                 flowControl: flowControl,
                 transferControl: transferControl,
+                cookies: cookies,
                 makeUploadBody: {
                     if let existingUploadFile {
                         return .existingFile(existingUploadFile)
@@ -570,6 +576,7 @@ extension Internals {
             forwarding delegate: URLSessionTaskDelegate?,
             flowControl: Internals.FlowControlWindow,
             transferControl: Internals.TransferControl?,
+            cookies: Internals.CookieContext?,
             makeUploadBody: (@Sendable () async throws -> Internals.URLSessionUploadFile.Materialized)?
         ) async throws -> SessionTask {
             // Before anything can be produced into the window, so a suspension that came first
@@ -700,7 +707,8 @@ extension Internals {
                 },
                 makeBodyStream: makeBodyStream,
                 metrics: metrics,
-                observer: transferControl?.observer
+                observer: transferControl?.observer,
+                cookies: cookies
             )
 
             // A download continuation is a new exchange, so it gets a delegate of its own, with
@@ -715,7 +723,8 @@ extension Internals {
                     tls: tlsDelegate,
                     forwarding: delegate,
                     metrics: metrics,
-                    observer: transferControl?.observer
+                    observer: transferControl?.observer,
+                    cookies: cookies
                 )
             }
 
@@ -1055,6 +1064,11 @@ extension Internals {
                 }
 
                 let taskDelegate = continuationDelegate(continuation)
+
+                // The request this continues was sent with the cookies of the moment it started.
+                // What its response set, or deleted, since is in the jar and not in that header.
+                continuation = taskDelegate.applyingCookies(to: continuation)
+
                 var deliveredBytes = state.deliveredBytes
                 var attemptTask: URLSessionTask?
 
@@ -1344,6 +1358,10 @@ extension Internals.URLSessionClient {
         private let metricsSource: Internals.TransactionMetrics.Source
         /// Told about each transaction as `URLSession` reports it, for a `RequestMonitor`.
         private let observer: Internals.ExecutionObserver?
+        /// The cookie jar of the session this exchange belongs to, if it has one: told about the
+        /// `Set-Cookie` of every response (a redirect's too), and the one that sets the `Cookie`
+        /// header of each hop the jar owns.
+        private let cookies: Internals.CookieContext?
         private let lock = Lock()
 
         // MARK: - Unsafe properties
@@ -1433,7 +1451,8 @@ extension Internals.URLSessionClient {
             makeBodyStream: (@Sendable () -> InputStream?)? = nil,
             metrics: Internals.RequestMetricsCollector? = nil,
             metricsSource: Internals.TransactionMetrics.Source = .network,
-            observer: Internals.ExecutionObserver? = nil
+            observer: Internals.ExecutionObserver? = nil,
+            cookies: Internals.CookieContext? = nil
         ) {
             self.redirectConfiguration = redirectConfiguration
             self.urlOverrides = urlOverrides
@@ -1447,6 +1466,7 @@ extension Internals.URLSessionClient {
             self.metrics = metrics
             self.metricsSource = metricsSource
             self.observer = observer
+            self.cookies = cookies
             self.bodyLength = initialRequest.value(forHTTPHeaderField: "Content-Length")
             self._lastRequest = initialRequest
             self._visited = [initialRequest.url?.absoluteString ?? ""]
@@ -1491,6 +1511,10 @@ extension Internals.URLSessionClient {
             // `URLOverride` stands in for is mapped to its destination, before anything below
             // counts, compares or follows it.
             let request = rewrittenByURLOverrides(proposedRequest)
+
+            // Before anything below decides what to do with this hop: the next request, whichever
+            // way it is built, must be owed what this redirect just set.
+            storeCookies(from: response)
 
             switch redirectConfiguration {
             case .disallow:
@@ -1604,7 +1628,9 @@ extension Internals.URLSessionClient {
         /// reissues it as a brand new `bytes(for:delegate:)` call. That is a genuinely new task,
         /// not a continuation of the redirected one, so the platform quirk above never applies to
         /// it.
-        private func completeRedirect(with request: URLRequest, _ completionHandler: (URLRequest?) -> Void) {
+        private func completeRedirect(with redirect: URLRequest, _ completionHandler: (URLRequest?) -> Void) {
+            let request = applyingCookies(to: redirect)
+
             guard
                 makeBodyStream != nil,
                 let method = request.httpMethod,
@@ -1616,6 +1642,41 @@ extension Internals.URLSessionClient {
 
             lock.withLock { _pendingManualBodyRedirect = request }
             completionHandler(nil)
+        }
+
+        /// Hands the `Set-Cookie` fields of `response` to the jar, with the URL of the request it
+        /// answers. `allHeaderFields` has joined repeated ones with `", "`, which the jar splits
+        /// again.
+        func storeCookies(from response: HTTPURLResponse) {
+            guard let cookies, let url = response.url else {
+                return
+            }
+
+            cookies.store(
+                headerFields: response.allHeaderFields.compactMap { name, value in
+                    guard let name = name as? String, let value = value as? String else {
+                        return nil
+                    }
+
+                    return (name: name, value: value)
+                },
+                for: url,
+                // `allHeaderFields` joins repeated headers with ", ".
+                areFolded: true
+            )
+        }
+
+        /// `request` with the `Cookie` header the jar owes that hop, when the jar owns the header
+        /// (the caller did not set one). What `URLSession` copied over from the previous hop is
+        /// replaced even when the jar has nothing to send, since it may be what a redirect deleted.
+        func applyingCookies(to request: URLRequest) -> URLRequest {
+            guard let cookies, cookies.managesHeader, let url = request.url else {
+                return request
+            }
+
+            var request = request
+            request.setValue(cookies.cookieHeaderForHop(to: url), forHTTPHeaderField: "Cookie")
+            return request
         }
 
         /// `request` with its URL mapped through the `URLOverride` rules, when one covers it.
@@ -1934,7 +1995,13 @@ extension Internals.URLSessionClient {
                 throw UnexpectedURLResponseError(response: response)
             }
 
-            return Internals.ResponseHead(httpResponse)
+            return responseHead(storingCookiesOf: httpResponse)
+        }
+
+        /// The head of `response`, the final one of the exchange: its cookies are stored first.
+        private func responseHead(storingCookiesOf response: HTTPURLResponse) -> Internals.ResponseHead {
+            storeCookies(from: response)
+            return Internals.ResponseHead(response)
         }
 
         /// Response-side counterpart to `needNewBodyStream` above. Exercised by the
@@ -2023,7 +2090,7 @@ extension Internals.URLSessionClient {
                 return
             }
 
-            completion(.success((Internals.ResponseHead(httpResponse), data)))
+            completion(.success((responseHead(storingCookiesOf: httpResponse), data)))
         }
 
         // MARK: - Private methods
@@ -2055,7 +2122,7 @@ extension Internals.URLSessionClient {
                 return
             }
 
-            let head = Internals.ResponseHead(httpResponse)
+            let head = responseHead(storingCookiesOf: httpResponse)
 
             let totalSize =
                 head.headerValues(named: "Content-Length")

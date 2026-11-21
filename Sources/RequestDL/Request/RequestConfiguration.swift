@@ -104,6 +104,11 @@ public struct RequestConfiguration: Sendable {
 
     private var explicitReadingMode: Internals.DownloadStep.ReadingMode?
 
+    /// The cookie jar this request takes part in, and whether it wrote this request's `Cookie`
+    /// header. `nil` when its session has no jar. Set by `RawTask` right before the request is
+    /// executed, so that the cache sees the `Cookie` header it is going to be sent with.
+    var cookies: Internals.CookieContext?
+
     /// `true` only when the `User-Agent` currently in ``headers`` is exactly RequestDL's own
     /// untouched default (``UserAgentHeader/init()``): no other `User-Agent` node has written
     /// to it since. Kept up to date by `markUserAgentWritten(isDefault:)` as `HeaderNode`s fold

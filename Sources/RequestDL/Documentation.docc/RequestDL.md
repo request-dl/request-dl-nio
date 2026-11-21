@@ -104,6 +104,7 @@ We are excited to expand this list with many other features. Start by making you
 ### Advanced
 
 - <doc:Request-Customization>
+- <doc:Using-Cookies>
 - <doc:Using-a-Client-Certificate-with-URLSession>
 - <doc:Configuring-App-Transport-Security-for-URLSession>
 - <doc:Downloading-in-the-Background>

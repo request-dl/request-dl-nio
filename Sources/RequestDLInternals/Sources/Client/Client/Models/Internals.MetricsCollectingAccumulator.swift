@@ -29,6 +29,7 @@ extension Internals {
         private let source: Internals.TransactionMetrics.Source
         private let bodyless: Internals.BodylessResponse
         private let host: String
+        private let cookies: Internals.CookieContext?
         private let lock = NIOLock()
 
         // MARK: - Unsafe properties
@@ -42,13 +43,15 @@ extension Internals {
         package init(
             request: HTTPClient.Request,
             metrics: Internals.RequestMetricsCollector,
-            source: Internals.TransactionMetrics.Source
+            source: Internals.TransactionMetrics.Source,
+            cookies: Internals.CookieContext? = nil
         ) {
             self.accumulator = ResponseAccumulator(request: request)
             self.metrics = metrics
             self.source = source
             self.bodyless = Internals.BodylessResponse(method: request.method)
             self.host = request.host
+            self.cookies = cookies
         }
 
         // MARK: - Package methods
@@ -71,7 +74,20 @@ extension Internals {
             _ request: HTTPClient.Request,
             _ head: HTTPResponseHead
         ) {
+            cookies?.store(headerFields: head.headers.map { (name: $0.name, value: $0.value) }, for: request.url)
             accumulator.didVisitURL(task: task, request, head)
+        }
+
+        package func willFollowRedirect(request: inout HTTPClient.Request) {
+            guard let cookies, cookies.managesHeader else {
+                return
+            }
+
+            request.headers.remove(name: "Cookie")
+
+            if let value = cookies.cookieHeaderForHop(to: request.url) {
+                request.headers.add(name: "Cookie", value: value)
+            }
         }
 
         package func didReceiveHead(

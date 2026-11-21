@@ -485,6 +485,24 @@ public struct Session: Property {
     }
 
     ///
+    /// Gives the session a cookie jar: its requests are sent the cookies the jar holds for them,
+    /// and the `Set-Cookie` headers of its responses, redirects included, are stored in it.
+    ///
+    /// When not set, the session has no cookies: nothing is stored and no `Cookie` header is
+    /// added, on every executor. Cookies are opt-in, and owned by the ``CookieJar`` you pass, not
+    /// by the session.
+    ///
+    /// Two sessions given the same jar share their cookies, and two given different jars never do,
+    /// whatever else they have in common.
+    ///
+    /// - Parameter jar: The jar to read the cookies from and store them in.
+    /// - Returns: The modified `Session` instance with the cookie jar configured.
+    ///
+    public func cookieJar(_ jar: CookieJar) -> Self {
+        edit { $0.cookieStorage = jar.storage }
+    }
+
+    ///
     /// Sets the metrics factory RequestDL reports what it measured of each request to, through this
     /// session: how long it took, how much was sent and how much was received.
     ///

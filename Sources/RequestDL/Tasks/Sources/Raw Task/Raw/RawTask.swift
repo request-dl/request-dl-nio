@@ -6,8 +6,10 @@ import RequestDLInternals
 import Tracing
 
 #if canImport(FoundationEssentials)
+import struct FoundationEssentials.URL
 import struct FoundationEssentials.URLComponents
 #else
+import struct Foundation.URL
 import struct Foundation.URLComponents
 #endif
 
@@ -83,10 +85,12 @@ struct RawTask<Content: Property>: RequestTask {
     ) async throws -> AsyncResponse {
         // Asking for the rest of a download from a saved point changes the request itself, so it is
         // done before anything downstream looks at the configuration, the cache included.
-        let (resolved, validateHead) = try Self.applyResumption(
+        let (resumed, validateHead) = try Self.applyResumption(
             environment.downloadResumptionStart,
             to: resolvedFromProperties
         )
+
+        let resolved = Self.applyingCookies(to: resumed)
 
         let logger = Internals.TaskLogger(
             baseURL: resolved.requestConfiguration.baseURL,
@@ -171,6 +175,43 @@ struct RawTask<Content: Property>: RequestTask {
             validateHead: validateHead,
             deadline: deadline,
             metrics: sessionTask.metrics
+        )
+    }
+
+    // MARK: - Private static methods, cookies
+
+    /// `resolved` with the `Cookie` header its session's jar owes it, when the session has a jar.
+    ///
+    /// Done before the cache looks at the request: `Internals.CacheControl` treats a `Cookie` as a
+    /// credential, and a response fetched with one must not be found by a request without it.
+    ///
+    /// A request that already carries a `Cookie` header keeps it as it is (the explicit header
+    /// wins over the automatic one, as it does for `User-Agent`). The jar still stores what its
+    /// responses set, but it neither adds to that header nor recomputes it on redirects.
+    static func applyingCookies(to resolved: Resolved) -> Resolved {
+        guard let storage = resolved.session.configuration.cookieStorage else {
+            return resolved
+        }
+
+        var configuration = resolved.requestConfiguration
+        let hasExplicitCookie = configuration.headers.contains(name: "Cookie")
+
+        if !hasExplicitCookie, let url = URL(string: configuration.url),
+            let value = storage.cookieHeader(for: url)
+        {
+            configuration.headers.add(name: "Cookie", value: value)
+        }
+
+        configuration.cookies = .init(
+            storage: storage,
+            managesHeader: !hasExplicitCookie,
+            initialCookieHeader: configuration.headers["Cookie"]?.first
+        )
+
+        return Resolved(
+            session: resolved.session,
+            requestConfiguration: configuration,
+            dataCache: resolved.dataCache
         )
     }
 

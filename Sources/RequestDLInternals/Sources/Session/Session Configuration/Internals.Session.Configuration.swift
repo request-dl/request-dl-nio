@@ -61,6 +61,15 @@ extension Internals.Session {
         /// differing only in it are fine sharing a pooled client.
         package var metricsFactory: (any MetricsFactory)?
 
+        /// The jar the requests of this session read their `Cookie` header from, and store the
+        /// `Set-Cookie` of their responses in; `nil` means the session has no cookies at all, which
+        /// is what every session did before there was a jar.
+        ///
+        /// Excluded from `Equatable`, like `tracer`: it travels with each request rather than
+        /// being baked into a pooled client, so two sessions that differ only in their jar share
+        /// one client, and keep their cookies apart.
+        package var cookieStorage: Internals.CookieStorage?
+
         /// Off by default on every platform: decompression is opt-in, matching the fact that
         /// the risky posture is decompressing unbounded, not leaving compressed bytes alone.
         ///

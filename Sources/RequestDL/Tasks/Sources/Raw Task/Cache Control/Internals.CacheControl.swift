@@ -163,8 +163,10 @@ extension Internals {
         }
 
         /// The request headers that identify an account: `Authorization`, `Cookie` and
-        /// `Proxy-Authorization`, by lowercased name. The package turns the cookie jar off on both
-        /// executors, so a `Cookie` is always one the caller put on the request by hand.
+        /// `Proxy-Authorization`, by lowercased name. A `Cookie` is one the caller put on the
+        /// request by hand, or one the session's `CookieJar` added: `RawTask` adds it before this
+        /// is built, so a response fetched with a jar's cookies is never found by a request
+        /// without them.
         private static let credentialFields = ["authorization", "cookie", "proxy-authorization"]
 
         /// Whether the stored response was stored for the credentials this request sends.
@@ -582,6 +584,14 @@ extension Internals {
                 )
             else { return nil }
 
+            // A redirect hop of the conditional request was sent cookies the request did not carry:
+            // what it confirms is about other credentials than the ones the entry was stored for,
+            // and must not extend the life of the shared entry.
+            if requestConfiguration.cookies?.hasSentCookiesTheRequestDidNot ?? false {
+                logger?.log(level: .info, "Cache not validated - a redirect carried cookies the request did not")
+                return nil
+            }
+
             if head.status.code == 304 {
                 logger?.log(level: .info, "Cache validated (304 Not Modified), reusing cached data")
                 // The fresh 304 response's own headers, not the stale cached ones: a 304 is where
@@ -763,6 +773,16 @@ extension Internals {
                     // `Vary: *` is a response that no later request can be said to match.
                     !isAny(vary)
                 else {
+                    return nil
+                }
+
+                // A redirect hop the jar sent cookies the request did not: this response was
+                // fetched with credentials that are not the ones recorded with it below.
+                guard !(requestConfiguration.cookies?.hasSentCookiesTheRequestDidNot ?? false) else {
+                    logger?.log(
+                        level: .info,
+                        "Response will not be cached - a redirect carried cookies the request did not"
+                    )
                     return nil
                 }
 

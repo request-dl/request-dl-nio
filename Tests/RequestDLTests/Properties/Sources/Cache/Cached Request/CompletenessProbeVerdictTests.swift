@@ -8,6 +8,18 @@ import Testing
 @testable import RequestDL
 @testable import RequestDLTestSupport
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.URL
+#endif
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import struct Foundation.URL
+#endif
+
 /// How the answer to the completeness probe is read.
 struct CompletenessProbeVerdictTests {
 
@@ -207,6 +219,58 @@ struct CompletenessProbeRunTests {
         #expect(sent.headers["If-None-Match"] == nil)
         #expect(sent.headers["If-Modified-Since"] == nil)
         #expect(sent.headers["Authorization"] == ["Bearer token"])
+    }
+
+    /// The response being cached set a cookie after the request had gone out, so the header the
+    /// request started with is stale by the time the probe is sent.
+    @Test
+    func run_sendsTheCookiesTheJarHoldsNow_whenTheJarOwnsTheHeader() async throws {
+        let storage = Internals.CookieStorage()
+        let target = try #require(URL(string: "https://example.com/resource"))
+        storage.store(setCookieValues: ["old=1"], for: target)
+
+        let recorder = Recorder()
+        let probe = probe(
+            recorder: recorder,
+            configure: {
+                $0.exactURL = "https://example.com/resource"
+                $0.headers.add(name: "Cookie", value: "old=1")
+                $0.cookies = .init(storage: storage, managesHeader: true, initialCookieHeader: "old=1")
+            },
+            answer: { self.head(416, [("Content-Range", "bytes */10")]) }
+        )
+
+        // The response to the request itself sets a cookie.
+        storage.store(setCookieValues: ["session=2"], for: target)
+
+        _ = await probe.run(response: head(200, ranges), receivedBytes: 10)
+
+        let sent = try #require(recorder.configurations.first)
+        #expect(sent.headers["Cookie"] == ["old=1; session=2"])
+    }
+
+    /// A `Cookie` header the caller set is theirs, on the probe as on every other request.
+    @Test
+    func run_keepsTheCookieTheCallerSet() async throws {
+        let storage = Internals.CookieStorage()
+        let target = try #require(URL(string: "https://example.com/resource"))
+        storage.store(setCookieValues: ["session=2"], for: target)
+
+        let recorder = Recorder()
+        let probe = probe(
+            recorder: recorder,
+            configure: {
+                $0.exactURL = "https://example.com/resource"
+                $0.headers.add(name: "Cookie", value: "mine=1")
+                $0.cookies = .init(storage: storage, managesHeader: false, initialCookieHeader: "mine=1")
+            },
+            answer: { self.head(416, [("Content-Range", "bytes */10")]) }
+        )
+
+        _ = await probe.run(response: head(200, ranges), receivedBytes: 10)
+
+        let sent = try #require(recorder.configurations.first)
+        #expect(sent.headers["Cookie"] == ["mine=1"])
     }
 
     @Test

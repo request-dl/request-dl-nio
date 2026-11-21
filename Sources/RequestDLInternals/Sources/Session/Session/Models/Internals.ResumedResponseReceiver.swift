@@ -40,6 +40,9 @@ extension Internals {
         private let download: Internals.DownloadBuffer
         private let attempt: Internals.DownloadResumptionState.Attempt
         private let reconnection: Internals.NIODownloadReconnection
+
+        /// The cookie jar of the request this continues, if its session has one.
+        private let cookies: Internals.CookieContext?
         private let lock = Lock()
 
         // MARK: - Unsafe properties
@@ -55,15 +58,35 @@ extension Internals {
             url: String,
             download: Internals.DownloadBuffer,
             attempt: Internals.DownloadResumptionState.Attempt,
-            reconnection: Internals.NIODownloadReconnection
+            reconnection: Internals.NIODownloadReconnection,
+            cookies: Internals.CookieContext? = nil
         ) {
             self.url = url
             self.download = download
             self.attempt = attempt
             self.reconnection = reconnection
+            self.cookies = cookies
         }
 
         // MARK: - Internal methods
+
+        /// Every hop of the continuation is stored with the URL of its own request, as for the
+        /// request it continues.
+        func didVisitURL(task: HTTPClient.Task<Response>, _ request: HTTPClient.Request, _ head: HTTPResponseHead) {
+            cookies?.store(headerFields: head.headers.map { (name: $0.name, value: $0.value) }, for: request.url)
+        }
+
+        func willFollowRedirect(request: inout HTTPClient.Request) {
+            guard let cookies, cookies.managesHeader else {
+                return
+            }
+
+            request.headers.remove(name: "Cookie")
+
+            if let value = cookies.cookieHeaderForHop(to: request.url) {
+                request.headers.add(name: "Cookie", value: value)
+            }
+        }
 
         func didReceiveHead(task: HTTPClient.Task<Response>, _ head: HTTPResponseHead) -> EventLoopFuture<Void> {
             lock.withLock { _isDriven = true }
