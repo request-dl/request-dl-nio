@@ -544,6 +544,68 @@ struct ResumableUploadExecutionStubTests {
         #expect(patches.withLockedValue { $0 } == 11)
     }
 
+    /// The server held 600 once, lost data, and now keeps 100 bytes of each `PATCH`: until it is
+    /// past 600 again, every answer is past where that attempt began and short of the 600 it once
+    /// held. None is charged to the budget (the upload does finish), but each waits, or the number
+    /// of attempts made back to back would depend on the size of the upload and each would resend
+    /// the rest of the body.
+    @Test
+    func aPartialAnswerBelowTheFurthestTheServerHeld_waitsWithoutSpendingTheBudget() async throws {
+        let events = LockedValueBox<[String]>([])
+        let patches = LockedValueBox(0)
+
+        let execution = try await Self.execution(
+            dialect: TUSResumableUploadDialect(),
+            delay: 7,
+            sleep: { delay in events.withLockedValue { $0.append("wait \(delay)") } },
+            client: ScriptedClient { configuration in
+                switch configuration.method {
+                case "POST":
+                    return await Self.sessionTask(head: Self.head(status: 201, headers: [("Location", "/uploads/1")]))
+                case "HEAD":
+                    return await Self.sessionTask(
+                        head: Self.head(status: 200, headers: [("Upload-Offset", "100"), ("Upload-Length", "1000")])
+                    )
+                case "PATCH":
+                    let count = patches.withLockedValue { value -> Int in
+                        value += 1
+                        return value
+                    }
+
+                    let offset = Int(configuration.headers.first(name: "Upload-Offset") ?? "0") ?? 0
+                    events.withLockedValue { $0.append("PATCH \(offset)") }
+
+                    switch count {
+                    case 1:
+                        return await Self.sessionTask(head: Self.head(status: 204, headers: [("Upload-Offset", "600")]))
+                    case 2:
+                        return await Self.sessionTask(head: Self.head(status: 409))
+                    default:
+                        return await Self.sessionTask(
+                            head: Self.head(status: 204, headers: [("Upload-Offset", String(min(offset + 100, 1_000)))])
+                        )
+                    }
+                default:
+                    return await Self.sessionTask(head: Self.head(status: 204))
+                }
+            }
+        )
+
+        execution.start()
+        for try await _ in execution.response {}
+
+        // The conflict that moved nothing waited, and so did each answer that climbed back up to the
+        // 600 and no further. Past it, the upload moves, and does not wait.
+        #expect(
+            events.withLockedValue { $0 } == [
+                "PATCH 0", "PATCH 600", "wait 7",
+                "PATCH 100", "wait 7", "PATCH 200", "wait 7", "PATCH 300", "wait 7",
+                "PATCH 400", "wait 7", "PATCH 500", "wait 7",
+                "PATCH 600", "PATCH 700", "PATCH 800", "PATCH 900",
+            ]
+        )
+    }
+
     /// tus: a partial answer that holds nothing new waits like any other attempt that moved nothing.
     @Test
     func aPartialAnswerThatHoldsNothingNew_waitsBeforeTheNextAttempt() async throws {

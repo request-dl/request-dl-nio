@@ -430,8 +430,9 @@ final class ResumableUploadExecution: @unchecked Sendable {
     /// - Parameter start: Where the attempt this answers began, when the answer says how much the
     ///   server kept of it: an offset past it, though not past the furthest the server ever held,
     ///   is neither progress nor a stall.
-    /// - Returns: Whether this attempt moved nothing that was not already moved, and spent the
-    ///   budget for it: the answer to wait before asking again.
+    /// - Returns: Whether to wait before asking again: this attempt got nowhere past the furthest
+    ///   the server was ever said to be. That spends the budget when it moved nothing at all; when
+    ///   it took bytes, but not past that furthest, it waits without spending it.
     @discardableResult
     private func advance(
         _ budget: inout Budget,
@@ -449,7 +450,12 @@ final class ResumableUploadExecution: @unchecked Sendable {
             budget.withoutProgress = .zero
             budget.highestOffset = offset
         } else if let start, offset > start {
-            // The server took bytes of this attempt: it moved, only not past where it once was.
+            // The server took bytes of this attempt: it moved, only not past where it once was, so
+            // the budget is not charged. It still waits: how many of these there can be depends on
+            // the size of the upload, and not on the budget, so without a wait a server that keeps
+            // one byte of each attempt would be asked again, with the rest of the body, as fast as
+            // it answers.
+            isStalled = true
         } else if countsAsAttempt {
             budget.withoutProgress += 1
             isStalled = true
