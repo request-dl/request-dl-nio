@@ -144,3 +144,20 @@ jobs:
           fi
           echo "raised soft limit: $(ulimit -Sn)"
           swift test --disable-default-traits
+
+  watchos-device-build:
+    name: "⌚ watchOS device build"
+    # Skip draft PRs, matching the jobs above.
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: xcode-27
+    timeout-minutes: 30
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.2.app
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build RequestDL for a watchOS device (arm64_32)
+        # Build only, no tests. The watchOS leg of the shared workflow runs on the arm64 Simulator,
+        # where Int is 64 bits; an Apple Watch Series 4 to 8 or SE runs arm64_32, where it is 32.
+        # A literal that overflows there (2_147_483_648) compiled everywhere CI looks and broke the
+        # build of any app archived for those watches.
+        run: xcodebuild -scheme request-dl -destination 'generic/platform=watchOS' build CODE_SIGNING_ALLOWED=NO
