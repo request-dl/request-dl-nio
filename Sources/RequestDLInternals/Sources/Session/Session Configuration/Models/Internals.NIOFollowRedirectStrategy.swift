@@ -9,9 +9,10 @@ import AsyncHTTPClient
 
 extension Internals {
 
-    /// AsyncHTTPClient's own `.follow(max:allowCycles:)`, reproduced as a strategy so the one thing
-    /// it gets wrong for this package, an explicit `Host` header replayed on a redirect to another
-    /// origin, can be put right.
+    /// AsyncHTTPClient's own `.follow(max:allowCycles:)`, reproduced as a strategy so the two things
+    /// it gets wrong for this package can be put right: an explicit `Host` header replayed on a
+    /// redirect to another origin, and the credentials a `URLOverride` rule would carry to an origin
+    /// AsyncHTTPClient never compared the request with.
     ///
     /// `.follow` rewrites the request through AsyncHTTPClient's `transformRequestForRedirect`,
     /// which strips `Origin`/`Cookie`/`Authorization`/`Proxy-Authorization` for another origin
@@ -64,10 +65,14 @@ extension Internals {
                 throw HTTPClientError.redirectCycleDetected
             }
 
-            if let previousURL = context.history.last?.request.url,
-                !Internals.RedirectSanitizer.isSameOrigin(previousURL, request.url)
-            {
-                request.headers.remove(name: "Host")
+            // On the final URL, which is not the one AsyncHTTPClient decided what to take off for:
+            // it compared the previous hop with the `Location`, and a rule can map a `Location` on
+            // the same origin to another one. This takes off everything a redirect to another
+            // origin must not carry, `Host` included.
+            if let previousURL = context.history.last?.request.url {
+                var headers = Internals.HTTPHeaders(request.headers)
+                Internals.RedirectSanitizer.sanitize(&headers, from: previousURL, to: request.url)
+                request.headers = headers.build()
             }
 
             return .follow(request)
