@@ -145,4 +145,5 @@ A ``CookieJar/Cookie`` and a ``CookieJar/Snapshot`` print without their values (
 
 - Cookies are not saved by RequestDL: a snapshot is yours to keep, and to protect.
 - `SameSite` is ignored: a client has no notion of the site that made a request.
+- A comma never separates cookies, as RFC 6265 says: `Set-Cookie: a=1,b=2` is one cookie, `a`, on every executor. The one case `.urlSession` cannot get right is a value that holds a comma, a space and something that looks like `name=` (`a=1, b=2` in a single header): the system joins repeated `Set-Cookie` headers with exactly that, and the jar cannot tell the two apart, so there it stores two cookies where the other executors store one.
 - Background downloads are not covered, because the system sends those requests itself.

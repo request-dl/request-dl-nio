@@ -52,6 +52,18 @@ struct InternalsCookieParsingTests {
     }
 
     @Test
+    func splitter_whenACommaHasNoSpaceAfterIt_doesNotSplit() {
+        #expect(Internals.SetCookieSplitter.split("a=1,b=2") == ["a=1,b=2"])
+        #expect(Internals.SetCookieSplitter.split("a=1; Path=/,b=2") == ["a=1; Path=/,b=2"])
+    }
+
+    @Test
+    func splitter_whenTheTransportJoinsWithACommaAndASpace_splits() {
+        #expect(Internals.SetCookieSplitter.split("a=1, b=2") == ["a=1", "b=2"])
+        #expect(Internals.SetCookieSplitter.split("a=1,b=2, c=3") == ["a=1,b=2", "c=3"])
+    }
+
+    @Test
     func domainMatches_followsRFC6265() {
         #expect(Internals.Cookie.domainMatches(host: "example.com", domain: "example.com"))
         #expect(Internals.Cookie.domainMatches(host: "a.example.com", domain: "example.com"))
