@@ -183,6 +183,49 @@ extension BackgroundDownloads.Session {
         return nil
     }
 
+    /// The `Content-Encoding`s a download continued from resume data may be decoded from, as the
+    /// task description keeps them. `nil` when nothing is decoded.
+    ///
+    /// What the request that stopped sent still decides, as in `decompression(_:resumedFrom:)`, in
+    /// both directions. A request that sent no `Accept-Encoding` was decoded by the system, so
+    /// nothing is. A request that sent one did take over decoding, so the file is still encoded
+    /// whatever `decompression` says: when `content` was written again without the algorithms,
+    /// the encodings come from the header itself and the decompressors the app registered stand
+    /// in for them. Without that, the still-encoded file would have been handed to `destination`
+    /// as `.completed`; this way a missing decompressor fails the download, as it does for any
+    /// other.
+    ///
+    /// The names the system decodes on its own (`gzip`, `deflate`, `br`) are left out of what is
+    /// read from the header: a request that took over `Accept-Encoding` never lists them, so they
+    /// only show up when the app set the header, or the system added it, and the system decoded
+    /// those.
+    static func acceptedEncodings(
+        _ decompression: [any Internals.DecompressionAlgorithm]?,
+        resumedFrom request: URLRequest?
+    ) -> [String]? {
+        if let algorithms = Self.decompression(decompression, resumedFrom: request) {
+            return algorithms.map { $0.contentEncodingValue.lowercased() }
+        }
+
+        guard
+            decompression == nil,
+            let header = request?.value(forHTTPHeaderField: "Accept-Encoding")
+        else {
+            return nil
+        }
+
+        let systemDecoded: Set<String> = ["gzip", "x-gzip", "deflate", "br", "identity", "*"]
+
+        let encodings =
+            header
+            .split(separator: ",")
+            .compactMap { $0.split(separator: ";").first }
+            .map { $0.trimmingCharacters(in: .whitespaces).lowercased() }
+            .filter { !$0.isEmpty && !systemDecoded.contains($0) }
+
+        return encodings.isEmpty ? nil : encodings
+    }
+
     /// Every `Content-Encoding` field of `response`, comma-split, lowercased and without
     /// `identity`, which undoes nothing.
     static func contentEncodings(of response: URLResponse?) -> [String] {

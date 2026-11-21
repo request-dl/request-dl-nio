@@ -454,6 +454,100 @@ struct BackgroundDownloadsSessionDecompressionTests {
         #expect(BackgroundDownloads.Session.decompression(algorithms, resumedFrom: request)?.count == 1)
     }
 
+    /// The request that stopped took over `Accept-Encoding`, so the file is encoded, whatever the
+    /// `content` passed when continuing says: the encodings come from the header and the
+    /// registered decompressors decode, or the download fails. It must never be `nil`, which
+    /// hands the encoded file to `destination` as `.completed`.
+    @Test
+    func aResumedDownloadWhoseContentLostTheAlgorithms_readsThemFromTheRequest() throws {
+        var request = URLRequest(url: try #require(URL(string: "https://example.invalid")))
+        request.setValue("rle, Custom;q=0.5", forHTTPHeaderField: "Accept-Encoding")
+
+        #expect(BackgroundDownloads.Session.acceptedEncodings(nil, resumedFrom: request) == ["rle", "custom"])
+    }
+
+    @Test
+    func aResumedDownloadWhoseContentLostTheAlgorithms_isNotDecodedWhenTheRequestAskedForTheSystemOnly() throws {
+        var request = URLRequest(url: try #require(URL(string: "https://example.invalid")))
+
+        #expect(BackgroundDownloads.Session.acceptedEncodings(nil, resumedFrom: request) == nil)
+
+        for header in ["gzip, deflate", "br;q=1.0, gzip", "identity", "*"] {
+            request.setValue(header, forHTTPHeaderField: "Accept-Encoding")
+            #expect(BackgroundDownloads.Session.acceptedEncodings(nil, resumedFrom: request) == nil)
+        }
+    }
+
+    @Test
+    func aResumedDownload_keepsWhatTheRequestAndContentAgreeOn() throws {
+        var request = URLRequest(url: try #require(URL(string: "https://example.invalid")))
+        let algorithms = [Self.algorithm(RLEDecompressor())]
+
+        // No `Accept-Encoding`: the system decoded it, whatever `content` lists.
+        #expect(BackgroundDownloads.Session.acceptedEncodings(algorithms, resumedFrom: request) == nil)
+
+        request.setValue("rle", forHTTPHeaderField: "Accept-Encoding")
+        #expect(BackgroundDownloads.Session.acceptedEncodings(algorithms, resumedFrom: request) == ["rle"])
+
+        // No request: nothing to contradict `content`.
+        #expect(BackgroundDownloads.Session.acceptedEncodings(algorithms, resumedFrom: nil) == ["rle"])
+        #expect(BackgroundDownloads.Session.acceptedEncodings(nil, resumedFrom: nil) == nil)
+    }
+
+    @Test
+    func aResumedDownloadWhoseContentLostTheAlgorithms_failsWithoutARegisteredDecompressor() async throws {
+        try await withTemporaryFileURL("destination.txt") { destination in
+            // Given: the encodings the resumed request lists, as `schedule(resumeData:)` keeps them
+            var request = URLRequest(url: try #require(URL(string: "https://example.invalid")))
+            request.setValue("rle", forHTTPHeaderField: "Accept-Encoding")
+            let accepted = try #require(BackgroundDownloads.Session.acceptedEncodings(nil, resumedFrom: request))
+
+            try Data("previous".utf8).write(to: destination)
+
+            // When
+            let events = try await Self.download(
+                id: "resumed",
+                to: destination,
+                encoding: "rle",
+                body: Self.rleEncode("aaa"),
+                session: BackgroundDownloads.Session(),
+                acceptedEncodings: accepted
+            )
+
+            // Then
+            let error = try Self.failure(of: events)
+            #expect((error as? BackgroundDownloadMissingDecompressorError)?.contentEncoding == "rle")
+            #expect(try String(contentsOf: destination, encoding: .utf8) == "previous")
+        }
+    }
+
+    @Test
+    func aResumedDownloadWhoseContentLostTheAlgorithms_isDecodedByARegisteredDecompressor() async throws {
+        try await withTemporaryFileURL("destination.txt") { destination in
+            // Given
+            var request = URLRequest(url: try #require(URL(string: "https://example.invalid")))
+            request.setValue("rle", forHTTPHeaderField: "Accept-Encoding")
+            let accepted = try #require(BackgroundDownloads.Session.acceptedEncodings(nil, resumedFrom: request))
+
+            let session = BackgroundDownloads.Session()
+            session.register(Self.algorithm(RLEDecompressor()))
+
+            // When
+            let events = try await Self.download(
+                id: "resumed",
+                to: destination,
+                encoding: "rle",
+                body: Self.rleEncode("aaabb"),
+                session: session,
+                acceptedEncodings: accepted
+            )
+
+            // Then
+            #expect(Self.terminal(events).count == 1)
+            #expect(try String(contentsOf: destination, encoding: .utf8) == "aaabb")
+        }
+    }
+
     @Test
     func aResumedDownloadWithoutARequest_keepsWhatWasConfigured() {
         let algorithms = [Self.algorithm(RLEDecompressor())]

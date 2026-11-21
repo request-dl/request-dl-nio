@@ -134,6 +134,7 @@ extension BackgroundDownloads {
 
             // What was asked for is what the request that stopped asked for, which is in the resume
             // data and not in `content`. See `decompression(_:resumedFrom:)`.
+            let acceptedEncodings = Self.acceptedEncodings(decompression, resumedFrom: task.originalRequest)
             let decompression = Self.decompression(decompression, resumedFrom: task.originalRequest)
             keepDecompressors(decompression, for: task)
             task.taskDescription = Self.encode(
@@ -142,7 +143,7 @@ extension BackgroundDownloads {
                 serverTrust: serverTrust,
                 clientIdentity: clientIdentity,
                 clientIdentityHost: clientIdentity == nil ? nil : host,
-                acceptedEncodings: decompression?.map { $0.contentEncodingValue.lowercased() }
+                acceptedEncodings: acceptedEncodings
             )
 
             task.resume()
