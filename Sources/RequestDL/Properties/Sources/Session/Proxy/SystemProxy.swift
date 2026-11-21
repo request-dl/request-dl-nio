@@ -27,6 +27,12 @@ import RequestDLInternals
 /// > Note: An explicit ``Proxy`` takes precedence. Declaring both leaves the explicit one in
 /// effect.
 ///
+/// > Note: The system's answer (the bypass list or the PAC script included) is asked once, for the
+/// destination of the first request: with a ``URLOverride``, the one the request is rewritten to.
+/// The hops of a redirect are not asked again, so a redirect to a host the system would have
+/// routed differently (directly, or through another proxy) goes the same way as the first
+/// request. This holds for any redirect, with or without a ``URLOverride``.
+///
 /// > Note: Proxy auto configuration (a PAC script) is evaluated (fetched and run as JavaScript
 /// against the request's URL), with results cached briefly per script and origin (scheme, host
 /// and port) so a burst of requests to the same host doesn't re-fetch and re-evaluate the same
