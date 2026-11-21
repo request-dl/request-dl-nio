@@ -345,8 +345,24 @@ public struct Session: Property {
     /// host, from the moment a request is asked to execute until it completes.
     ///
     /// Unlike ``maximumConnectionsPerHost(_:)``, which is a per-host soft limit that AsyncHTTPClient
-    /// may exceed, this is an exact, session-wide cap: once it is reached, further requests wait
+    /// may exceed, this is an exact, session-wide cap (see the note below for when a session
+    /// is served by more than one client): once it is reached, further requests wait
     /// in line for a slot to free up rather than opening another connection.
+    ///
+    /// - Important: The slots belong to the client the session resolves to, not to the session
+    /// itself. Requests whose sessions have the same configuration are served by one pooled client
+    /// and share its slots, which is what makes this a cap on the session. A configuration that can
+    /// never match a pooled one gets a client of its own for every request, with slots of its own,
+    /// so the cap does not hold across those requests: all of them are admitted at once. Today that
+    /// is a session with a ``redirectStrategy(_:)`` or an ``onRedirect(_:)`` handler, whose policy
+    /// cannot be compared. A configuration that holds per-instance hooks (TLS callbacks, for
+    /// example) matches a pooled client only while the very same instance is reused, so it can
+    /// come to the same. For a moment, for any session, the cap also does not hold across requests
+    /// still running on a client the pool has already let go of (because it was idle for its
+    /// lifetime, or because of the pool's size ceiling) and requests that resolve a new one.
+    ///
+    /// A resumable download that loses its connection while it is suspended gives its slot back
+    /// until it is resumed, and waits for one again before it reconnects.
     ///
     /// - Parameter maximum: The maximum number of requests this session may have in flight at once.
     /// A value of zero or less means no limit.

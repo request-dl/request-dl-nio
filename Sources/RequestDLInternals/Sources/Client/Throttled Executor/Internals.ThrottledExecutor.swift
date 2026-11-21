@@ -12,6 +12,17 @@ extension Internals {
     /// Hoisted out of `Internals.Client` so `maximumConcurrentConnections` behaves identically
     /// regardless of executor, rather than each concrete client owning its own copy of the same
     /// semaphore logic and risking the two drifting apart.
+    ///
+    /// - Important: One instance is one limit, and each client creates its own
+    /// (`Internals.Client`, `Internals.URLSessionClient`). The limit is therefore per client, not
+    /// per session: sessions with the same configuration share a pooled client and so share the
+    /// limit, but a configuration that can never match a pooled one
+    /// (`Internals.Session.Configuration.isPoolable == false`, today a redirect strategy) gets a
+    /// client, and with it a limit, for every request, and the limit does not hold across them. It
+    /// does not, for a moment, across a client the pool let go of while callers still hold it and
+    /// the one that replaces it either. Making it a limit of the session would take one throttle
+    /// per `sessionProviderID`, kept by `Internals.ClientManager` and handed to the clients it
+    /// creates.
     package struct ThrottledExecutor: Sendable {
 
         // MARK: - Private properties
