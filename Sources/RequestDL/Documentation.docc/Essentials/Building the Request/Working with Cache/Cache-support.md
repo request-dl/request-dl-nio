@@ -97,7 +97,7 @@ What the answer says:
 | `206` | There is a byte after them: the body was cut. | No |
 | `200`, any other status, a `416` for another length, a failure or no answer in time | The server does not do ranges, or says something else. | No |
 
-The probe only runs when the response advertised `Accept-Ranges: bytes`, which keeps a server that ignores `Range` from answering the probe with the whole body again. It does not decide, and nothing is stored, when:
+The probe only runs when the response advertised `Accept-Ranges: bytes`, which keeps a server that ignores `Range` from answering the probe with the whole body again. A server that answers with the whole body anyway, because the `If-Range` no longer matches, is not read past its headers: the probe stops at the status line and the headers, and cancels the request. It does not decide, and nothing is stored, when:
 
 - the response has a `Content-Encoding`. `.urlSession` hands over the decoded body, and a byte range counts the encoded one, so `n` would point somewhere else;
 - the server does not support ranges for a body that it sends chunked. That is common for responses generated on the fly, and for those the answer is not in the probe's hands: pin them to `.nio`;
