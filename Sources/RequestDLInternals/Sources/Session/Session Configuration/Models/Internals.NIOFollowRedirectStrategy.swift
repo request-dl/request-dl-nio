@@ -55,7 +55,7 @@ extension Internals {
                 var candidate = Internals.RedirectRequest(request)
                 let previous = context.history.last.map { Internals.RedirectRequest($0.request) }
 
-                urlOverrides.rewritingRedirect(&candidate, previous: previous)
+                try urlOverrides.rewritingRedirect(&candidate, previous: previous)
 
                 request.url = candidate.url
                 request.headers = candidate.headers.build()

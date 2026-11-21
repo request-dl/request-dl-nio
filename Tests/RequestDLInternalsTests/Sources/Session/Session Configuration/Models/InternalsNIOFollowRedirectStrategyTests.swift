@@ -270,6 +270,36 @@ struct InternalsNIOFollowRedirectStrategyTests {
         #expect(request.headers.first(name: "Cookie") == "s=1")
     }
 
+    /// A rule covers the `Location` but the URL it maps to cannot be built: following it as the
+    /// server wrote it would reach the host the rule stands in for.
+    @Test
+    func redirectDecision_whenARuleCoversTheLocationButItsDestinationCannotBeBuilt_failsInsteadOfFollowingIt() {
+        // Given
+        let strategy = Internals.NIOFollowRedirectStrategy(
+            max: 5,
+            allowCycles: false,
+            urlOverrides: .init(rules: [
+                .init(
+                    origin: .init(scheme: "https", host: "staging.example.com", port: nil, pathComponents: []),
+                    destination: .init(scheme: "https", host: "not a host", port: nil, pathComponents: [])
+                )
+            ])
+        )
+
+        // When / Then
+        let error = #expect(throws: Internals.RedirectError.self) {
+            try strategy.redirectDecision(
+                for: context(
+                    to: "https://staging.example.com/b",
+                    history: ["https://staging.example.com/a"],
+                    headers: ["Authorization": "Bearer prod"]
+                )
+            )
+        }
+
+        #expect(error?.reason == .invalidURL(nil))
+    }
+
     // MARK: - Private methods
 
     private func context(

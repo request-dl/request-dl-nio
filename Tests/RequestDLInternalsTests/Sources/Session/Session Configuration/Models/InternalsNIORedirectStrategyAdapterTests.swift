@@ -331,6 +331,78 @@ extension InternalsNIORedirectStrategyAdapterTests {
         #expect(error == Internals.InvalidHeaderError(.value, count: 1, headerNames: ["X-Token"]))
         #expect(!String(describing: error).contains("s3cr3t"))
     }
+
+    /// A rule covers the `Location` but the URL it maps to cannot be built: the strategy is not
+    /// consulted, and the redirect is not followed to the host the rule stands in for.
+    @Test
+    func redirectDecision_whenARuleCoversTheLocationButItsDestinationCannotBeBuilt_failsWithoutConsultingTheStrategy() {
+        let strategy = RecordingStrategy { context in .follow(context.redirectRequest) }
+
+        let adapter = Internals.NIORedirectStrategyAdapter(
+            strategy: strategy,
+            urlOverrides: .init(rules: [
+                .init(
+                    origin: .init(scheme: "https", host: "staging.example.com", port: nil, pathComponents: []),
+                    destination: .init(scheme: "https", host: "not a host", port: nil, pathComponents: [])
+                )
+            ])
+        )
+
+        let context = HTTPClientRedirectContext(
+            redirectRequest: HTTPClientRequest(url: "https://staging.example.com/b"),
+            response: .init(version: .http1_1, status: .found),
+            history: [
+                HTTPClientRequestResponse(
+                    request: HTTPClientRequest(url: "https://staging.example.com/a"),
+                    responseHead: .init(version: .http1_1, status: .found)
+                )
+            ],
+            redirectCount: 0
+        )
+
+        let error = #expect(throws: Internals.RedirectError.self) {
+            try adapter.redirectDecision(for: context)
+        }
+
+        #expect(error?.reason == .invalidURL(nil))
+        #expect(strategy.seenContext == nil)
+    }
+
+    /// The URL the strategy answers with is mapped through the rules like any other `Location`.
+    @Test
+    func redirectDecision_whenTheStrategyAnswersWithAURLWhoseRuleDestinationCannotBeBuilt_fails() {
+        let strategy = RecordingStrategy { context in
+            var request = context.redirectRequest
+            request.url = "https://staging.example.com/c"
+            return .follow(request)
+        }
+
+        let adapter = Internals.NIORedirectStrategyAdapter(
+            strategy: strategy,
+            urlOverrides: .init(rules: [
+                .init(
+                    origin: .init(scheme: "https", host: "staging.example.com", port: nil, pathComponents: []),
+                    destination: .init(scheme: "https", host: "not a host", port: nil, pathComponents: [])
+                )
+            ])
+        )
+
+        let context = HTTPClientRedirectContext(
+            redirectRequest: HTTPClientRequest(url: "https://other.example.com/b"),
+            response: .init(version: .http1_1, status: .found),
+            history: [
+                HTTPClientRequestResponse(
+                    request: HTTPClientRequest(url: "https://other.example.com/a"),
+                    responseHead: .init(version: .http1_1, status: .found)
+                )
+            ],
+            redirectCount: 0
+        )
+
+        #expect(throws: Internals.RedirectError.self) {
+            try adapter.redirectDecision(for: context)
+        }
+    }
 }
 
 private final class RecordingStrategy: Internals.RedirectStrategy, @unchecked Sendable {
