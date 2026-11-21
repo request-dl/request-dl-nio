@@ -440,7 +440,10 @@ extension Internals {
                         ?? .default,
                     urlOverrides: sessionConfiguration.urlOverrides,
                     proxy: sessionConfiguration.proxy,
-                    maximumConcurrentConnections: sessionConfiguration.maximumConcurrentConnections
+                    maximumConcurrentConnections: sessionConfiguration.maximumConcurrentConnections,
+                    acceptEncoding: Internals.URLSessionClient.announcedAcceptEncoding(
+                        for: sessionConfiguration.decompression
+                    )
                 )
             }
 

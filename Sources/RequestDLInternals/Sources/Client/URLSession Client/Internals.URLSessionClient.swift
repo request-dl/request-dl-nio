@@ -38,6 +38,15 @@ extension Internals {
             operationQueue.generation
         }
 
+        /// The `Accept-Encoding` this client announces for the session's decompression, set by
+        /// `Internals.ClientManager` from ``announcedAcceptEncoding(for:)``. `nil` when it
+        /// leaves the header to CFNetwork, or when this client was not told.
+        ///
+        /// What a request that is not the one the caller made, but stands in for it, says too:
+        /// the conditional request of a cache revalidation (see
+        /// `Internals.Client.acceptEncoding`, its `.nio` counterpart).
+        package let acceptEncoding: String?
+
         // MARK: - Private properties
 
         private let session: URLSession
@@ -81,6 +90,7 @@ extension Internals {
         /// .proxyBearerAuthorizationUnderURLSession`), so a well-formed caller never passes that
         /// here. See `Internals.Proxy.buildConnectionProxyDictionary()`'s doc comment for the
         /// per-platform status of this mapping.
+        /// - Parameter acceptEncoding: See ``acceptEncoding``.
         /// - Parameter sessionDelegate: Handed to the `URLSession` itself, which holds on to it
         /// until the session is invalidated. Every exchange answers through its own task delegate,
         /// so production leaves this `nil`; it exists so a test can observe the session being
@@ -93,6 +103,7 @@ extension Internals {
             urlOverrides: Internals.URLOverrides = .init(),
             proxy: Internals.Proxy? = nil,
             maximumConcurrentConnections: Int? = nil,
+            acceptEncoding: String? = nil,
             sessionDelegate: (any URLSessionDelegate)? = nil
         ) throws {
             // A shape that does not fit the proxy (`.bearer` on SOCKS, a SOCKS username/password
@@ -133,6 +144,7 @@ extension Internals {
             self.urlOverrides = urlOverrides
             self.proxyAuthorization = proxy?.authorization
             self.identityPolicy = identityPolicy
+            self.acceptEncoding = acceptEncoding
         }
 
         // MARK: - Internal methods
@@ -812,7 +824,7 @@ extension Internals {
         ///
         /// A conditional revalidation request is announced with the same value as the request it
         /// revalidates, so the server answers it for the same representation.
-        static func announcedAcceptEncoding(for decompression: Internals.Decompression) -> String? {
+        package static func announcedAcceptEncoding(for decompression: Internals.Decompression) -> String? {
             switch decompression {
             case .disabled:
                 return "identity"
