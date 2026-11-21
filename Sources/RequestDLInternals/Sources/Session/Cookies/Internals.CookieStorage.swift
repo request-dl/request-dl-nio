@@ -37,6 +37,19 @@ extension Internals {
         /// evict the cookies of every other site to make room.
         package static let maximumCookiesPerResponse = 50
 
+        /// The most bytes of `name=value; name=value` the `Cookie` header of one request may have.
+        ///
+        /// The limits above count cookies, not bytes, and one cookie may have 4096 bytes, so a
+        /// host that sets 50 of them (they fit every limit) would otherwise add 200 KB to each
+        /// request to its whole domain, until they expired, and the servers would answer 431 or
+        /// close the connection. 8000 is under the 8 KB a header line may have by default in the
+        /// servers most often found in front of an app (nginx's `large_client_header_buffers`,
+        /// Apache's `LimitRequestFieldSize` of 8190, Tomcat's `maxHttpHeaderSize`), and leaves room
+        /// for `Cookie: ` and the line ending. It holds any one cookie (4096 bytes at most). The
+        /// cookies that do not fit are not sent: the ones last in the order of RFC 6265 section 5.4,
+        /// which are those with the shortest paths and the most recent ones.
+        package static let maximumCookieHeaderLength = 8_000
+
         // MARK: - Private properties
 
         private let lock = Lock()
@@ -120,7 +133,7 @@ extension Internals {
 
             cookies.removeAll { $0.isExpired(at: now) }
 
-            let matching = orderedMatches(for: origin, now: now)
+            let matching = withinHeaderLimit(orderedMatches(for: origin, now: now))
 
             guard !matching.isEmpty else {
                 return nil
@@ -206,7 +219,7 @@ extension Internals {
             lock.lock()
             defer { lock.unlock() }
 
-            return orderedMatches(for: origin, now: now).map { cookies[$0] }
+            return withinHeaderLimit(orderedMatches(for: origin, now: now)).map { cookies[$0] }
         }
 
         /// Stores a cookie that did not come from a response.
@@ -416,6 +429,30 @@ extension Internals {
             }
 
             return matching
+        }
+
+        /// The first of `ordered` whose `Cookie` header stays within ``maximumCookieHeaderLength``.
+        /// Stops at the first cookie that does not fit, instead of skipping it: a smaller one after
+        /// it could be a less specific cookie of the same name, which the server would then read
+        /// in place of the one that was left out. Expects the lock to be held.
+        private func withinHeaderLimit(_ ordered: [Int]) -> [Int] {
+            var length = 0
+            var fitting: [Int] = []
+
+            for index in ordered {
+                let cookie = cookies[index]
+                // `name=value`, and the `; ` that comes before every cookie but the first.
+                let added = cookie.name.utf8.count + 1 + cookie.value.utf8.count + (fitting.isEmpty ? 0 : 2)
+
+                guard length + added <= Self.maximumCookieHeaderLength else {
+                    break
+                }
+
+                length += added
+                fitting.append(index)
+            }
+
+            return fitting
         }
 
         /// Expects the lock to be held.

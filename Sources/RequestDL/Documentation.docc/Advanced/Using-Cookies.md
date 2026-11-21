@@ -48,6 +48,8 @@ Parse the list once and reuse it. A file that is not a list, such as the HTML or
 
 A domain holds at most 50 cookies and a jar at most 3000, and when one of those limits is reached the least recently used cookies go first. A single response may set at most 50: the first 50 `Set-Cookie` headers are read and the rest are ignored. The limit is per response, and every hop of a redirect is a response of its own.
 
+Those limits count cookies, not bytes, and a cookie may have up to 4096, so a server could still set 50 large cookies that make every later request to its domain too big for any server to accept. The `Cookie` header a request is sent therefore has at most 8000 bytes (under the 8 KB a header line may have by default in common servers, such as nginx, Apache and Tomcat). When the cookies that match do not fit, the ones that come last in the order RFC 6265 gives are left out, which are the ones with the shortest paths and the newest ones, and none after the first that does not fit is sent. A cookie that is left out stays in the jar and is not counted as used. ``CookieJar/cookies(for:)`` lists what would be sent, so it leaves them out too.
+
 ### Managing the cookies
 
 A jar can be read and changed while requests use it. A cookie is a ``CookieJar/Cookie``, a value with the name, value, domain, whether it is host-only, path, `Secure` and `HttpOnly` flags, expiry (`nil` for a session cookie) and creation time.

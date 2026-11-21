@@ -133,6 +133,9 @@ public final class CookieJar: Sendable {
     /// to a loopback address), and expiry. `HttpOnly` cookies are included. Like ``cookies``, it
     /// is a copy, and reading it is not a use of the cookies.
     ///
+    /// The `Cookie` header of a request has at most 8000 bytes, and so does this list: when the
+    /// cookies that match do not fit, the ones last in this order are left out of both.
+    ///
     /// - Parameter url: The URL of the request. One without a host has no cookies.
     public func cookies(for url: URL) -> [Cookie] {
         storage.cookies(for: url).map(Cookie.init)
