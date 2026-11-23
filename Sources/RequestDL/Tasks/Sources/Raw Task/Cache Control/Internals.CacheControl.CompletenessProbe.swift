@@ -161,7 +161,7 @@ extension Internals.CacheControl {
 
             let head: Internals.ResponseHead? = await withTaskGroup(of: Internals.ResponseHead?.self) { group in
                 group.addTask {
-                    try? await client.revalidationHead(configuration: request, logger: logger, metrics: nil)
+                    await Self.head(of: request, using: client, logger: logger)
                 }
 
                 group.addTask {
@@ -182,6 +182,56 @@ extension Internals.CacheControl {
         }
 
         // MARK: - Private static methods
+
+        /// The head of the response to `request`, read off the stream and then the request is
+        /// cancelled, so that the body is never downloaded.
+        ///
+        /// Not `revalidationHead`: that returns the body too, and on `.urlSession` it collects all
+        /// of it in memory before it returns anything. A server that answers `200` with the whole
+        /// resource (an `If-Range` that no longer matches, a `Last-Modified` it treats as weak)
+        /// would have it read in full into memory, up to the time limit, for the sake of a status
+        /// the head already had.
+        ///
+        /// `decompression` is `.disabled`: nothing here reads the body, and a response with a
+        /// `Content-Encoding` is not one the probe decides for.
+        private static func head(
+            of request: RequestConfiguration,
+            using client: any RequestExecutingClient,
+            logger: Internals.TaskLogger?
+        ) async -> Internals.ResponseHead? {
+            guard
+                let task = try? await client.execute(
+                    configuration: request,
+                    decompression: .disabled,
+                    cache: nil,
+                    logger: logger,
+                    transferControl: nil
+                )
+            else {
+                return nil
+            }
+
+            let seed = task.seed
+
+            return await withTaskCancellationHandler {
+                // Whichever way this ends, the request does: the head was all it was for.
+                defer { seed() }
+
+                do {
+                    for try await step in task.response {
+                        if case .download(let download) = step {
+                            return download.head
+                        }
+                    }
+                } catch {
+                    return nil
+                }
+
+                return nil
+            } onCancel: {
+                seed()
+            }
+        }
 
         /// The `ETag` of the response when it is a strong one, otherwise its `Last-Modified`.
         /// `If-Range` has no use for a weak entity tag (RFC 9110 §13.1.5).

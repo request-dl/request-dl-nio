@@ -328,16 +328,30 @@ extension Internals {
                     )
                 else { return nil }
 
-                return await makeCachedSession(cachedData, startedAt: startedAt, revalidation: revalidation)
+                // Just confirmed by the origin, so its freshness lifetime does not decide whether
+                // it is served now: see `isCachedDataValid(_:checkingFreshness:)`.
+                return await makeCachedSession(
+                    cachedData,
+                    startedAt: startedAt,
+                    revalidation: revalidation,
+                    validated: true
+                )
             }
         }
 
+        /// - Parameter validated: The entry was just confirmed by the origin (a `304`, or a
+        ///   response whose validators match). RFC 9111 §4.3.4 lets that response be used for the
+        ///   request that triggered the validation even when its freshness lifetime is already
+        ///   over, as with `max-age=0` or an `Expires` in the past, so only the checks that are
+        ///   about the stored body are applied. Without it such an entry was removed right after
+        ///   it was renewed and the body was downloaded again.
         private func makeCachedSession(
             _ cachedData: CachedData,
             startedAt: Date,
-            revalidation: Internals.RequestMetricsCollector
+            revalidation: Internals.RequestMetricsCollector,
+            validated: Bool = false
         ) async -> SessionTask? {
-            if !isCachedDataValid(cachedData) {
+            if !isCachedDataValid(cachedData, checkingFreshness: !validated) {
                 await dataCache.remove(forKey: requestConfiguration.url)
                 return nil
             }
@@ -875,7 +889,11 @@ extension Internals {
                     do {
                         try await Self.write(asyncBuffers, to: &cacheBuffer)
 
-                        if let probe {
+                        // Not asked when no tier kept the body: there is nothing to complete, and the
+                        // byte count it would be asked about (0, once both tiers were given up on)
+                        // is not the length of anything stored. The probe would send a request for
+                        // nothing and log a truncation that did not happen.
+                        if let probe, !cacheBuffer.hasNowhereToWrite {
                             let verdict = await probe.run(response: head, receivedBytes: cacheBuffer.readableBytes)
 
                             guard verdict == .complete else {
@@ -967,7 +985,9 @@ extension Internals {
             return !head.headerValues(named: "Transfer-Encoding").isEmpty
         }
 
-        private func isCachedDataValid(_ cachedData: CachedData) -> Bool {
+        /// - Parameter checkingFreshness: Whether the entry also has to be within its freshness
+        ///   lifetime. Its body is always checked against `Content-Length`.
+        private func isCachedDataValid(_ cachedData: CachedData, checkingFreshness: Bool = true) -> Bool {
             let headers = cachedData.response.headers
 
             // The cached byte count is only checked against `Content-Length` when that check can
@@ -990,6 +1010,10 @@ extension Internals {
                 cachedData.buffer.readableBytes != contentLength
             {
                 return false
+            }
+
+            guard checkingFreshness else {
+                return true
             }
 
             // A freshness value that is there and cannot be read is a stale response, not a
@@ -1147,8 +1171,9 @@ extension Internals {
         }
 
         /// What RFC 9111 §1.2.2 calls `delta-seconds`: digits only, optionally in quotes, which a
-        /// recipient ought to accept. A value too large for an `Int` reads as 2^31, as the RFC
-        /// says, which is already more than a cache keeps anything for.
+        /// recipient ought to accept. A value beyond `largestDeltaSeconds` reads as that ceiling
+        /// (the RFC says 2^31, this is one second less), which is already more than a cache keeps
+        /// anything for.
         private static func deltaSeconds(_ value: String) -> Int? {
             var digits = value.trimming(where: \.isWhitespace)
 
@@ -1163,7 +1188,10 @@ extension Internals {
             return min(Int(digits) ?? Self.largestDeltaSeconds, Self.largestDeltaSeconds)
         }
 
-        private static let largestDeltaSeconds = 2_147_483_648
+        /// 2^31 - 1, not the RFC's 2^31: a literal of 2^31 does not fit an `Int` where that is 32
+        /// bits wide (watchOS on arm64_32), and the package would not build for a watch. One
+        /// second short of the RFC's ceiling is still centuries beyond any entry's useful life.
+        private static let largestDeltaSeconds = Int(Int32.max)
 
         /// Flattens header values into individual directives.
         ///

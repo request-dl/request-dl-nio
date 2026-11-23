@@ -67,7 +67,9 @@ extension Property {
     ///   `Content-Length` only. The caller does not wait for it: the response has already been
     ///   delivered. It goes out through the same session as the request.
     /// - It only runs for a response that sent `Accept-Ranges: bytes`, so a server that ignores
-    ///   `Range` is never asked to send the body a second time.
+    ///   `Range` is not asked to send the body a second time. One that answers with the whole body
+    ///   anyway (an `If-Range` that no longer matches) is read as far as its headers, and the
+    ///   request is cancelled: the body is never downloaded.
     /// - It cannot decide for a response with a `Content-Encoding` (what `.urlSession` hands over is
     ///   the decoded body, and a range counts the encoded one), nor for a server that does not support
     ///   ranges on a chunked body, which is common for responses generated on the fly.

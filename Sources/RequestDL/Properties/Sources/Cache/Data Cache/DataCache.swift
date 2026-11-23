@@ -83,9 +83,44 @@ public struct DataCache: Sendable, Equatable {
         /// (`CacheBacklogExceededError`); while it is unfinished, the key reads as a miss.
         let pendingWrites = Internals.PendingTasks()
 
-        /// Held while a revalidated entry is rewritten and read back, one at a time: see
+        /// Runs `body` while holding the revalidation lock of `key`: see
         /// ``DataCache/renewCached(key:cachedResponse:expecting:policy:)``.
-        let revalidationLock = AsyncLock()
+        ///
+        /// One lock per key, not one for the whole cache. What the lock protects is one entry
+        /// being rewritten and read back, and revalidations of other entries have nothing to do
+        /// with it: a single lock queued every revalidation of every URL behind the disk work
+        /// (and the body promotion) of the one ahead of it.
+        ///
+        /// A key's lock exists only while someone holds or waits for it.
+        func withRevalidationLock<Value: Sendable>(
+            forKey key: String,
+            _ body: @Sendable () async -> Value
+        ) async -> Value {
+            let keyLock = lock.withLock { () -> AsyncLock in
+                var entry = _revalidationLocks[key] ?? (lock: AsyncLock(), users: 0)
+                entry.users += 1
+                _revalidationLocks[key] = entry
+                return entry.lock
+            }
+
+            let value = await keyLock.withLock { await body() }
+
+            lock.withLock {
+                guard var entry = _revalidationLocks[key] else {
+                    return
+                }
+
+                entry.users -= 1
+                _revalidationLocks[key] = entry.users > 0 ? entry : nil
+            }
+
+            return value
+        }
+
+        /// How many keys have a revalidation lock right now, exposed for tests.
+        var revalidationLockCount: Int {
+            lock.withLock { _revalidationLocks.count }
+        }
 
         var memoryCapacity: Int64 {
             get { lock.withLock { _memoryCapacity } }
@@ -147,6 +182,8 @@ public struct DataCache: Sendable, Equatable {
 
         private var _memoryStorage: MemoryStorage
         private var _diskStorage: DiskStorage
+
+        private var _revalidationLocks: [String: (lock: AsyncLock, users: Int)] = [:]
 
         /// Best-effort disk usage estimate, `nil` until first reconciled.
         ///
@@ -807,7 +844,7 @@ public struct DataCache: Sendable, Equatable {
         expecting expected: CachedResponse,
         policy: DataCache.Policy.Set
     ) async -> CachedData? {
-        await storage.revalidationLock.withLock {
+        await storage.withRevalidationLock(forKey: key) {
             await updateCached(key: key, cachedResponse: cachedResponse, expecting: expected)
 
             guard

@@ -93,15 +93,37 @@ struct CompletenessProbeRunTests {
 
     private final class Recorder: Sendable {
 
-        private let box = LockedValueBox<[RequestConfiguration]>([])
+        private struct State {
+            var configurations: [RequestConfiguration] = []
+            var cancelled = 0
+            var readBodyInFull = 0
+        }
 
-        var configurations: [RequestConfiguration] { box.withLockedValue { $0 } }
+        private let box = LockedValueBox(State())
+
+        var configurations: [RequestConfiguration] { box.withLockedValue { $0.configurations } }
+
+        /// How many of the requests were cancelled by whoever asked for them.
+        var cancelled: Int { box.withLockedValue { $0.cancelled } }
+
+        /// How many times the head came with the whole body, as `revalidationHead` returns it.
+        var readBodyInFull: Int { box.withLockedValue { $0.readBodyInFull } }
 
         func append(_ configuration: RequestConfiguration) {
-            box.withLockedValue { $0.append(configuration) }
+            box.withLockedValue { $0.configurations.append(configuration) }
+        }
+
+        func cancel() {
+            box.withLockedValue { $0.cancelled += 1 }
+        }
+
+        func readInFull() {
+            box.withLockedValue { $0.readBodyInFull += 1 }
         }
     }
 
+    /// Answers like an executor that streams: the head first, then a body that never ends, which
+    /// only stops when the request is cancelled.
     private struct ScriptedClient: RequestExecutingClient {
 
         let recorder: Recorder
@@ -114,7 +136,27 @@ struct CompletenessProbeRunTests {
             logger: Internals.TaskLogger?,
             transferControl: Internals.TransferControl?
         ) async throws -> SessionTask {
-            fatalError("The probe only asks for a head")
+            recorder.append(configuration)
+
+            let head = try await answer()
+            let recorder = recorder
+            let download = await Internals.DownloadBuffer(readingMode: configuration.readingMode)
+
+            return SessionTask(
+                seed: .init {
+                    recorder.cancel()
+                    download.close()
+                },
+                response: .init(
+                    logger: logger,
+                    uploadingBytes: .zero,
+                    upload: .empty(),
+                    decompressionDispatch: .skip,
+                    readingMode: configuration.readingMode,
+                    head: .constant(head),
+                    download: download.stream
+                )
+            )
         }
 
         func revalidationHead(
@@ -123,6 +165,7 @@ struct CompletenessProbeRunTests {
             metrics: Internals.RequestMetricsCollector?
         ) async throws -> Internals.ResponseHead {
             recorder.append(configuration)
+            recorder.readInFull()
             return try await answer()
         }
     }
@@ -173,6 +216,21 @@ struct CompletenessProbeRunTests {
 
         #expect(await probe.run(response: head(200, ranges), receivedBytes: 10) == .undecided)
         #expect(recorder.configurations.count == 1)
+    }
+
+    /// A `200` with the whole resource (an `If-Range` that no longer matches) is answered by a body
+    /// the probe has no use for. It has to stop at the head: `revalidationHead` returns the body too,
+    /// and `.urlSession` collects all of it in memory first.
+    @Test(arguments: [200, 206, 416])
+    func run_readsTheHeadOnly_andCancelsTheRequestWithoutTakingTheBody(_ status: UInt) async {
+        let recorder = Recorder()
+        let probe = probe(recorder: recorder) { self.head(status, [("Content-Range", "bytes */10")]) }
+
+        _ = await probe.run(response: head(200, ranges), receivedBytes: 10)
+
+        #expect(recorder.configurations.count == 1)
+        #expect(recorder.readBodyInFull == 0)
+        #expect(recorder.cancelled == 1)
     }
 
     @Test
