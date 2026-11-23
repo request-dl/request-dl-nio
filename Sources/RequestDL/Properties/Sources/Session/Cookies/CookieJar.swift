@@ -61,6 +61,13 @@ public final class CookieJar: Sendable {
     ///   is a public suffix, such as `co.uk`, which would otherwise be sent to every site below
     ///   it. The jar refuses a `Domain` that is a single label (`com`) with a list or without
     ///   one; without a list, a multi-label suffix like `co.uk` gets through.
+    ///
+    ///   Pass a list whenever the jar talks to hosts you do not control. Without one, a tenant of
+    ///   a shared hosting platform can plant a cookie on all the others: `attacker.github.io` may
+    ///   set `Domain=github.io`, and the jar sends that cookie to every other `*.github.io` it
+    ///   visits. The same goes for `*.herokuapp.com`, `*.vercel.app`, `*.netlify.app`,
+    ///   `*.pages.dev`, `*.azurewebsites.net`, and S3 buckets under `*.s3.amazonaws.com`. A list
+    ///   has them (its private section); see <doc:Using-Cookies>.
     public init(publicSuffixList: PublicSuffixList? = nil) {
         storage = Internals.CookieStorage(publicSuffixList: publicSuffixList?.list)
     }
@@ -125,6 +132,9 @@ public final class CookieJar: Sendable {
     /// It applies the rules the `Cookie` header does: the host, the path, `Secure` (over HTTPS, or
     /// to a loopback address), and expiry. `HttpOnly` cookies are included. Like ``cookies``, it
     /// is a copy, and reading it is not a use of the cookies.
+    ///
+    /// The `Cookie` header of a request has at most 8000 bytes, and so does this list: when the
+    /// cookies that match do not fit, the ones last in this order are left out of both.
     ///
     /// - Parameter url: The URL of the request. One without a host has no cookies.
     public func cookies(for url: URL) -> [Cookie] {

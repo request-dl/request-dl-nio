@@ -78,7 +78,7 @@ extension Internals.Cookie {
                 let cleaned = rawValue.hasPrefix(".") ? String(rawValue.dropFirst()) : rawValue
                 // An empty `Domain` is ignored, as RFC 6265bis says: it does not undo an earlier one.
                 if !cleaned.isEmpty {
-                    domain = Internals.HostName.ascii(cleaned)
+                    domain = withoutTrailingDot(Internals.HostName.ascii(cleaned))
                 }
             case "path":
                 path = rawValue.hasPrefix("/") ? rawValue : nil
@@ -158,6 +158,12 @@ extension Internals.Cookie {
         // A Domain attribute never applies to an IP address, except the one it names itself.
         if isIPAddress(origin.host) || isIPAddress(attribute) {
             return attribute == origin.host ? (origin.host, true) : nil
+        }
+
+        // An empty label (`Domain=a..com`, or a lone `.`) is not a name: refused before anything
+        // compares it, so it cannot be taken for a suffix of the host.
+        guard isHostName(attribute) else {
+            return nil
         }
 
         // A single label is never allowed, with a list or without one: the Public Suffix List's own
