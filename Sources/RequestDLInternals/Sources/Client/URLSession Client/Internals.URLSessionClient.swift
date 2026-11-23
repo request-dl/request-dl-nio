@@ -1510,7 +1510,17 @@ extension Internals.URLSessionClient {
             // The hop as it is going to be requested: a `Location` that names a host a
             // `URLOverride` stands in for is mapped to its destination, before anything below
             // counts, compares or follows it.
-            let request = rewrittenByURLOverrides(proposedRequest)
+            let request: URLRequest
+
+            do {
+                request = try rewrittenByURLOverrides(proposedRequest)
+            } catch {
+                // A rule covers this hop and its destination cannot be built: following the
+                // `Location` as the server wrote it would reach the host the rule stands in for.
+                lock.withLock { _redirectError = error }
+                completionHandler(nil)
+                return
+            }
 
             // Before anything below decides what to do with this hop: the next request, whichever
             // way it is built, must be owed what this redirect just set.
@@ -1587,11 +1597,13 @@ extension Internals.URLSessionClient {
                     // What the strategy kept of the candidate's URL is already the destination. One
                     // it wrote itself is a URL like any other `Location`; rewriting the first again
                     // would send a destination through the rules a second time.
-                    if redirectRequest.url != candidateURL, let url = urlOverrides.rewriting(redirectRequest.url) {
-                        redirectRequest.url = url
-                    }
-
                     do {
+                        if redirectRequest.url != candidateURL,
+                            let url = try urlOverrides.rewriting(redirectRequest.url)
+                        {
+                            redirectRequest.url = url
+                        }
+
                         // Sanitized again, against the same previous hop: the strategy may have
                         // answered with a URL on another origin than the candidate's.
                         newRequest = try sanitizedForRedirect(
@@ -1686,17 +1698,21 @@ extension Internals.URLSessionClient {
         /// ``Internals/URLOverrides/rewritingRedirect(_:previous:)``, which also puts back the
         /// credentials `URLSession` took off because the `Location` named another host than the
         /// one the previous hop was sent to, when the rewritten URL is back on it.
-        private func rewrittenByURLOverrides(_ request: URLRequest) -> URLRequest {
+        private func rewrittenByURLOverrides(_ request: URLRequest) throws -> URLRequest {
             guard !urlOverrides.isEmpty else {
                 return request
             }
 
             var candidate = Internals.RedirectRequest(request)
             let previous = lock.withLock { Internals.RedirectRequest(_lastRequest) }
-            urlOverrides.rewritingRedirect(&candidate, previous: previous)
+            try urlOverrides.rewritingRedirect(&candidate, previous: previous)
 
-            guard candidate.url != request.url?.absoluteString, let url = URL(string: candidate.url) else {
+            guard candidate.url != request.url?.absoluteString else {
                 return request
+            }
+
+            guard let url = URL(string: candidate.url) else {
+                throw Internals.RedirectError(.invalidURL(nil))
             }
 
             var rewritten = request

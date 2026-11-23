@@ -115,12 +115,27 @@ extension Internals {
             return match.map { Match(destination: $0.destination, remainder: $0.remainder) }
         }
 
-        /// `url` with the rule that covers it applied, or `nil` when no rule does (or `url` is not
-        /// an absolute URL with a host): such a URL is to be requested as it is.
+        /// What applying the rules to a URL came to.
+        package enum Rewrite: Sendable, Equatable {
+
+            /// No rule covers the URL (or it is not an absolute URL with a host): it is to be
+            /// requested as it is.
+            case notCovered
+
+            /// The URL a rule maps it to.
+            case rewritten(String)
+
+            /// A rule covers the URL, but the URL it maps to cannot be built. Not the same as
+            /// ``notCovered``: that one goes where the server said, which here would be the real
+            /// host the rule stands in for.
+            case failed
+        }
+
+        /// `url` with the rule that covers it applied.
         ///
         /// What `Resolve` does to the first request, for a URL a server named. Query, fragment and
         /// a trailing slash pass through untouched.
-        package func rewriting(_ url: String) -> String? {
+        package func rewrite(_ url: String) -> Rewrite {
             guard
                 !rules.isEmpty,
                 let parsed = URL(string: url),
@@ -129,7 +144,7 @@ extension Internals {
                 let host = components.host,
                 !host.isEmpty
             else {
-                return nil
+                return .notCovered
             }
 
             let encodedPath = components.percentEncodedPath
@@ -139,7 +154,7 @@ extension Internals {
             let origin = Endpoint(scheme: scheme, host: host, port: components.port, pathComponents: [])
 
             guard let match = match(origin: origin, pathComponents: pathComponents) else {
-                return nil
+                return .notCovered
             }
 
             let rewrittenComponents = match.destination.pathComponents + match.remainder
@@ -156,12 +171,44 @@ extension Internals {
                 path = "/"
             }
 
+            var destinationHost = match.destination.host
+
+            // An IPv6 literal is bracketed in a URL, and `URLComponents` refuses the bare form.
+            if destinationHost.contains(":"), !destinationHost.hasPrefix("[") {
+                destinationHost = "[\(destinationHost)]"
+            }
+
             components.scheme = match.destination.scheme
-            components.host = match.destination.host
+            components.host = destinationHost
             components.port = match.destination.port
             components.percentEncodedPath = path
 
-            return components.string
+            guard let rewritten = components.string else {
+                return .failed
+            }
+
+            return .rewritten(rewritten)
+        }
+
+        /// ``rewrite(_:)`` for a caller that has to follow the URL it gets: `nil` when no rule
+        /// covers `url`.
+        ///
+        /// - Throws: ``Internals/RedirectError`` (``Internals/RedirectError/Reason/invalidURL(_:)``)
+        /// when a rule covers `url` and the URL it maps to cannot be built. Following the URL as
+        /// it was would send the request to the host the rule stands in for, which is the
+        /// one thing a rule exists to prevent. The URL is not part of the error, as it can carry
+        /// a credential.
+        package func rewriting(_ url: String) throws -> String? {
+            switch rewrite(url) {
+            case .notCovered:
+                return nil
+
+            case .rewritten(let rewritten):
+                return rewritten
+
+            case .failed:
+                throw Internals.RedirectError(.invalidURL(nil))
+            }
         }
 
         /// Applies the rules to the next hop of a redirect, in place: `request.url` becomes the
@@ -182,11 +229,15 @@ extension Internals {
         /// origin the previous one went to: the origin a credential was already sent to is not a
         /// new one. A hop that ends on another origin keeps what the executor took off, and has
         /// the rest taken off by the same sanitizer as any other redirect.
+        ///
+        /// - Throws: ``Internals/RedirectError`` when a rule covers the URL and the destination
+        /// cannot be built (see ``rewriting(_:)``): the redirect fails instead of reaching the
+        /// host the rule stands in for.
         package func rewritingRedirect(
             _ request: inout Internals.RedirectRequest,
             previous: Internals.RedirectRequest?
-        ) {
-            guard let rewritten = rewriting(request.url) else {
+        ) throws {
+            guard let rewritten = try rewriting(request.url) else {
                 return
             }
 

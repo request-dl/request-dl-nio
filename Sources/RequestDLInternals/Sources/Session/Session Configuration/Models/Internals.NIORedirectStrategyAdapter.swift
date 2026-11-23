@@ -41,7 +41,7 @@ extension Internals {
 
             // Before anything else looks at it, the strategy included: the candidate is the
             // request that would be sent, which is what `history` records of every earlier hop.
-            urlOverrides.rewritingRedirect(&candidate, previous: history.last?.request)
+            try urlOverrides.rewritingRedirect(&candidate, previous: history.last?.request)
             let rewrittenURL = candidate.url
 
             // AsyncHTTPClient has already stripped what it knows to strip for a redirect to
@@ -67,7 +67,7 @@ extension Internals {
                 // What the strategy kept of the candidate's URL is already the destination. One it
                 // wrote itself is a URL like any other `Location`; rewriting the first again would
                 // send a destination through the rules a second time.
-                if redirectRequest.url != rewrittenURL, let url = urlOverrides.rewriting(redirectRequest.url) {
+                if redirectRequest.url != rewrittenURL, let url = try urlOverrides.rewriting(redirectRequest.url) {
                     redirectRequest.url = url
                 }
 
@@ -78,6 +78,10 @@ extension Internals {
                 // `.RAW(value:)` is written on the request line as it is, and this method comes from
                 // a strategy: no more trusted than the caller's own.
                 try Internals.MethodValidation.validate(redirectRequest.method)
+
+                // AsyncHTTPClient refuses a bad header too, but with an error that carries every
+                // offending value.
+                try Internals.HeaderValidation.validate(redirectRequest.headers)
 
                 var request = context.redirectRequest
                 request.url = redirectRequest.url
