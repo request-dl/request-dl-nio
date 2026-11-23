@@ -90,6 +90,11 @@ extension Internals {
         /// .proxyBearerAuthorizationUnderURLSession`), so a well-formed caller never passes that
         /// here. See `Internals.Proxy.buildConnectionProxyDictionary()`'s doc comment for the
         /// per-platform status of this mapping.
+        /// - Parameter maximumConcurrentConnections: Builds a throttle of this client's own. Ignored
+        /// when `throttledExecutor` is given.
+        /// - Parameter throttledExecutor: The throttle this client admits its requests through,
+        /// shared with the other clients of its session so that the cap holds across all of them.
+        /// See `Internals.ClientManager.throttledExecutor(provider:maximumConcurrentConnections:)`.
         /// - Parameter acceptEncoding: See ``acceptEncoding``.
         /// - Parameter sessionDelegate: Handed to the `URLSession` itself, which holds on to it
         /// until the session is invalidated. Every exchange answers through its own task delegate,
@@ -103,6 +108,7 @@ extension Internals {
             urlOverrides: Internals.URLOverrides = .init(),
             proxy: Internals.Proxy? = nil,
             maximumConcurrentConnections: Int? = nil,
+            throttledExecutor: Internals.ThrottledExecutor? = nil,
             acceptEncoding: String? = nil,
             sessionDelegate: (any URLSessionDelegate)? = nil
         ) throws {
@@ -137,9 +143,9 @@ extension Internals {
             let identityPolicy = try secureConnection.map(Internals.URLSessionIdentityPolicy.init)
 
             session = URLSession(configuration: configuration, delegate: sessionDelegate, delegateQueue: nil)
-            throttledExecutor = Internals.ThrottledExecutor(
-                maximumConcurrentConnections: maximumConcurrentConnections
-            )
+            self.throttledExecutor =
+                throttledExecutor
+                ?? Internals.ThrottledExecutor(maximumConcurrentConnections: maximumConcurrentConnections)
             self.redirectConfiguration = redirectConfiguration
             self.urlOverrides = urlOverrides
             self.proxyAuthorization = proxy?.authorization

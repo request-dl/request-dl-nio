@@ -71,8 +71,12 @@ extension Internals {
         /// involved (tests constructing a client directly).
         private let eventLoopGroupToken: Internals.EventLoopGroupToken?
 
-        /// Caps how many requests this client may have in flight at once, from the moment a
-        /// request is asked to execute until it completes, is cancelled, or is released.
+        /// Caps how many requests may be in flight at once, from the moment a request is asked to
+        /// execute until it completes, is cancelled, or is released.
+        ///
+        /// Not necessarily this client's own: `Internals.ClientManager` hands every client of one
+        /// session the same throttle, so the cap holds across all of them. A client built without
+        /// one (a test, mostly) makes a throttle of its own from `maximumConcurrentConnections`.
         private let throttledExecutor: Internals.ThrottledExecutor
 
         #if canImport(Darwin)
@@ -113,6 +117,7 @@ extension Internals {
             localIdentityHandle: Internals.IdentityHandle? = nil,
             identityOrigins: Internals.IdentityOrigins? = nil,
             maximumConcurrentConnections: Int? = nil,
+            throttledExecutor: Internals.ThrottledExecutor? = nil,
             eventLoopGroupToken: Internals.EventLoopGroupToken? = nil,
             acceptEncoding: String? = nil
         ) {
@@ -122,9 +127,9 @@ extension Internals {
                 eventLoopGroupProvider: eventLoopGroupProvider,
                 configuration: configuration
             )
-            throttledExecutor = Internals.ThrottledExecutor(
-                maximumConcurrentConnections: maximumConcurrentConnections
-            )
+            self.throttledExecutor =
+                throttledExecutor
+                ?? Internals.ThrottledExecutor(maximumConcurrentConnections: maximumConcurrentConnections)
             self.localIdentityHandle = localIdentityHandle
             self.identityOrigins = identityOrigins
             self.eventLoopGroupToken = eventLoopGroupToken
@@ -135,6 +140,7 @@ extension Internals {
             configuration: HTTPClient.Configuration,
             identityOrigins: Internals.IdentityOrigins? = nil,
             maximumConcurrentConnections: Int? = nil,
+            throttledExecutor: Internals.ThrottledExecutor? = nil,
             eventLoopGroupToken: Internals.EventLoopGroupToken? = nil,
             acceptEncoding: String? = nil
         ) {
@@ -144,9 +150,9 @@ extension Internals {
                 eventLoopGroupProvider: eventLoopGroupProvider,
                 configuration: configuration
             )
-            throttledExecutor = Internals.ThrottledExecutor(
-                maximumConcurrentConnections: maximumConcurrentConnections
-            )
+            self.throttledExecutor =
+                throttledExecutor
+                ?? Internals.ThrottledExecutor(maximumConcurrentConnections: maximumConcurrentConnections)
             self.identityOrigins = identityOrigins
             self.eventLoopGroupToken = eventLoopGroupToken
         }

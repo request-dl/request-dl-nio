@@ -50,6 +50,22 @@ extension Internals.ClientManager {
 
         let sessionProviderID = provider.uniqueIdentifier(with: options)
 
+        // A configuration that can never be pooled has nothing to look up in the table and nothing
+        // to add to it, so there is nothing for ``lock`` to order. It is skipped, so that building
+        // one such client (an event loop group that may have to be created, a TLS configuration)
+        // does not make every other session's resolution wait behind it.
+        guard sessionConfiguration.isPoolable else {
+            try Task.checkCancellation()
+
+            return try await _newNIOClient(
+                id: sessionProviderID,
+                provider: provider,
+                options: options,
+                sessionConfiguration: sessionConfiguration,
+                isCompatibleWithNetworkFramework: isCompatibleWithNetworkFramework
+            )
+        }
+
         return try await lock.withLock {
             // `AsyncLock` never aborts acquisition, so a task cancelled while queued behind
             // a cleanup sweep would otherwise still pay for (or trigger) client creation and
@@ -59,35 +75,47 @@ extension Internals.ClientManager {
 
             // `withLock` rather than a manual lock and unlock pair with a return in the
             // middle of it, which balances today and stops balancing on the next edit.
-            //
-            // Skipped outright for a configuration that can never match a pooled one: the scan
-            // is linear, and for such a configuration it is guaranteed to walk the whole list and
-            // find nothing, every single time.
-            if sessionConfiguration.isPoolable,
-                case .nio(let client) = tableLock.withLock({
-                    _reusableItem(id: sessionProviderID, sessionConfiguration: sessionConfiguration)
-                })
-            {
+            if case .nio(let client) = tableLock.withLock({
+                _reusableItem(id: sessionProviderID, sessionConfiguration: sessionConfiguration)
+            }) {
                 return client
             }
 
-            let eventLoopGroupToken = await Internals.EventLoopGroupManager.shared.provider(
-                provider,
-                with: options
-            )
-
-            return try _createNewClient(
+            return try await _newNIOClient(
                 id: sessionProviderID,
-                eventLoopGroupToken: eventLoopGroupToken,
+                provider: provider,
+                options: options,
                 sessionConfiguration: sessionConfiguration,
                 isCompatibleWithNetworkFramework: isCompatibleWithNetworkFramework
             )
         }
     }
 
+    private func _newNIOClient(
+        id: String,
+        provider: SessionProvider,
+        options: SessionProviderOptions,
+        sessionConfiguration: Internals.Session.Configuration,
+        isCompatibleWithNetworkFramework: Bool
+    ) async throws -> Internals.Client {
+        let eventLoopGroupToken = await Internals.EventLoopGroupManager.shared.provider(
+            provider,
+            with: options
+        )
+
+        return try _createNewClient(
+            id: id,
+            provider: provider,
+            eventLoopGroupToken: eventLoopGroupToken,
+            sessionConfiguration: sessionConfiguration,
+            isCompatibleWithNetworkFramework: isCompatibleWithNetworkFramework
+        )
+    }
+
     /// - Warning: Lockless with respect to `tableLock`, which it takes itself.
     fileprivate func _createNewClient(
         id: String,
+        provider: SessionProvider,
         eventLoopGroupToken: Internals.EventLoopGroupToken,
         sessionConfiguration: Internals.Session.Configuration,
         isCompatibleWithNetworkFramework: Bool
@@ -95,6 +123,11 @@ extension Internals.ClientManager {
         let output = try sessionConfiguration.build(
             isCompatibleWithNetworkFramework: isCompatibleWithNetworkFramework
         )
+        let throttledExecutor = self.throttledExecutor(
+            provider: provider,
+            maximumConcurrentConnections: sessionConfiguration.maximumConcurrentConnections
+        )
+
         // The token, not just the group: `.shared(_:)` means the client doesn't own the group,
         // and `Internals.EventLoopGroupManager`'s table can drop its own reference at any point.
         // Holding the token is what keeps the loops alive for as long as this client needs them.
@@ -104,7 +137,7 @@ extension Internals.ClientManager {
             configuration: output.httpClientConfiguration,
             localIdentityHandle: output.localIdentityHandle,
             identityOrigins: output.identityOrigins,
-            maximumConcurrentConnections: sessionConfiguration.maximumConcurrentConnections,
+            throttledExecutor: throttledExecutor,
             eventLoopGroupToken: eventLoopGroupToken,
             acceptEncoding: sessionConfiguration.decompression.acceptEncoding
         )
@@ -113,7 +146,7 @@ extension Internals.ClientManager {
             eventLoopGroupProvider: .shared(eventLoopGroupToken.group),
             configuration: output.httpClientConfiguration,
             identityOrigins: output.identityOrigins,
-            maximumConcurrentConnections: sessionConfiguration.maximumConcurrentConnections,
+            throttledExecutor: throttledExecutor,
             eventLoopGroupToken: eventLoopGroupToken,
             acceptEncoding: sessionConfiguration.decompression.acceptEncoding
         )
