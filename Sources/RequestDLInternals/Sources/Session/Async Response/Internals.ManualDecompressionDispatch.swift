@@ -89,7 +89,7 @@ extension Internals.ManualDecompressionDispatch {
         source: Internals.AsyncStream<Internals.Chunk>,
         readingMode: Internals.DownloadStep.ReadingMode
     ) throws -> Internals.AsyncStream<Internals.Chunk> {
-        guard case .dispatch(let algorithms, let nativelyDecoded) = self else {
+        guard case .dispatch(let algorithms, _) = self else {
             return source
         }
 

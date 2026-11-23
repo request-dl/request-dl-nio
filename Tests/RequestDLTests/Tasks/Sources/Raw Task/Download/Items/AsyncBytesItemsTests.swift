@@ -33,7 +33,7 @@ struct AsyncBytesItemsTests {
         )
 
         for chunk in chunks {
-            await stream.append(.success(Internals.Chunk(chunk)))
+            stream.append(.success(Internals.Chunk(chunk)))
         }
 
         stream.close()

@@ -123,7 +123,7 @@ struct AsyncBytesCollectTests {
         let bytes = AsyncBytes(seed: .withoutCancellation, bytes: internalBytes)
 
         // When
-        await stream.append(.success(Internals.Chunk(part)))
+        stream.append(.success(Internals.Chunk(part)))
         stream.close()
 
         let data = try await bytes.collect()
