@@ -92,9 +92,22 @@ jobs:
         {"destination":"platform=macOS,arch=arm64,name=My Mac","name":"macOS"},
         {"destination":"platform=macOS,arch=arm64,variant=Mac Catalyst,name=My Mac","name":"macOS Catalyst"}]
 
+      # Apple destinations that are only built. watchOS devices run arm64_32, where Int has 32
+      # bits; the watchOS leg above runs on the arm64 Simulator, where it has 64, so a literal
+      # such as 2_147_483_648 compiles there and breaks the build of an app archived for a watch.
+      apple-build-only-matrix: >-
+        [{"destination":"generic/platform=watchOS","name":"watchOS device"}]
+
       # Step 4 – Third Party
       enable-third-party-tests: true
       third-party-coverage-enabled: true
+      # The Linux leg is the workflow's own default, repeated here because setting the input
+      # replaces it. The macOS leg builds and runs the suite with the NIOTransport trait off, so
+      # the URLSession executor is what gets tested; setup-swift is false because that leg needs
+      # the Apple SDK frameworks of the runner's Xcode. Takes 9 to 19 minutes, hence the 30.
+      third-party-tests-matrix: >-
+        [{"platform":"ubuntu-latest","name":"Linux"},
+        {"platform":"xcode-27","name":"macOS URLSession-only","args":"--disable-default-traits","setup-swift":false,"timeout":30}]
 
       # Step 4 – Linkage Test (renomeado de test-foundation-essentials)
       enable-linkage-test: true
@@ -109,55 +122,3 @@ jobs:
       # Step 5
       enable-coverage-upload: true
     secrets: inherit
-
-  urlsession-only-build:
-    name: "🌐 URLSession-only Build & Test"
-    # Skip draft PRs, matching the reusable "Swift CI" job's own guard above.
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    runs-on: xcode-27
-    # Takes 9 to 19 minutes; without a cap a stuck run holds a macOS runner for GitHub's six hours.
-    timeout-minutes: 30
-    env:
-      DEVELOPER_DIR: /Applications/Xcode_27.2.app
-    steps:
-      - uses: actions/checkout@v7
-      - name: Build RequestDL with the NIOTransport trait disabled
-        run: swift build --disable-default-traits --target RequestDL
-      - name: Build the Test targets with the NIOTransport trait disabled
-        run: swift build --disable-default-traits --target RequestDLTests --target RequestDLInternalsTests
-      - name: Run the test suite with the NIOTransport trait disabled
-        # macOS GitHub-hosted runners default to a 256 open-file soft limit; the portable
-        # (NIOCore-less) file-buffer path caches one descriptor per open Internals.Buffer for
-        # its whole lifetime, with no pool cap the way the NIOThreadPool-backed path has, so a
-        # suite that opens hundreds of file-backed buffers concurrently (InternalsFileBufferTests
-        # / InternalsEncryptedFileStreamBufferTests / DiskStorageTests) exhausts it -- silently,
-        # since every failed open/write in that path already swallows its error by design and
-        # reports "no data" rather than throwing. Raise the limit before running, matching this
-        # process's local ulimit (effectively unbounded) rather than the CI default.
-        run: |
-          hard_limit="$(ulimit -Hn)"
-          echo "hard limit: $hard_limit"
-          if [ "$hard_limit" = "unlimited" ]; then
-            ulimit -n 65536
-          else
-            ulimit -n "$hard_limit"
-          fi
-          echo "raised soft limit: $(ulimit -Sn)"
-          swift test --disable-default-traits
-
-  watchos-device-build:
-    name: "⌚ watchOS device build"
-    # Skip draft PRs, matching the jobs above.
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    runs-on: xcode-27
-    timeout-minutes: 30
-    env:
-      DEVELOPER_DIR: /Applications/Xcode_27.2.app
-    steps:
-      - uses: actions/checkout@v7
-      - name: Build RequestDL for a watchOS device (arm64_32)
-        # Build only, no tests. The watchOS leg of the shared workflow runs on the arm64 Simulator,
-        # where Int is 64 bits; an Apple Watch Series 4 to 8 or SE runs arm64_32, where it is 32.
-        # A literal that overflows there (2_147_483_648) compiled everywhere CI looks and broke the
-        # build of any app archived for those watches.
-        run: xcodebuild -scheme request-dl -destination 'generic/platform=watchOS' build CODE_SIGNING_ALLOWED=NO
