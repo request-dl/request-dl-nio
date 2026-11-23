@@ -126,6 +126,51 @@ struct InternalsClientConcurrencyLimitTests {
             try await group.shutdownGracefully()
         }
     }
+
+    /// A caller queued for a slot counts the client as busy for as long as it waits, which is what
+    /// keeps `Internals.ClientManager`'s sweep and its ceiling eviction from un-pooling a client
+    /// that still has callers waiting on it. Registered after the wait instead, the client reads
+    /// idle in the instant a slot is handed on, and a second client (with a semaphore of its own)
+    /// can be created beside it.
+    @Test
+    func execute_whileWaitingForASlot_countsTheClientAsBusy() async throws {
+        // Given: a limit of one, with its only slot taken by something that is not a request.
+        let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        let client = Internals.Client(
+            eventLoopGroupProvider: .shared(group),
+            configuration: .init(),
+            maximumConcurrentConnections: 1
+        )
+
+        let semaphore = try #require(client.connectionSemaphoreForTesting)
+        try await semaphore.wait()
+        #expect(!client.isRunning)
+
+        // When
+        let queued = _Concurrency.Task {
+            try await client.execute(request: try HTTPClient.Request(url: "http://127.0.0.1:1/"), logger: nil)
+        }
+
+        try await semaphore.waitForWaiters(1, timeout: 30)
+
+        // Then
+        #expect(client.isRunning)
+
+        // And a caller that gives up leaves the client idle again.
+        queued.cancel()
+        try await semaphore.waitForWaiters(0, timeout: 30)
+
+        await #expect(throws: CancellationError.self) {
+            _ = try await queued.value
+        }
+
+        #expect(!client.isRunning)
+
+        semaphore.signal()
+
+        _ = try? await client.shutdown()
+        try await group.shutdownGracefully()
+    }
 }
 
 private actor StartedCounter {

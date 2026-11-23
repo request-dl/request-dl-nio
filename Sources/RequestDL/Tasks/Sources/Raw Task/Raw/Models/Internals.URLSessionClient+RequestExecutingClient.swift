@@ -65,8 +65,19 @@ extension Internals.URLSessionClient: RequestExecutingClient {
         logger: Internals.TaskLogger?,
         metrics: Internals.RequestMetricsCollector?
     ) async throws -> Internals.ResponseHead {
+        var request = try configuration.buildURLRequestWithoutBody()
+
+        // The conditional request says what the request it revalidates said, so the server answers
+        // it for the same representation: `Vary: Accept-Encoding` with a strong ETag per
+        // representation would otherwise never match one sent with CFNetwork's own default, and
+        // every revalidation would be a miss. Unless the caller wrote one, which that request
+        // carried as it is.
+        if let acceptEncoding, request.value(forHTTPHeaderField: "Accept-Encoding") == nil {
+            request.setValue(acceptEncoding, forHTTPHeaderField: "Accept-Encoding")
+        }
+
         let (head, _) = try await execute(
-            request: try configuration.buildURLRequestWithoutBody(),
+            request: request,
             metrics: metrics,
             metricsSource: .revalidation,
             cookies: configuration.cookies

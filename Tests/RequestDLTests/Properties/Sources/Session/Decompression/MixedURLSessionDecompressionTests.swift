@@ -178,6 +178,32 @@ struct MixedURLSessionDecompressionTests {
         #expect(acceptEncoding(in: server.request) == expected)
     }
 
+    /// `.disabled` and `.nio` leave an `Accept-Encoding` the caller wrote alone, so a mixed list does too:
+    /// it only fills the header in when nothing set it. A caller that wrote `AcceptEncodingHeader` is
+    /// saying what the server is to be asked for, and which executor happens to resolve must not change
+    /// that.
+    @Test
+    func mixedList_whenTheCallerSetsAcceptEncoding_keepsItOnTheWire() async throws {
+        let server = try Server()
+        respond(with: server, encoding: "rle", body: Self.rleEncode(Self.original))
+
+        let data = try await DataTask {
+            BaseURL(.http, host: "127.0.0.1:\(server.port)")
+            AcceptEncodingHeader(.identity)
+            Session()
+                .decompressionAlgorithms([.gzip, RLEDecompressor()])
+                .requiredExecutor(.urlSession)
+        }
+        .extractPayload()
+        .result()
+
+        // As `AcceptEncodingHeader` writes it, quality value included, and not the custom algorithm's.
+        #expect(acceptEncoding(in: server.request) == "identity;q=1.0")
+
+        // And the response is still decoded by what the list says, not by what was asked for.
+        #expect(String(data: data, encoding: .utf8) == Self.original)
+    }
+
     // MARK: - What is decoded
 
     @Test

@@ -103,6 +103,40 @@ struct InternalsClientManagerExecutorTests {
         #expect(firstClient === secondClient)
     }
 
+    /// The client is told what the session's decompression announces, which is what its conditional
+    /// revalidation request carries (`revalidationHead`), so the server answers it for the same
+    /// representation as the request it revalidates.
+    @Test(
+        arguments: [
+            (Internals.Decompression.disabled, "identity" as String?),
+            (.enabled(algorithms: [ManagerTestAlgorithm()], limit: .none), "x-requestdl-manager-test"),
+            (.enabled(algorithms: [ManagerTestAlgorithm(isNative: true)], limit: .none), nil),
+        ]
+    )
+    func resolvedClient_givesTheClientTheAcceptEncodingTheSessionAnnounces(
+        _ decompression: Internals.Decompression,
+        _ expected: String?
+    ) async throws {
+        // Given
+        let manager = Internals.ClientManager(lifetime: 5 * 60 * 1_000_000_000)
+        var sessionConfiguration = Internals.Session.Configuration()
+        sessionConfiguration.decompression = decompression
+
+        // When
+        let resolved = try await manager.resolvedClient(
+            provider: Internals.SharedSessionProvider(),
+            sessionConfiguration: sessionConfiguration
+        )
+
+        // Then
+        guard case .urlSession(let client) = resolved else {
+            Issue.record("Expected .urlSession, got \(resolved)")
+            return
+        }
+
+        #expect(client.acceptEncoding == expected)
+    }
+
     /// A `.urlSession` client resolved once and used for two sequential calls on the very same
     /// instance (what `Internals.CacheControl`'s conditional revalidation does: a `HEAD`, then,
     /// if still needed, the real `GET`) must not be invalidated in the gap between the two just
@@ -481,6 +515,23 @@ private final class AcceptAnyServerTrustDelegate: NSObject, URLSessionTaskDelega
 
         completionHandler(.useCredential, URLCredential(trust: serverTrust))
     }
+}
+
+/// A custom algorithm (or, with `isNative`, one CFNetwork decodes on its own), for what a client
+/// is told to announce.
+private struct ManagerTestAlgorithm: Internals.DecompressionAlgorithm {
+
+    struct Stream: Internals.DecompressorStream {
+        mutating func callAsFunction(decompressing bytes: Data) throws -> Data { bytes }
+        mutating func finish() throws -> Data { Data() }
+    }
+
+    var isNative = false
+
+    var contentEncodingValue: String { isNative ? "gzip" : "x-requestdl-manager-test" }
+    var isNativelyDecodedByURLSession: Bool { isNative }
+
+    func callAsFunction() throws -> any Internals.DecompressorStream { Stream() }
 }
 
 #endif

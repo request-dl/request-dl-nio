@@ -38,6 +38,15 @@ extension Internals {
             operationQueue.generation
         }
 
+        /// The `Accept-Encoding` this client announces for the session's decompression, set by
+        /// `Internals.ClientManager` from ``announcedAcceptEncoding(for:)``. `nil` when it
+        /// leaves the header to CFNetwork, or when this client was not told.
+        ///
+        /// What a request that is not the one the caller made, but stands in for it, says too:
+        /// the conditional request of a cache revalidation (see
+        /// `Internals.Client.acceptEncoding`, its `.nio` counterpart).
+        package let acceptEncoding: String?
+
         // MARK: - Private properties
 
         private let session: URLSession
@@ -81,6 +90,7 @@ extension Internals {
         /// .proxyBearerAuthorizationUnderURLSession`), so a well-formed caller never passes that
         /// here. See `Internals.Proxy.buildConnectionProxyDictionary()`'s doc comment for the
         /// per-platform status of this mapping.
+        /// - Parameter acceptEncoding: See ``acceptEncoding``.
         /// - Parameter sessionDelegate: Handed to the `URLSession` itself, which holds on to it
         /// until the session is invalidated. Every exchange answers through its own task delegate,
         /// so production leaves this `nil`; it exists so a test can observe the session being
@@ -93,6 +103,7 @@ extension Internals {
             urlOverrides: Internals.URLOverrides = .init(),
             proxy: Internals.Proxy? = nil,
             maximumConcurrentConnections: Int? = nil,
+            acceptEncoding: String? = nil,
             sessionDelegate: (any URLSessionDelegate)? = nil
         ) throws {
             // A shape that does not fit the proxy (`.bearer` on SOCKS, a SOCKS username/password
@@ -133,6 +144,7 @@ extension Internals {
             self.urlOverrides = urlOverrides
             self.proxyAuthorization = proxy?.authorization
             self.identityPolicy = identityPolicy
+            self.acceptEncoding = acceptEncoding
         }
 
         // MARK: - Internal methods
@@ -600,41 +612,31 @@ extension Internals {
                 throw CancellationError()
             }
 
-            // Either every configured algorithm is one CFNetwork decodes natively, and this stays
-            // quiet, or at least one is custom and `Accept-Encoding` is set here, announcing only
-            // the custom ones: this package decodes those itself, and never asks the server for
-            // `gzip`/`deflate`/`br`, so there is nothing for CFNetwork to decode (or to leave
-            // encoded) behind this package's back. How CFNetwork treats an `Accept-Encoding` set
-            // by the caller is not something this relies on; it has been seen to decode a
-            // response whatever the header says, so a native encoding in a mixed list is not
-            // dispatched to its placeholder: it is a response nobody asked for, and fails as one
-            // (`Internals.UnsupportedContentEncodingError`), see
-            // `Internals.Decompression.urlSessionManualAlgorithms`. `.disabled` reaches the same
-            // `identity` override; see `Internals.Decompression.requiresManualURLSessionHandling`.
-            let decompressionDispatch: Internals.ManualDecompressionDispatch
+            // What this client announces for `decompression`, and why, is
+            // `announcedAcceptEncoding(for:)`'s to say.
             var request = request
+
+            // Only when the caller hasn't already set their own, whatever the configuration: a
+            // caller who set `Accept-Encoding` explicitly (e.g. `AcceptEncodingHeader`, documented
+            // as usable exactly when the caller intends to decode the body itself) is relying on
+            // that value reaching the wire unchanged, the same way it does under `.nio`. Without
+            // this guard, `.urlSession` silently overwrote it, defeating that configuration only
+            // under this executor. What the response is decoded with does not depend on it: that
+            // is `decompressionDispatch`, from the configured list alone.
+            if let acceptEncoding = Self.announcedAcceptEncoding(for: decompression),
+                request.value(forHTTPHeaderField: "Accept-Encoding") == nil
+            {
+                request.setValue(acceptEncoding, forHTTPHeaderField: "Accept-Encoding")
+            }
+
+            let decompressionDispatch: Internals.ManualDecompressionDispatch
 
             switch decompression {
             case .disabled:
-                // Only when the caller hasn't already set their own: `.disabled` means this
-                // package leaves `Content-Encoding` handling alone entirely, and a caller who set
-                // `Accept-Encoding` explicitly (e.g. `AcceptEncodingHeader`, documented as usable
-                // exactly when the caller intends to decode the body itself) is relying on that
-                // value reaching the wire unchanged, the same way it does under `.nio`. Without
-                // this guard, `.urlSession` silently overwrote it with `identity` regardless,
-                // defeating that configuration only under this executor.
-                if request.value(forHTTPHeaderField: "Accept-Encoding") == nil {
-                    request.setValue("identity", forHTTPHeaderField: "Accept-Encoding")
-                }
                 decompressionDispatch = .skip
 
             case .enabled where decompression.requiresManualURLSessionHandling:
-                let algorithms = decompression.urlSessionManualAlgorithms
-                request.setValue(
-                    algorithms.map(\.contentEncodingValue).joined(separator: ", "),
-                    forHTTPHeaderField: "Accept-Encoding"
-                )
-                decompressionDispatch = .dispatch(algorithms: algorithms)
+                decompressionDispatch = .dispatch(algorithms: decompression.urlSessionManualAlgorithms)
 
             case .enabled:
                 decompressionDispatch = .skip
@@ -647,6 +649,21 @@ extension Internals {
                 release()
                 operation.complete()
                 throw error
+            }
+
+            // Writing the body does not look at cancellation, and `exchange` below is a `Task` of
+            // its own, which does not inherit it from this call: a body whose source ignores
+            // cancellation (a file read, the caller's own sequence) finishes however long the
+            // caller was cancelled ago, and without this the request would be sent all the same.
+            // Everything that was claimed so far goes back first, the temporary file included:
+            // nothing past this point will, since `exchange` never starts.
+            guard !Task.isCancelled else {
+                if case .file(let bufferURL) = uploadBody {
+                    await bufferURL.removeIfTemporary()
+                }
+                release()
+                operation.complete()
+                throw CancellationError()
             }
 
             let makeBodyStream: (@Sendable () -> InputStream?)?
@@ -732,6 +749,10 @@ extension Internals {
             let session = session
             let isResumable = uploadBody == nil
 
+            // What `exchange` hands back at its end, and what a download waiting to reconnect hands
+            // back for the time it waits (see `resumeDownload`).
+            let slot = ThrottleSlot(executor: throttledExecutor, release: release)
+
             // Unstructured on purpose: it runs for as long as the exchange does, well past this
             // method's return, the same way the `URLSessionTask` it replaces did. Owns every
             // ending: the throttle slot, the operation-queue slot and a spilled upload file are
@@ -752,11 +773,12 @@ extension Internals {
                     flowControl: flowControl,
                     transferControl: transferControl,
                     resumption: isResumable ? transferControl?.resumption : nil,
-                    uploadPump: uploadPump
+                    uploadPump: uploadPump,
+                    slot: slot
                 )
 
                 upload.close()
-                release()
+                slot.release()
                 operation.complete()
 
                 // Only now, not once the body finished sending: a redirect or authentication
@@ -806,6 +828,85 @@ extension Internals {
             )
         }
 
+        /// The throttle slot of one exchange, which can be given back and taken again while the
+        /// exchange runs: held from its admission to its end, except while a download waits to
+        /// reconnect (see `resumeDownload`).
+        ///
+        /// `release()` is idempotent and does nothing while the slot is not held, so the end of
+        /// the exchange can hand back whatever it holds then, however it got there.
+        private final class ThrottleSlot: @unchecked Sendable {
+
+            // MARK: - Private properties
+
+            private let executor: Internals.ThrottledExecutor
+            private let lock = Lock()
+
+            // MARK: - Unsafe properties
+
+            /// `nil` while the slot is not held.
+            private var _release: (@Sendable () -> Void)?
+
+            // MARK: - Inits
+
+            /// - Parameter release: What gives back the slot `executor` admitted this exchange with.
+            init(executor: Internals.ThrottledExecutor, release: @escaping @Sendable () -> Void) {
+                self.executor = executor
+                self._release = release
+            }
+
+            // MARK: - Internal methods
+
+            func release() {
+                let release = lock.withLock { () -> (@Sendable () -> Void)? in
+                    defer { _release = nil }
+                    return _release
+                }
+
+                release?()
+            }
+
+            /// Waits for a slot, cancellably, and holds it until ``release()``.
+            ///
+            /// - Throws: `CancellationError` if the current task is cancelled while it waits, in
+            /// which case nothing is held.
+            func acquire() async throws {
+                let release = try await executor.acquire()
+
+                lock.withLock { _release = release }
+            }
+        }
+
+        /// The `Accept-Encoding` this client sets on a request that doesn't carry one, for
+        /// `decompression`; `nil` when it leaves the header to CFNetwork.
+        ///
+        /// Either every configured algorithm is one CFNetwork decodes natively, and this stays
+        /// quiet (`nil`), or at least one is custom and the header announces only the custom ones:
+        /// this package decodes those itself, and never asks the server for `gzip`/`deflate`/`br`,
+        /// so there is nothing for CFNetwork to decode (or to leave encoded) behind this package's
+        /// back. How CFNetwork treats an `Accept-Encoding` set by the caller is not something this
+        /// relies on; it has been seen to decode a response whatever the header says, so a native
+        /// encoding in a mixed list is not dispatched to its placeholder: it is a response nobody
+        /// asked for, and fails as one (`Internals.UnsupportedContentEncodingError`), see
+        /// `Internals.Decompression.urlSessionManualAlgorithms`. `.disabled` says `identity`; see
+        /// `Internals.Decompression.requiresManualURLSessionHandling`.
+        ///
+        /// A conditional revalidation request is announced with the same value as the request it
+        /// revalidates, so the server answers it for the same representation.
+        package static func announcedAcceptEncoding(for decompression: Internals.Decompression) -> String? {
+            switch decompression {
+            case .disabled:
+                return "identity"
+
+            case .enabled where decompression.requiresManualURLSessionHandling:
+                return decompression.urlSessionManualAlgorithms
+                    .map(\.contentEncodingValue)
+                    .joined(separator: ", ")
+
+            case .enabled:
+                return nil
+            }
+        }
+
         /// Runs one request for `executeSessionTask`, from sending it to the end of the response
         /// body, resolving `head` and ending `downloadBuffer` exactly once whichever way it goes,
         /// over as many exchanges as reconnecting a lost download takes, when `resumption` allows
@@ -825,7 +926,8 @@ extension Internals {
             flowControl: Internals.FlowControlWindow,
             transferControl: Internals.TransferControl?,
             resumption: Internals.DownloadResumptionPolicy?,
-            uploadPump: Internals.URLSessionUploadBodyPump?
+            uploadPump: Internals.URLSessionUploadBodyPump?,
+            slot: ThrottleSlot
         ) async {
             // Nothing is produced into the window past this point, whichever way this ends, so
             // it must not be left able to pause anything. The pump stops before the gate opens,
@@ -975,7 +1077,8 @@ extension Internals {
                         readingMode: wireReadingMode,
                         downloadBuffer: downloadBuffer,
                         flowControl: flowControl,
-                        transferControl: transferControl
+                        transferControl: transferControl,
+                        slot: slot
                     )
                 }
 
@@ -1026,7 +1129,8 @@ extension Internals {
             readingMode: Internals.DownloadStep.ReadingMode,
             downloadBuffer: Internals.DownloadBuffer,
             flowControl: Internals.FlowControlWindow,
-            transferControl: Internals.TransferControl
+            transferControl: Internals.TransferControl,
+            slot: ThrottleSlot
         ) async throws {
             var failure = error
 
@@ -1038,6 +1142,15 @@ extension Internals {
                 else {
                     throw failure
                 }
+
+                // Nothing of this download is on the network until the continuation goes out, and
+                // that can be as long as an execution stays suspended (hours, if the app wants).
+                // Held for all of it, the slot would keep every other request of the session
+                // waiting, when `maximumConcurrentConnections` is what it is for: the limit on
+                // what is open. It is what `.nio` does (`Internals.NIODownloadReconnection` waits
+                // without a slot and asks for a new one when it sends the continuation). Given
+                // back on every pass, since the continuation that follows is taken again below.
+                slot.release()
 
                 // Released by the seed along with everything else when the exchange is cancelled,
                 // which is what ends this wait then; the handler covers any other cancellation.
@@ -1052,6 +1165,16 @@ extension Internals {
                 }
 
                 guard !Task.isCancelled else {
+                    throw URLError(.cancelled)
+                }
+
+                // The continuation is an exchange like any other, and is counted against the limit
+                // like one: it waits its turn behind whoever took the slot meanwhile. The wait is
+                // cancellable, and a cancelled one ends the download the way the check above does.
+                // Held again from here to the end of the exchange, which is what hands it back.
+                do {
+                    try await slot.acquire()
+                } catch {
                     throw URLError(.cancelled)
                 }
 

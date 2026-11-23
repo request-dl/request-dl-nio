@@ -687,14 +687,14 @@ struct InternalsClientManagerTests {
         }
     }
 
-    /// The sweep takes its instant before it waits for the manager's lock, so a client resolved while it
-    /// waited is stamped *after* that instant. `now - readAt` is then negative, which on the unsigned
+    /// The sweep takes its instant when it is asked to run, so a client resolved between that and the sweep
+    /// looking at the table is stamped *after* that instant. `now - readAt` is then negative, which on the unsigned
     /// Darwin clock traps (`arithmetic overflow` in `isExpired`) and took the whole test process down once.
     /// An item newer than the instant being judged is simply not expired.
     @Test
     func manager_whenAClientIsNewerThanTheSweepInstant_sweepShouldKeepItAndNotTrap() async throws {
-        // Given: an instant taken before the client exists, as a sweep that is still waiting for the lock
-        // has, and a client resolved after it.
+        // Given: an instant taken before the client exists, as a sweep that has not looked at the table
+        // yet has, and a client resolved after it.
         let manager = Internals.ClientManager(lifetime: 5 * 60 * 1_000_000_000)
         let provider = Internals.SharedSessionProvider()
         let sessionConfiguration = Internals.Session.Configuration()
@@ -712,6 +712,47 @@ struct InternalsClientManagerTests {
 
         let again = try await manager.client(provider: provider, sessionConfiguration: sessionConfiguration)
         #expect(again === client)
+    }
+
+    /// The sweep only reads and edits the table, which `tableLock` already makes atomic, so it has no reason
+    /// to queue behind the lock client resolution holds. It runs at a low priority, and `AsyncLock` does not
+    /// raise the priority of whoever holds it or is next in line: a resolver waiting on that lock while a
+    /// low priority sweep sits in the queue ahead of it waits for the sweep to be scheduled, which under low
+    /// power mode or thermal pressure can take a long time.
+    ///
+    /// Run here with the resolution lock held, as it is for as long as a resolution builds a client.
+    @Test
+    func manager_sweepShouldNotWaitForTheResolutionLock() async throws {
+        // Given: a pooled client, past `lifetime` by the instant the sweep is run at, and the resolution lock
+        // held, as in the middle of another resolution.
+        let lifetime: Int64 = 5 * 60 * 1_000_000_000
+        let manager = Internals.ClientManager(lifetime: lifetime)
+        let provider = Internals.SharedSessionProvider()
+        let sessionConfiguration = Internals.Session.Configuration()
+
+        _ = try await manager.client(provider: provider, sessionConfiguration: sessionConfiguration)
+        try #require(manager.count == 1)
+
+        await manager.lock.lock()
+        let afterLifetime = Self.instant(after: lifetime)
+
+        // When
+        let remaining: Int
+
+        do {
+            remaining = try await completing(within: 5) {
+                await manager.cleanupIfNeeded(at: afterLifetime)
+                return manager.count
+            }
+        } catch {
+            manager.lock.unlock()
+            throw error
+        }
+
+        manager.lock.unlock()
+
+        // Then: it finished with the lock still held, and did its job.
+        #expect(remaining == 0)
     }
 
     /// A moment `nanoseconds` past now, on the clock the sweep reads.
