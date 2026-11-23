@@ -78,7 +78,9 @@ import struct Foundation.URL
 /// is at `destination` until that has worked, and ``BackgroundDownloads/Event/completed(id:destination:)``
 /// follows it. A response encoded in something that is not on the list fails the download with
 /// ``UnsupportedContentEncodingError``, and a corrupt or truncated body with whatever your
-/// decompressor throws.
+/// decompressor throws. The `limit` of that method bounds this decoding too, when it is not
+/// ``DecompressionLimit/none``: a file that expands past it fails with
+/// ``BackgroundDownloadDecompressionLimitError``, and what had been written is removed.
 ///
 /// The system may finish the download in a launch of the app that has none of `content`. Register
 /// your decompressors with ``BackgroundDownloads/registerDecompressors(_:)`` early in every launch,
@@ -216,6 +218,8 @@ public struct BackgroundDownloadTask<Content: Property> {
             for: resolved.session.configuration.decompression
         )
 
+        let decompressionLimit = BackgroundDownloads.Session.limit(of: resolved.session.configuration.decompression)
+
         if let resumeData {
             BackgroundDownloads.Session.shared.schedule(
                 resumeData: resumeData,
@@ -224,7 +228,8 @@ public struct BackgroundDownloadTask<Content: Property> {
                 serverTrust: serverTrust,
                 clientIdentity: clientIdentity,
                 host: request.url?.host,
-                decompression: decompression
+                decompression: decompression,
+                decompressionLimit: decompressionLimit
             )
             return
         }
@@ -235,7 +240,8 @@ public struct BackgroundDownloadTask<Content: Property> {
             destination: destination,
             serverTrust: serverTrust,
             clientIdentity: clientIdentity,
-            decompression: decompression
+            decompression: decompression,
+            decompressionLimit: decompressionLimit
         )
     }
 }

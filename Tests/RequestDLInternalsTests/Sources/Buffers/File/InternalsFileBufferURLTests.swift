@@ -27,6 +27,24 @@ struct InternalsFileBufferURLTests {
         #expect(bufferURL.absoluteURL() == url)
     }
 
+    /// On a 32-bit platform `Int.max` is 2 GiB: a size past it is not clamped, which reports a file
+    /// shorter than it is and lets a reader end its stream as if the body were whole.
+    @Test(arguments: [(0, 0), (1, 1), (100, 100), (101, 0), (Int64(Int32.max) + 1, 0), (-1, 0)] as [(Int64, Int)])
+    func aSizeThatDoesNotFitAnInt_isUnreadable(_ size: Int64, _ expected: Int) {
+        // Given: an `Int` of 100, in place of a 32-bit one
+        // When
+        let bytes = Internals.FileBufferURL.readableSize(ofFileSized: size, limit: 100)
+
+        // Then
+        #expect(bytes == expected)
+    }
+
+    @Test
+    func theSizeOfAFile_isItsWrittenBytes() {
+        #expect(Internals.FileBufferURL.readableSize(ofFileSized: 5) == 5)
+        #expect(Internals.FileBufferURL.readableSize(ofFileSized: Int64(Int.max)) == Int.max)
+    }
+
     @Test
     func truncateEmptiesAnExistingFile() async throws {
         try await withTemporaryFileURL("truncate.bin") { url in

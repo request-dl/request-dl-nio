@@ -54,6 +54,54 @@ struct BackgroundDownloadsSessionDecompressionTests {
         }
     }
 
+    /// The directory the decoded file is made in is the system's own, not beside `destination`, so
+    /// `leftovers(beside:)` cannot see it: a session that records the ones it made can.
+    @Test
+    func theDirectoryTheDecodedFileWasMadeIn_isRemovedWhateverTheOutcome() async throws {
+        try await withTemporaryFileURL("destination.txt") { destination in
+            let directories = LockedValueBox<[URL]>([])
+            let session = Self.session(recording: directories)
+            session.register(Self.algorithm(RLEDecompressor()))
+
+            // Decoded and moved.
+            let completed = try await Self.download(
+                id: "completed",
+                to: destination,
+                encoding: "rle",
+                body: Self.rleEncode("aabb"),
+                session: session
+            )
+            #expect(Self.terminal(completed).count == 1)
+            #expect(directories.withLockedValue { $0 }.count == 1)
+
+            // Decoded and refused, for passing the limit.
+            let refused = try await Self.download(
+                id: "refused",
+                to: destination,
+                encoding: "rle",
+                body: Self.rleEncode(Self.bomb),
+                session: session,
+                limit: .size(10)
+            )
+            #expect(try Self.failure(of: refused) is BackgroundDownloadDecompressionLimitError)
+
+            // Decoded and failed, for ending in the middle of a pair.
+            session.register(Self.algorithm(StrictDecompressor()))
+            let truncated = try await Self.download(
+                id: "truncated",
+                to: destination,
+                encoding: "strict",
+                body: [97],
+                session: session
+            )
+            #expect(try Self.failure(of: truncated) is StrictDecompressor.TruncatedError)
+
+            let made = directories.withLockedValue { $0 }
+            #expect(made.count == 3)
+            #expect(made.allSatisfy { !FileManager.default.fileExists(atPath: $0.path) })
+        }
+    }
+
     /// More than one piece is read, so the decoder is fed across `decodingChunkSize` boundaries.
     @Test
     func aBodyLargerThanOnePiece_isDecodedWhole() async throws {
@@ -366,6 +414,124 @@ struct BackgroundDownloadsSessionDecompressionTests {
         }
     }
 
+    // MARK: - Limit
+
+    /// 1 000 bytes, from 8.
+    private static let bomb = String(repeating: "a", count: 1_000)
+
+    @Test(
+        arguments: [
+            Internals.Decompression.Limit.size(999),
+            .size(0),
+            .ratio(124),
+            .ratio(1),
+        ]
+    )
+    func aLimitThatTheDecodedFilePasses_stopsTheDecoding(_ limit: Internals.Decompression.Limit) async throws {
+        try await withTemporaryFileURL("input.bin") { input in
+            let output = input.deletingLastPathComponent().appendingPathComponent("output.bin")
+            try Data(Self.rleEncode(Self.bomb)).write(to: input)
+            FileManager.default.createFile(atPath: output.path, contents: nil)
+
+            #expect(throws: BackgroundDownloadDecompressionLimitError.self) {
+                try BackgroundDownloads.Session.decode(
+                    from: input,
+                    to: output,
+                    using: Self.algorithm(RLEDecompressor()),
+                    limit: limit
+                )
+            }
+        }
+    }
+
+    /// What is written is never past the limit: the piece that passes it is not written.
+    @Test
+    func aLimitThatTheDecodedFilePasses_writesNothingPastIt() async throws {
+        try await withTemporaryFileURL("input.bin") { input in
+            let output = input.deletingLastPathComponent().appendingPathComponent("output.bin")
+            try Data(Self.rleEncode(Self.bomb)).write(to: input)
+            FileManager.default.createFile(atPath: output.path, contents: nil)
+
+            // Two bytes at a time: one pair, so 255 bytes more on each read.
+            _ = try? BackgroundDownloads.Session.decode(
+                from: input,
+                to: output,
+                using: Self.algorithm(RLEDecompressor()),
+                limit: .size(600),
+                chunkSize: 2
+            )
+
+            #expect(try Data(contentsOf: output).count == 510)
+        }
+    }
+
+    @Test(
+        arguments: [
+            Internals.Decompression.Limit.none,
+            .size(1_000),
+            .size(Int.max),
+            .ratio(125),
+            .ratio(Int.max),
+        ]
+    )
+    func aLimitThatTheDecodedFileDoesNotPass_isDecodedWhole(_ limit: Internals.Decompression.Limit) async throws {
+        try await withTemporaryFileURL("input.bin") { input in
+            let output = input.deletingLastPathComponent().appendingPathComponent("output.bin")
+            try Data(Self.rleEncode(Self.bomb)).write(to: input)
+            FileManager.default.createFile(atPath: output.path, contents: nil)
+
+            try BackgroundDownloads.Session.decode(
+                from: input,
+                to: output,
+                using: Self.algorithm(RLEDecompressor()),
+                limit: limit
+            )
+
+            #expect(try String(contentsOf: output, encoding: .utf8) == Self.bomb)
+        }
+    }
+
+    @Test
+    func aDownloadThatExpandsPastTheLimit_failsAndKeepsWhatWasThere() async throws {
+        try await withTemporaryFileURL("destination.txt") { destination in
+            // Given
+            try Data("previous".utf8).write(to: destination)
+            let session = BackgroundDownloads.Session()
+            session.register(Self.algorithm(RLEDecompressor()))
+
+            // When
+            let events = try await Self.download(
+                id: "bomb",
+                to: destination,
+                encoding: "rle",
+                body: Self.rleEncode(Self.bomb),
+                session: session,
+                limit: .size(500)
+            )
+
+            // Then
+            let error = try Self.failure(of: events)
+            #expect((error as? BackgroundDownloadDecompressionLimitError)?.limit == .size(500))
+            #expect(try String(contentsOf: destination, encoding: .utf8) == "previous")
+            #expect(Self.leftovers(beside: destination).isEmpty)
+        }
+    }
+
+    @Test
+    func theLimit_survivesInTheTaskDescription() {
+        for limit: Internals.Decompression.Limit in [.none, .size(10), .ratio(3)] {
+            let description = BackgroundDownloads.Session.encode(
+                id: "a",
+                destination: URL(fileURLWithPath: "/tmp/a"),
+                decompressionLimit: limit
+            )
+
+            #expect(BackgroundDownloads.Session.decodeDecompressionLimit(description) == limit)
+        }
+
+        #expect(BackgroundDownloads.Session.decodeDecompressionLimit(nil) == .none)
+    }
+
     // MARK: - Accept-Encoding
 
     @Test
@@ -452,6 +618,100 @@ struct BackgroundDownloadsSessionDecompressionTests {
 
         request.setValue("rle", forHTTPHeaderField: "Accept-Encoding")
         #expect(BackgroundDownloads.Session.decompression(algorithms, resumedFrom: request)?.count == 1)
+    }
+
+    /// The request that stopped took over `Accept-Encoding`, so the file is encoded, whatever the
+    /// `content` passed when continuing says: the encodings come from the header and the
+    /// registered decompressors decode, or the download fails. It must never be `nil`, which
+    /// hands the encoded file to `destination` as `.completed`.
+    @Test
+    func aResumedDownloadWhoseContentLostTheAlgorithms_readsThemFromTheRequest() throws {
+        var request = URLRequest(url: try #require(URL(string: "https://example.invalid")))
+        request.setValue("rle, Custom;q=0.5", forHTTPHeaderField: "Accept-Encoding")
+
+        #expect(BackgroundDownloads.Session.acceptedEncodings(nil, resumedFrom: request) == ["rle", "custom"])
+    }
+
+    @Test
+    func aResumedDownloadWhoseContentLostTheAlgorithms_isNotDecodedWhenTheRequestAskedForTheSystemOnly() throws {
+        var request = URLRequest(url: try #require(URL(string: "https://example.invalid")))
+
+        #expect(BackgroundDownloads.Session.acceptedEncodings(nil, resumedFrom: request) == nil)
+
+        for header in ["gzip, deflate", "br;q=1.0, gzip", "identity", "*"] {
+            request.setValue(header, forHTTPHeaderField: "Accept-Encoding")
+            #expect(BackgroundDownloads.Session.acceptedEncodings(nil, resumedFrom: request) == nil)
+        }
+    }
+
+    @Test
+    func aResumedDownload_keepsWhatTheRequestAndContentAgreeOn() throws {
+        var request = URLRequest(url: try #require(URL(string: "https://example.invalid")))
+        let algorithms = [Self.algorithm(RLEDecompressor())]
+
+        // No `Accept-Encoding`: the system decoded it, whatever `content` lists.
+        #expect(BackgroundDownloads.Session.acceptedEncodings(algorithms, resumedFrom: request) == nil)
+
+        request.setValue("rle", forHTTPHeaderField: "Accept-Encoding")
+        #expect(BackgroundDownloads.Session.acceptedEncodings(algorithms, resumedFrom: request) == ["rle"])
+
+        // No request: nothing to contradict `content`.
+        #expect(BackgroundDownloads.Session.acceptedEncodings(algorithms, resumedFrom: nil) == ["rle"])
+        #expect(BackgroundDownloads.Session.acceptedEncodings(nil, resumedFrom: nil) == nil)
+    }
+
+    @Test
+    func aResumedDownloadWhoseContentLostTheAlgorithms_failsWithoutARegisteredDecompressor() async throws {
+        try await withTemporaryFileURL("destination.txt") { destination in
+            // Given: the encodings the resumed request lists, as `schedule(resumeData:)` keeps them
+            var request = URLRequest(url: try #require(URL(string: "https://example.invalid")))
+            request.setValue("rle", forHTTPHeaderField: "Accept-Encoding")
+            let accepted = try #require(BackgroundDownloads.Session.acceptedEncodings(nil, resumedFrom: request))
+
+            try Data("previous".utf8).write(to: destination)
+
+            // When
+            let events = try await Self.download(
+                id: "resumed",
+                to: destination,
+                encoding: "rle",
+                body: Self.rleEncode("aaa"),
+                session: BackgroundDownloads.Session(),
+                acceptedEncodings: accepted
+            )
+
+            // Then
+            let error = try Self.failure(of: events)
+            #expect((error as? BackgroundDownloadMissingDecompressorError)?.contentEncoding == "rle")
+            #expect(try String(contentsOf: destination, encoding: .utf8) == "previous")
+        }
+    }
+
+    @Test
+    func aResumedDownloadWhoseContentLostTheAlgorithms_isDecodedByARegisteredDecompressor() async throws {
+        try await withTemporaryFileURL("destination.txt") { destination in
+            // Given
+            var request = URLRequest(url: try #require(URL(string: "https://example.invalid")))
+            request.setValue("rle", forHTTPHeaderField: "Accept-Encoding")
+            let accepted = try #require(BackgroundDownloads.Session.acceptedEncodings(nil, resumedFrom: request))
+
+            let session = BackgroundDownloads.Session()
+            session.register(Self.algorithm(RLEDecompressor()))
+
+            // When
+            let events = try await Self.download(
+                id: "resumed",
+                to: destination,
+                encoding: "rle",
+                body: Self.rleEncode("aaabb"),
+                session: session,
+                acceptedEncodings: accepted
+            )
+
+            // Then
+            #expect(Self.terminal(events).count == 1)
+            #expect(try String(contentsOf: destination, encoding: .utf8) == "aaabb")
+        }
     }
 
     @Test
@@ -543,7 +803,8 @@ struct BackgroundDownloadsSessionDecompressionTests {
         encoding: String?,
         body: [UInt8],
         session: BackgroundDownloads.Session,
-        acceptedEncodings: [String]? = ["rle", "strict"]
+        acceptedEncodings: [String]? = ["rle", "strict"],
+        limit: Internals.Decompression.Limit = .none
     ) async throws -> [BackgroundDownloads.Event] {
         let bodyFile = destination.deletingLastPathComponent()
             .appendingPathComponent("served-\(UUID().uuidString).bin")
@@ -569,7 +830,8 @@ struct BackgroundDownloadsSessionDecompressionTests {
         task.taskDescription = BackgroundDownloads.Session.encode(
             id: id,
             destination: destination,
-            acceptedEncodings: acceptedEncodings
+            acceptedEncodings: acceptedEncodings,
+            decompressionLimit: limit
         )
 
         task.resume()
@@ -590,6 +852,15 @@ struct BackgroundDownloadsSessionDecompressionTests {
             throw CancellationError()
         }
         return error
+    }
+
+    /// A session that makes the directories of its decoded files as the system does, and records them.
+    private static func session(recording directories: LockedValueBox<[URL]>) -> BackgroundDownloads.Session {
+        BackgroundDownloads.Session { destination in
+            let directory = try BackgroundDownloads.Session.systemReplacementDirectory(destination)
+            directories.withLockedValue { $0.append(directory) }
+            return directory
+        }
     }
 
     /// Whatever the decoding left beside `destination` besides `destination` itself.
