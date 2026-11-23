@@ -72,9 +72,27 @@ extension Internals {
             tableLock.withLock { _table.values.reduce(0) { $0 + $1.count } }
         }
 
+        /// How many sessions' limits are tracked, dead entries not yet removed included. Bookkeeping
+        /// only, like ``count``.
+        package var throttleCount: Int {
+            tableLock.withLock { _throttles.count }
+        }
+
         // MARK: - Unsafe properties
 
         var _table = [String: [Item]]()
+
+        /// The semaphores that make `maximumConcurrentConnections` a limit of the session, one per
+        /// session provider and limit. See ``throttledExecutor(provider:maximumConcurrentConnections:)``.
+        ///
+        /// Weak, and that is the whole lifecycle: a semaphore is held by the throttle of every
+        /// client that uses it, and by the closure of every slot handed out and by every waiter
+        /// queued behind it, so it is alive for exactly as long as the session has a live client, a
+        /// request holding a slot or one waiting for it. Nothing else keeps one, so the table can
+        /// neither keep a session's limit alive after the session is gone nor lose it while the
+        /// session is still using it. What stays behind is the dead entry, dropped by
+        /// ``removeDeadThrottles()``. Guarded by ``tableLock``.
+        var _throttles = [ThrottleKey: WeakSemaphore]()
 
         // MARK: - Inits
 
@@ -141,13 +159,28 @@ extension Internals {
                     with: SessionProviderOptions(isCompatibleWithNetworkFramework: false)
                 )
 
+            // A configuration that can never be pooled has nothing to look up in the table and
+            // nothing to add to it, so there is nothing for ``lock`` to order. Building its client
+            // under it would only make every other session wait for the `URLSession` (and, for mTLS,
+            // the identity) of this one.
+            guard sessionConfiguration.isPoolable else {
+                try Task.checkCancellation()
+
+                return .urlSession(
+                    try await _createNewURLSessionClient(
+                        id: sessionProviderID,
+                        provider: provider,
+                        sessionConfiguration: sessionConfiguration
+                    )
+                )
+            }
+
             return try await lock.withLock {
                 try Task.checkCancellation()
 
-                if sessionConfiguration.isPoolable,
-                    let item = tableLock.withLock({
-                        _reusableItem(id: sessionProviderID, sessionConfiguration: sessionConfiguration)
-                    }),
+                if let item = tableLock.withLock({
+                    _reusableItem(id: sessionProviderID, sessionConfiguration: sessionConfiguration)
+                }),
                     case .urlSession = item
                 {
                     return item
@@ -156,6 +189,7 @@ extension Internals {
                 return .urlSession(
                     try await _createNewURLSessionClient(
                         id: sessionProviderID,
+                        provider: provider,
                         sessionConfiguration: sessionConfiguration
                     )
                 )
@@ -242,10 +276,27 @@ extension Internals {
         /// the priority of the task ahead of a waiting one: an interactive request would wait for
         /// the scheduling of a low priority task that has nothing to do with it.
         ///
+        /// Also forgets the session limits nothing uses any more (``removeDeadThrottles()``), which
+        /// is after the clients above have gone: the last client of a session going away is what
+        /// ends its limit. Those are not counted by ``maximumCount`` and need no ceiling of
+        /// their own: each is alive only while a client, a waiter or a slot holder holds it, so
+        /// there are never more than the clients (bounded by ``maximumCount`` when pooled, by the
+        /// requests in flight when not) can account for, and a dead one is dropped the next time
+        /// a limit is added or a sweep runs.
+        ///
         /// - Parameter now: Defaults to the monotonic clock. Not `private` and not fixed to it, so a
         /// test can run one sweep at an instant of its choosing, and so decide what is "idle for
         /// longer than `lifetime`" without waiting that long for it.
         package func cleanupIfNeeded(at now: MonotonicInstant = ClientManager.monotonicNow()) async {
+            unpoolExpiredClients(at: now)
+
+            // After the clients above have gone, which is the only thing that can end a session's
+            // limit: it has to be a separate call, so that the clients are not still alive in this
+            // frame when the limits are looked at.
+            removeDeadThrottles()
+        }
+
+        private func unpoolExpiredClients(at now: MonotonicInstant) {
             // Dropped off `tableLock`, below: a client that nobody else holds retires itself
             // when its last reference goes, which can mean tearing down its connections and
             // identity, and that does not belong under a mutex every lookup also takes.
@@ -289,6 +340,78 @@ extension Internals {
             }
 
             withExtendedLifetime(expired) {}
+        }
+
+        // MARK: - Throttles
+
+        /// The throttle every client of one session admits its requests through, which is what
+        /// makes `maximumConcurrentConnections` a limit of the session and not of whichever client
+        /// a request happened to get.
+        ///
+        /// A session is its provider (`SessionProvider.uniqueIdentifier(with:)`, whatever executor
+        /// resolves: the limit counts requests, not transports) and the limit it declares. Every
+        /// request of the session, with a poolable configuration or not, gets a handle on the same
+        /// semaphore for as long as that semaphore is in use, so 50 requests with a redirect
+        /// strategy, each with a client of its own, still queue behind the same two slots. It is
+        /// also what keeps the limit whole across a client the pool has let go of while callers
+        /// still hold it and the one that replaces it.
+        ///
+        /// Two requests of one provider that declare *different* limits are two sessions as far as
+        /// this goes: each limit is a cap on the requests that declare it, and they do not count
+        /// against each other. The alternatives all go wrong in one way or another. The first
+        /// limit to arrive winning would throttle a session to a number it never asked for, for as
+        /// long as the winner lives, and which one that is depends on who asked first. The
+        /// smallest winning would need a semaphore that can shrink while requests hold its slots
+        /// (`AsyncCancellableSemaphore`'s count is fixed), and growing one back when the small one
+        /// leaves would be as bad. Keying on the limit needs neither, cannot make one session wait
+        /// for another's slots, and is what the clients did before: the limit is part of a
+        /// configuration's identity (`Internals.Session.Configuration.==`), so two limits never
+        /// shared a client either.
+        ///
+        /// A limit of zero or less, or none, is no limit at all (see
+        /// `Internals.ThrottledExecutor.init(maximumConcurrentConnections:)`) and never touches
+        /// the table.
+        package func throttledExecutor(
+            provider: SessionProvider,
+            maximumConcurrentConnections: Int?
+        ) -> Internals.ThrottledExecutor {
+            guard let maximumConcurrentConnections, maximumConcurrentConnections > .zero else {
+                return Internals.ThrottledExecutor(maximumConcurrentConnections: nil)
+            }
+
+            let key = ThrottleKey(
+                providerID: provider.uniqueIdentifier(
+                    with: SessionProviderOptions(isCompatibleWithNetworkFramework: false)
+                ),
+                maximumConcurrentConnections: maximumConcurrentConnections
+            )
+
+            return tableLock.withLock {
+                if let semaphore = _throttles[key]?.semaphore {
+                    return Internals.ThrottledExecutor(sharing: semaphore)
+                }
+
+                // A new session's limit is the moment the table grows, and so the moment the dead
+                // ones are dropped: it never holds more than the live limits and the ones that
+                // died since the last time a limit was added or a sweep ran, however many
+                // different sessions come and go.
+                _removeDeadThrottles()
+
+                let semaphore = AsyncCancellableSemaphore(permits: maximumConcurrentConnections)
+                _throttles[key] = WeakSemaphore(semaphore)
+
+                return Internals.ThrottledExecutor(sharing: semaphore)
+            }
+        }
+
+        /// Forgets the limits nothing uses any more. Part of the sweep (``cleanupIfNeeded(at:)``).
+        func removeDeadThrottles() {
+            tableLock.withLock { _removeDeadThrottles() }
+        }
+
+        /// - Warning: Lockless. The caller must be holding ``tableLock``.
+        func _removeDeadThrottles() {
+            _throttles = _throttles.filter { $0.value.semaphore != nil }
         }
 
         // MARK: - Unsafe methods
@@ -430,8 +553,14 @@ extension Internals {
         /// `Internals` already uses for exactly that reason (see its own doc comment).
         private func _createNewURLSessionClient(
             id: String,
+            provider: SessionProvider,
             sessionConfiguration: Internals.Session.Configuration
         ) async throws -> Internals.URLSessionClient {
+            let throttledExecutor = self.throttledExecutor(
+                provider: provider,
+                maximumConcurrentConnections: sessionConfiguration.maximumConcurrentConnections
+            )
+
             let client = try await Internals.FileSystemManager.run {
                 try Internals.URLSessionClient(
                     configuration: sessionConfiguration.buildURLSessionConfiguration(),
@@ -440,7 +569,7 @@ extension Internals {
                         ?? .default,
                     urlOverrides: sessionConfiguration.urlOverrides,
                     proxy: sessionConfiguration.proxy,
-                    maximumConcurrentConnections: sessionConfiguration.maximumConcurrentConnections,
+                    throttledExecutor: throttledExecutor,
                     acceptEncoding: Internals.URLSessionClient.announcedAcceptEncoding(
                         for: sessionConfiguration.decompression
                     )

@@ -13,16 +13,12 @@ extension Internals {
     /// regardless of executor, rather than each concrete client owning its own copy of the same
     /// semaphore logic and risking the two drifting apart.
     ///
-    /// - Important: One instance is one limit, and each client creates its own
-    /// (`Internals.Client`, `Internals.URLSessionClient`). The limit is therefore per client, not
-    /// per session: sessions with the same configuration share a pooled client and so share the
-    /// limit, but a configuration that can never match a pooled one
-    /// (`Internals.Session.Configuration.isPoolable == false`, today a redirect strategy) gets a
-    /// client, and with it a limit, for every request, and the limit does not hold across them. It
-    /// does not, for a moment, across a client the pool let go of while callers still hold it and
-    /// the one that replaces it either. Making it a limit of the session would take one throttle
-    /// per `sessionProviderID`, kept by `Internals.ClientManager` and handed to the clients it
-    /// creates.
+    /// - Important: A throttle is a handle on a semaphore, and what makes the limit one of the
+    /// session is that every client of the session holds a handle on the *same* semaphore.
+    /// `Internals.ClientManager.throttledExecutor(provider:maximumConcurrentConnections:)` is what
+    /// hands them out: one semaphore per session provider and limit, for as long as some client,
+    /// waiter or slot holder is using it. A client that is given none (a test, mostly) makes a
+    /// semaphore of its own, and the limit is then its own.
     package struct ThrottledExecutor: Sendable {
 
         // MARK: - Private properties
@@ -31,6 +27,12 @@ extension Internals {
         private let semaphore: AsyncCancellableSemaphore?
 
         // MARK: - Inits
+
+        /// Takes part in a limit that other throttles already share, instead of making a limit of
+        /// its own. See `Internals.ClientManager.throttledExecutor(provider:maximumConcurrentConnections:)`.
+        package init(sharing semaphore: AsyncCancellableSemaphore) {
+            self.semaphore = semaphore
+        }
 
         /// A non-positive limit is treated as no limit at all. It reaches here unvalidated (from
         /// `Session.maximumConcurrentConnections(_:)`, or a `Configured` config file), and

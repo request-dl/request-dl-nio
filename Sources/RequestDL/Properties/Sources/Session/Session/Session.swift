@@ -345,21 +345,25 @@ public struct Session: Property {
     /// host, from the moment a request is asked to execute until it completes.
     ///
     /// Unlike ``maximumConnectionsPerHost(_:)``, which is a per-host soft limit that AsyncHTTPClient
-    /// may exceed, this is an exact, session-wide cap (see the note below for when a session
-    /// is served by more than one client): once it is reached, further requests wait
-    /// in line for a slot to free up rather than opening another connection.
+    /// may exceed, this is an exact cap: once it is reached, further requests wait in line for a
+    /// slot to free up rather than opening another connection. A request that is cancelled while
+    /// it waits leaves the line without taking a slot.
     ///
-    /// - Important: The slots belong to the client the session resolves to, not to the session
-    /// itself. Requests whose sessions have the same configuration are served by one pooled client
-    /// and share its slots, which is what makes this a cap on the session. A configuration that can
-    /// never match a pooled one gets a client of its own for every request, with slots of its own,
-    /// so the cap does not hold across those requests: all of them are admitted at once. Today that
-    /// is a session with a ``redirectStrategy(_:)`` or an ``onRedirect(_:)`` handler, whose policy
-    /// cannot be compared. A configuration that holds per-instance hooks (TLS callbacks, for
-    /// example) matches a pooled client only while the very same instance is reused, so it can
-    /// come to the same. For a moment, for any session, the cap also does not hold across requests
-    /// still running on a client the pool has already let go of (because it was idle for its
-    /// lifetime, or because of the pool's size ceiling) and requests that resolve a new one.
+    /// - Important: The cap is shared by every request made through the same session provider
+    /// that declares the same limit: the default one (`Session()`), one with the same identifier
+    /// (`Session("name")`), or the same custom event loop group. It does not matter what else
+    /// their sessions are configured with, or whether they can share a client. A session with a
+    /// ``redirectStrategy(_:)`` or an ``onRedirect(_:)`` handler, which gets a client for every
+    /// request, is held to the same cap as any other. Everything that uses `Session()` and the
+    /// same limit therefore counts against one cap, so a session that wants a cap of its own
+    /// needs a provider of its own.
+    ///
+    /// Requests of one provider that declare *different* limits are held to the limit each of
+    /// them declares, counted separately: `maximumConcurrentConnections(2)` and
+    /// `maximumConcurrentConnections(5)` allow two and five in flight, not two and not seven. A
+    /// request that declares no limit is never held back, and does not count against one that does.
+    /// The cap lives for as long as some request of the session is using it, and is dropped with the
+    /// last one.
     ///
     /// A resumable download that loses its connection while it is suspended gives its slot back
     /// until it is resumed, and waits for one again before it reconnects.
