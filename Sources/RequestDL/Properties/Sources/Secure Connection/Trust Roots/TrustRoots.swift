@@ -11,6 +11,10 @@ import class Foundation.Bundle
 #endif
 
 /// Configure the trusted roots certificates to validate the server using TLS.
+///
+/// `TrustRoots` replaces the system's trusted roots, so it needs at least one certificate: one
+/// that ends up with none (an empty builder, a false `if`) throws `EmptyTrustRootsError` when the
+/// request is resolved, instead of silently trusting the system roots.
 public struct TrustRoots<Content: Property>: Property {
 
     private struct Node: SecureConnectionPropertyNode {
@@ -36,6 +40,16 @@ public struct TrustRoots<Content: Property>: Property {
                 for node in nodes {
                     try node.passthrough(&collector)
                 }
+
+                // `TrustRoots` replaces the system roots, so a declaration that ends up with no
+                // certificate (an empty builder, a false `if`, an empty `PropertyForEach`) can't
+                // anchor trust on anything. Resolving it would leave `trustRoots` unset, which
+                // every executor reads as "use the system store": the opposite of what was asked,
+                // and silent. It fails here instead, like an empty `SPKIPinning` does.
+                guard !(collector.trustRoots ?? []).isEmpty else {
+                    throw Internals.EmptyTrustRootsError()
+                }
+
                 secureConnection = collector(\.trustRoots)
             }
         }

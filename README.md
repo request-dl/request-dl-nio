@@ -36,6 +36,8 @@ dependencies: [
 ]
 ```
 
+> **Important:** **Dependency compatibility.** RequestDL does not depend on `apple/async-http-client` or `apple/swift-nio-extras`. It depends on forks, `request-dl/async-http-client` and `request-dl/swift-nio-extras`, that carry changes upstream does not have. The two forks also depend on each other, and the fork of AsyncHTTPClient calls APIs that only exist in the fork of swift-nio-extras (the SOCKS5 credentials used by proxy authentication), while RequestDL itself uses the Network.framework client identity API that only the fork of AsyncHTTPClient has. Swift Package Manager identifies a package by the last component of its URL, so a fork and the upstream package are the same package to it. If your own package, or another dependency in the same graph (a server framework, a generated OpenAPI client, and so on), declares `apple/async-http-client` or `apple/swift-nio-extras`, the build can fail to resolve, or resolve to the upstream code and then fail to compile against RequestDL. Use the forks everywhere in that graph, or build RequestDL without the `NIOTransport` trait (see the "Disabling the NIOTransport Trait" article in the documentation). The forks use `from:` requirements, so `swift package update` picks up newer tags of the forks.
+
 ## Usage
 
 Using RequestDL is easy and intuitive. You can create network requests in a declarative way, specifying the properties of the request through the use of the `Property` protocol or using the `@PropertyBuilder` attribute.

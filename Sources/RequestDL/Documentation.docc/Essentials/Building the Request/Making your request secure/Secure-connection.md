@@ -98,6 +98,8 @@ TrustRoots {
 }
 ```
 
+> Important: ``RequestDL/TrustRoots`` *replaces* the system's trusted roots, so it needs at least one certificate. A ``RequestDL/TrustRoots`` that ends up with none (an empty builder, a false `if`, an empty ``RequestDL/PropertyForEach``) throws `EmptyTrustRootsError` when the request is resolved, instead of silently trusting the system roots. To trust the system roots, use ``RequestDL/DefaultTrustRoots``, or leave the trust roots out.
+
 After defining the base certificates, you need to specify additional certificates to be used as alternative server validation. It is optional and can be explored depending on the server's specifications.
 
 > Tip: In an application where security is not a priority, you can combine ``RequestDL/DefaultTrustRoots`` with ``RequestDL/AdditionalTrustRoots`` to include both system certificates and the ones you want to trust.
