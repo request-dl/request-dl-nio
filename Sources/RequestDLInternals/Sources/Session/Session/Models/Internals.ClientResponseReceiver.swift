@@ -469,8 +469,17 @@ extension Internals {
         /// fails the task's `futureResult` and nothing else. The request has been sent by then
         /// (`didSendRequest`), but no response has come in, so that is covered too.
         ///
-        /// Guarded by the same lock/state machine as every real callback, so it is a no-op once a
-        /// response has started, or the delegate has been told of a failure, which is every case
+        /// Also ends an exchange whose response had started (head, even part of the body, delivered)
+        /// but that the delegate was never told the end of. AsyncHTTPClient does that when the
+        /// response has been received in full, the connection is gone, and only then the request
+        /// body stream finishes: `RequestBag.finishRequestBodyStream` fails the task's promise with
+        /// `requestStreamCancelled` on `forwardStreamFinishedAndSucceedTask`'s failure branch
+        /// without calling `didFinishRequest` or `didReceiveError`. A server that answers and closes
+        /// before the client finished sending (any early `4xx`/`5xx` with `Connection: close`) gets
+        /// there; the readers of the response, and the request's timeout, would wait forever.
+        ///
+        /// Guarded by the same lock/state machine as every real callback, so it is a no-op once the
+        /// delegate has been told of the end or of a failure, which is every other case
         /// AsyncHTTPClient does report to it.
         package func failIfNotStarted(_ error: Error) {
             // Like `didReceiveError(task:_:)`: whoever reads this gets the same error whichever
@@ -478,19 +487,39 @@ extension Internals {
             let error = Internals.RedirectError.translating(error)
 
             decide {
-                guard (_state == .idle && _reference == .none) || _state == .uploading else {
+                switch _state {
+                case .idle where _reference == .none, .uploading:
+                    _state = .failure
+
+                    return [
+                        { self.transferControl?.release() },
+                        { self.transferControl?.observer?.didChange(.failed(error)) },
+                        { self.head.append(.failure(error)) },
+                        { self.upload.close() },
+                        endDownload { self.download.close() },
+                    ]
+
+                case .head, .downloading:
+                    // The head, and maybe part of the body, was delivered, but the exchange never
+                    // ended: AsyncHTTPClient failed the task without telling the delegate. See
+                    // the doc comment above. Ended exactly as `didReceiveError(task:_:)` would.
+                    _state = .failure
+                    _reference = .lockout
+
+                    return [
+                        { self.download.flowControl?.release() },
+                        { self.transferControl?.release() },
+                        { self.transferControl?.observer?.didChange(.failed(error)) },
+                        { self.upload.close() },
+                        { self.head.close() },
+                        endDownload { self.download.failed(error) },
+                    ]
+
+                default:
+                    // Not begun, or already ended by the delegate (`didFinishRequest`,
+                    // `didReceiveError`), or taken over by a reconnection.
                     return []
                 }
-
-                _state = .failure
-
-                return [
-                    { self.transferControl?.release() },
-                    { self.transferControl?.observer?.didChange(.failed(error)) },
-                    { self.head.append(.failure(error)) },
-                    { self.upload.close() },
-                    endDownload { self.download.close() },
-                ]
             }
         }
 

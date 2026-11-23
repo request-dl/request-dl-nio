@@ -48,7 +48,6 @@ extension Internals {
         // MARK: - Unsafe properties
 
         private var _isValidated = false
-        private var _isDriven = false
         private var _isOver = false
         private var _pausedPart: PausedBodyPart?
 
@@ -89,8 +88,6 @@ extension Internals {
         }
 
         func didReceiveHead(task: HTTPClient.Task<Response>, _ head: HTTPResponseHead) -> EventLoopFuture<Void> {
-            lock.withLock { _isDriven = true }
-
             let responseHead = ResponseHead(
                 url: url,
                 status: .init(code: head.status.code, reason: head.status.reasonPhrase),
@@ -142,10 +139,7 @@ extension Internals {
         }
 
         func didFinishRequest(task: HTTPClient.Task<Response>) throws -> Response {
-            lock.withLock {
-                _isDriven = true
-                _isOver = true
-            }
+            lock.withLock { _isOver = true }
 
             reconnection.observer?.didChange(.finished)
             reconnection.terminate { self.download.close() }
@@ -153,8 +147,6 @@ extension Internals {
 
         func didReceiveError(task: HTTPClient.Task<Response>, _ error: Error) {
             let isFirst = lock.withLock { () -> Bool in
-                _isDriven = true
-
                 guard !_isOver else {
                     return false
                 }
@@ -193,10 +185,15 @@ extension Internals {
         }
 
         /// See `Internals.ClientResponseReceiver.failIfNotStarted(_:)`: a pre-flight rejection
-        /// never calls the delegate, and would otherwise leave the body waiting on nobody.
+        /// never calls the delegate, and neither does AsyncHTTPClient when it fails the task of an
+        /// exchange whose response was already received (the request body stream finishing after
+        /// the connection was gone). Either would leave the body waiting on nobody.
+        ///
+        /// A no-op once the delegate was told the end of the exchange, by `didFinishRequest` or
+        /// `didReceiveError`, or once another continuation took it over.
         func failIfNotStarted(_ error: Error) {
             let isFirst = lock.withLock { () -> Bool in
-                guard !_isDriven, !_isOver else {
+                guard !_isOver else {
                     return false
                 }
 
