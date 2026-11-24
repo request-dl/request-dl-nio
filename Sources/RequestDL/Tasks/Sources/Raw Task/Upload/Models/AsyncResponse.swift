@@ -81,6 +81,10 @@ public struct AsyncResponse: Sendable, AsyncSequence {
                 let error = RedirectError(error)
                 onResponseHead?(.failure(error))
                 throw error
+            } catch let error as Internals.SOCKSAuthenticationRejectedError {
+                let error = ProxyAuthorizationError(error)
+                onResponseHead?(.failure(error))
+                throw error
             } catch let error as Internals.RequestBodyPartUnreadableError {
                 let error = RequestBodyUnreadableError(error)
                 onResponseHead?(.failure(error))

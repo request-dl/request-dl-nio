@@ -178,7 +178,9 @@ extension Internals {
             }
 
             // See `Internals.ClientResponseReceiver.didReceiveError(task:_:)`.
-            let error = Internals.RedirectError.translating(error)
+            let error = Internals.SOCKSAuthenticationRejectedError.translating(
+                Internals.RedirectError.translating(error)
+            )
 
             reconnection.observer?.didChange(.failed(error))
             reconnection.terminate { self.download.failed(error) }

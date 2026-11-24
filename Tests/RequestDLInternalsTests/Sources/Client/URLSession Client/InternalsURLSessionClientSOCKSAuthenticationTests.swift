@@ -238,14 +238,18 @@ struct InternalsURLSessionClientSOCKSAuthenticationTests {
         // Then: the negative control of the tests above.
         let error = try #require(outcome.error)
         #expect(outcome.elapsed < 5)
-        // The documented error (`EAUTH`) is what CFNetwork reports today, not a contract: if an OS
-        // changes it, it shows as a known issue and the documentation on `Proxy` needs an update.
+        // What the caller gets is this package's own error, the same as under the NIO executors,
+        // with the error CFNetwork reported as its cause.
+        let rejection = try #require(error as? Internals.SOCKSAuthenticationRejectedError)
+        // `EAUTH` is what CFNetwork reports today, not a contract: if an OS changes it, it shows
+        // as a known issue, the mapping above stops recognising it, and the documentation on
+        // `Proxy` needs an update.
         withKnownIssue(
             "URLSession no longer reports a rejected SOCKS5 password as NSPOSIXErrorDomain 80 (EAUTH): update the error documented on Proxy",
             isIntermittent: true
         ) {
-            #expect((error as NSError).domain == NSPOSIXErrorDomain)
-            #expect((error as NSError).code == Int(EAUTH))
+            #expect((rejection.underlying as NSError).domain == NSPOSIXErrorDomain)
+            #expect((rejection.underlying as NSError).code == Int(EAUTH))
         }
         #expect(!String(describing: error).contains("WRONG"))
         #expect(proxy.observations.authenticationAttempts.count == 1)

@@ -63,17 +63,18 @@ import RequestDLInternals
 ///   network that is trusted, or tunnel to it. The credentials are never part of the request
 ///   that the tunnel carries.
 /// - A proxy that rejects the credentials by answering with a failure status (RFC 1929 says it
-///   must) fails the request at once with the underlying transport's error, and it is not
-///   retried: sending the same wrong credentials again could only lock the account. A proxy that
-///   closes the connection after receiving them *without* answering is a different case: the
-///   `.nio` and `.nioTransportServices` executors cannot tell that from a dropped connection, and
-///   reconnect and send the same credentials again until the request's own timeout ends it.
-///   Prefer a proxy that answers, and set a ``Timeout`` if you cannot.
-/// - That failure has no error type of RequestDL's own, and what it is depends on the executor,
-///   which is the contract to match on: under `.nio` and `.nioTransportServices` it is
-///   `SOCKSError.AuthenticationFailed` (from `NIOSOCKS`, a product of the swift-nio-extras fork
-///   that RequestDL does not re-export, so match on the type's name), and under `.urlSession` it is an `NSError` in
-///   `NSPOSIXErrorDomain` with code `EAUTH` (80). Neither carries the credentials.
+///   must) fails the request at once with a ``ProxyAuthorizationError`` whose reason is
+///   ``ProxyAuthorizationError/Reason-swift.enum/socksAuthenticationRejected``, the same on every
+///   executor, and it is not retried: sending the same wrong credentials again could only lock the
+///   account. The error never carries the credentials. What the executor itself reported, kept as
+///   ``ProxyAuthorizationError/underlyingError`` for diagnosis, is `SOCKSError.AuthenticationFailed`
+///   (from `NIOSOCKS`, which RequestDL does not re-export) under `.nio` and `.nioTransportServices`,
+///   and an `NSError` in `NSPOSIXErrorDomain` with code `EAUTH` (80) under `.urlSession`.
+/// - A proxy that closes the connection after receiving the credentials *without* answering is a
+///   different case: the `.nio` and `.nioTransportServices` executors cannot tell that from a
+///   dropped connection, so it is not reported as a rejection. They reconnect and send the same
+///   credentials again until the request's own timeout ends it. Prefer a proxy that answers, and
+///   set a ``Timeout`` if you cannot.
 /// - A proxy that does not require authentication simply does not ask for the credentials,
 ///   which are then not sent.
 /// - Under `.urlSession` a user name or password of more than 254 bytes cannot be sent intact:

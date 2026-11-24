@@ -19,6 +19,10 @@ import struct Foundation.TimeInterval
 import struct Foundation.UUID
 #endif
 
+#if canImport(Darwin)
+import Foundation
+#endif
+
 /// SOCKS5 username/password authentication (RFC 1929) through the public `DataTask` and `Proxy`
 /// API, against `LocalSOCKSProxy`, a real server that demands the credentials and records the
 /// bytes it receives: what is asserted is what the proxy saw on the wire, not what the client was
@@ -246,12 +250,16 @@ struct ProxySOCKSAuthenticationTests {
             #expect(try barrier.result.get() == "Hello Through SOCKS")
             #expect(proxy.observations.authenticationAttempts.map(\.accepted) == [false, true])
             #expect(proxy.connectAttempts.count == 1)
-            // The error says what happened, and not what the password was.
-            #expect(String(describing: error).contains("uthentication"))
+            // The same typed error on every executor, with what the executor reported kept as its
+            // cause. It says what happened, and not what the password was.
+            let typed = try #require(error as? ProxyAuthorizationError)
+            #expect(typed.reason == .socksAuthenticationRejected)
             #expect(!String(describing: error).contains("WRONG"))
-            // The type `Proxy` documents as the failure under both NIO executors: it comes from the
-            // fork of swift-nio-extras, which the test target does not link, hence the name.
-            #expect(String(reflecting: type(of: error)) == "NIOSOCKS.SOCKSError.AuthenticationFailed")
+            #expect(!String(reflecting: error).contains("WRONG"))
+            // The type comes from the fork of swift-nio-extras, which the test target does not
+            // link, hence the name.
+            let underlying = try #require(typed.underlyingError)
+            #expect(String(reflecting: type(of: underlying)) == "NIOSOCKS.SOCKSError.AuthenticationFailed")
         }
     }
 
@@ -441,7 +449,15 @@ struct ProxySOCKSAuthenticationTests {
             }
 
             #expect(outcome.elapsed < 5)
+            // The same typed error as under the NIO executors, with the `EAUTH` CFNetwork ended the
+            // connection with as its cause.
+            let typed = try #require(error as? ProxyAuthorizationError)
+            #expect(typed.reason == .socksAuthenticationRejected)
             #expect(!String(describing: error).contains("WRONG"))
+            #expect(!String(reflecting: error).contains("WRONG"))
+            let underlying = try #require(typed.underlyingError as NSError?)
+            #expect(underlying.domain == NSPOSIXErrorDomain)
+            #expect(underlying.code == Int(EAUTH))
             #expect(proxy.observations.authenticationAttempts.map(\.accepted) == [false])
             #expect(proxy.connectAttempts.count == 0)
         }

@@ -131,6 +131,11 @@ let package = Package(
                     package: "swift-nio-extras",
                     condition: .when(traits: ["NIOTransport"])
                 ),
+                .product(
+                    name: "NIOSOCKS",
+                    package: "swift-nio-extras",
+                    condition: .when(traits: ["NIOTransport"])
+                ),
                 .product(name: "NIOSSL", package: "swift-nio-ssl", condition: .when(traits: ["NIOTransport"])),
                 .product(
                     name: "NIOTransportServices",

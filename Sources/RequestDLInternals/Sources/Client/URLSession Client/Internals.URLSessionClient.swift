@@ -2089,6 +2089,15 @@ extension Internals.URLSessionClient {
                 return proxyAuthenticationError
             }
 
+            // CFNetwork ends a connection to a SOCKS5 proxy that rejected the credentials with
+            // `EAUTH`. Only for a session that sent some, so an `EAUTH` from anywhere else is not
+            // taken for it.
+            if case .socks = proxyAuthorization,
+                Internals.SOCKSAuthenticationRejectedError.isURLSessionRejection(error)
+            {
+                return Internals.SOCKSAuthenticationRejectedError(underlying: error)
+            }
+
             if error is CancellationError || (error as? URLError)?.code == .cancelled {
                 return error
             }
