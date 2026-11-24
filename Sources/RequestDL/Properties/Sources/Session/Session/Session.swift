@@ -395,6 +395,11 @@ public struct Session: Property {
     ///
     /// Enables redirect follow for the session.
     ///
+    /// > Note: The `URLSession` executor stops a chain at 20 redirects, the system's own limit,
+    /// whatever `max` is. The request then fails with a ``RedirectError`` whose reason is
+    /// ``RedirectError/Reason/limitReached``, as it does when `max` is reached. The other
+    /// executors honor `max`.
+    ///
     /// - Parameters:
     /// - max: The maximum number of redirects to follow.
     /// - allowCycles: Whether to allow redirect cycles or not.
