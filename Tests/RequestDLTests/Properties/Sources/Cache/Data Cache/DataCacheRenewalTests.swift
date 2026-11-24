@@ -232,7 +232,7 @@ struct DiskStorageRenewalEvictionTests {
                 version: .init(minor: 1, major: 1),
                 headers: [
                     .init(name: "ETag", value: "\"\(key)\""),
-                    .init(name: "X-Pad", value: String(repeating: "a", count: pad))
+                    .init(name: "X-Pad", value: String(repeating: "a", count: pad)),
                 ],
                 isKeepAlive: true
             ),
