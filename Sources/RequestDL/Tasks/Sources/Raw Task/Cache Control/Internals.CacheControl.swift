@@ -345,14 +345,22 @@ extension Internals {
         ///   over, as with `max-age=0` or an `Expires` in the past, so only the checks that are
         ///   about the stored body are applied. Without it such an entry was removed right after
         ///   it was renewed and the body was downloaded again.
-        private func makeCachedSession(
+        ///
+        /// Every removal here is of the entry as it was read (`cachedData.cachedResponse.date`),
+        /// not of whatever is under the key by then: a revalidation that ran alongside this
+        /// request may have renewed it, which moves its body, and the entry that replaced this one
+        /// is not the one that failed to be read.
+        func makeCachedSession(
             _ cachedData: CachedData,
             startedAt: Date,
             revalidation: Internals.RequestMetricsCollector,
-            validated: Bool = false
+            validated: Bool = false,
+            isRetry: Bool = false
         ) async -> SessionTask? {
+            let readDate = cachedData.cachedResponse.date
+
             if !isCachedDataValid(cachedData, checkingFreshness: !validated) {
-                await dataCache.remove(forKey: requestConfiguration.url)
+                await dataCache.remove(forKey: requestConfiguration.url, ifDated: readDate)
                 return nil
             }
 
@@ -363,7 +371,26 @@ extension Internals {
 
             guard let firstPiece = await Self.readPiece(of: &body) else {
                 logger?.log(level: .debug, "Cache entry could not be read - treating it as a miss")
-                await dataCache.remove(forKey: requestConfiguration.url)
+                await dataCache.remove(forKey: requestConfiguration.url, ifDated: readDate)
+
+                // Renewed while it was being read: what is under the key now is that entry, whole,
+                // and reading it is the answer. Only once, and only for a different entry.
+                if !isRetry,
+                    let renewed = await dataCache.getCachedData(
+                        forKey: requestConfiguration.url,
+                        policy: requestConfiguration.cachePolicy
+                    ),
+                    renewed.cachedResponse.date != readDate
+                {
+                    return await makeCachedSession(
+                        renewed,
+                        startedAt: startedAt,
+                        revalidation: revalidation,
+                        validated: validated,
+                        isRetry: true
+                    )
+                }
+
                 return nil
             }
 
@@ -380,7 +407,7 @@ extension Internals {
             // At the priority of the request, not a low one: the response is read by the caller of
             // this request, which is waiting on exactly what this feeds it.
             Self.startReplay(body, startingWith: firstPiece, into: download, window: window) {
-                await dataCache.remove(forKey: key)
+                await dataCache.remove(forKey: key, ifDated: readDate)
             }
 
             // Nothing crossed the wire for this response, but it is still part of what happened to

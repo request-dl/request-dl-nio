@@ -52,20 +52,14 @@ struct DataCacheEncryptedEntryTests {
             )
             await cache.finalizeWrite(buffer, contentLengthHint: 0)
 
-            // Warms what is not about the body: the directory lookup, the file system pool.
-            _ = await cache.getCachedData(forKey: key, policy: .disk)
-
             // When
-            let clock = ContinuousClock()
-            let start = clock.now
             let cached = await cache.getCachedData(forKey: key, policy: .disk)
-            let elapsed = start.duration(to: clock.now)
 
-            // Then: it is a hit, and nothing waited. Reopening a file that reads as empty used to
-            // retry for ~290 ms, in case the empty answer was a stat that missed.
+            // Then: it is a hit, and nothing waited for content. Reopening a file that reads as
+            // empty used to retry for ~290 ms, in case the empty answer was a stat that missed.
             #expect(cached != nil)
             #expect(cached?.buffer.readableBytes == 0)
-            #expect(elapsed < .milliseconds(200))
+            #expect(cache.storage.diskStorage.emptyContentWaits.value == 0)
         }
     }
 

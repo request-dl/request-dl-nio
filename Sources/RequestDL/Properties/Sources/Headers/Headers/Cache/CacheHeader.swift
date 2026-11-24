@@ -10,6 +10,13 @@
 ///     .cached(true)
 ///     .stored(true)
 /// ```
+///
+/// - Important: These are request directives, sent to the server and to whatever cache sits in
+///   the path to it. The cache of this package (``RequestDL/DataCache``) reacts to three of them:
+///   `no-cache` (revalidate before using what is stored), `no-store` (do not store the response)
+///   and `only-if-cached` (do not go to the network). The others (`max-age`, `max-stale`,
+///   `s-maxage`, `stale-while-revalidate`, `stale-if-error`, ...) are only sent: `maxAge(0)` does not
+///   make the local cache revalidate. Use ``RequestDL/CacheStrategy`` for that.
 public struct CacheHeader: Property {
 
     // MARK: - Public properties

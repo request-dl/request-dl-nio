@@ -13,7 +13,7 @@ import struct Foundation.URL
 
 struct MemoryStorage: Sendable {
 
-    private struct Record: Sendable, Hashable {
+    struct Record: Sendable, Hashable {
 
         // MARK: - Internal properties
 
@@ -165,11 +165,31 @@ struct MemoryStorage: Sendable {
         maximumCapacity: Int64,
         knownUsage: Int64? = nil
     ) -> (dataURL: Internals.ByteURL?, usage: Int64?) {
+        let (dataURL, usage, _) = allocateBufferReplacing(
+            key: key,
+            cachedResponse: cachedResponse,
+            contentLength: contentLength,
+            maximumCapacity: maximumCapacity,
+            knownUsage: knownUsage
+        )
+
+        return (dataURL, usage)
+    }
+
+    /// ``allocateBuffer(key:cachedResponse:contentLength:maximumCapacity:knownUsage:)``, which also
+    /// says which record it replaced, for ``restore(_:forKey:ifDataURL:)``.
+    mutating func allocateBufferReplacing(
+        key: String,
+        cachedResponse: CachedResponse,
+        contentLength: Int64,
+        maximumCapacity: Int64,
+        knownUsage: Int64? = nil
+    ) -> (dataURL: Internals.ByteURL?, usage: Int64?, replaced: Record?) {
         // `contentLength` comes from a response's `Content-Length`, which a server controls.
         // A negative one is no size at all, and `Int64.min` would overflow the subtraction below
         // and trap, so it is turned down like an entry that does not fit, as `DiskStorage` does.
         guard contentLength >= 0, contentLength <= maximumCapacity else {
-            return (nil, nil)
+            return (nil, nil, nil)
         }
 
         let usageAfterEviction = freeSpace(maximumCapacity - contentLength, knownUsage: knownUsage)
@@ -179,9 +199,23 @@ struct MemoryStorage: Sendable {
             cachedResponse: cachedResponse
         )
 
+        let replaced = records[key]
         records[key] = record
 
-        return (record.dataURL, usageAfterEviction + contentLength)
+        return (record.dataURL, usageAfterEviction + contentLength, replaced)
+    }
+
+    /// Puts back the record that a write replaced, when that write is given up on and its own
+    /// record, the one `dataURL` identifies, is still what sits at `key`.
+    ///
+    /// A write that fails leaves the entry it was going to replace as it was, in this tier as it
+    /// does in the disk one. Nothing is restored over a record that a later write installed.
+    mutating func restore(_ replaced: Record, forKey key: String, ifDataURL dataURL: Internals.ByteURL) {
+        guard records[key]?.dataURL === dataURL else {
+            return
+        }
+
+        records[key] = replaced
     }
 
     /// Installs a record whose bytes are already in `dataURL`, for an entry that was read from

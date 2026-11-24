@@ -8,6 +8,7 @@ import RequestDLInternals
 import FoundationEssentials
 #else
 import struct Foundation.Data
+import struct Foundation.Date
 import struct Foundation.URL
 #endif
 
@@ -233,8 +234,15 @@ extension Internals.CacheControl {
             }
         }
 
-        /// The `ETag` of the response when it is a strong one, otherwise its `Last-Modified`.
-        /// `If-Range` has no use for a weak entity tag (RFC 9110 §13.1.5).
+        /// The `ETag` of the response when it is a strong one, otherwise its `Last-Modified` when
+        /// that is a strong one too.
+        ///
+        /// `If-Range` has no use for a weak entity tag, and a `Last-Modified` is only strong when
+        /// the response's `Date` is at least a second after it, since the resource could have
+        /// changed again within the same second (RFC 9110 §13.1.5). A server compares a weak
+        /// validator as a mismatch, and answers `200` with the whole body, which says nothing of
+        /// the response being whole, on every probe of such a resource. Without a validator the
+        /// probe asks for the range alone, as it does for a response that has none.
         private static func strongValidator(of head: Internals.ResponseHead) -> String? {
             if let entityTag = head.headerValues(named: "ETag").first?.trimmingASCIIWhitespace(),
                 !entityTag.isEmpty,
@@ -243,7 +251,18 @@ extension Internals.CacheControl {
                 return entityTag
             }
 
-            return head.headerValues(named: "Last-Modified").first?.trimmingASCIIWhitespace()
+            guard
+                let lastModified = head.headerValues(named: "Last-Modified").first?.trimmingASCIIWhitespace(),
+                let modified = Date(httpDate: lastModified),
+                let date = head.headerValues(named: "Date").first.flatMap({
+                    Date(httpDate: $0.trimmingASCIIWhitespace())
+                }),
+                date.timeIntervalSince(modified) >= 1
+            else {
+                return nil
+            }
+
+            return lastModified
         }
 
         /// `<total>` of `bytes */<total>`.

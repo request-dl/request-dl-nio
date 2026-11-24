@@ -329,9 +329,9 @@ public struct DataCache: Sendable, Equatable {
             key: String,
             cachedResponse: CachedResponse,
             contentLength: Int64
-        ) -> Internals.ByteURL? {
+        ) -> (dataURL: Internals.ByteURL, replaced: MemoryStorage.Record?)? {
             lock.withLock {
-                let (dataURL, usage) = _memoryStorage.allocateBuffer(
+                let (dataURL, usage, replaced) = _memoryStorage.allocateBufferReplacing(
                     key: key,
                     cachedResponse: cachedResponse,
                     contentLength: contentLength,
@@ -348,7 +348,7 @@ public struct DataCache: Sendable, Equatable {
                 }
 
                 _memoryUsageEstimate = usage
-                return dataURL
+                return (dataURL, replaced)
             }
         }
 
@@ -378,6 +378,37 @@ public struct DataCache: Sendable, Equatable {
             }
 
             return (buffer, recordURL)
+        }
+
+        /// Rewrites the response record of a disk entry, reusing `_diskUsageEstimate` so that a
+        /// renewal nowhere near capacity does not measure the whole directory, and moving the
+        /// estimate by what the record grew.
+        func updateDiskCached(
+            key: String,
+            cachedResponse: CachedResponse,
+            expecting expected: CachedResponse
+        ) async {
+            let (diskStorage, maximumCapacity, knownUsage) = lock.withLock {
+                (_diskStorage, _diskCapacity, _diskUsageEstimate)
+            }
+
+            let growth = await diskStorage.updateCached(
+                key: key,
+                cachedResponse: cachedResponse,
+                expecting: expected,
+                maximumCapacity: maximumCapacity,
+                knownUsage: knownUsage
+            )
+
+            guard growth != .zero else {
+                return
+            }
+
+            lock.withLock {
+                if let estimate = _diskUsageEstimate {
+                    _diskUsageEstimate = estimate + growth
+                }
+            }
         }
 
         /// Corrects `_memoryUsageEstimate` after a write finishes, replacing the `contentLength`
@@ -763,6 +794,29 @@ public struct DataCache: Sendable, Equatable {
         await storage.diskStorage.remove(key)
     }
 
+    /// Removes the entry at `key` in each tier that still holds the one that was stored at `date`.
+    ///
+    /// For whoever found an entry unusable, or stale, some time ago: the entry may have been
+    /// renewed (revalidated) or replaced since, and that one is not what it found. A key that is
+    /// being written is left alone, since what is there is not the entry either.
+    func remove(forKey key: String, ifDated date: Date) async {
+        let key = base64EncodedKey(key)
+
+        guard !storage.isWriting(key: key) else {
+            return
+        }
+
+        if let memory = await storage.memoryStorage[key], memory.cachedResponse.date == date {
+            storage.invalidatePromotion(key: key)
+            storage.withMemoryStorage { $0.remove(key) }
+        }
+
+        if let disk = await storage.diskStorage[key], disk.cachedResponse.date == date {
+            storage.invalidatePromotion(key: key)
+            await storage.diskStorage.remove(key)
+        }
+    }
+
     ///
     /// Removes all cached data from the cache.
     ///
@@ -773,9 +827,11 @@ public struct DataCache: Sendable, Equatable {
     }
 
     ///
-    /// Removes all cached data from the cache that was stored since a specified date.
+    /// Removes all cached data from the cache that was stored on or before a specified date.
     ///
-    /// - Parameter date: The date to filter cached data removal.
+    /// - Parameter date: The cut-off: entries whose response is dated at or before it are removed,
+    ///   and later ones are kept. The name is `since` for historical reasons, the comparison
+    ///   has always been this one.
     ///
     public func removeAll(since date: Date) async {
         storage.invalidateAllPromotions()
@@ -816,11 +872,10 @@ public struct DataCache: Sendable, Equatable {
         }
 
         if cachedResponse.policy.contains(.disk) {
-            await storage.diskStorage.updateCached(
+            await storage.updateDiskCached(
                 key: key,
                 cachedResponse: cachedResponse,
-                expecting: expected,
-                maximumCapacity: diskCapacity
+                expecting: expected
             )
         }
     }
@@ -874,6 +929,7 @@ public struct DataCache: Sendable, Equatable {
 
         var memoryBuffer: Internals.AnyBuffer?
         var memoryDataURL: Internals.ByteURL?
+        var replacedMemoryRecord: MemoryStorage.Record?
         var diskBuffer: Internals.AnyBuffer?
         var diskRecordURL: URL?
 
@@ -882,11 +938,14 @@ public struct DataCache: Sendable, Equatable {
             // `allocateMemoryDataURL`'s own lock acquisition; opening a buffer over the result is
             // asynchronous and belongs outside it, which also keeps the lock from being held
             // across that.
-            memoryDataURL = storage.allocateMemoryDataURL(
+            let allocated = storage.allocateMemoryDataURL(
                 key: key,
                 cachedResponse: cachedResponse,
                 contentLength: contentLength
             )
+
+            memoryDataURL = allocated?.dataURL
+            replacedMemoryRecord = allocated?.replaced
 
             if let memoryDataURL {
                 memoryBuffer = await Internals.DataBuffer(memoryDataURL)
@@ -931,6 +990,7 @@ public struct DataCache: Sendable, Equatable {
             diskBuffer: diskBuffer,
             diskRecordURL: diskRecordURL,
             memoryDataURL: memoryDataURL,
+            replacedMemoryRecord: replacedMemoryRecord,
             writeToken: writeToken,
             memoryCapacity: storage.memoryCapacity,
             diskCapacity: storage.diskCapacity,
@@ -954,7 +1014,14 @@ public struct DataCache: Sendable, Equatable {
         let key = base64EncodedKey(key)
 
         if let memoryDataURL = buffer.memoryDataURL {
-            storage.withMemoryStorage { $0.remove(key, ifDataURL: memoryDataURL) }
+            storage.withMemoryStorage { memory in
+                // What this write was going to replace stays, as it does on disk.
+                if let replaced = buffer.replacedMemoryRecord {
+                    memory.restore(replaced, forKey: key, ifDataURL: memoryDataURL)
+                } else {
+                    memory.remove(key, ifDataURL: memoryDataURL)
+                }
+            }
         }
 
         if let diskRecordURL = buffer.diskRecordURL {
@@ -981,6 +1048,12 @@ public struct DataCache: Sendable, Equatable {
         await buffer.closeDiskBuffer()
 
         defer { buffer.writeToken?.end() }
+
+        // The write is whole now: the record stops being an unfinished one, and the generations
+        // of the key before it are no longer needed. A tier the body outgrew has no record left.
+        if let diskRecordURL = buffer.diskRecordURL, !buffer.diskOverflowed {
+            await storage.diskStorage.finishRecord(at: diskRecordURL)
+        }
 
         let actualSize = Int64(buffer.readableBytes)
 

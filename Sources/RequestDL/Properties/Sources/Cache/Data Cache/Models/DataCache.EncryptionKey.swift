@@ -32,13 +32,29 @@ extension DataCache {
         // MARK: - Inits
 
         /// - Parameter data: Raw key bytes. 32 bytes is recommended, for AES-256-GCM.
+        ///
+        /// AES takes keys of 16, 24 or 32 bytes, and those are used as they are. Any other length
+        /// is not a key AES can use, and used to leave the cache silently unable to write or read
+        /// anything: it is run through HKDF-SHA256 into a 32-byte key instead. That does not add
+        /// entropy to bytes that had little, so a key that is not already random should go through
+        /// HKDF in the app, as the guide on encrypting the cache describes.
         public init<Bytes: DataProtocol & Sendable>(_ data: Bytes) {
-            symmetricKey = SymmetricKey(data: Data(data))
+            self.init(SymmetricKey(data: Data(data)))
         }
 
-        /// For apps that already manage their key material as a `Crypto.SymmetricKey`.
+        /// For apps that already manage their key material as a `Crypto.SymmetricKey`. The same
+        /// goes for its size as for the bytes above.
         public init(_ symmetricKey: SymmetricKey) {
-            self.symmetricKey = symmetricKey
+            switch symmetricKey.bitCount {
+            case 128, 192, 256:
+                self.symmetricKey = symmetricKey
+            default:
+                self.symmetricKey = HKDF<SHA256>.deriveKey(
+                    inputKeyMaterial: symmetricKey,
+                    info: Data("request-dl.cache.encryption-key.v1".utf8),
+                    outputByteCount: 32
+                )
+            }
         }
     }
 }
