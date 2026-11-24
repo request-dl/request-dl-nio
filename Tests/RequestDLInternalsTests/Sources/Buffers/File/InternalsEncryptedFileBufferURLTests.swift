@@ -48,7 +48,7 @@ struct InternalsEncryptedFileBufferURLTests {
     /// 16-byte tag on top. It is what a writer that flushed full intermediate chunks and then
     /// crashed before `close()` ran leaves behind. It has no authenticated final chunk, so none of
     /// its chunks may be reported as readable: each verifies on its own, and a size that counted
-    /// them would let `Internals.CacheControl.isCachedDataValid` take the truncated entry for a
+    /// them would let `Internals.CacheControl.isBodyConsistent` take the truncated entry for a
     /// complete one when its `Content-Length` happens to match.
     @Test
     func writtenBytes_whenBodyIsExactMultipleOfChunkOnDiskSize_reportsNothingReadable() async throws {

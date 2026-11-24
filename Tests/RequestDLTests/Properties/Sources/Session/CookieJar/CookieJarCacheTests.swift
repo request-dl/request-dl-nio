@@ -41,7 +41,11 @@ struct CookieJarCacheTests {
         let resourcePath = "/" + UUID().uuidString
 
         for _ in 0..<resourceResponses {
-            server.insert(try .init(jsonObject: "resource"), at: resourcePath)
+            // With a lifetime of its own: what has none is stale as soon as it is stored.
+            server.insert(
+                try .init(headers: .init([("Cache-Control", "max-age=3600")]), jsonObject: "resource"),
+                at: resourcePath
+            )
         }
 
         let dataCache = DataCache(suiteName: UUID().uuidString)

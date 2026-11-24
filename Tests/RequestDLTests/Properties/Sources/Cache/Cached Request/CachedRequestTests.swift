@@ -138,7 +138,7 @@ struct CachedRequestTests {
     func cache_whenUseCachedDataOnlyStrategyWithValidCacheMaxAge() async throws {
         let testState = try await TestState()
         // A wide `max-age`, not the two seconds
-        // `cache_whenUseCachedDataOnlyStrategyWithInvalidCacheMaxAge` waits past. This test never
+        // `cache_whenUseCachedDataOnlyStrategyWithExpiredMaxAge_servesItAnyway` waits past. This test never
         // sleeps, so its window only has to outlast the actual request/response round trip below,
         // which on a loaded CI simulator alone can exceed a couple of seconds.
         let cacheData = await mockCachedData(makeHeaders(maxAgeSeconds: 3_600))
@@ -166,60 +166,50 @@ struct CachedRequestTests {
     }
 
     @Test
-    func cache_whenUseCachedDataOnlyStrategyWithInvalidCacheMaxAge() async throws {
+    func cache_whenUseCachedDataOnlyStrategyWithExpiredMaxAge_servesItAnyway() async throws {
         let testState = try await TestState()
         let cacheData = await mockCachedData(makeHeaders())
         let cacheKey = "https://localhost:8888" + testState.uri
-        var thrownError: Error?
 
         // When
         await testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
 
         try await waitCacheExpiration()
 
-        do {
-            _ = try await performCacheRequest(
-                testState: testState,
-                headers: makeHeaders(),
-                cacheStrategy: .useCachedDataOnly
-            )
-        } catch {
-            thrownError = error
-        }
+        let response = try await performCacheRequest(
+            testState: testState,
+            headers: makeHeaders(),
+            cacheStrategy: .useCachedDataOnly
+        )
 
-        // Then
-        #expect(thrownError is EmptyCachedDataError)
+        // Then: stale, and served all the same, since the caller asked for what is stored
+        #expect(response.head == cacheData.response)
     }
 
-    /// `isCachedDataValid`'s max-age freshness check must not be skipped for
+    /// `isFresh`'s max-age freshness check must not be skipped for
     /// `Cache-Control: max-age=0`, a common, valid directive meaning "cacheable, but revalidate
     /// before every reuse". It has to be treated as immediately stale, since otherwise (with no
     /// `Expires` header, the common modern pattern of relying on `Cache-Control` alone) the entry
     /// would be reported valid forever. No sleep needed here, unlike
-    /// `cache_whenUseCachedDataOnlyStrategyWithInvalidCacheMaxAge`: `max-age=0` must already be
+    /// `cache_whenUseCachedDataOnlyStrategyWithExpiredMaxAge_servesItAnyway`: `max-age=0` must already be
     /// stale the instant it's checked.
     @Test
-    func cache_whenUseCachedDataOnlyStrategyWithMaxAgeZero_treatsCacheAsInvalid() async throws {
+    func cache_whenUseCachedDataOnlyStrategyWithMaxAgeZero_servesItAnyway() async throws {
         let testState = try await TestState()
         let cacheData = await mockCachedData(makeHeaders(maxAgeSeconds: 0))
         let cacheKey = "https://localhost:8888" + testState.uri
-        var thrownError: Error?
 
         // When
         await testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
 
-        do {
-            _ = try await performCacheRequest(
-                testState: testState,
-                headers: makeHeaders(),
-                cacheStrategy: .useCachedDataOnly
-            )
-        } catch {
-            thrownError = error
-        }
+        let response = try await performCacheRequest(
+            testState: testState,
+            headers: makeHeaders(),
+            cacheStrategy: .useCachedDataOnly
+        )
 
-        // Then
-        #expect(thrownError is EmptyCachedDataError)
+        // Then: stale, and served all the same, since the caller asked for what is stored
+        #expect(response.head == cacheData.response)
     }
 
     /// An `Expires` the date parser cannot hold is an `Expires` that is not a date, which is a stale
@@ -233,23 +223,18 @@ struct CachedRequestTests {
             ("Expires", "Sun, 06 Nov 400000000000 08:49:37 GMT"),
         ])
         let cacheKey = "https://localhost:8888" + testState.uri
-        var thrownError: Error?
 
         // When
         await testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
 
-        do {
-            _ = try await performCacheRequest(
-                testState: testState,
-                headers: makeHeaders(eTag: UUID()),
-                cacheStrategy: .useCachedDataOnly
-            )
-        } catch {
-            thrownError = error
-        }
+        let response = try await performCacheRequest(
+            testState: testState,
+            headers: makeHeaders(eTag: UUID()),
+            cacheStrategy: .returnCachedDataElseLoad
+        )
 
-        // Then
-        #expect(thrownError is EmptyCachedDataError)
+        // Then: stale, so it is not served
+        #expect(response.head != cacheData.response)
     }
 
     @Test
@@ -284,29 +269,24 @@ struct CachedRequestTests {
     }
 
     @Test
-    func cache_whenUseCachedDataOnlyStrategyWithInvalidCacheExpires() async throws {
+    func cache_whenUseCachedDataOnlyStrategyWithExpiredExpires_servesItAnyway() async throws {
         let testState = try await TestState()
         let cacheData = await mockCachedData(makeHeaders(maxAge: false))
         let cacheKey = "https://localhost:8888" + testState.uri
-        var thrownError: Error?
 
         // When
         await testState.dataCache.setCachedData(cacheData, forKey: cacheKey)
 
         try await waitCacheExpiration()
 
-        do {
-            _ = try await performCacheRequest(
-                testState: testState,
-                headers: makeHeaders(),
-                cacheStrategy: .useCachedDataOnly
-            )
-        } catch {
-            thrownError = error
-        }
+        let response = try await performCacheRequest(
+            testState: testState,
+            headers: makeHeaders(),
+            cacheStrategy: .useCachedDataOnly
+        )
 
-        // Then
-        #expect(thrownError is EmptyCachedDataError)
+        // Then: stale, and served all the same, since the caller asked for what is stored
+        #expect(response.head == cacheData.response)
     }
 
     @Test
@@ -378,7 +358,7 @@ struct CachedRequestTests {
         )
 
         // Then: this is the critical test for at-rest encryption on the disk tier.
-        // `isCachedDataValid` rejects an entry whose `buffer.readableBytes` doesn't match the
+        // `isBodyConsistent` rejects an entry whose `buffer.readableBytes` doesn't match the
         // origin's `Content-Length`: if `EncryptedFileBufferURL.writtenBytes` ever reported the
         // real (ciphertext-plus-framing) file size instead of the logical plaintext size, that
         // check would fail for every encrypted entry, permanently, and every request would fall
@@ -913,10 +893,13 @@ struct CachedRequestTests {
         )
 
         // Then
-        #expect(updatedCachedData?.response.headers.first(name: "Cache-Control") == "public")
+        // `public` is the 304's; the `max-age` it did not repeat is the entry's own, and stays.
+        let cacheControl = updatedCachedData?.response.headers.first(name: "Cache-Control") ?? ""
+        #expect(cacheControl.contains("public"))
+        #expect(cacheControl.contains("max-age"))
         #expect(updatedCachedData?.response.headers.first(name: "Expires") != nil)
         #expect(updatedCachedData?.response != cacheData.response)
-        #expect(response.head.headers.first(name: "Cache-Control") == "public")
+        #expect(response.head.headers.first(name: "Cache-Control") == cacheControl)
     }
 
     @Test
@@ -960,7 +943,7 @@ struct CachedRequestTests {
         let testState = try await TestState()
         let eTag = UUID()
         // `Content-Length` deliberately overstated relative to the actual stored payload, so
-        // `isCachedDataValid`'s `cachedData.buffer.readableBytes != contentLength` check fails
+        // `isBodyConsistent`'s `cachedData.buffer.readableBytes != contentLength` check fails
         // the entry regardless of `max-age`/`Expires`.
         let cacheData = await mockCachedData(
             makeHeaders(eTag: eTag),
@@ -1735,7 +1718,7 @@ extension CachedRequestTests {
 
     /// Sleeps past the two second `max-age` used by `makeHeaders`.
     ///
-    /// The comparison in `isCachedDataValid` is a strict `<` against `date + maxAge`, so
+    /// The comparison in `isFresh` is a strict `<` against `date + maxAge`, so
     /// sleeping exactly two seconds sits right on the boundary. The margin costs nothing and
     /// removes one more reason for these tests to flicker.
     func waitCacheExpiration() async throws {
