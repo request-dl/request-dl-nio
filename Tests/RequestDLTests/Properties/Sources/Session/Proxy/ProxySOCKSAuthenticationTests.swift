@@ -249,6 +249,9 @@ struct ProxySOCKSAuthenticationTests {
             // The error says what happened, and not what the password was.
             #expect(String(describing: error).contains("uthentication"))
             #expect(!String(describing: error).contains("WRONG"))
+            // The type `Proxy` documents as the failure under both NIO executors: it comes from the
+            // fork of swift-nio-extras, which the test target does not link, hence the name.
+            #expect(String(reflecting: type(of: error)) == "NIOSOCKS.SOCKSError.AuthenticationFailed")
         }
     }
 

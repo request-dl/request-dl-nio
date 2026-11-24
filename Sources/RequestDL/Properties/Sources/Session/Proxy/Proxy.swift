@@ -62,10 +62,18 @@ import RequestDLInternals
 ///   anyone who can read the connection to the proxy can read them; use the proxy only over a
 ///   network that is trusted, or tunnel to it. The credentials are never part of the request
 ///   that the tunnel carries.
-/// - A proxy that rejects the credentials fails the request at once with the underlying
-///   transport's error, and it is not retried: sending the same wrong credentials again could
-///   only lock the account. Under the `.nio` and `.nioTransportServices` executors that error is
-///   `SOCKSError.AuthenticationFailed`; under `.urlSession` it is a POSIX `EAUTH` (80) error.
+/// - A proxy that rejects the credentials by answering with a failure status (RFC 1929 says it
+///   must) fails the request at once with the underlying transport's error, and it is not
+///   retried: sending the same wrong credentials again could only lock the account. A proxy that
+///   closes the connection after receiving them *without* answering is a different case: the
+///   `.nio` and `.nioTransportServices` executors cannot tell that from a dropped connection, and
+///   reconnect and send the same credentials again until the request's own timeout ends it.
+///   Prefer a proxy that answers, and set a ``Timeout`` if you cannot.
+/// - That failure has no error type of RequestDL's own, and what it is depends on the executor,
+///   which is the contract to match on: under `.nio` and `.nioTransportServices` it is
+///   `SOCKSError.AuthenticationFailed` (from `NIOSOCKS`, a product of the swift-nio-extras fork
+///   that RequestDL does not re-export, so match on the type's name), and under `.urlSession` it is an `NSError` in
+///   `NSPOSIXErrorDomain` with code `EAUTH` (80). Neither carries the credentials.
 /// - A proxy that does not require authentication simply does not ask for the credentials,
 ///   which are then not sent.
 /// - Under `.urlSession` a user name or password of more than 254 bytes cannot be sent intact:
