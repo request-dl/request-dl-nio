@@ -32,7 +32,9 @@ public struct RedirectError: Error, Sendable, Hashable, CustomStringConvertible 
         /// allow that (see `allowCycles` of ``Session/enableRedirectFollow(max:allowCycles:)``).
         case cycleDetected
 
-        /// A ``RedirectStrategy`` answered with a decision to follow a URL that can't be parsed.
+        /// The next hop is a URL that can't be built: a ``RedirectStrategy`` answered with a
+        /// decision to follow a URL that can't be parsed, or a ``URLOverride`` covers the
+        /// `Location` and its destination can't be built.
         ///
         /// The URL is not part of the error: an error's description tends to end up in logs, and
         /// the URL may carry credentials.
@@ -51,7 +53,7 @@ public struct RedirectError: Error, Sendable, Hashable, CustomStringConvertible 
             return "A redirect led back to a URL that had already been visited."
 
         case .invalidURL:
-            return "A redirect strategy answered with a URL that can't be parsed."
+            return "A redirect was to a URL that can't be built (a strategy's answer or a URL override's destination)."
         }
     }
 

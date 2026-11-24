@@ -1627,7 +1627,8 @@ extension Internals.URLSessionClient {
         /// `Proxy-Authorization`, and an explicit `Host`, from `request` when it no longer shares
         /// the previously sent request's origin (scheme, host, and port); see
         /// ``Internals/RedirectSanitizer``. `URLSession` does not do this on its own (it only ever
-        /// removes `Authorization`, on every redirect), unlike the NIO executor's
+        /// removes `Authorization`, on every redirect, which is put back when the origin is the
+        /// same: see `nextHop(_:after:)`), unlike the NIO executor's
         /// `followingRedirect`/`transformRequestForRedirect`, which this mirrors so a redirect
         /// leaking credentials to a different host fails the same way under either transport.
         ///
@@ -1641,30 +1642,27 @@ extension Internals.URLSessionClient {
             newRequest proposedRequest: URLRequest,
             completionHandler: @escaping (URLRequest?) -> Void
         ) {
-            // The hop as it is going to be requested: a `Location` that names a host a
-            // `URLOverride` stands in for is mapped to its destination, before anything below
-            // counts, compares or follows it.
-            let request: URLRequest
-
-            do {
-                request = try rewrittenByURLOverrides(proposedRequest)
-            } catch {
-                // A rule covers this hop and its destination cannot be built: following the
-                // `Location` as the server wrote it would reach the host the rule stands in for.
-                lock.withLock { _redirectError = error }
-                completionHandler(nil)
-                return
-            }
-
             // Before anything below decides what to do with this hop: the next request, whichever
             // way it is built, must be owed what this redirect just set.
             storeCookies(from: response)
 
             switch redirectConfiguration {
             case .disallow:
+                // Nothing is followed, so no hop is built: a rule that cannot build one is no
+                // reason to fail a redirect that is handed back as the response.
                 completionHandler(nil)
 
             case .follow(let max, let allowCycles):
+                let request: URLRequest
+
+                do {
+                    request = try nextHop(proposedRequest, after: response)
+                } catch {
+                    lock.withLock { _redirectError = error }
+                    completionHandler(nil)
+                    return
+                }
+
                 let redirectURL = request.url?.absoluteString ?? ""
 
                 let outcome: Result<Void, Error> = lock.withLock {
@@ -1698,6 +1696,16 @@ extension Internals.URLSessionClient {
                 }
 
             case .strategy(let strategy):
+                let request: URLRequest
+
+                do {
+                    request = try nextHop(proposedRequest, after: response)
+                } catch {
+                    lock.withLock { _redirectError = error }
+                    completionHandler(nil)
+                    return
+                }
+
                 let sanitizedRequest = sanitizedForRedirect(request)
                 let entry = historyEntry(for: response)
 
@@ -1824,6 +1832,53 @@ extension Internals.URLSessionClient {
             request.setValue(cookies.cookieHeaderForHop(to: url), forHTTPHeaderField: "Cookie")
             return request
         }
+
+        /// The hop as it is going to be requested, from what `URLSession` proposed: a `Location`
+        /// that names a host a `URLOverride` stands in for is mapped to its destination, before
+        /// anything that follows counts, compares or follows it, and what `URLSession` changed on
+        /// its own is put back to what the other executor does.
+        ///
+        /// - Throws: ``Internals/RedirectError`` when a rule covers the `Location` and its
+        /// destination cannot be built: following it as the server wrote it would reach the host
+        /// the rule stands in for.
+        private func nextHop(
+            _ proposedRequest: URLRequest,
+            after response: HTTPURLResponse
+        ) throws -> URLRequest {
+            var request = try rewrittenByURLOverrides(proposedRequest)
+            let previous = lock.withLock { _lastRequest }
+
+            // `Authorization` and `Proxy-Authorization` stay with a redirect that does not leave
+            // the origin they were sent to, as with AsyncHTTPClient and as `RedirectRequest`
+            // documents; `URLSession` takes them off every redirect. What leaves the origin is
+            // removed by the sanitizer afterwards, so this only ever gives back what was owed.
+            if let previousURL = previous.url,
+                let newURL = request.url,
+                previousURL.hasTheSameOrigin(as: newURL)
+            {
+                for header in Self.headersURLSessionDropsOnRedirect
+                where request.value(forHTTPHeaderField: header) == nil {
+                    if let value = previous.value(forHTTPHeaderField: header) {
+                        request.setValue(value, forHTTPHeaderField: header)
+                    }
+                }
+            }
+
+            // A `303` asks for the target with `GET` or `HEAD` (RFC 9110, 15.4.4). `URLSession`
+            // always picks `GET`, which downloads a body the caller did not ask for; AsyncHTTPClient
+            // keeps `HEAD`.
+            if response.statusCode == 303,
+                previous.httpMethod?.uppercased() == "HEAD",
+                request.httpMethod?.uppercased() == "GET"
+            {
+                request.httpMethod = "HEAD"
+            }
+
+            return request
+        }
+
+        /// The headers `URLSession` removes from a redirect to the very origin it was sent to.
+        private static let headersURLSessionDropsOnRedirect = ["Authorization", "Proxy-Authorization"]
 
         /// `request` with its URL mapped through the `URLOverride` rules, when one covers it.
         ///
@@ -2104,7 +2159,17 @@ extension Internals.URLSessionClient {
                 return error
             }
 
-            return lock.withLock { _redirectError } ?? error
+            if let redirectError = lock.withLock({ _redirectError }) {
+                return redirectError
+            }
+
+            // `URLSession` stops at 20 redirects on its own, whatever `max` was asked for, and says
+            // so with its own error. It is the limit being reached all the same.
+            if (error as? URLError)?.code == .httpTooManyRedirects {
+                return Internals.RedirectError(.limitReached)
+            }
+
+            return error
         }
 
         /// The redirect `willPerformHTTPRedirection` deferred to `runExchange` (see

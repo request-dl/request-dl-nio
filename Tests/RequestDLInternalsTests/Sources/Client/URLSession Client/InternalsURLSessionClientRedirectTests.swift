@@ -210,6 +210,49 @@ struct InternalsURLSessionClientRedirectTests {
         }
     }
 
+    /// Nothing is followed under `.disallow`, so a rule whose destination cannot be built has no hop
+    /// to fail: the redirect is handed back as the response, as the NIO executor does.
+    @Test
+    func execute_whenRedirectIsDisallowedAndARuleCoversTheLocationWithADestinationThatCannotBeBuilt_returnsTheRedirect()
+        async throws
+    {
+        // Given
+        let localServer = try await LocalServer(.standard)
+        let origin = "/" + UUID().uuidString
+
+        localServer.cleanup(at: origin)
+        localServer.insert(
+            LocalServer.ResponseConfiguration(
+                status: .found,
+                headers: ["Location": "https://staging.example.test/next"],
+                data: Data()
+            ),
+            at: origin
+        )
+        defer { localServer.cleanup(at: origin) }
+
+        let url = try #require(URL(string: "https://\(localServer.baseURL)\(origin)"))
+        let client = try Internals.URLSessionClient(
+            configuration: .ephemeral,
+            redirectConfiguration: .disallow,
+            urlOverrides: .init(rules: [
+                .init(
+                    origin: .init(scheme: "https", host: "staging.example.test", port: nil, pathComponents: []),
+                    destination: .init(scheme: "https", host: "not a host", port: nil, pathComponents: [])
+                )
+            ])
+        )
+
+        // When
+        let result = try await client.execute(
+            request: URLRequest(url: url),
+            delegate: AcceptAnyServerTrustDelegate()
+        )
+
+        // Then
+        #expect(result.head.status.code == 302)
+    }
+
     @Test
     func execute_whenRedirectAllowsCycles_followsBackToAVisitedURL() async throws {
         // Given: a two-hop cycle (origin -> hop -> origin -> ...), same URIs as the cycle test

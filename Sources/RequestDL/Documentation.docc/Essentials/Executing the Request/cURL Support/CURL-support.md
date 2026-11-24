@@ -93,7 +93,7 @@ Request-level — these shape the `RequestDL/RequestConfiguration` itself:
 
 Session-level — these configure the same `Session`-level settings a declared `@PropertyBuilder` tree would reach through ``RequestDL/Session``/``RequestDL/SecureConnection``/``RequestDL/Proxy``:
 
-- `-L` / `--location` (with `--max-redirs`) — follows redirects, up to 50 by default; `--max-redirs -1` means no limit
+- `-L` / `--location` (with `--max-redirs`) — follows redirects, up to 50 by default; `--max-redirs -1` means no limit. On the `URLSession` executor the system stops a chain at 20 redirects whatever the limit is, and the task fails with a ``RequestDL/RedirectError`` whose reason is ``RequestDL/RedirectError/Reason/limitReached``
 - `-k` / `--insecure` — disables certificate verification
 - `-x` / `--proxy` — `[scheme://][user[:password]@]host[:port]`; a `socks*` scheme maps to a SOCKS proxy, anything else to HTTP; defaults to port 1080
 - `--socks5 <host[:port]>` / `--socks5-hostname <host[:port]>` — a SOCKS5 proxy named without a scheme (the same proxy `-x socks5://host[:port]` names; destinations are always sent to the proxy as names). A value that has a scheme of its own (`--socks5 socks5h://host`) is rejected: use `-x` for a proxy URL

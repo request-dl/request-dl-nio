@@ -80,13 +80,9 @@ struct InternalsURLSessionClientRedirectStrategyTests {
         #expect(!headers.contains(name: "Cookie"))
     }
 
-    /// - Note: Asserts on `Cookie` and a plain custom header, not `Authorization`:
-    /// `URLSession` drops `Authorization` on *every* redirect it performs, same-origin included,
-    /// as an OS-level default this type has no hook to override (confirmed empirically: swapping
-    /// this test's header to `Authorization` fails even though nothing here strips it).
-    ///
-    /// That is strictly more conservative than the RFC 9110-derived, origin-only stripping this
-    /// type adds on top for `Cookie`/`Origin`/`Proxy-Authorization`, so it is not a gap.
+    /// - Note: Asserts on `Cookie` and a plain custom header. `Authorization` and
+    /// `Proxy-Authorization`, which `URLSession` takes off every redirect on its own, are put back
+    /// for a redirect within the origin and are checked on the wire in `RedirectExecutorParityTests`.
     @Test
     func execute_whenRedirectSameOrigin_preservesHeaders() async throws {
         // Given: both hops on the same LocalServer, so same origin.
