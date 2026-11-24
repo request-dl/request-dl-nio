@@ -83,23 +83,6 @@ extension Internals.Log {
         )
     }
 
-    package static func cantCreateSPKIHashOutsideSPKIPinning() -> Internals.Log {
-        Internals.Log(
-            """
-            It seems that you are attempting to create an SPKIHash \
-            property outside of the allowed context.
-
-            Please note that SPKIPinning is the only valid context in \
-            which you can create an SPKIHash property. An SPKIHash \
-            declared elsewhere has no effect: SPKIPinning only finds \
-            the SPKIHash values nested inside its own content closure.
-
-            Please ensure that you are creating your SPKIHash property \
-            within an SPKIPinning context to avoid encountering this error.
-            """
-        )
-    }
-
     package static func pinsIgnoredWithoutCertificateVerification() -> Internals.Log {
         Internals.Log(
             """
@@ -217,6 +200,21 @@ extension Internals.Log {
 }
 
 extension Internals.Log {
+
+    package static func systemProxySOCKSCredentialsUndecodable() -> Internals.Log {
+        let reason = "the user name or the password is not valid percent-encoded text"
+
+        return Internals.Log(
+            """
+            The user name and password of the system's SOCKS proxy were ignored, because \(reason) \
+            (a % that is not followed by two hex digits, or encoded bytes that are not UTF-8). \
+            The request goes to the proxy without credentials, which fails if the proxy requires \
+            them. Fix the encoding of the proxy URL, or declare \
+            Proxy(host:port:connection:authorization:).
+            """,
+            metadata: ["reason": .string(reason)]
+        )
+    }
 
     /// The credentials of a SOCKS proxy that the system settings or the environment named could
     /// not be sent, so the proxy is used without them. Only why is reported, never the credentials.
