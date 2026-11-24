@@ -60,7 +60,8 @@ extension RDLWrapper where Base: WKInterfaceImage {
     ///    - placeholder: The image to set immediately, shown until the load finishes. Passing
     ///    `nil` (the default) clears the interface image instead, so a reused view never keeps
     ///    showing the image of its previous owner while the new one loads. Ignored when
-    ///    `keepsCurrentImageWhileLoading` is `true`.
+    ///    `keepsCurrentImageWhileLoading` is `true`: a `WKInterfaceImage` cannot be read, so
+    ///    there is no telling whether it is empty.
     ///    - loader: The ``RDLImageLoader`` performing the request. Defaults to ``RDLImageLoader/shared``.
     ///    - keepsCurrentImageWhileLoading: Pass `true` to leave whatever the interface image is
     ///    showing untouched until the new image arrives, instead of replacing it with
@@ -108,7 +109,8 @@ extension RDLWrapper where Base: WKInterfaceImage {
     ///    - placeholder: The image to set immediately, shown until the load finishes. Passing
     ///    `nil` (the default) clears the interface image instead, so a reused view never keeps
     ///    showing the image of its previous owner while the new one loads. Ignored when
-    ///    `keepsCurrentImageWhileLoading` is `true`.
+    ///    `keepsCurrentImageWhileLoading` is `true`: a `WKInterfaceImage` cannot be read, so
+    ///    there is no telling whether it is empty.
     ///    - loader: The ``RDLImageLoader`` performing the request. Defaults to ``RDLImageLoader/shared``.
     ///    - keepsCurrentImageWhileLoading: Pass `true` to leave whatever the interface image is
     ///    showing untouched until the new image arrives, instead of replacing it with

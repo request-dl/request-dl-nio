@@ -62,7 +62,8 @@ extension RDLWrapper where Base: NSImageView {
     ///    - placeholder: The image to set immediately, shown until the load finishes. Passing
     ///    `nil` (the default) clears the image view instead, so a reused view never keeps
     ///    showing the image of its previous owner while the new one loads. Ignored when
-    ///    `keepsCurrentImageWhileLoading` is `true`.
+    ///    `keepsCurrentImageWhileLoading` is `true` and the view is already showing an image; a
+    ///    view with none still gets it.
     ///    - loader: The ``RDLImageLoader`` performing the request. Defaults to ``RDLImageLoader/shared``.
     ///    - keepsCurrentImageWhileLoading: Pass `true` to leave whatever the image view is
     ///    showing untouched until the new image arrives, instead of replacing it with
@@ -80,7 +81,9 @@ extension RDLWrapper where Base: NSImageView {
     ) {
         cancel()
 
-        if !keepsCurrentImageWhileLoading {
+        // Keeping the current image only means something when there is one: an empty view has
+        // nothing to keep and shows the placeholder, which is what the parameter's name promises.
+        if !keepsCurrentImageWhileLoading || base.image == nil {
             base.image = placeholder
         }
 
@@ -110,7 +113,8 @@ extension RDLWrapper where Base: NSImageView {
     ///    - placeholder: The image to set immediately, shown until the load finishes. Passing
     ///    `nil` (the default) clears the image view instead, so a reused view never keeps
     ///    showing the image of its previous owner while the new one loads. Ignored when
-    ///    `keepsCurrentImageWhileLoading` is `true`.
+    ///    `keepsCurrentImageWhileLoading` is `true` and the view is already showing an image; a
+    ///    view with none still gets it.
     ///    - loader: The ``RDLImageLoader`` performing the request. Defaults to ``RDLImageLoader/shared``.
     ///    - keepsCurrentImageWhileLoading: Pass `true` to leave whatever the image view is
     ///    showing untouched until the new image arrives, instead of replacing it with
@@ -129,7 +133,9 @@ extension RDLWrapper where Base: NSImageView {
     ) {
         cancel()
 
-        if !keepsCurrentImageWhileLoading {
+        // Keeping the current image only means something when there is one: an empty view has
+        // nothing to keep and shows the placeholder, which is what the parameter's name promises.
+        if !keepsCurrentImageWhileLoading || base.image == nil {
             base.image = placeholder
         }
 

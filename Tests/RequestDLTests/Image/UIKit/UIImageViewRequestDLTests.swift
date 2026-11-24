@@ -141,6 +141,28 @@ struct UIImageViewRequestDLTests {
     }
 
     @Test
+    func keepingTheCurrentImageStillShowsThePlaceholderOnAnEmptyView() {
+        // Given
+        let imageView = UIImageView()
+        let placeholder = Self.makeImage(.blue)
+
+        // When
+        imageView.rdl.setImage(
+            id: "keeps-empty",
+            task: StubImageTask {
+                try await Task.sleep(nanoseconds: 200_000_000)
+                return .init(head: .stub, payload: .onePixelPNG)
+            },
+            placeholder: placeholder,
+            keepsCurrentImageWhileLoading: true
+        )
+
+        // Then
+        #expect(imageView.image === placeholder)
+        imageView.rdl.cancel()
+    }
+
+    @Test
     func keepingTheCurrentImageStillAppliesTheLoadedImage() async throws {
         // Given
         let imageView = UIImageView()
