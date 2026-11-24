@@ -50,6 +50,15 @@ struct CompletenessProbeVerdictTests {
     }
 
     @Test
+    func verdict_whenTheRepresentationIsShorterThanWhatWasReceived_isUndecided() {
+        // The resource changed since the body was read: it is now shorter than what arrived, so
+        // the answer says nothing of whether what arrived was whole.
+        let answer = head(416, [("Content-Range", "bytes */500")])
+
+        #expect(Probe.verdict(of: answer, receivedBytes: 1_000) == .undecided)
+    }
+
+    @Test
     func verdict_whenTheUnsatisfiedRangeSaysNothingOfTheLength_isUndecided() {
         #expect(Probe.verdict(of: head(416, []), receivedBytes: 1_000) == .undecided)
         #expect(Probe.verdict(of: head(416, [("Content-Range", "bytes */*")]), receivedBytes: 1_000) == .undecided)
