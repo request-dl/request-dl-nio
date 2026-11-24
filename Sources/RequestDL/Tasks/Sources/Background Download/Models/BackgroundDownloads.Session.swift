@@ -599,7 +599,7 @@ extension BackgroundDownloads {
             let clientIdentityHost: String?
 
             /// The `Content-Encoding` values the request asked for, when `Accept-Encoding` was
-            /// taken over (which switches CFNetwork's own decoding off), else `nil`. Optional for
+            /// taken over, else `nil`. Optional for
             /// the same reason as `clientIdentityHost`, and `nil` also means what an older
             /// version did: the downloaded bytes are moved as they came.
             let acceptedEncodings: [String]?
