@@ -57,8 +57,9 @@ struct ControlledGroupTaskTests {
             // own, which still has to read the request head before it writes a byte. `settled`
             // alone would call a server that has not started yet "stalled" at 0 after its quiet
             // half second, and the kernel buffers filling afterwards would then read as the
-            // controller leaking bytes.
-            try await eventually(timeout: 30) { server.bodyBytesWritten > 0 }
+            // controller leaking bytes. Every one of them has to have written, not just one:
+            // the byte count is a sum, and the first connection alone makes it positive.
+            try await eventually(timeout: 30) { server.connectionsThatWrote == Self.requests }
             let stalledAt = try await server.settled { server.bodyBytesWritten }
 
             // Then: every request is held well short of its body.
@@ -102,8 +103,9 @@ struct ControlledGroupTaskTests {
             // own, which still has to read the request head before it writes a byte. `settled`
             // alone would call a server that has not started yet "stalled" at 0 after its quiet
             // half second, and the kernel buffers filling afterwards would then read as the
-            // controller leaking bytes.
-            try await eventually(timeout: 30) { server.bodyBytesWritten > 0 }
+            // controller leaking bytes. Every one of them has to have written, not just one:
+            // the byte count is a sum, and the first connection alone makes it positive.
+            try await eventually(timeout: 30) { server.connectionsThatWrote == Self.requests }
             let stalledAt = try await server.settled { server.bodyBytesWritten }
 
             // Then
