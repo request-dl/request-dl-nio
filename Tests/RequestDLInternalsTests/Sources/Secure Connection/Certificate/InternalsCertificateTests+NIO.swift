@@ -237,6 +237,29 @@ extension InternalsCertificateTests {
         #expect(resolved.count == 2)
         #expect(resolved == expected)
     }
+
+    /// OpenSSL (so NIOSSL, and the `.nio`/`.nioTransportServices` executors) reads the two older PEM
+    /// labels as a certificate. `.urlSession` used to reject them, so the same file worked on one
+    /// executor and failed on the other.
+    @Test(arguments: ["X509 CERTIFICATE", "TRUSTED CERTIFICATE"])
+    func resolvedDERBytes_whenPEMUsesAnOlderCertificateLabel_matchesNIOSSLBuildOutput(_ label: String) async throws {
+        // Given
+        let der = try Data(contentsOf: Certificates(.der).client().certificateURL)
+        // The OpenSSL trust block `TRUSTED CERTIFICATE` appends: an empty `X509_CERT_AUX`.
+        let payload = label == "TRUSTED CERTIFICATE" ? der + Data([0x30, 0x00]) : der
+        let base64 = payload.base64EncodedString(options: [.lineLength64Characters, .endLineWithLineFeed])
+        let pem = Data("-----BEGIN \(label)-----\n\(base64)\n-----END \(label)-----\n".utf8)
+
+        // When
+        let resolved = try Internals.Certificate(Array(pem), format: .pem).resolvedDERBytes()
+
+        // Then
+        let expected = try Internals.Certificate(Array(pem), format: .pem).build().map {
+            Data(try $0.toDERBytes())
+        }
+        #expect(resolved == [der])
+        #expect(resolved == expected)
+    }
 }
 
 #endif

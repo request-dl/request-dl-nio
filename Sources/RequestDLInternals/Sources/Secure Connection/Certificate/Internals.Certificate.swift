@@ -97,13 +97,65 @@ extension Internals {
             }
 
             let documents = try PEMDocument.parseMultiple(pemString: pemString)
-                .filter { $0.discriminator == "CERTIFICATE" }
+                .filter { Self.certificateDiscriminators.contains($0.discriminator) }
 
             guard !documents.isEmpty else {
                 throw MalformedPEMError()
             }
 
-            return documents.map { Data($0.derBytes) }
+            return documents.map { document in
+                let der = Data(document.derBytes)
+
+                // OpenSSL's `TRUSTED CERTIFICATE` appends a trust block after the certificate,
+                // which `SecCertificate` doesn't tolerate; only the certificate is kept.
+                return document.discriminator == "TRUSTED CERTIFICATE" ? Self.certificatePrefix(of: der) : der
+            }
+        }
+
+        /// The PEM labels that carry a certificate: the standard one, and the two OpenSSL (and so
+        /// `NIOSSLCertificate`) also reads, which `.urlSession` would otherwise reject while the
+        /// SwiftNIO executors accept.
+        private static let certificateDiscriminators: Set<String> = [
+            "CERTIFICATE",
+            "X509 CERTIFICATE",
+            "TRUSTED CERTIFICATE",
+        ]
+
+        /// `der` up to the end of its first DER `SEQUENCE`, or `der` itself if it doesn't start with
+        /// a well-formed one (the certificate is then left for the platform to reject).
+        private static func certificatePrefix(of der: Data) -> Data {
+            let bytes = Array(der)
+
+            guard bytes.count >= 2, bytes[0] == 0x30 else {
+                return der
+            }
+
+            var length = 0
+            var headerCount = 2
+
+            if bytes[1] < 0x80 {
+                length = Int(bytes[1])
+            } else {
+                let lengthByteCount = Int(bytes[1] & 0x7F)
+
+                guard lengthByteCount > 0, lengthByteCount <= 4, bytes.count >= 2 + lengthByteCount else {
+                    return der
+                }
+
+                for byte in bytes[2..<(2 + lengthByteCount)] {
+                    length = length << 8 | Int(byte)
+                }
+
+                headerCount = 2 + lengthByteCount
+            }
+
+            let total = headerCount + length
+
+            guard total <= bytes.count else {
+                return der
+            }
+
+            return Data(bytes[0..<total])
         }
 
         // MARK: - Internal methods (build)
