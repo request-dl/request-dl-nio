@@ -352,19 +352,38 @@ struct NonFatalWatchdogTraitTests {
         }
     }
 
-    /// The real probes, on the real pools: they begin, and say how long that took.
+    /// The real probes, on the real pools: each of them begins, on its own pool.
+    ///
+    /// `completedProbes` alone cannot say that: the probes repeat every interval, so four of them
+    /// can all be the same cheap one while another pool never ran its own. The real probes are
+    /// wrapped to count, per source, every time one begins.
     @Test
-    func theStandardProbes_measureTheRealPools() async throws {
+    func theStandardProbes_beginOnEveryRealPool() async throws {
         // Given
-        let monitor = PoolLagMonitor(interval: 0.01)
+        let began = LockedValueBox<[PoolLagMonitor.Source: Int]>([:])
+
+        let probes = PoolLagMonitor.Probe.standard.map { probe in
+            PoolLagMonitor.Probe(source: probe.source) { didBegin in
+                probe.enqueue {
+                    began.withLockedValue { $0[probe.source, default: 0] += 1 }
+                    didBegin()
+                }
+            }
+        }
+
+        let monitor = PoolLagMonitor(interval: 0.01, probes: probes)
 
         // When
         monitor.start()
         defer { monitor.stop() }
 
         // Then
-        try await eventually(timeout: 60) { monitor.completedProbes >= 4 }
-        #expect(monitor.worstLag(within: 30).seconds >= 0)
+        try await eventually(timeout: 60) {
+            let counts = began.withLockedValue { $0 }
+            return probes.allSatisfy { counts[$0.source, default: 0] >= 1 }
+        }
+
+        #expect(monitor.completedProbes >= probes.count)
     }
 }
 
