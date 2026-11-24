@@ -37,15 +37,18 @@ import RequestDLInternals
 /// needed. Nest them here only when also configuring settings that live directly on
 /// `SecureConnection` (`version`, `cipherSuites`, `keyLogger`, ...).
 ///
-/// > Important: `URLSessionConfiguration` has no API for TLS version or ALPN policy.
-/// `version(maximum:)` and ``applicationProtocols(_:)`` are treated as incompatible with
-/// ``Session/Executor/urlSession``, like `cipherSuites(_:)`: automatic executor resolution skips
-/// `.urlSession` when either is set, and pinning to it throws ``ExecutorRequirementError``.
-/// `version(minimum:)` is the one exception: it has no effect under `.urlSession` but isn't
-/// flagged, because App Transport Security offers a real equivalent, an
-/// `NSExceptionMinimumTLSVersion` entry in your app's `Info.plist`, that `version(maximum:)` and
-/// ``applicationProtocols(_:)`` don't have. See
-/// <doc:Configuring-App-Transport-Security-for-URLSession>. To control HTTP/2 use
+/// > Important: Under ``Session/Executor/urlSession`` the TLS version range is applied through
+/// `URLSessionConfiguration.tlsMinimumSupportedProtocolVersion` and
+/// `tlsMaximumSupportedProtocolVersion`, so `version(minimum:)` and `version(maximum:)` both
+/// take effect there and neither moves the session to another executor. App Transport Security
+/// still has the last word on the floor: a `version(minimum:)` below TLS 1.2 does not lift it,
+/// only an `NSExceptionMinimumTLSVersion` entry in your app's `Info.plist` does. See
+/// <doc:Configuring-App-Transport-Security-for-URLSession>.
+///
+/// > Important: `URLSessionConfiguration` has no API for the ALPN policy.
+/// ``applicationProtocols(_:)`` is treated as incompatible with ``Session/Executor/urlSession``,
+/// like `cipherSuites(_:)`: automatic executor resolution skips `.urlSession` when it is set, and
+/// pinning to it throws ``ExecutorRequirementError``. To control HTTP/2 use
 /// ``Session/httpVersion(_:)``, which replaces ``applicationProtocols(_:)``.
 public struct SecureConnection<Content: Property>: Property {
 
@@ -207,8 +210,10 @@ public struct SecureConnection<Content: Property>: Property {
     /// Without it, the ``Session/Executor/nio`` executors refuse anything below TLS 1.2. Pass
     /// `.v1` or `.v1_1` to connect to a server that still speaks one of those.
     ///
-    /// > Important: Has no effect under ``Session/Executor/urlSession``. Configure an
-    /// `NSExceptionMinimumTLSVersion` ATS exception in `Info.plist` instead. See
+    /// > Important: Under ``Session/Executor/urlSession`` this sets
+    /// `tlsMinimumSupportedProtocolVersion`, which can raise the floor but cannot lower what App
+    /// Transport Security allows (TLS 1.2 by default). To reach a server below that, add an
+    /// `NSExceptionMinimumTLSVersion` ATS exception to `Info.plist` as well. See
     /// <doc:Configuring-App-Transport-Security-for-URLSession>.
     ///
     /// - Parameter minimum: The minimum TLS version to use.
@@ -221,13 +226,11 @@ public struct SecureConnection<Content: Property>: Property {
     #if canImport(NIOCore)
     /// Sets the maximum TLS version for the secure connection.
     ///
-    /// - Important: Unavailable in a build without NIO: `URLSessionConfiguration` has no
-    /// maximum-TLS-version API, and App Transport Security has no `Info.plist` key for one
-    /// either, so there is no executor left this could ever take effect on. In a build where NIO
-    /// is available, this is treated as incompatible with ``Session/Executor/urlSession``:
-    /// automatic executor resolution skips it in favor of a NIO-based executor, and pinning to
-    /// `.urlSession` via ``Session/requiredExecutor(_:)`` throws ``ExecutorRequirementError``. See
-    /// <doc:Configuring-App-Transport-Security-for-URLSession>.
+    /// Under ``Session/Executor/urlSession`` this sets `tlsMaximumSupportedProtocolVersion`, so it
+    /// is enforced there too and does not move the session to another executor. App Transport
+    /// Security has no key for a maximum, and needs none.
+    ///
+    /// - Important: Not declared in a build without NIO.
     ///
     /// - Parameter maximum: The maximum TLS version to use.
     /// - Returns: A modified `SecureConnection` with the maximum TLS version set.
@@ -238,7 +241,7 @@ public struct SecureConnection<Content: Property>: Property {
 
     /// Sets the minimum and maximum TLS versions for the secure connection.
     ///
-    /// - Important: Unavailable in a build without NIO. See ``version(maximum:)``. Use
+    /// - Important: Not declared in a build without NIO, like ``version(maximum:)``. Use
     /// ``version(minimum:)`` alone there instead.
     ///
     /// - Parameters:
@@ -251,7 +254,7 @@ public struct SecureConnection<Content: Property>: Property {
 
     /// Sets the TLS version range for the secure connection.
     ///
-    /// - Important: Unavailable in a build without NIO. See ``version(maximum:)``. Use
+    /// - Important: Not declared in a build without NIO, like ``version(maximum:)``. Use
     /// ``version(minimum:)`` alone there instead.
     ///
     /// - Parameter range: The range of TLS versions to use.
@@ -265,7 +268,7 @@ public struct SecureConnection<Content: Property>: Property {
 
     /// Sets the TLS version range for the secure connection, inclusive of both ends.
     ///
-    /// - Important: Unavailable in a build without NIO. See ``version(maximum:)``. Use
+    /// - Important: Not declared in a build without NIO, like ``version(maximum:)``. Use
     /// ``version(minimum:)`` alone there instead.
     ///
     /// - Parameter range: The closed range of TLS versions to use.
