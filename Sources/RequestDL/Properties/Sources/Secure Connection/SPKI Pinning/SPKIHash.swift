@@ -26,6 +26,10 @@ import struct Foundation.Data
 /// SPKIHash("base64-encoded-hash") // SPKIHash<SHA256>
 /// ```
 ///
+/// - Important: An `SPKIHash` is only valid inside ``SPKIPinning``. Declared anywhere else
+/// (`SecureConnection { SPKIHash(...) }`), it throws when the request is resolved instead of being
+/// dropped, since a dropped pin would leave the connection validated by the certificate chain alone.
+///
 /// Generate pins using OpenSSL:
 /// ```bash
 /// openssl s_client -connect example.com:443 -servername example.com 2>/dev/null | \
@@ -88,14 +92,11 @@ public struct SPKIHash<Algorithm: HashFunction>: Property {
     ) async throws -> _PropertyOutputs {
         property.assertPathway()
 
+        // Dropping a pin that sits outside `SPKIPinning` would leave the connection validated by the
+        // chain alone, which is how an `SPKIPinning { }` with no pin fails open. It is rejected, in
+        // every build, instead of logged.
         guard inputs.environment.isInsideSPKIPinning else {
-            #if DEBUG
-            Internals.Log.cantCreateSPKIHashOutsideSPKIPinning().log(
-                level: .warning,
-                logger: inputs.environment.logger
-            )
-            #endif
-            return .empty
+            throw Internals.SPKIHashOutsideSPKIPinningError()
         }
 
         let hash = Internals.SPKIHash(
