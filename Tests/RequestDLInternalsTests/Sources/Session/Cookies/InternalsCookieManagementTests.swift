@@ -142,6 +142,8 @@ struct InternalsCookieManagementTests {
             (cookie(value: "x\r\nSet-Cookie: y=1"), .invalidValue),
             (cookie(value: "x "), .invalidValue),
             (cookie(value: "\tx"), .invalidValue),
+            (cookie(value: "日本語"), .invalidValue),
+            (cookie("naïve"), .invalidName),
             (cookie(domain: ""), .invalidDomain),
             (cookie(domain: "exa mple.com"), .invalidDomain),
             (cookie(domain: "a..b"), .invalidDomain),

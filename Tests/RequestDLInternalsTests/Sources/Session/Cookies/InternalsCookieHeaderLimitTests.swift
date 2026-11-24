@@ -47,8 +47,8 @@ struct InternalsCookieHeaderLimitTests {
         let header = try #require(storage.cookieHeader(for: url("https://api.example.com/"), now: now))
 
         #expect(header.utf8.count <= limit)
-        // The ones set first (the older, in a tie) are the ones kept.
-        #expect(header.hasPrefix("c00="))
+        // Among equal paths the oldest are left out, and in a tie the one stored first is the older.
+        #expect(header.hasPrefix("c49="))
         #expect(header.split(separator: ";").count == 1)
     }
 
@@ -87,9 +87,14 @@ struct InternalsCookieHeaderLimitTests {
         #expect(header.utf8.count == limit)
         #expect(header.split(separator: ";").count == 2)
 
+        // One more cookie does not fit beside them: the oldest is the one left out.
         storage.store(setCookieValues: ["c=1"], for: url("https://example.com/"), now: now)
 
-        #expect(storage.cookieHeader(for: url("https://example.com/"), now: now)?.utf8.count == limit)
+        let after = try #require(storage.cookieHeader(for: url("https://example.com/"), now: now))
+
+        #expect(after.utf8.count <= limit)
+        #expect(after.hasSuffix("; c=1"))
+        #expect(!after.hasPrefix("a="))
     }
 
     @Test
@@ -115,9 +120,10 @@ struct InternalsCookieHeaderLimitTests {
         let storage = Internals.CookieStorage()
         let origin = url("https://example.com/a")
 
-        // In the order a request to /a is sent: a, b, c, then d. c does not fit, and d, which would,
-        // is left out too: it could be the less specific cookie of a name the server would read in
-        // place of one that was dropped.
+        // In the order a request to /a is sent: a, b, c, then d. The header is filled from the
+        // other end (the longer path, then the newer one), so c and b fit and a does not, and d, which
+        // would, is left out too: it could be the less specific cookie of a name the server would read
+        // in place of one that was dropped.
         storage.store(
             setCookieValues: [
                 setCookie("a", size: 3_900, attributes: "; Path=/a"),
@@ -132,7 +138,7 @@ struct InternalsCookieHeaderLimitTests {
         let header = try #require(storage.cookieHeader(for: origin, now: now))
         let names = header.split(separator: ";").map { $0.trimmingCharacters(in: .whitespaces).prefix(1) }
 
-        #expect(names == ["a", "b"])
+        #expect(names == ["b", "c"])
     }
 
     @Test
@@ -155,8 +161,39 @@ struct InternalsCookieHeaderLimitTests {
 
         let lastAccess = Dictionary(uniqueKeysWithValues: storage.snapshot(now: later).map { ($0.name, $0.lastAccess) })
 
-        #expect(lastAccess["a"] == later)
+        // `a`, the oldest, is the one left out.
+        #expect(lastAccess["a"] == now)
         #expect(lastAccess["b"] == later)
-        #expect(lastAccess["c"] == now)
+        #expect(lastAccess["c"] == later)
+    }
+
+    @Test
+    func cookieHeader_whenOverTheLimit_keepsTheCookieJustSetAndDropsTheOldest() throws {
+        let storage = Internals.CookieStorage()
+        let big = String(repeating: "x", count: 4_000)
+
+        // A sibling subdomain sets two large cookies for the whole domain, then the login sets `sid`:
+        // smaller and newer, with the same path. It is the one that must not be left out.
+        storage.store(
+            setCookieValues: ["b1=\(big); Domain=example.com", "b2=\(big); Domain=example.com"],
+            for: url("https://evil.example.com/"),
+            now: now
+        )
+        storage.store(
+            setCookieValues: ["sid=SECRET"],
+            for: url("https://example.com/"),
+            now: now.addingTimeInterval(5)
+        )
+
+        let target = url("https://example.com/")
+        let header = try #require(storage.cookieHeader(for: target, now: now.addingTimeInterval(10)))
+
+        #expect(header.contains("sid=SECRET"))
+        #expect(header.utf8.count <= limit)
+        // The cookies still go in the order RFC 6265 gives: the older first.
+        #expect(header.hasPrefix("b2="))
+        #expect(
+            storage.cookies(for: target, now: now.addingTimeInterval(10)).map(\.name) == ["b2", "sid"]
+        )
     }
 }

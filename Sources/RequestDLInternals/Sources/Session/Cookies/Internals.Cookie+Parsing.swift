@@ -81,7 +81,10 @@ extension Internals.Cookie {
                     domain = withoutTrailingDot(Internals.HostName.ascii(cleaned))
                 }
             case "path":
-                path = rawValue.hasPrefix("/") ? rawValue : nil
+                // A `Path` the jar could not take back (a control character, which a header value
+                // may have as HTAB) counts as absent, like one that does not start with `/`: the
+                // cookie gets the default path instead of one `insert` and `restore` refuse.
+                path = rawValue.hasPrefix("/") && !hasControlCharacters(rawValue) ? rawValue : nil
             case "secure":
                 secure = true
             case "httponly":

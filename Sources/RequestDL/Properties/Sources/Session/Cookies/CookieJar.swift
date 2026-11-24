@@ -118,8 +118,14 @@ public final class CookieJar: Sendable {
     /// iterating.
     ///
     /// These are not changes: a cookie expiring (nothing happens at that instant; it stops being
-    /// listed), a cookie being sent, a response that sets a cookie just as it already is, and a
-    /// ``removeAll()`` of an empty jar.
+    /// listed), a cookie being sent, a response that sets a cookie with the same value, flags and
+    /// `Expires` it already has, and a ``removeAll()`` of an empty jar.
+    ///
+    /// A response that renews a `Max-Age` *is* a change: the expiry it computes is later every
+    /// time, and a new expiry is something a snapshot would have to save. A server with sliding
+    /// sessions (`Set-Cookie: sid=...; Max-Age=3600` on every response) therefore produces an
+    /// element per response. Do not write to disk or to the Keychain on every one: wait a moment
+    /// first, and merge the elements that arrive in the meantime.
     public var changes: AsyncStream<Void> {
         storage.changes()
     }
@@ -134,7 +140,8 @@ public final class CookieJar: Sendable {
     /// is a copy, and reading it is not a use of the cookies.
     ///
     /// The `Cookie` header of a request has at most 8000 bytes, and so does this list: when the
-    /// cookies that match do not fit, the ones last in this order are left out of both.
+    /// cookies that match do not fit, the ones with the shortest paths are left out of both and,
+    /// among equal paths, the oldest, so a cookie that was just set is not the one that goes.
     ///
     /// - Parameter url: The URL of the request. One without a host has no cookies.
     public func cookies(for url: URL) -> [Cookie] {

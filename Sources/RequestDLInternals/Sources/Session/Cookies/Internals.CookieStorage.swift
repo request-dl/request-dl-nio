@@ -46,8 +46,8 @@ extension Internals {
         /// servers most often found in front of an app (nginx's `large_client_header_buffers`,
         /// Apache's `LimitRequestFieldSize` of 8190, Tomcat's `maxHttpHeaderSize`), and leaves room
         /// for `Cookie: ` and the line ending. It holds any one cookie (4096 bytes at most). The
-        /// cookies that do not fit are not sent: the ones last in the order of RFC 6265 section 5.4,
-        /// which are those with the shortest paths and the most recent ones.
+        /// cookies that do not fit are not sent: the ones with the shortest paths and, among equal
+        /// paths, the oldest, so a cookie just set (a login) is not the one that is left out.
         package static let maximumCookieHeaderLength = 8_000
 
         // MARK: - Private properties
@@ -431,28 +431,46 @@ extension Internals {
             return matching
         }
 
-        /// The first of `ordered` whose `Cookie` header stays within ``maximumCookieHeaderLength``.
-        /// Stops at the first cookie that does not fit, instead of skipping it: a smaller one after
-        /// it could be a less specific cookie of the same name, which the server would then read
-        /// in place of the one that was left out. Expects the lock to be held.
+        /// The cookies of `ordered` that fit in ``maximumCookieHeaderLength``, in the same order.
+        ///
+        /// What is left out is chosen from the end of the priority, not of the send order: the
+        /// shortest paths first and, among equal paths, the oldest. RFC 6265 sends equal paths
+        /// oldest first, so cutting the tail of that order dropped the newest cookie, which is
+        /// the one a login has just set: two big cookies from a sibling subdomain were enough to
+        /// leave `sid` out. Stops at the first cookie that does not fit, instead of skipping it: a
+        /// smaller one after it could be a less specific cookie of the same name, which the
+        /// server would then read in place of the one that was left out. Expects the lock to be
+        /// held.
         private func withinHeaderLimit(_ ordered: [Int]) -> [Int] {
             var length = 0
-            var fitting: [Int] = []
+            var kept: Set<Int> = []
 
-            for index in ordered {
+            for index in ordered.sorted(by: { isHigherPriority($0, than: $1) }) {
                 let cookie = cookies[index]
                 // `name=value`, and the `; ` that comes before every cookie but the first.
-                let added = cookie.name.utf8.count + 1 + cookie.value.utf8.count + (fitting.isEmpty ? 0 : 2)
+                let added = cookie.name.utf8.count + 1 + cookie.value.utf8.count + (kept.isEmpty ? 0 : 2)
 
                 guard length + added <= Self.maximumCookieHeaderLength else {
                     break
                 }
 
                 length += added
-                fitting.append(index)
+                kept.insert(index)
             }
 
-            return fitting
+            return ordered.filter(kept.contains)
+        }
+
+        /// Whether the cookie at `lhs` is kept before the one at `rhs` when the header is full:
+        /// the longer path, then the newer one.
+        private func isHigherPriority(_ lhs: Int, than rhs: Int) -> Bool {
+            let (lhsCookie, rhsCookie) = (cookies[lhs], cookies[rhs])
+
+            if lhsCookie.path.count != rhsCookie.path.count {
+                return lhsCookie.path.count > rhsCookie.path.count
+            }
+
+            return lhsCookie.creation != rhsCookie.creation ? lhsCookie.creation > rhsCookie.creation : lhs > rhs
         }
 
         /// Expects the lock to be held.
