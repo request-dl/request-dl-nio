@@ -103,7 +103,7 @@ struct InternalsAsyncResponseTests {
 
         // When
         configuration.head.append(.success(head))
-        await configuration.download.append(.success(.init(data)))
+        configuration.download.append(.success(.init(data)))
 
         configuration.upload.close()
         configuration.head.close()
@@ -156,7 +156,7 @@ struct InternalsAsyncResponseTests {
         }
 
         configuration.head.append(.success(head))
-        await configuration.download.append(.success(.init(Data([1, 2, 3]))))
+        configuration.download.append(.success(.init(Data([1, 2, 3]))))
 
         configuration.upload.close()
         configuration.head.close()

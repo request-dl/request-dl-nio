@@ -33,8 +33,8 @@ struct AsyncBytesEventsTests {
         let bytes = AsyncBytes(seed: .withoutCancellation, bytes: internalBytes)
 
         // When
-        await stream.append(.success(Internals.Chunk(part1)))
-        await stream.append(.success(Internals.Chunk(part2)))
+        stream.append(.success(Internals.Chunk(part1)))
+        stream.append(.success(Internals.Chunk(part2)))
         stream.close()
 
         var events: [ServerSentEvent] = []
@@ -67,7 +67,7 @@ struct AsyncBytesEventsTests {
         let bytes = AsyncBytes(seed: .withoutCancellation, bytes: internalBytes)
 
         // When
-        await stream.append(.success(Internals.Chunk(part)))
+        stream.append(.success(Internals.Chunk(part)))
         stream.close()
 
         var events: [ServerSentEvent] = []
@@ -103,7 +103,7 @@ struct AsyncBytesEventsTests {
         let bytes = AsyncBytes(seed: .withoutCancellation, bytes: internalBytes)
 
         for part in parts {
-            await stream.append(.success(Internals.Chunk(part)))
+            stream.append(.success(Internals.Chunk(part)))
         }
 
         stream.close()
@@ -128,7 +128,7 @@ struct AsyncBytesEventsTests {
         let internalBytes = Internals.AsyncBytes(logger: nil, totalSize: part.count, stream: stream)
         let bytes = AsyncBytes(seed: .withoutCancellation, bytes: internalBytes)
 
-        await stream.append(.success(Internals.Chunk(part)))
+        stream.append(.success(Internals.Chunk(part)))
         stream.close()
 
         await #expect(throws: AsyncBytesItemTooLargeError(maximumLength: 10)) {
@@ -145,7 +145,7 @@ struct AsyncBytesEventsTests {
         let internalBytes = Internals.AsyncBytes(logger: nil, totalSize: part.count, stream: stream)
         let bytes = AsyncBytes(seed: .withoutCancellation, bytes: internalBytes)
 
-        await stream.append(.success(Internals.Chunk(part)))
+        stream.append(.success(Internals.Chunk(part)))
         stream.close()
 
         var events: [ServerSentEvent] = []

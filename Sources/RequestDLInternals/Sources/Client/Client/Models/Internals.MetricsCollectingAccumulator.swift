@@ -18,7 +18,7 @@ extension Internals {
     /// it. Only the buffered requests that are not the caller's own use this, such as the
     /// conditional request that asks whether a cached response still holds: a request that is
     /// streamed to the caller has `ClientResponseReceiver` for that.
-    package final class MetricsCollectingAccumulator: HTTPClientResponseDelegate {
+    package final class MetricsCollectingAccumulator: @unchecked Sendable, HTTPClientResponseDelegate {
 
         package typealias Response = HTTPClient.Response
 

@@ -30,8 +30,8 @@ struct InternalsAsyncBytesTests {
         )
 
         // When
-        await stream.append(.success(Internals.Chunk(part1)))
-        await stream.append(.success(Internals.Chunk(part2)))
+        stream.append(.success(Internals.Chunk(part1)))
+        stream.append(.success(Internals.Chunk(part2)))
         stream.close()
 
         // Them
@@ -56,8 +56,8 @@ struct InternalsAsyncBytesTests {
         )
 
         // When
-        await stream.append(.success(Internals.Chunk(part1)))
-        await stream.append(.success(Internals.Chunk(part2)))
+        stream.append(.success(Internals.Chunk(part1)))
+        stream.append(.success(Internals.Chunk(part2)))
         stream.append(.failure(error))
 
         var data = Data()

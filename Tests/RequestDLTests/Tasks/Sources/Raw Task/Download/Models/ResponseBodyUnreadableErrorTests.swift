@@ -22,7 +22,7 @@ struct ResponseBodyUnreadableErrorTests {
     func aChunkThatCannotBeReadBack_failsTheReaderWithResponseBodyUnreadableError() async throws {
         // Given: what `Internals.AsyncBytes` throws for it (see `InternalsDownloadBufferTests`).
         let stream = Internals.AsyncStream<Internals.Chunk>()
-        await stream.append(.success(Internals.Chunk(Data("first".utf8))))
+        stream.append(.success(Internals.Chunk(Data("first".utf8))))
         stream.append(.failure(AsyncBytesReadError()))
 
         let bytes = AsyncBytes(
