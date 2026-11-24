@@ -26,12 +26,17 @@ import RequestDLInternals
 /// either policy.
 ///
 /// - Warning: Combined with ``SecureConnection/verification(_:)`` set to ``CertificateVerification/none``,
-/// the pins are not enforced by the SwiftNIO and URLSession executors, since `.none` opts out of trust evaluation
-/// altogether, while Network.framework still enforces them. RequestDL logs a warning when it sees the combination.
+/// the pins are enforced by Network.framework (``Session/enableNetworkFramework(_:)``) and **not** by
+/// `.nio` or `.urlSession`, so the same request can be accepted by one executor and rejected by
+/// another. `.none` opts out of trust evaluation, and on those two the pin check is part of it: BoringSSL
+/// does not call the verification callback when verification is off, and the `URLSession` trust policy
+/// returns before looking at the pins. Network.framework's custom verification runs before that opt-out
+/// is looked at, so it still applies them. This is how each executor behaves, and RequestDL does not
+/// change it: it logs a warning when it sees the combination. Remove `.verification(.none)` to have the
+/// pins enforced everywhere.
 ///
-/// - Note: Pinning is enforced by every executor, including Network.framework (``Session/enableNetworkFramework(_:)``),
-/// which gets the same pin check through a custom trust evaluation. Pinning is never dropped to
-/// honor that flag.
+/// - Note: Without `.verification(.none)`, pinning is enforced by every executor, including
+/// Network.framework, which gets the same pin check through a custom trust evaluation.
 public struct SPKIPinning<Content: Property>: Property {
 
     private struct Node: SecureConnectionPropertyNode {
