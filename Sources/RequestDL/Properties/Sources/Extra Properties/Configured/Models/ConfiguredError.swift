@@ -38,10 +38,13 @@ public struct ConfiguredError: Error {
         /// was specified but is none of `"1.0"`, `"1.1"`, `"1.2"`, `"1.3"`,
         /// `secureConnection.spkiPinning.pins` was specified but empty, or
         /// `secureConnection.spkiPinning.policy` was specified but is neither `"strict"` nor
-        /// `"audit"`.
+        /// `"audit"`, or `spkiPinning.policy` is present without `spkiPinning.pins`, or
+        /// `privateKey.format` or `privateKey.password` is present without `privateKey.file`.
         case invalidSecureConnectionConfiguration
 
-        /// `redirect.mode` was specified but is neither `"follow"` nor `"disallow"`.
+        /// `redirect.mode` was specified but is neither `"follow"` nor `"disallow"`, or
+        /// `redirect.maxRedirects` is negative, or `redirect.maxRedirects` or `redirect.allowCycles`
+        /// is present without `redirect.mode`.
         case invalidRedirectConfiguration
 
         /// `timeout` was specified but is negative.
@@ -54,7 +57,8 @@ public struct ConfiguredError: Error {
 
         /// A key that has no context of its own (`method`, `headers`, `queries`, `dnsOverrides`,
         /// `urlOverrides`, `systemProxy`, `maximumConnectionsPerHost`,
-        /// `maximumConcurrentConnections`) holds a value of the wrong type, or an entry of one of
+        /// `maximumConcurrentConnections`) holds a value of the wrong type, or
+        /// `maximumConcurrentConnections` is below `1`, or an entry of one of
         /// the pair lists (`headers`, `queries`, `dnsOverrides`, `urlOverrides`) has no separator
         /// or an empty name.
         case invalidConfigurationValue
