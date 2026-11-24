@@ -586,19 +586,25 @@ final class ResumableUploadExecution: @unchecked Sendable {
         let logger = logger
 
         Task.detached(priority: .utility) {
+            // One budget for the whole of it, from the moment this was asked: what waits here (for
+            // a free slot of `maximumConcurrentConnections`, say, which a session full of long
+            // requests never gives) must not hold the client and the request's configuration for
+            // longer than the answer is worth waiting for.
+            let deadline = Internals.ResourceDeadline(nanoseconds: Self.terminationTimeout)
+
             guard
-                let task = try? await client.execute(
-                    configuration: termination,
-                    decompression: decompression,
-                    cache: nil,
-                    logger: logger,
-                    transferControl: nil
-                )
+                let task = try? await deadline.race({
+                    try await client.execute(
+                        configuration: termination,
+                        decompression: decompression,
+                        cache: nil,
+                        logger: logger,
+                        transferControl: nil
+                    )
+                })
             else {
                 return
             }
-
-            let deadline = Internals.ResourceDeadline(nanoseconds: Self.terminationTimeout)
 
             // Until the head: that it was heard is all there is to know, and the seed is what lets
             // go of the exchange whether it answered or not.

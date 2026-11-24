@@ -875,8 +875,8 @@ extension Internals {
             ///
             /// - Throws: `CancellationError` if the current task is cancelled while it waits, in
             /// which case nothing is held.
-            func acquire() async throws {
-                let release = try await executor.acquire()
+            func acquire(pausing idle: Internals.IdleDeadline? = Internals.IdleDeadline.queueing) async throws {
+                let release = try await executor.acquire(pausing: idle)
 
                 lock.withLock { _release = release }
             }
@@ -1177,9 +1177,11 @@ extension Internals {
                 // The continuation is an exchange like any other, and is counted against the limit
                 // like one: it waits its turn behind whoever took the slot meanwhile. The wait is
                 // cancellable, and a cancelled one ends the download the way the check above does.
+                // The wait is not idle time of the read timeout, which is the session's limit holding
+                // the request back, and not the server.
                 // Held again from here to the end of the exchange, which is what hands it back.
                 do {
-                    try await slot.acquire()
+                    try await slot.acquire(pausing: transferControl.observer?.idle)
                 } catch {
                     throw URLError(.cancelled)
                 }

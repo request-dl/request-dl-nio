@@ -272,13 +272,18 @@ extension Internals {
 
             // `execute` now throws when the request is rejected before dispatch; that ends this
             // attempt the same way a failure of the task itself would.
+            //
+            // Run on a task of its own, so the execution's idle deadline is handed over by hand: a
+            // wait in line for a connection slot is not idle time of the read timeout.
             let unsafeTask: Internals.UnsafeTask<Void>
             do {
-                unsafeTask = try await client.execute(
-                    request: continuation,
-                    delegate: receiver,
-                    logger: logger
-                )
+                unsafeTask = try await Internals.IdleDeadline.$queueing.withValue(observer?.idle) {
+                    try await client.execute(
+                        request: continuation,
+                        delegate: receiver,
+                        logger: logger
+                    )
+                }
             } catch {
                 receiver.failIfNotStarted(error)
                 return

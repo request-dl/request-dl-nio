@@ -32,6 +32,10 @@ extension Internals {
     /// not caught up. Nothing is expected from the server then, so nothing is owed by it. See
     /// ``hold(while:)``.
     ///
+    /// The same goes for the wait in line for a connection, when the session has a
+    /// `maximumConcurrentConnections`: the request is not on the network yet, and it is the
+    /// application's own limit that keeps it from being. See ``pause()``.
+    ///
     /// ## How it ends an execution
     ///
     /// Once the budget is spent the deadline cancels the request's ``Internals/TaskSeed``, as
@@ -72,6 +76,7 @@ extension Internals {
         private var _isExpired = false
         private var _isFinished = false
         private var _isHeld: (@Sendable () -> Bool)?
+        private var _pauses = 0
         private weak var _seed: Internals.TaskSeed?
         private var _pending: Internals.TaskSeed?
         private var _wasAttached = false
@@ -96,6 +101,13 @@ extension Internals {
         }
 
         // MARK: - Internal static methods
+
+        /// The deadline of the execution this task is part of, for what waits on behalf of that
+        /// execution to say that the wait is not idle time: the line for a connection slot.
+        ///
+        /// Bound by `RawTask` around everything it hands to an executor, and by whatever starts
+        /// work of the execution on a task of its own (a reconnection). `nil` outside any.
+        @TaskLocal package static var queueing: IdleDeadline?
 
         /// Anything at or above this means "never": `UnitTime.infinity`.
         package static let never = Int64.max
@@ -162,6 +174,31 @@ extension Internals {
         package func hold(while isHeld: @escaping @Sendable () -> Bool) {
             lock.withLock {
                 _isHeld = isHeld
+            }
+        }
+
+        /// The execution is waiting for something on its own side (a place in the line for a
+        /// connection), and that time is not idle: nothing is owed by the server for a request it
+        /// has not been sent. Calls nest, and each is undone by one ``resume()``.
+        package func pause() {
+            lock.withLock {
+                _pauses += 1
+            }
+        }
+
+        /// Undoes one ``pause()``. The wait ended, which is something that moved: the budget
+        /// starts over, so the request is not met with an exhausted one on its way out.
+        package func resume() {
+            let instant = now()
+
+            lock.withLock {
+                _pauses = max(_pauses - 1, 0)
+
+                guard !_isFinished, !_isExpired else {
+                    return
+                }
+
+                _lastActivity = instant
             }
         }
 
@@ -273,7 +310,7 @@ extension Internals {
 
                     let instant = now()
 
-                    if held {
+                    if held || _pauses > 0 {
                         // The client is the one holding things back: the budget starts over, and
                         // is looked at again a full budget from now.
                         _lastActivity = instant

@@ -341,22 +341,29 @@ public struct Session: Property {
     }
 
     ///
-    /// Caps how many requests made through this session may be in flight at once, across every
-    /// host, from the moment a request is asked to execute until it completes.
+    /// Caps how many requests may be in flight at once through the sessions that share a provider
+    /// (see the note below), across every host, from the moment a request is asked to execute
+    /// until it completes.
     ///
     /// Unlike ``maximumConnectionsPerHost(_:)``, which is a per-host soft limit that AsyncHTTPClient
     /// may exceed, this is an exact cap: once it is reached, further requests wait in line for a
     /// slot to free up rather than opening another connection. A request that is cancelled while
-    /// it waits leaves the line without taking a slot.
+    /// it waits leaves the line without taking a slot. The wait is not idle time: the read
+    /// ``Timeout`` of a request starts when it leaves the line, and not before. A
+    /// ``Timeout/Source/resource`` timeout covers the whole execution, the wait included.
     ///
     /// - Important: The cap is shared by every request made through the same session provider
     /// that declares the same limit: the default one (`Session()`), one with the same identifier
-    /// (`Session("name")`), or the same custom event loop group. It does not matter what else
-    /// their sessions are configured with, or whether they can share a client. A session with a
-    /// ``redirectStrategy(_:)`` or an ``onRedirect(_:)`` handler, which gets a client for every
-    /// request, is held to the same cap as any other. Everything that uses `Session()` and the
+    /// and the same `numberOfThreads` (`Session("name")`; the same identifier with another number of
+    /// threads is another provider, with a cap of its own), or the same custom event loop group.
+    /// It does not matter what else their sessions are configured with, or whether they can share a
+    /// client. A session with a ``redirectStrategy(_:)`` or an ``onRedirect(_:)`` handler, which
+    /// gets a client for every request, is held to the same cap as any other. Everything that uses `Session()` and the
     /// same limit therefore counts against one cap, so a session that wants a cap of its own
     /// needs a provider of its own.
+    ///
+    /// Background downloads (`BackgroundDownloads`) are not held to the cap: they are run by a
+    /// session of their own, outside of the providers, and neither count against it nor wait for it.
     ///
     /// Requests of one provider that declare *different* limits are held to the limit each of
     /// them declares, counted separately: `maximumConcurrentConnections(2)` and

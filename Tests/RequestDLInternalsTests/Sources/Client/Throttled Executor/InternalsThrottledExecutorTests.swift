@@ -6,6 +6,7 @@
 import Testing
 
 @_spi(Testing) @testable import RequestDLInternals
+@testable import RequestDLTestSupport
 
 struct InternalsThrottledExecutorTests {
 
@@ -86,6 +87,85 @@ struct InternalsThrottledExecutorTests {
 
         // Then: every operation eventually got its turn once earlier ones released theirs.
         #expect(await startedCounter.value == operationCount)
+    }
+
+    // MARK: - Idle time
+
+    /// The line for a slot is the session's own limit holding the request back, not a server that
+    /// went quiet: the read timeout of the execution that waits does not count it, and counts again
+    /// from the moment the request is admitted.
+    @Test
+    func acquire_whileQueued_doesNotCountAsIdle() async throws {
+        // Given: the only slot taken, and an execution whose budget is a thousand nanoseconds.
+        let budget: Int64 = 1_000
+        let clock = FakeIdleClock()
+        let deadline = clock.makeDeadline(nanoseconds: budget)
+        let throttledExecutor = Internals.ThrottledExecutor(maximumConcurrentConnections: 1)
+        let semaphore = try #require(throttledExecutor.semaphoreForTesting)
+        let holder = try await throttledExecutor.acquire()
+
+        deadline.start()
+
+        let waiter = _Concurrency.Task {
+            try await Internals.IdleDeadline.$queueing.withValue(deadline) {
+                try await throttledExecutor.acquire()
+            }
+        }
+
+        try await semaphore.waitForWaiters(1, timeout: 30)
+
+        // When: several budgets go by in the line.
+        for _ in 0..<4 {
+            #expect(await clock.advance(by: budget))
+        }
+
+        // Then
+        #expect(!deadline.isExpired)
+
+        // And once admitted, the whole budget starts, and runs out like any other.
+        holder()
+        let release = try await waiter.value
+
+        await clock.advance(by: budget - 1)
+        #expect(!deadline.isExpired)
+
+        await clock.advanceUntilDone(deadline, by: budget)
+        #expect(deadline.isExpired)
+
+        release()
+    }
+
+    /// A caller that leaves the line by being cancelled leaves the pause too: the deadline of an
+    /// execution that goes on after it counts again.
+    @Test
+    func acquire_whenCancelledWhileQueued_endsThePause() async throws {
+        // Given
+        let budget: Int64 = 1_000
+        let clock = FakeIdleClock()
+        let deadline = clock.makeDeadline(nanoseconds: budget)
+        let throttledExecutor = Internals.ThrottledExecutor(maximumConcurrentConnections: 1)
+        let semaphore = try #require(throttledExecutor.semaphoreForTesting)
+        let holder = try await throttledExecutor.acquire()
+
+        deadline.start()
+
+        let waiter = _Concurrency.Task {
+            try await throttledExecutor.acquire(pausing: deadline)
+        }
+
+        try await semaphore.waitForWaiters(1, timeout: 30)
+        #expect(await clock.advance(by: budget))
+
+        // When
+        waiter.cancel()
+        try await semaphore.waitForWaiters(0, timeout: 30)
+        _ = await waiter.result
+
+        // Then: nothing is paused any more, so the budget runs out.
+        await clock.advanceUntilDone(deadline, by: budget)
+        #expect(deadline.isExpired)
+
+        holder()
     }
 
     // MARK: - Cancellation
