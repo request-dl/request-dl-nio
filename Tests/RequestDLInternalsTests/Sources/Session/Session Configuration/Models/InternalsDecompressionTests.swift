@@ -94,6 +94,26 @@ struct InternalsDecompressionTests {
         #expect(decompression.urlSessionManualAlgorithms.allSatisfy { !$0.isNativelyDecodedByURLSession })
     }
 
+    /// Of what is announced, the names CFNetwork decodes anyway: only a custom algorithm that
+    /// declares one of them, never the built-in native ones (not announced) and never another name.
+    @Test
+    func urlSessionAnnouncedNativeEncodings_isTheAnnouncedNamesTheSystemDecodes() {
+        let decompression = Internals.Decompression.enabled(
+            algorithms: [
+                MockGzipAlgorithm(),
+                MockCustomAlgorithm(),
+                MockCustomAlgorithmNamedGzip(),
+            ],
+            limit: .none
+        )
+
+        #expect(decompression.urlSessionAnnouncedNativeEncodings == ["gzip"])
+        #expect(Internals.Decompression.disabled.urlSessionAnnouncedNativeEncodings.isEmpty)
+
+        let onlyCustom = Internals.Decompression.enabled(algorithms: [MockCustomAlgorithm()], limit: .none)
+        #expect(onlyCustom.urlSessionAnnouncedNativeEncodings.isEmpty)
+    }
+
     @Test
     func urlSessionManualAlgorithms_whenDisabled_isEmpty() {
         #expect(Internals.Decompression.disabled.urlSessionManualAlgorithms.isEmpty)

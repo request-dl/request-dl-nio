@@ -63,6 +63,17 @@ struct MixedURLSessionDecompressionTests {
         }
     }
 
+    /// An app's own decompressor under a name the system decodes: running it at all is the failure.
+    private struct MustNotRunDecompressor: Decompressor {
+        struct RanError: Error {}
+
+        let encoding: String
+
+        var contentEncodingValue: String { encoding }
+
+        func callAsFunction() throws -> any DecompressorStream { throw RanError() }
+    }
+
     /// A second custom algorithm, for the order in which they are announced.
     private struct TagDecompressor: Decompressor {
         var contentEncodingValue: String { "tag" }
@@ -282,6 +293,39 @@ struct MixedURLSessionDecompressionTests {
 
         await #expect(throws: UnsupportedContentEncodingError.self) {
             _ = try await fetch(from: server, algorithms: [.gzip, RLEDecompressor()])
+        }
+    }
+
+    // MARK: - A custom algorithm under a name the system decodes
+
+    /// An app's own `Decompressor` for `br` (`.nio` has no brotli) is announced, and CFNetwork
+    /// decodes `br` all the same and keeps the header. Dispatch ran the app's decompressor over the
+    /// plain bytes a second time. The system's decoding is the one that applies, so the decompressor
+    /// of the app never runs.
+    @Test(arguments: ["gzip", "deflate", "br"])
+    func aCustomAlgorithmForANativeName_isAnnouncedButNotRunOverWhatTheSystemDecoded(encoding: String) async throws {
+        let server = try Server()
+        let original = String(repeating: "decoded by the system. ", count: 100)
+        respond(with: server, encoding: encoding, body: try Self.compressed(original, as: encoding))
+
+        let data = try await fetch(from: server, algorithms: [MustNotRunDecompressor(encoding: encoding)])
+
+        #expect(acceptEncoding(in: server.request) == encoding)
+        #expect(String(data: data, encoding: .utf8) == original)
+    }
+
+    /// Only the names it announced: an unrelated native encoding is still the server's own doing.
+    @Test
+    func aCustomAlgorithmForANativeName_doesNotLetAnotherNativeEncodingThrough() async throws {
+        let server = try Server()
+        respond(
+            with: server,
+            encoding: "deflate",
+            body: try Self.compressed(String(repeating: "unasked ", count: 100), as: "deflate")
+        )
+
+        await #expect(throws: UnsupportedContentEncodingError.self) {
+            _ = try await fetch(from: server, algorithms: [MustNotRunDecompressor(encoding: "br")])
         }
     }
 

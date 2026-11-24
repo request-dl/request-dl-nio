@@ -48,6 +48,31 @@ extension Internals {
             algorithms.filter { !$0.isNativelyDecodedByURLSession }
         }
 
+        /// The `Content-Encoding` values CFNetwork decodes on its own, whatever `Accept-Encoding`
+        /// says and whoever's `Decompressor` is configured under that name.
+        package static let urlSessionNativeEncodings: Set<String> = ["gzip", "deflate", "br"]
+
+        /// Of what `.urlSession` announces itself (`urlSessionManualAlgorithms`), the encodings
+        /// CFNetwork decodes anyway: an app's own `Decompressor` that declares `br`, say, which
+        /// is natural since `.nio` has no brotli.
+        ///
+        /// The server answers `Content-Encoding: br` to that announcement, CFNetwork decodes it
+        /// and leaves the header as it was, so running the app's decompressor over the body
+        /// would decode plain bytes a second time. Manual dispatch is told to leave these alone,
+        /// the same way `.nio` leaves gzip/deflate to its own decoder. The app's `Decompressor`
+        /// for such a name therefore never runs under `.urlSession`: the system's decoding is the
+        /// one that applies.
+        ///
+        /// Not the unsolicited ones: a native encoding nobody asked for still fails as
+        /// unsupported, see `urlSessionManualAlgorithms`.
+        package var urlSessionAnnouncedNativeEncodings: Set<String> {
+            Set(
+                urlSessionManualAlgorithms
+                    .map { $0.contentEncodingValue.lowercased() }
+                    .filter(Self.urlSessionNativeEncodings.contains)
+            )
+        }
+
         /// The full set of configured algorithms, `[]` for `.disabled`. Used both to build
         /// `Accept-Encoding` and, on the manual-dispatch path, to match an arriving
         /// `Content-Encoding` against one of them.

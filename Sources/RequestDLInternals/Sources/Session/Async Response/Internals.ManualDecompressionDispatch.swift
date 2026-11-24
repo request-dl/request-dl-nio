@@ -29,6 +29,12 @@ extension Internals {
     /// it: it dispatches only the custom ones (`Internals.Decompression.urlSessionManualAlgorithms`),
     /// and announces only those, so a native encoding that arrives anyway is an unsolicited one
     /// that fails as unsupported, whether or not CFNetwork already decoded it.
+    ///
+    /// A custom algorithm that declares a name CFNetwork decodes (`br`, from an app that wants
+    /// it under `.nio`) is announced, so it is the one case of a native encoding that is asked
+    /// for. CFNetwork decodes it all the same and keeps the header, so it goes in
+    /// `nativelyDecoded` (`Internals.Decompression.urlSessionAnnouncedNativeEncodings`) and is
+    /// passed through, instead of being decoded a second time.
     package enum ManualDecompressionDispatch: Sendable {
         case skip
 
@@ -37,11 +43,11 @@ extension Internals {
         ///   passed straight through rather than matched against `algorithms`.
         ///
         ///   Neither transport strips `Content-Encoding` after decoding natively, so the header
-        ///   alone can't tell the two apart; this is the only thing that can. Empty for
-        ///   `.urlSession`, which dispatches only algorithms CFNetwork does not decode (see
-        ///   above), and non-empty only for `.nio`'s mixed case, where
-        ///   `NIOHTTPResponseDecompressor` handles the gzip/deflate half of a list while manual
-        ///   dispatch handles the rest.
+        ///   alone can't tell the two apart; this is the only thing that can. For `.nio`, the
+        ///   mixed case, where `NIOHTTPResponseDecompressor` handles the gzip/deflate half of a
+        ///   list while manual dispatch handles the rest. For `.urlSession`, which dispatches
+        ///   only what it announces, the announced names CFNetwork decodes anyway (an app's own
+        ///   `Decompressor` for `br`): empty for every other list.
         case dispatch(
             algorithms: [any Internals.DecompressionAlgorithm],
             nativelyDecoded: Set<String>
