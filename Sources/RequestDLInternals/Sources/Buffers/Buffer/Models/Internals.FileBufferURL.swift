@@ -73,7 +73,11 @@ extension Internals {
         /// Not clamped: on a 32-bit platform (watchOS' `arm64_32`) a clamp would report `Int.max`
         /// for a file past 2 GiB, and whoever reads up to that count would stop at 2 GiB and end
         /// its stream as if the body were whole. Zero is what an unreadable file looks like to
-        /// everything upstream, and a read of it fails instead of ending short.
+        /// everything upstream: a buffer opened over it (`Internals.Buffer.init(addressing:)`,
+        /// after waiting out the empty-content retry) is empty and its read ends at once, with no
+        /// error. That is not a failure, only a body that is never more than whole: it can reach
+        /// here only through a file already on disk past 2 GiB on a 32-bit platform, since what
+        /// this package writes there is refused beforehand by `BufferBounds`.
         ///
         /// - Parameter limit: The largest size that is representable; only a test sets it, to
         ///   stand in for a 32-bit `Int` without a file of 2 GiB.

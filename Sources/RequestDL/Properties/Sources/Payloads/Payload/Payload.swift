@@ -34,6 +34,17 @@ import class Foundation.JSONSerialization
 /// }
 /// ```
 ///
+/// ## A server that answers before the body is all sent
+///
+/// A server may answer while the body is still being sent (`413`, `408`, `401`, even a `2xx`)
+/// and close the connection. Under `.nio` and `.nioTransportServices` that answer is what the
+/// task returns, with the status the server gave, and the task does not throw: the connection
+/// closing after a complete response is not an error. Nothing in the result says the body did
+/// not go out whole, so a `2xx` is not a confirmation that the server received all of it. When
+/// that matters (a large upload that the server may cut short), compare what the upload
+/// reported (``RequestMonitor``, or the ``UploadStep`` of ``UploadTask``) with the size of the
+/// body: the upload reached its total only if the whole body was sent.
+///
 /// ## Topics
 ///
 /// ### Sending raw bytes

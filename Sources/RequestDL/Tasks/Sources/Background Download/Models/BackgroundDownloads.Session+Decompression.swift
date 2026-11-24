@@ -20,8 +20,10 @@ extension BackgroundDownloads.Session {
     /// Decodes the file `URLSession` downloaded, when the request took over `Accept-Encoding` and
     /// the server answered with an encoding.
     ///
-    /// Takes over `Accept-Encoding` is what makes this necessary: it switches CFNetwork's own
-    /// decoding off, for every encoding, so the file at `location` is still encoded. The decoded
+    /// Taking over `Accept-Encoding` is what makes this necessary: the server is asked for the
+    /// encodings of the app's own decompressors, so the file at `location` is still encoded in
+    /// them. (CFNetwork decodes gzip, deflate and brotli whatever `Accept-Encoding` says, and keeps
+    /// the header: such a file is plain, and is not decoded here.) The decoded
     /// bytes are written next to `destination`, so that moving them there is a rename and not a
     /// copy across volumes, in `decodingChunkSize` pieces: the file is never held whole, which is
     /// the reason to stream a download to disk in the first place.
@@ -63,6 +65,14 @@ extension BackgroundDownloads.Session {
         // as the foreground tasks do.
         guard accepted.contains(encoding) else {
             throw UnsupportedContentEncodingError(value: encoding)
+        }
+
+        // Asked for, and one the system decodes whoever's decompressor is registered under that
+        // name (an app's own for `br`, say): CFNetwork decoded it, and kept the header. The file
+        // is plain already, and running the decompressor over it would corrupt it or fail. Same
+        // answer as the foreground `.urlSession` tasks.
+        if Internals.Decompression.urlSessionNativeEncodings.contains(encoding) {
+            return nil
         }
 
         guard let algorithm = decompressor(forEncoding: encoding, task: task) else {
@@ -136,16 +146,18 @@ extension BackgroundDownloads.Session {
 
         var stream = try algorithm()
         var hasInput = false
-        var read = 0
-        var written = 0
+        // Not `Int`: on a 32-bit platform (watchOS' `arm64_32`) an encoded file or an expansion
+        // past 2 GiB overflows it, which traps the process instead of being a limit to report.
+        var read: UInt64 = 0
+        var written: UInt64 = 0
 
         while let chunk = try reader.read(upToCount: chunkSize), !chunk.isEmpty {
             hasInput = true
-            read += chunk.count
+            read += UInt64(chunk.count)
 
             let decoded = try stream(decompressing: chunk)
             if !decoded.isEmpty {
-                written += decoded.count
+                written += UInt64(decoded.count)
                 try Self.enforce(limit, read: read, written: written)
                 try writer.write(contentsOf: decoded)
             }
@@ -156,7 +168,7 @@ extension BackgroundDownloads.Session {
         if hasInput {
             let tail = try stream.finish()
             if !tail.isEmpty {
-                written += tail.count
+                written += UInt64(tail.count)
                 try Self.enforce(limit, read: read, written: written)
                 try writer.write(contentsOf: tail)
             }
@@ -167,18 +179,26 @@ extension BackgroundDownloads.Session {
 
     /// Throws when `written` bytes of decoded output, from `read` bytes of input, pass `limit`.
     /// Checked before the bytes that pass it are written.
-    private static func enforce(_ limit: Internals.Decompression.Limit, read: Int, written: Int) throws {
+    ///
+    /// Counted in `UInt64`: a count that passes `Int.max` on a 32-bit platform is a limit to
+    /// report, not an overflow. A limit below zero is passed by any output at all, as it always
+    /// was.
+    static func enforce(_ limit: Internals.Decompression.Limit, read: UInt64, written: UInt64) throws {
         switch limit {
         case .none:
             return
 
         case .size(let maximum):
-            if written > maximum {
+            if maximum < 0 || written > UInt64(maximum) {
                 throw BackgroundDownloadDecompressionLimitError(limit: .size(maximum))
             }
 
         case .ratio(let maximum):
-            let (allowed, overflow) = read.multipliedReportingOverflow(by: maximum)
+            guard maximum >= 0 else {
+                throw BackgroundDownloadDecompressionLimitError(limit: .ratio(maximum))
+            }
+
+            let (allowed, overflow) = read.multipliedReportingOverflow(by: UInt64(maximum))
             if !overflow, written > allowed {
                 throw BackgroundDownloadDecompressionLimitError(limit: .ratio(maximum))
             }
@@ -189,15 +209,15 @@ extension BackgroundDownloads.Session {
     /// set on `request` as the `Accept-Encoding` it sends, or `nil` and `request` untouched when
     /// the system does the decoding. The same rule the foreground `.urlSession` executor follows:
     /// CFNetwork decodes gzip, deflate and brotli on its own, and the only way to hand it anything
-    /// else is to take over `Accept-Encoding`, which switches that off for all of them.
+    /// else is to take over `Accept-Encoding`.
     ///
     /// Not for `.disabled`, which keeps what a background download has always done: the system
     /// decides.
     ///
     /// - Throws: ``BackgroundDownloadUnsupportedConfigurationError`` when the list that takes over
     ///   `Accept-Encoding` also holds an algorithm that only stands for the system's decoding
-    ///   (`GzipAlgorithm`, `DeflateAlgorithm`, `BrotliURLSessionOnlyAlgorithm`). Taking over turns
-    ///   that decoding off, so such a response would fail when the download is done, which is too
+    ///   (`GzipAlgorithm`, `DeflateAlgorithm`, `BrotliURLSessionOnlyAlgorithm`). The request does
+    ///   not ask for them, so such a response would fail when the download is done, which is too
     ///   late to be told.
     static func takingOverAcceptEncoding(
         of request: inout URLRequest,
