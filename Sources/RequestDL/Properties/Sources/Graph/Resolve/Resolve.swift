@@ -205,9 +205,14 @@ struct Resolve<Root: Property>: Sendable {
             return
         }
 
+        // Splitting drops the marker of a trailing slash, which names another resource than the
+        // path without it, and which `Internals.URLOverrides.rewrite(_:)` keeps on every hop
+        // after this one.
+        let joinedPath = make.requestConfiguration.pathComponents.joinedAsPath()
+        let hasTrailingSlash = joinedPath.hasSuffix("/")
+
         let pathComponents = Array(
-            make.requestConfiguration.pathComponents
-                .joinedAsPath()
+            joinedPath
                 .split(separator: "/")
                 .map(String.init)
         )
@@ -221,7 +226,18 @@ struct Resolve<Root: Property>: Sendable {
 
         let destinationHost = destination.port.map { "\(destination.host):\($0)" } ?? destination.host
         make.requestConfiguration.baseURL = "\(destination.scheme)://\(destinationHost)"
-        make.requestConfiguration.pathComponents = destination.pathComponents + remainder
+
+        var rewrittenComponents = destination.pathComponents + remainder
+
+        if hasTrailingSlash {
+            if let last = rewrittenComponents.last {
+                rewrittenComponents[rewrittenComponents.count - 1] = last + "/"
+            } else {
+                rewrittenComponents = ["/"]
+            }
+        }
+
+        make.requestConfiguration.pathComponents = rewrittenComponents
     }
 
     /// Resolves every `Payload`-contributed url-encoded field set accumulated during the walk,
