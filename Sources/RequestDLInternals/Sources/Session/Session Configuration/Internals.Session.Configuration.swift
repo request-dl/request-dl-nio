@@ -141,15 +141,14 @@ extension Internals.Session {
             )
 
             // Without a configuration of its own AsyncHTTPClient follows redirects its own way, which
-            // knows nothing of the overrides: the default is spelled out when there are any.
-            let redirectConfiguration =
-                urlOverrides.isEmpty
-                ? redirectConfiguration
-                : (redirectConfiguration ?? .default)
+            // knows nothing of the overrides nor of the rule that keeps an explicit `Host` from
+            // another origin (see ``Internals/RedirectSanitizer``): the default is spelled out, as
+            // `.urlSession` does, so both executors apply what they document.
+            let redirectConfiguration = redirectConfiguration ?? .default
 
             var configuration = HTTPClient.Configuration.init(
                 tlsConfiguration: secureConnectionOutput?.tlsConfiguration,
-                redirectConfiguration: redirectConfiguration?.build(urlOverrides: urlOverrides),
+                redirectConfiguration: redirectConfiguration.build(urlOverrides: urlOverrides),
                 timeout: timeout.build(),
                 connectionPool: connectionPool.build(),
                 proxy: try proxy?.build(),
@@ -407,7 +406,9 @@ extension Internals.Session.Configuration: Equatable {
 
     package static func == (_ lhs: Self, _ rhs: Self) -> Bool {
         lhs.secureConnection == rhs.secureConnection
-            && lhs.redirectConfiguration == rhs.redirectConfiguration
+            // No configuration is the default one, on both executors: telling them apart would give
+            // a session that never mentioned redirects a client of its own.
+            && (lhs.redirectConfiguration ?? .default) == (rhs.redirectConfiguration ?? .default)
             && lhs.urlOverrides == rhs.urlOverrides
             && lhs.timeout == rhs.timeout
             && lhs.connectionPool == rhs.connectionPool
