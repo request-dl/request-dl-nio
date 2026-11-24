@@ -187,7 +187,43 @@ extension Internals {
                 return true
             }
 
-            return Self.credentialFields.allSatisfy { recorded[$0] == requestValue(forVaryField: $0) }
+            return Self.credentialFields.allSatisfy {
+                recorded[$0] == requestValue(forVaryField: $0) || ($0 == "cookie" && coversRecordedCookies(recorded))
+            }
+        }
+
+        /// Where a stored response keeps the digest of each cookie it was fetched with, comma
+        /// separated, next to the digest of the whole header. Not a header name, so it never
+        /// collides with a `Vary` field.
+        private static let cookiePairsField = "x-request-dl-cookie-pairs"
+
+        /// Whether this request sends every cookie the stored response was fetched with, and
+        /// maybe more.
+        ///
+        /// The digest of the whole `Cookie` header changes as soon as a jar gains a cookie that
+        /// has nothing to do with who is signed in (an analytics id, a refreshed preference), and
+        /// the stored response stopped being found: `.useCachedDataOnly` failed offline with the
+        /// data on disk. What identifies the account is in the cookies the response was fetched
+        /// with, and a request that sends all of them is the same account; one that sends other
+        /// values, or none, is not, and still does not get it. Records written before this one
+        /// have no list and are matched as they were, by the whole header.
+        private func coversRecordedCookies(_ recorded: [String: String]) -> Bool {
+            guard let recordedPairs = recorded[Self.cookiePairsField], !recordedPairs.isEmpty else {
+                return false
+            }
+
+            return Set(recordedPairs.split(separator: ",").map(String.init)).isSubset(of: requestCookiePairDigests())
+        }
+
+        /// A digest for each `name=value` the request sends in its `Cookie` header.
+        private func requestCookiePairDigests() -> Set<String> {
+            Set(
+                (requestConfiguration.headers["cookie"] ?? [])
+                    .flatMap { $0.split(separator: ";") }
+                    .map { $0.trimming(where: \.isWhitespace) }
+                    .filter { !$0.isEmpty }
+                    .map { Self.digest(ofCredential: $0, field: "cookie-pair") }
+            )
         }
 
         private enum Vary {
@@ -953,10 +989,20 @@ extension Internals {
                     fields = Array(Set(fields).union(Self.credentialFields)).sorted()
                 }
 
-                let varyRequestHeaders: [String: String]? =
-                    fields.isEmpty
-                    ? nil
-                    : Dictionary(uniqueKeysWithValues: fields.map { ($0, requestValue(forVaryField: $0)) })
+                let varyRequestHeaders: [String: String]? = {
+                    guard !fields.isEmpty else {
+                        return nil
+                    }
+
+                    var recorded = Dictionary(uniqueKeysWithValues: fields.map { ($0, requestValue(forVaryField: $0)) })
+                    let cookiePairs = requestCookiePairDigests()
+
+                    if !cookiePairs.isEmpty {
+                        recorded[Self.cookiePairsField] = cookiePairs.sorted().joined(separator: ",")
+                    }
+
+                    return recorded
+                }()
 
                 // A capacity hint for the allocation below, not a correctness check, so `0` is a
                 // fine stand-in when the header is absent.
