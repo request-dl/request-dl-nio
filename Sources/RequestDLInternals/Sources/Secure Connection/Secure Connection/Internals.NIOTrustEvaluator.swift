@@ -60,6 +60,17 @@ extension Internals {
             let tlsPins = secureConnection.tlsPins ?? []
             let hasAdditionalTrustRoots = !(secureConnection.additionalTrustRoots ?? []).isEmpty
 
+            // `.verification(.none)` opts out of trust evaluation, and `.nio` and `.urlSession` take it
+            // that way: additional roots, revocation and the observer are never consulted there. The
+            // evaluator below would still be installed on Network.framework (whose fork hands the
+            // custom verification the chain before it looks at `.none`) and reject a server the
+            // other executors accept, so with no pin to enforce there is nothing to install. Pins
+            // are the one thing still applied under `.none`, on Network.framework only, and
+            // `Resolve` warns about that combination.
+            if secureConnection.certificateVerification == Internals.CertificateVerification.none, tlsPins.isEmpty {
+                return nil
+            }
+
             #if canImport(Darwin)
             let skipsHostnameVerification = secureConnection.certificateVerification == .noHostnameVerification
             let revocationPolicy = secureConnection.revocationPolicy

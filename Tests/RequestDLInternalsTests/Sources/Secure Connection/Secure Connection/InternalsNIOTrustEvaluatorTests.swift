@@ -49,6 +49,39 @@ struct InternalsNIOTrustEvaluatorTests {
         #expect(try Internals.NIOTrustEvaluator.resolve(from: secureConnection) == nil)
     }
 
+    /// `.verification(.none)` opts out of trust evaluation under `.nio` and `.urlSession`. The
+    /// Network.framework executor used to evaluate the chain anyway for any of these, and reject a
+    /// server the other two accept.
+    @Test
+    func resolve_whenVerificationIsNone_installsNothingForAdditionalRootsRevocationOrObserver() throws {
+        var additionalRoots = Internals.SecureConnection()
+        additionalRoots.certificateVerification = Internals.CertificateVerification.none
+        additionalRoots.additionalTrustRoots = [.certificates([])]
+
+        var revocation = Internals.SecureConnection()
+        revocation.certificateVerification = Internals.CertificateVerification.none
+        revocation.revocationPolicy = .strict
+
+        var observed = Internals.SecureConnection()
+        observed.certificateVerification = Internals.CertificateVerification.none
+        observed.trustDecisionObserver = NoOpTrustDecisionObserver()
+
+        #expect(try Internals.NIOTrustEvaluator.resolve(from: additionalRoots) == nil)
+        #expect(try Internals.NIOTrustEvaluator.resolve(from: revocation) == nil)
+        #expect(try Internals.NIOTrustEvaluator.resolve(from: observed) == nil)
+    }
+
+    /// Pins are the exception: they are still enforced under `.none` where the executor can (see
+    /// `SPKIPinning`), and `Resolve` warns about the combination.
+    @Test
+    func resolve_whenVerificationIsNoneWithPins_stillInstallsEvaluator() throws {
+        var secureConnection = Internals.SecureConnection()
+        secureConnection.certificateVerification = Internals.CertificateVerification.none
+        secureConnection.tlsPins = [.init(source: .base64String(Self.unrelatedPinBase64), algorithm: SHA256.self)]
+
+        #expect(try Internals.NIOTrustEvaluator.resolve(from: secureConnection) != nil)
+    }
+
     /// `TrustRoots` replaces the system's roots. On Darwin an empty anchor list makes the
     /// evaluator skip anchoring, which would hand trust back to the system's roots, so an
     /// exclusive set with nothing in it is rejected instead of being evaluated.
