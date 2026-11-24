@@ -9,7 +9,29 @@ import Testing
 @testable import RequestDLTestSupport
 
 #if DEBUG
+/// Serialized because two of these tests take the process-wide slot for a while.
+@Suite(.serialized)
 struct InternalsOverrideAssertionFailureTests {
+
+    private typealias Closure = Internals.Override.AssertionFailure.Closure
+
+    /// A global replacement that acts on the reports that contain `marker` and hands every other
+    /// one to whatever `forward` holds by then (what the slot held before). The suites running
+    /// beside these tests report through the same slot, and must not lose theirs to it.
+    private static func closure(
+        for marker: String,
+        forward: InlineProperty<Closure?>,
+        _ body: @escaping @Sendable (String) -> Void
+    ) -> Closure {
+        { message, file, line in
+            guard message.contains(marker) else {
+                forward.wrappedValue?(message, file, line)
+                return
+            }
+
+            body(message)
+        }
+    }
 
     @Test
     func replaceAsyncInterceptsAssertionFailure() async {
@@ -65,10 +87,21 @@ struct InternalsOverrideAssertionFailureTests {
         let captured = InlineProperty<String?>(wrappedValue: nil)
         let signal = AsyncSignal()
 
-        Internals.Override.AssertionFailure.installGlobally { message, _, _ in
-            captured.wrappedValue = message
-            signal.signal()
-        }
+        // The slot is the whole process's, so what was in it comes back when this test is done:
+        // left in place, every later `Internals.assertionFailure` of a detached task (the lock
+        // watchdog's) in the rest of the test run would land in `captured` and be told to no one,
+        // and the trait's closure, the one that turns it into a test issue, would never run again.
+        // Until then, a report that is not this test's own goes on to that closure, so that the
+        // suites running beside this one are not blind for its duration.
+        let forward = InlineProperty<Closure?>(wrappedValue: nil)
+        let replaced = Internals.Override.AssertionFailure.installGlobally(
+            Self.closure(for: "simulated watchdog trip", forward: forward) { message in
+                captured.wrappedValue = message
+                signal.signal()
+            }
+        )
+        forward.wrappedValue = replaced
+        defer { Internals.Override.AssertionFailure.installGlobally(replaced) }
 
         // When
         Task.detached {
@@ -95,6 +128,57 @@ struct InternalsOverrideAssertionFailureTests {
 
         // Then
         #expect(taskLocalCaptured.wrappedValue == "🐞 RequestDL bug: task-local should win")
+    }
+
+    /// What `installGlobally` hands back is what was there, and handing it back in puts it there
+    /// again: the way a test that needs the slot for a while gives it back.
+    @Test
+    func installGloballyReturnsTheClosureItReplaced_andInstallingItAgainRestoresIt() async throws {
+        // Given
+        NonFatalWatchdogTrait.ensureInstalled()
+
+        let first = InlineProperty<String?>(wrappedValue: nil)
+        let second = InlineProperty<String?>(wrappedValue: nil)
+        let signalFirst = AsyncSignal()
+        let signalSecond = AsyncSignal()
+
+        let forward = InlineProperty<Closure?>(wrappedValue: nil)
+        let original = Internals.Override.AssertionFailure.installGlobally(
+            Self.closure(for: "the first is back", forward: forward) { message in
+                first.wrappedValue = message
+                signalFirst.signal()
+            }
+        )
+        forward.wrappedValue = original
+        defer { Internals.Override.AssertionFailure.installGlobally(original) }
+
+        // The trait's closure was in the slot, whatever suite ran first.
+        #expect(original != nil)
+
+        // When
+        let replaced = Internals.Override.AssertionFailure.installGlobally(
+            Self.closure(for: "the second is installed", forward: forward) { message in
+                second.wrappedValue = message
+                signalSecond.signal()
+            }
+        )
+
+        Task.detached { Internals.assertionFailure("while the second is installed") }
+        try await signalSecond.wait()
+
+        // Then: what it replaced is what this test installed, and the report went to the new one.
+        #expect(replaced != nil)
+        #expect(first.wrappedValue == nil)
+        #expect(second.wrappedValue == "🐞 RequestDL bug: while the second is installed")
+
+        // When
+        Internals.Override.AssertionFailure.installGlobally(replaced)
+        Task.detached { Internals.assertionFailure("after the first is back") }
+        try await signalFirst.wait()
+
+        // Then
+        #expect(first.wrappedValue == "🐞 RequestDL bug: after the first is back")
+        #expect(second.wrappedValue == "🐞 RequestDL bug: while the second is installed")
     }
 }
 #endif
