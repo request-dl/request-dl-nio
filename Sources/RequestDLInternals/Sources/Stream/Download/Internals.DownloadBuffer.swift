@@ -110,8 +110,18 @@ extension Internals {
             ///
             /// Queued like everything else so it is ordered against the appends. Setting it
             /// out of band would let chunks already dispatched miss the cache.
+            ///
+            /// A download that has already ended (failed, or closed) will never feed it, and
+            /// nothing else would end it: the writer reading it would wait for ever, holding the
+            /// key's write token, and the entry it began could not be finished or discarded. So it
+            /// is failed on the spot, which is what makes the writer discard what it began.
             package func cacheStream(_ cacheStream: Internals.AsyncStream<Chunk>) {
                 queue.addOperation {
+                    guard self._pending != nil else {
+                        cacheStream.append(.failure(Internals.CacheStreamAfterEndError()))
+                        return
+                    }
+
                     self._cacheStream = cacheStream
                 }
             }
@@ -601,6 +611,20 @@ extension Internals {
         package init(limit: Int) {
             self.limit = limit
         }
+    }
+}
+
+extension Internals {
+
+    /// Ends a cache tee that was attached after the download it was meant to copy had ended, so
+    /// no body was ever going to reach it. See ``Internals/DownloadBuffer/cacheStream(_:)``.
+    package struct CacheStreamAfterEndError: Swift.Error, Sendable, Hashable, CustomStringConvertible {
+
+        package var description: String {
+            "The cache stream was attached after the download had ended."
+        }
+
+        package init() {}
     }
 }
 

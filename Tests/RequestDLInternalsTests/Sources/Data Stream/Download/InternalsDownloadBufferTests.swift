@@ -669,6 +669,63 @@ struct InternalsDownloadBufferTests {
         download.close()
     }
 
+    // MARK: - A tee attached after the download ended
+
+    private struct DownloadFailure: Error {}
+
+    /// A tee that is attached once the download is over would otherwise never end: nothing is
+    /// left to feed it or to close it, and its writer waits for ever.
+    @Test(arguments: [true, false])
+    func cacheStream_whenAttachedAfterTheDownloadEnded_failsAtOnce(failed: Bool) async throws {
+        // Given: a download that already failed, or was already closed.
+        let download = await Internals.DownloadBuffer(readingMode: .length(1_024))
+
+        if failed {
+            download.failed(DownloadFailure())
+        } else {
+            download.close()
+        }
+
+        await download.waitUntilIdle()
+
+        // When
+        let cacheStream = Internals.DownloadBuffer.makeCacheStream()
+        download.cacheStream(cacheStream)
+        await download.waitUntilIdle()
+
+        // Then: the writer reading it is told, and does not wait. A stream that is never ended
+        // is closed by hand after a while, so that it shows as a failure here and not as a hang.
+        let watchdog = _Concurrency.Task {
+            try await _Concurrency.Task.sleep(nanoseconds: 5_000_000_000)
+            cacheStream.close()
+        }
+        defer { watchdog.cancel() }
+
+        let (received, error) = await drain(cacheStream)
+
+        #expect(received == 0)
+        #expect(error is Internals.CacheStreamAfterEndError)
+    }
+
+    @Test
+    func cacheStream_whenAttachedBeforeTheDownloadEnds_isNotFailed() async throws {
+        // Given
+        let download = await Internals.DownloadBuffer(readingMode: .length(1_024))
+        let cacheStream = Internals.DownloadBuffer.makeCacheStream()
+        download.cacheStream(cacheStream)
+
+        // When
+        await download.append(Internals.DataBuffer(Data(repeating: 1, count: 2_048)))
+        download.close()
+        await download.waitUntilIdle()
+
+        // Then
+        let (received, error) = await drain(cacheStream)
+
+        #expect(received == 2_048)
+        #expect(error == nil)
+    }
+
     // MARK: - Priority
 
     /// Whoever reads the body is waiting for what the buffer produces, and is usually the task

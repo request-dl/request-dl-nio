@@ -27,6 +27,14 @@ struct CacheFreshnessTests {
 
         let head: Internals.ResponseHead?
 
+        private let lock = SwiftAsyncStream.Lock()
+        private var _revalidations = 0
+
+        /// How many conditional requests were asked of the network.
+        var revalidations: Int {
+            lock.withLock { _revalidations }
+        }
+
         init(head: Internals.ResponseHead? = nil) {
             self.head = head
         }
@@ -46,6 +54,8 @@ struct CacheFreshnessTests {
             logger: Internals.TaskLogger?,
             metrics: Internals.RequestMetricsCollector?
         ) async throws -> Internals.ResponseHead {
+            lock.withLock { _revalidations += 1 }
+
             let now = Date()
 
             metrics?.append(
@@ -148,6 +158,29 @@ struct CacheFreshnessTests {
         return false
     }
 
+    /// The body `output` serves, or `nil` when it serves nothing or fails.
+    private func servedBody(_ output: Internals.CacheControl.Output) async -> Data? {
+        guard case .task(let task) = output else {
+            return nil
+        }
+
+        var body = Data()
+
+        do {
+            for try await step in task.response {
+                if case .download(let download) = step {
+                    for try await chunk in download.bytes {
+                        body.append(contentsOf: chunk)
+                    }
+                }
+            }
+        } catch {
+            return nil
+        }
+
+        return body
+    }
+
     private func httpDate(_ offset: Double) -> String {
         Date().addingTimeInterval(offset).toHTTPDateString()
     }
@@ -173,6 +206,64 @@ struct CacheFreshnessTests {
         #expect(isServed(output))
         #expect(await isEmptyCachedDataError(output) == false)
         #expect(await isStored(configuration.url, in: dataCache))
+    }
+
+    /// Offline: the network is not asked for anything, however old the entry is, and each tier
+    /// still has it afterwards.
+    @Test(arguments: [DataCache.Policy.Set.memory, .disk, .all], [60.0, 86_400.0 * 365])
+    func useCachedDataOnly_whenTheEntryIsStale_servesItFromEachTierWithoutTheNetworkAndKeepsItThere(
+        policy: DataCache.Policy.Set,
+        age: Double
+    ) async throws {
+        // Given: an entry well past its `max-age`, stored in `policy`'s tiers.
+        let dataCache = makeCache()
+        var configuration = makeConfiguration(strategy: .useCachedDataOnly)
+        configuration.cachePolicy = policy
+
+        await dataCache.setCachedData(
+            CachedData(
+                cachedResponse: CachedResponse(
+                    response: head([("Cache-Control", "max-age=1"), ("ETag", "\"v1\"")]),
+                    policy: policy,
+                    date: Date().addingTimeInterval(-age)
+                ),
+                buffer: await Internals.DataBuffer(Data("body".utf8))
+            ),
+            forKey: configuration.url
+        )
+
+        // When
+        let client = Client()
+        let output = await decide(configuration, in: dataCache, client: client)
+
+        // Then: given as stored, without a request, not even to validate it.
+        #expect(await servedBody(output) == Data("body".utf8))
+        #expect(client.revalidations == 0)
+
+        // And: still in every tier it was written to, so the next call finds it too.
+        for tier in [DataCache.Policy.Set.memory, .disk] where policy.contains(tier) {
+            #expect(await dataCache.getCachedData(forKey: configuration.url, policy: tier) != nil)
+        }
+
+        let again = await decide(configuration, in: dataCache, client: client)
+
+        #expect(await servedBody(again) == Data("body".utf8))
+    }
+
+    /// What is removed is an entry that cannot be read, however recent: not one that is old.
+    @Test
+    func useCachedDataOnly_whenTheBodyDoesNotMatchTheResponse_removesTheEntry() async throws {
+        // Given: an entry that says its body is 4 bytes longer than what is stored.
+        let dataCache = makeCache()
+        let configuration = makeConfiguration(strategy: .useCachedDataOnly)
+        await store(response([("Content-Length", "8")]), key: configuration.url, in: dataCache)
+
+        // When
+        let output = await decide(configuration, in: dataCache)
+
+        // Then
+        #expect(await isEmptyCachedDataError(output))
+        #expect(await isStored(configuration.url, in: dataCache) == false)
     }
 
     @Test(arguments: ["must-revalidate", "no-cache"])

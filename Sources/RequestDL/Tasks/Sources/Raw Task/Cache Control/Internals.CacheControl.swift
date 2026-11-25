@@ -1035,6 +1035,9 @@ extension Internals {
                     } catch let error as Internals.CacheBacklogExceededError {
                         logger?.log(level: .warning, "Response will not be cached - \(error)")
                         await dataCache.discardFailedWrite(cacheBuffer, forKey: requestConfiguration.url)
+                    } catch let error as Internals.CacheStreamAfterEndError {
+                        logger?.log(level: .debug, "Response will not be cached - \(error)")
+                        await dataCache.discardFailedWrite(cacheBuffer, forKey: requestConfiguration.url)
                     } catch {
                         logger?.log(level: .error, "Failed to cache response: \(String(describing: error))")
                         await dataCache.discardFailedWrite(cacheBuffer, forKey: requestConfiguration.url)
