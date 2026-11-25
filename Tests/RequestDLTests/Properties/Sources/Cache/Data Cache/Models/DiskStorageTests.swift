@@ -124,7 +124,7 @@ struct DiskStorageTests {
             // Given: a first entry, written with plenty of room. The data file has to actually
             // exist on disk for the record to be discoverable later, so a byte is written and
             // the buffer closed.
-            var (firstBuffer, _, _) = await storage.allocateBuffer(
+            var (firstBuffer, _, written1) = await storage.allocateBuffer(
                 key: "k1",
                 cachedResponse: firstResponse,
                 contentLength: 0,
@@ -133,11 +133,12 @@ struct DiskStorageTests {
             #expect(firstBuffer != nil)
             await firstBuffer?.writeData(Data([0x1]))
             try? await firstBuffer?.close()
+            if let written1 { await storage.finishRecord(at: written1) }
             #expect(await storage["k1"] != nil)
 
             // When: a second entry is allocated with a capacity that only has room for itself
             // plus a sliver more, not enough to also keep the first entry around.
-            var (secondBuffer, _, _) = await storage.allocateBuffer(
+            var (secondBuffer, _, written2) = await storage.allocateBuffer(
                 key: "k2",
                 cachedResponse: secondResponse,
                 contentLength: 0,
@@ -145,6 +146,7 @@ struct DiskStorageTests {
             )
             await secondBuffer?.writeData(Data([0x1]))
             try? await secondBuffer?.close()
+            if let written2 { await storage.finishRecord(at: written2) }
 
             // Then: the oldest entry was evicted to free the space, the new one was kept.
             #expect(secondBuffer != nil)
@@ -160,7 +162,7 @@ struct DiskStorageTests {
 
             // Given: three entries written in the order k1, k2, k3.
             for key in ["k1", "k2", "k3"] {
-                var (buffer, _, _) = await storage.allocateBuffer(
+                var (buffer, _, written3) = await storage.allocateBuffer(
                     key: key,
                     cachedResponse: makeCachedResponse(key: key),
                     contentLength: 0,
@@ -168,6 +170,7 @@ struct DiskStorageTests {
                 )
                 await buffer?.writeData(Data([0x1, 0x2, 0x3, 0x4]))
                 try? await buffer?.close()
+                if let written3 { await storage.finishRecord(at: written3) }
                 try? await Task.sleep(nanoseconds: 5_000_000)
             }
 
@@ -224,7 +227,7 @@ struct DiskStorageTests {
     /// Writes `keys` through `storage` and returns once each one can be read back.
     private func write(_ keys: [String], through storage: DiskStorage) async throws {
         for key in keys {
-            var (buffer, _, _) = await storage.allocateBuffer(
+            var (buffer, _, written4) = await storage.allocateBuffer(
                 key: key,
                 cachedResponse: makeCachedResponse(key: key),
                 contentLength: 0,
@@ -232,6 +235,7 @@ struct DiskStorageTests {
             )
             await buffer?.writeData(Data([0x1]))
             try? await buffer?.close()
+            if let written4 { await storage.finishRecord(at: written4) }
         }
     }
 
@@ -323,7 +327,7 @@ struct DiskStorageTests {
             let writer = DiskStorage(directory: directoryURL)
             let response = makeCachedResponse(key: "k1")
 
-            var (buffer, _, _) = await writer.allocateBuffer(
+            var (buffer, _, written5) = await writer.allocateBuffer(
                 key: "k1",
                 cachedResponse: response,
                 contentLength: 1,
@@ -331,6 +335,7 @@ struct DiskStorageTests {
             )
             await buffer?.writeData(Data([0x1]))
             try? await buffer?.close()
+            if let written5 { await writer.finishRecord(at: written5) }
 
             // When: a second, freshly constructed `DiskStorage` value (its index unpopulated,
             // sharing no state at all with `writer`) reads that key concurrently alongside a
@@ -356,7 +361,7 @@ struct DiskStorageTests {
 
             // Given: a real entry that is already over whatever capacity `freeSpace` is about
             // to be called with: a rescan would find it and evict it.
-            var (buffer, _, _) = await storage.allocateBuffer(
+            var (buffer, _, written6) = await storage.allocateBuffer(
                 key: "k1",
                 cachedResponse: response,
                 contentLength: 0,
@@ -364,6 +369,7 @@ struct DiskStorageTests {
             )
             await buffer?.writeData(Data([0x1]))
             try? await buffer?.close()
+            if let written6 { await storage.finishRecord(at: written6) }
             #expect(await storage["k1"] != nil)
 
             // When: freeing space down to zero, but with a `knownUsage` of zero, a trusted
@@ -383,7 +389,7 @@ struct DiskStorageTests {
             let storage = DiskStorage(directory: directoryURL)
             let response = makeCachedResponse(key: "k1")
 
-            var (buffer, _, _) = await storage.allocateBuffer(
+            var (buffer, _, written7) = await storage.allocateBuffer(
                 key: "k1",
                 cachedResponse: response,
                 contentLength: 0,
@@ -391,6 +397,7 @@ struct DiskStorageTests {
             )
             await buffer?.writeData(Data([0x1]))
             try? await buffer?.close()
+            if let written7 { await storage.finishRecord(at: written7) }
             #expect(await storage["k1"] != nil)
 
             // When: `knownUsage` itself already claims to be over capacity, so the shortcut
@@ -554,7 +561,7 @@ struct DiskStorageTests {
             let storage = DiskStorage(directory: directoryURL)
             let response = makeCachedResponse(key: "k1")
 
-            var (buffer, _, _) = await storage.allocateBuffer(
+            var (buffer, _, written8) = await storage.allocateBuffer(
                 key: "k1",
                 cachedResponse: response,
                 contentLength: 1,
@@ -562,6 +569,7 @@ struct DiskStorageTests {
             )
             await buffer?.writeData(Data([0x1]))
             try? await buffer?.close()
+            if let written8 { await storage.finishRecord(at: written8) }
 
             // Given: the entry is indexed, so a lookup finds it without any directory scan.
             #expect(await storage["k1"] != nil)
@@ -619,7 +627,7 @@ struct DiskStorageTests {
         plaintext: Data,
         keeping rawSize: (_ fullSize: Int) -> Int = { $0 }
     ) async throws {
-        var (buffer, _, _) = await storage.allocateBuffer(
+        var (buffer, _, written9) = await storage.allocateBuffer(
             key: key,
             cachedResponse: makeCachedResponse(key: key, statusCode: statusCode, headers: headers),
             contentLength: Int64(plaintext.count),
@@ -627,6 +635,7 @@ struct DiskStorageTests {
         )
         await buffer?.writeData(plaintext)
         try? await buffer?.close()
+        if let written9 { await storage.finishRecord(at: written9) }
 
         let recordURL = try await encryptedRecordDirectoryURL(in: directoryURL)
         let dataURL = recordURL.appendingPathComponent("data.record")
@@ -857,7 +866,7 @@ struct DiskStorageTests {
             let plaintext = Data("this must never appear in cleartext on disk".utf8)
             let response = makeCachedResponse(key: "k1")
 
-            var (buffer, _, _) = await storage.allocateBuffer(
+            var (buffer, _, written10) = await storage.allocateBuffer(
                 key: "k1",
                 cachedResponse: response,
                 contentLength: Int64(plaintext.count),
@@ -866,6 +875,7 @@ struct DiskStorageTests {
             #expect(buffer != nil)
             await buffer?.writeData(plaintext)
             try? await buffer?.close()
+            if let written10 { await storage.finishRecord(at: written10) }
 
             let recordURL = try await encryptedRecordDirectoryURL(in: directoryURL)
             let dataURL = recordURL.appendingPathComponent("data.record")
@@ -889,7 +899,7 @@ struct DiskStorageTests {
             let plaintext = Data("round trips through the encrypted disk tier".utf8)
             let response = makeCachedResponse(key: "k1")
 
-            var (buffer, _, _) = await storage.allocateBuffer(
+            var (buffer, _, written11) = await storage.allocateBuffer(
                 key: "k1",
                 cachedResponse: response,
                 contentLength: Int64(plaintext.count),
@@ -897,6 +907,7 @@ struct DiskStorageTests {
             )
             await buffer?.writeData(plaintext)
             try? await buffer?.close()
+            if let written11 { await storage.finishRecord(at: written11) }
 
             let cachedData = await storage["k1"]
             #expect(cachedData != nil)
@@ -912,7 +923,7 @@ struct DiskStorageTests {
 
             let response = makeCachedResponse(key: "k1")
 
-            var (buffer, _, _) = await storage.allocateBuffer(
+            var (buffer, _, written12) = await storage.allocateBuffer(
                 key: "k1",
                 cachedResponse: response,
                 contentLength: 5,
@@ -920,6 +931,7 @@ struct DiskStorageTests {
             )
             await buffer?.writeData(Data("hello".utf8))
             try? await buffer?.close()
+            if let written12 { await storage.finishRecord(at: written12) }
             #expect(await storage["k1"] != nil)
 
             // When: the same directory is reopened under a different key. The shared-state
@@ -941,7 +953,7 @@ struct DiskStorageTests {
             var storage = DiskStorage(directory: directoryURL)
             storage.encryptionKey = .init(Data(repeating: 0x07, count: 32))
 
-            var (buffer, _, _) = await storage.allocateBuffer(
+            var (buffer, _, written13) = await storage.allocateBuffer(
                 key: "k1",
                 cachedResponse: makeCachedResponse(key: "k1"),
                 contentLength: 5,
@@ -949,6 +961,7 @@ struct DiskStorageTests {
             )
             await buffer?.writeData(Data("hello".utf8))
             try? await buffer?.close()
+            if let written13 { await storage.finishRecord(at: written13) }
             #expect(await storage["k1"] != nil)
 
             // When: the directory is copied to a name that says it is k2's.
@@ -982,7 +995,7 @@ struct DiskStorageTests {
 
             let response = makeCachedResponse(key: "k1")
 
-            var (buffer, _, _) = await storage.allocateBuffer(
+            var (buffer, _, written14) = await storage.allocateBuffer(
                 key: "k1",
                 cachedResponse: response,
                 contentLength: 5,
@@ -990,6 +1003,7 @@ struct DiskStorageTests {
             )
             await buffer?.writeData(Data("hello".utf8))
             try? await buffer?.close()
+            if let written14 { await storage.finishRecord(at: written14) }
 
             // Given: the response record as an earlier version wrote it, with no associated data.
             let recordURL = try await encryptedRecordDirectoryURL(in: directoryURL)
@@ -1005,7 +1019,7 @@ struct DiskStorageTests {
             #expect(await storage["k1"] == nil)
 
             // And a write for the key replaces it.
-            var (replacement, _, _) = await storage.allocateBuffer(
+            var (replacement, _, written15) = await storage.allocateBuffer(
                 key: "k1",
                 cachedResponse: makeCachedResponse(key: "k1"),
                 contentLength: 3,
@@ -1013,6 +1027,7 @@ struct DiskStorageTests {
             )
             await replacement?.writeData(Data("new".utf8))
             try? await replacement?.close()
+            if let written15 { await storage.finishRecord(at: written15) }
 
             let cachedData = await storage["k1"]
             #expect(await cachedData?.buffer.getData() == Data("new".utf8))
@@ -1027,7 +1042,7 @@ struct DiskStorageTests {
 
             let response = makeCachedResponse(key: "k1")
 
-            var (buffer, _, _) = await storage.allocateBuffer(
+            var (buffer, _, written16) = await storage.allocateBuffer(
                 key: "k1",
                 cachedResponse: response,
                 contentLength: 5,
@@ -1035,6 +1050,7 @@ struct DiskStorageTests {
             )
             await buffer?.writeData(Data("hello".utf8))
             try? await buffer?.close()
+            if let written16 { await storage.finishRecord(at: written16) }
             #expect(await storage["k1"] != nil)
 
             let recordURL = try await encryptedRecordDirectoryURL(in: directoryURL)
@@ -1066,7 +1082,7 @@ struct DiskStorageTests {
             // What has to keep working is `Record.size`'s eviction accounting, a real stat of
             // whatever is actually on disk, so eviction still targets the oldest entry correctly
             // once that "actually on disk" is ciphertext-plus-framing rather than plaintext.
-            var (firstBuffer, _, _) = await storage.allocateBuffer(
+            var (firstBuffer, _, written17) = await storage.allocateBuffer(
                 key: "k1",
                 cachedResponse: firstResponse,
                 contentLength: 0,
@@ -1075,9 +1091,10 @@ struct DiskStorageTests {
             #expect(firstBuffer != nil)
             await firstBuffer?.writeData(Data([0x1]))
             try? await firstBuffer?.close()
+            if let written17 { await storage.finishRecord(at: written17) }
             #expect(await storage["k1"] != nil)
 
-            var (secondBuffer, _, _) = await storage.allocateBuffer(
+            var (secondBuffer, _, written18) = await storage.allocateBuffer(
                 key: "k2",
                 cachedResponse: secondResponse,
                 contentLength: 0,
@@ -1085,6 +1102,7 @@ struct DiskStorageTests {
             )
             await secondBuffer?.writeData(Data([0x1]))
             try? await secondBuffer?.close()
+            if let written18 { await storage.finishRecord(at: written18) }
 
             #expect(secondBuffer != nil)
             #expect(await storage["k1"] == nil)
@@ -1099,7 +1117,9 @@ struct DiskStorageTests {
             // Given: one complete entry, written by some other `DiskStorage` over the same
             // directory, so a fresh instance below has to find it by scanning, not through the
             // index a write of its own would have populated.
-            var (buffer, _, _) = await DiskStorage(directory: directoryURL).allocateBuffer(
+            let writer = DiskStorage(directory: directoryURL)
+
+            var (buffer, _, completeURL) = await writer.allocateBuffer(
                 key: "complete",
                 cachedResponse: makeCachedResponse(key: "complete"),
                 contentLength: 1,
@@ -1107,6 +1127,7 @@ struct DiskStorageTests {
             )
             await buffer?.writeData(Data([0x1]))
             try? await buffer?.close()
+            if let completeURL { await writer.finishRecord(at: completeURL) }
 
             // And: an unrelated entry in the same directory whose write never completes, so its
             // "data.record" is permanently absent. The cold scan below walks past it on its way
@@ -1218,7 +1239,7 @@ struct DiskStorageTests {
             let writer = DiskStorage(directory: directoryURL)
 
             for name in ["older", "newer"] {
-                var (buffer, _, _) = await writer.allocateBuffer(
+                var (buffer, _, written19) = await writer.allocateBuffer(
                     key: "key",
                     cachedResponse: makeCachedResponse(key: name),
                     contentLength: 1,
@@ -1226,6 +1247,7 @@ struct DiskStorageTests {
                 )
                 await buffer?.writeData(Data([0x1]))
                 try? await buffer?.close()
+                if let written19 { await writer.finishRecord(at: written19) }
                 try? await Task.sleep(nanoseconds: 5_000_000)
             }
 

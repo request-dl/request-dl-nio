@@ -38,8 +38,19 @@ struct DiskStorage: Sendable {
 
         // MARK: - Internal static properties
         static let pathExtension = "cached"
-        private static let responsePath = "response.record"
-        private static let dataPath = "data.record"
+        static let responsePath = "response.record"
+        static let dataPath = "data.record"
+
+        /// An empty file that is in the directory from the moment a write starts until the write
+        /// has been closed, so that a write which never got there (the process was killed) is told
+        /// apart from one that did.
+        ///
+        /// A body in the clear has no end of its own to look for, unlike an encrypted one with its
+        /// final chunk, and its `response.record` is written before the body starts. Without this a
+        /// directory looked whole the moment its two files existed.
+        ///
+        /// A directory that never had one (every one written before this existed) is finished.
+        static let unfinishedPath = "unfinished"
 
         // MARK: - Internal properties
         var size: Int64 {
@@ -59,6 +70,18 @@ struct DiskStorage: Sendable {
         let date: Date
         let responseURL: URL
         let dataURL: URL
+
+        var unfinishedURL: URL {
+            url.appendingPathComponent(Self.unfinishedPath)
+        }
+
+        /// Whether the write that made this record was closed. See ``unfinishedPath``.
+        var isFinished: Bool {
+            get async {
+                let hasMarker = await unfinishedURL.isReachable
+                return !hasMarker
+            }
+        }
 
         // MARK: - Inits
 
@@ -276,6 +299,10 @@ struct DiskStorage: Sendable {
         private let now: @Sendable () -> UInt64
 
         private var locationsByKey: [String: URL] = [:]
+
+        /// Keys whose location a scan found and nothing here has looked into: whether the record
+        /// there is finished is not known. A location this value wrote itself is never in it.
+        private var unverifiedKeys: Set<String> = []
         private var lastUsedByKey: [String: Date] = [:]
         private var refreshTask: Task<Void, Never>?
         private var lastScanEnd: UInt64?
@@ -304,7 +331,7 @@ struct DiskStorage: Sendable {
         /// Looks up `key`, kicking off or joining a rescan first if it isn't already known.
         func location(
             for key: String,
-            scan: @escaping @Sendable () async -> [(key: String, url: URL)]
+            scan: @escaping @Sendable () async -> [(key: String, url: URL, isVerified: Bool)]
         ) async -> URL? {
             if let hit = lock.withLock({ locationsByKey[key] }) {
                 return hit
@@ -332,6 +359,10 @@ struct DiskStorage: Sendable {
                         // must not overwrite that with stale information.
                         for location in scanned where locationsByKey[location.key] == nil {
                             locationsByKey[location.key] = location.url
+
+                            if !location.isVerified {
+                                unverifiedKeys.insert(location.key)
+                            }
                         }
 
                         refreshTask = nil
@@ -349,7 +380,25 @@ struct DiskStorage: Sendable {
         }
 
         func set(_ key: String, location url: URL) {
-            lock.withLock { locationsByKey[key] = url }
+            lock.withLock {
+                locationsByKey[key] = url
+                unverifiedKeys.remove(key)
+            }
+        }
+
+        /// Whether the record `key` points at, found by a scan, still has to be checked for being
+        /// finished.
+        func isUnverified(_ key: String) -> Bool {
+            lock.withLock { unverifiedKeys.contains(key) }
+        }
+
+        /// Records that the record at `url` was checked, if `key` still points at it.
+        func markVerified(_ key: String, ifLocation url: URL) {
+            lock.withLock {
+                if locationsByKey[key] == url {
+                    unverifiedKeys.remove(key)
+                }
+            }
         }
 
         /// Points `key` at `url` only if it still points at `old`: a write that landed in between
@@ -363,6 +412,7 @@ struct DiskStorage: Sendable {
                 }
 
                 locationsByKey[key] = url
+                unverifiedKeys.remove(key)
                 return true
             }
         }
@@ -399,6 +449,7 @@ struct DiskStorage: Sendable {
                 if locationsByKey[key] == url {
                     locationsByKey[key] = nil
                     lastUsedByKey[key] = nil
+                    unverifiedKeys.remove(key)
                 }
             }
         }
@@ -407,6 +458,7 @@ struct DiskStorage: Sendable {
             lock.withLock {
                 locationsByKey = [:]
                 lastUsedByKey = [:]
+                unverifiedKeys = []
             }
         }
     }
@@ -416,6 +468,10 @@ struct DiskStorage: Sendable {
     private let index: Index
     private let orphanAge: Double
     private let measuring = SingleFlight<Measurement>()
+
+    /// Reads of an encrypted body that came out empty after waiting for content that might have
+    /// been a stat that missed, exposed for tests. An entry known to be empty is not waited on.
+    let emptyContentWaits = RetryCounter()
 
     // MARK: - Internal properties
 
@@ -450,6 +506,11 @@ struct DiskStorage: Sendable {
         self.index = Index(minimumRescanInterval: missRescanInterval, now: now)
     }
 
+    /// Times the directory was measured for eviction, exposed for tests.
+    var measureCount: Int {
+        measuring.runCount
+    }
+
     /// Directory scans the lookup index has started, exposed for tests.
     var scanCount: Int {
         index.scanCount
@@ -472,7 +533,9 @@ struct DiskStorage: Sendable {
                 )
             else { return nil }
 
-            guard await hasReadableBody(record, response: cachedResponse) else {
+            let body = await readableBody(of: record, response: cachedResponse)
+
+            guard body != .unreadable else {
                 return nil
             }
 
@@ -480,13 +543,15 @@ struct DiskStorage: Sendable {
 
             return await .init(
                 cachedResponse: cachedResponse,
-                buffer: dataBuffer(for: record, key: key)
+                // An empty body is not waited on: `readableBody(of:response:)` has just seen the file say so,
+                // and there is no content coming that a retry could catch.
+                buffer: dataBuffer(for: record, key: key, retryingEmptyContent: body != .empty)
             )
         }
     }
 
-    /// Whether the body of an encrypted `record` can be told apart from one that was never
-    /// finished, which is the one thing nothing above this type can do for it.
+    /// What can be said of the body of an encrypted `record`, which is whether it can be told apart
+    /// from one that was never finished, the one thing nothing above this type can do for it.
     ///
     /// A `data.record` with no final chunk (a writer killed before `close()`, with the rest of
     /// the body only ever in memory) opens with nothing readable, exactly like an empty body, and
@@ -503,9 +568,9 @@ struct DiskStorage: Sendable {
     /// is stat'd again for as long as `Internals.Buffer.init(addressing:)` would, since the same
     /// stat can report a file smaller than what was written under heavy disk contention, and a
     /// healthy entry should not be lost to it.
-    private func hasReadableBody(_ record: Record, response: CachedResponse) async -> Bool {
+    private func readableBody(of record: Record, response: CachedResponse) async -> ReadableBody {
         guard encryptionKey != nil else {
-            return true
+            return .content
         }
 
         let url = Internals.FileBufferURL(record.dataURL)
@@ -515,11 +580,13 @@ struct DiskStorage: Sendable {
             let size = await url.writtenBytes
 
             if Internals.EncryptedFileStreamBuffer.hasFinalChunk(rawSize: size) {
-                return true
+                return Internals.EncryptedFileStreamBuffer.plaintextSize(fromRawSize: size) == .zero
+                    ? .empty
+                    : .content
             }
 
             if size == .zero, Self.declaresNoBody(response) {
-                return true
+                return .empty
             }
 
             if attempt + 1 < attempts {
@@ -527,7 +594,21 @@ struct DiskStorage: Sendable {
             }
         }
 
-        return false
+        return .unreadable
+    }
+
+    /// What `readableBody(of:response:)` found.
+    private enum ReadableBody {
+
+        /// Not finished, or not told apart from a body that never was.
+        case unreadable
+
+        /// A body, which is read as it is found.
+        case content
+
+        /// A body that was seen to be empty: its file holds the final chunk and nothing before it,
+        /// or nothing at all in a response that says it has no body.
+        case empty
     }
 
     private static func declaresNoBody(_ response: CachedResponse) -> Bool {
@@ -634,10 +715,16 @@ struct DiskStorage: Sendable {
             associatedData: Self.associatedData(forBodyOf: key)
         )
 
-        return await Internals.Buffer<Internals.EncryptedFileStreamBuffer>(
+        let buffer = await Internals.Buffer<Internals.EncryptedFileStreamBuffer>(
             addressing: url,
             retryingEmptyContent: retryingEmptyContent
         )
+
+        if retryingEmptyContent, buffer.readableBytes == .zero {
+            emptyContentWaits.increment()
+        }
+
+        return buffer
     }
 
     // MARK: - Private static methods
@@ -685,7 +772,7 @@ struct DiskStorage: Sendable {
 
     private static let retryCounter = RetryCounter()
 
-    private final class RetryCounter: @unchecked Sendable {
+    final class RetryCounter: @unchecked Sendable {
 
         var value: Int {
             lock.withLock { _value }
@@ -705,10 +792,38 @@ struct DiskStorage: Sendable {
         index.markUsed(key)
     }
 
+    /// Removes everything stored for `key`: every directory of it, not only the one `index`
+    /// points at.
+    ///
+    /// A key written again leaves the earlier directories until the new write is finished (see
+    /// ``finishRecord(at:)``), and one that a write killed halfway left, or another process wrote,
+    /// is not in the index at all. Taking away only the newest let the one before it come back at
+    /// the next scan.
     func remove(_ key: String) async {
-        guard let record = await record(key) else { return }
-        await Self.removeItem(at: record.url.filePath)
-        index.remove(key, ifLocation: record.url)
+        for directory in await directories(forKey: key) {
+            await Self.removeItem(at: directory.url.filePath)
+            index.remove(key, ifLocation: directory.url)
+        }
+    }
+
+    /// Marks the write that made the record at `url` as closed, and drops what it replaced.
+    ///
+    /// Until this runs the record is not a response: another process that opens the directory, or
+    /// this one after a restart, does not serve it, and takes it for an orphan if it stays
+    /// untouched. The directories of the same key that are older than this one are removed here
+    /// and not when the write starts, so a write that fails leaves the entry it was going to
+    /// replace in place.
+    func finishRecord(at url: URL) async {
+        guard let (key, date) = Record.getKeyAndDate(url) else {
+            return
+        }
+
+        await Self.removeItem(at: url.appendingPathComponent(Record.unfinishedPath).filePath)
+
+        for directory in await directories(forKey: key) where directory.date < date {
+            await Self.removeItem(at: directory.url.filePath)
+            index.remove(key, ifLocation: directory.url)
+        }
     }
 
     func removeAll() async {
@@ -730,12 +845,21 @@ struct DiskStorage: Sendable {
     /// request for another account, say), the record at `key` is no longer the one that was
     /// revalidated, and giving it the old response would label the new body with the old
     /// credential digests.
+    ///
+    /// - Parameter knownUsage: A caller-tracked estimate of the disk usage, which lets the room
+    /// that the new response needs be made without measuring the directory when there is already
+    /// enough: see ``freeSpace(_:knownUsage:)``. Without it every renewal reads and stats every
+    /// entry of the cache.
+    /// - Returns: How much the entry grew by (the size of its response record is all that can
+    /// change), `0` when it was not rewritten.
+    @discardableResult
     func updateCached(
         key: String,
         cachedResponse: CachedResponse,
         expecting expected: CachedResponse,
-        maximumCapacity: Int64
-    ) async {
+        maximumCapacity: Int64,
+        knownUsage: Int64? = nil
+    ) async -> Int64 {
         guard let record = await record(key),
             let response = try? JSONEncoder().encode(cachedResponse),
             let storedData = await readResponseData(at: record.responseURL, key: key),
@@ -745,20 +869,24 @@ struct DiskStorage: Sendable {
             // that ran alongside this one, and just as good. Rewriting it moves the body to a new
             // directory, under whoever was about to read it from the one that renewal left.
             stored.date <= expected.date
-        else { return }
+        else { return .zero }
 
         let responseInfo = try? await Internals.fileSystem.info(forFileAt: record.responseURL.filePath)
         let responseLength = responseInfo?.size ?? 0
         let spaceChange = Int64(response.count) - Int64(responseLength)
         let spaceNeeded = Int64(spaceChange < 0 ? 0 : spaceChange)
 
-        guard spaceNeeded <= maximumCapacity else { return }
+        guard spaceNeeded <= maximumCapacity else { return .zero }
 
-        await freeSpace(maximumCapacity - spaceNeeded)
+        // The entry being renewed is in use as of now, which keeps it from being the one that is
+        // evicted to make room for its own renewal.
+        index.markUsed(key)
+
+        await freeSpace(maximumCapacity - spaceNeeded, knownUsage: knownUsage)
 
         guard await record.dataURL.isReachable,
             let newRecord = await self.record(key, createdAt: cachedResponse.date)
-        else { return }
+        else { return .zero }
 
         // Whether the body is in `newRecord` yet. Until it is, `record` is untouched, or its body
         // was taken by another update of the same entry, which is the one that removes it.
@@ -785,7 +913,7 @@ struct DiskStorage: Sendable {
             // body of a record it replaced.
             if index.replace(key, ifLocation: record.url, with: newRecord.url) {
                 await Self.removeItem(at: record.url.filePath)
-                return
+                return spaceChange
             }
         } catch {}
 
@@ -797,7 +925,7 @@ struct DiskStorage: Sendable {
         // the update that did move the body made that update's `replace` fail and take the entry
         // down with it.
         guard moved else {
-            return
+            return .zero
         }
 
         // The body was moved and the entry could not be completed, so there is nothing left on
@@ -805,6 +933,8 @@ struct DiskStorage: Sendable {
         // revalidation loses the entry outright rather than leaving `record`'s directory in place.
         await Self.removeItem(at: record.url.filePath)
         index.remove(key, ifLocation: record.url)
+
+        return .zero
     }
 
     /// - Parameter knownUsage: A caller-tracked estimate of current disk usage, used only to
@@ -843,6 +973,10 @@ struct DiskStorage: Sendable {
         guard let record = await record(key, createdAt: cachedResponse.date) else { return (nil, nil, nil) }
 
         do {
+            // Before anything else is in the directory, so that there is no moment at which it
+            // looks like a whole entry while it is not. Without it the entry could not be told
+            // from a finished one, so there is no entry.
+            try await record.unfinishedURL.createPathIfNeeded()
             try await writeAndClose(response, to: record.responseURL, key: key)
         } catch {
             // The directory itself was already created above (`Record.init(directory:key:at:)`
@@ -1164,7 +1298,32 @@ struct DiskStorage: Sendable {
             return nil
         }
 
-        return record
+        // A location the scan found was not looked into past its name. One this value wrote is
+        // trusted as it is: its write is in this process, and ``DataCache`` does not read a key
+        // while it is being written.
+        guard index.isUnverified(key) else {
+            return record
+        }
+
+        if await record.isFinished {
+            index.markVerified(key, ifLocation: url)
+            return record
+        }
+
+        // Not closed: another process is still writing it, or it is what a killed one left. Its
+        // body is not a response. What the scan says about this key, looking at it, is the entry
+        // before it (or nothing), and the leftover is removed once it is old enough.
+        index.remove(key, ifLocation: url)
+
+        guard
+            let found = await scannedLocations(for: key).first(where: { $0.key == key }),
+            let verified = await Record(found.url)
+        else {
+            return nil
+        }
+
+        index.set(key, location: found.url)
+        return verified
     }
 
     /// Where the entries of the directory are, read from their names alone.
@@ -1185,7 +1344,7 @@ struct DiskStorage: Sendable {
     ///
     /// Several directories for one key (a write that lost a race, a revalidation) are not
     /// ambiguous: the newest wins.
-    private func scannedLocations(for targetKey: String) async -> [(key: String, url: URL)] {
+    private func scannedLocations(for targetKey: String) async -> [(key: String, url: URL, isVerified: Bool)] {
         guard let names = try? await Internals.directoryEntryNames(atPath: directory.filePath.string) else {
             return []
         }
@@ -1207,17 +1366,24 @@ struct DiskStorage: Sendable {
             }
         }
 
-        var locations = newest.map { (key: $0.key, url: $0.value.url) }
+        var locations = newest.map { (key: $0.key, url: $0.value.url, isVerified: false) }
 
         candidates.sort { $0.date > $1.date }
 
         var chosen: URL?
         var incomplete: [URL] = []
 
+        // The ones whose files are all there, but whose write was never closed.
+        var unfinished: Set<URL> = []
+
         for candidate in candidates {
-            if await Record(candidate.url, retryOnMiss: false) != nil {
-                chosen = candidate.url
-                break
+            if let record = await Record(candidate.url, retryOnMiss: false) {
+                if await record.isFinished {
+                    chosen = candidate.url
+                    break
+                }
+
+                unfinished.insert(candidate.url)
             }
 
             incomplete.append(candidate.url)
@@ -1226,15 +1392,40 @@ struct DiskStorage: Sendable {
         let orphans = await removeOrphans(among: incomplete)
         incomplete.removeAll { orphans.contains($0) }
 
-        if chosen == nil, let newestIncomplete = incomplete.first, await Record(newestIncomplete) != nil {
+        if chosen == nil,
+            let newestIncomplete = incomplete.first,
+            !unfinished.contains(newestIncomplete),
+            await Record(newestIncomplete) != nil
+        {
             chosen = newestIncomplete
         }
 
         if let chosen {
-            locations.append((key: targetKey, url: chosen))
+            locations.append((key: targetKey, url: chosen, isVerified: true))
         }
 
         return locations
+    }
+
+    /// Every directory of `key`, by name alone, whatever its state.
+    private func directories(forKey key: String) async -> [(url: URL, date: Date)] {
+        guard let names = try? await Internals.directoryEntryNames(atPath: directory.filePath.string) else {
+            return []
+        }
+
+        return names.compactMap { name -> (url: URL, date: Date)? in
+            guard name.hasSuffix(".\(Record.pathExtension)") else {
+                return nil
+            }
+
+            let url = directory.appendingPathComponent(name)
+
+            guard let (found, date) = Record.getKeyAndDate(url), found == key else {
+                return nil
+            }
+
+            return (url, date)
+        }
     }
 
     /// Every entry of the directory that is whole, checked with no retry.
@@ -1290,12 +1481,12 @@ struct DiskStorage: Sendable {
     /// Removes each of `urls` that has gone untouched for `orphanAge` and returns the ones it
     /// removed.
     ///
-    /// Only for directories already found incomplete. A write creates the two files of its
-    /// record directory moments after the directory itself, and every one of those creations
-    /// moves the directory's modification date, so one that stays incomplete and unmoved for
-    /// this long belongs to a process that is gone. The directory name's own date is no help
-    /// here: it is the date of the response, not of the write. A directory whose date cannot be
-    /// read is left alone.
+    /// Only for directories already found incomplete or unfinished. A write creates the files of
+    /// its record directory moments after the directory itself, and a body keeps being written
+    /// to its file until the write is closed, so one that stays untouched for this long (see
+    /// ``lastActivity(of:)``) belongs to a process that is gone. The directory name's own date is
+    /// no help here: it is the date of the response, not of the write. A directory whose date
+    /// cannot be read is left alone.
     @discardableResult
     private func removeOrphans(among urls: [URL]) async -> Set<URL> {
         guard !urls.isEmpty else {
@@ -1304,9 +1495,7 @@ struct DiskStorage: Sendable {
 
         let limit = Date().addingTimeInterval(-orphanAge)
 
-        let ages = await Self.mapConcurrently(urls) {
-            await Internals.modificationDate(atPath: $0.filePath.string)
-        }
+        let ages = await Self.mapConcurrently(urls) { await Self.lastActivity(of: $0) }
 
         var removed: Set<URL> = []
 
@@ -1318,6 +1507,29 @@ struct DiskStorage: Sendable {
         }
 
         return removed
+    }
+
+    /// When something last happened in the record directory at `url`: the newest modification date
+    /// of the directory and of the two files in it.
+    ///
+    /// The directory's own date moves when a file is created or removed in it, which a write does
+    /// at its start and no more. The body file is what a download that is still going on keeps
+    /// touching, so a download that takes longer than the orphan age is not taken for the leftover
+    /// of one that was killed.
+    private static func lastActivity(of url: URL) async -> Date? {
+        var newest: Date?
+
+        for path in [
+            url.filePath.string,
+            url.appendingPathComponent(Record.dataPath).filePath.string,
+            url.appendingPathComponent(Record.responsePath).filePath.string,
+        ] {
+            if let date = await Internals.modificationDate(atPath: path), date > (newest ?? .distantPast) {
+                newest = date
+            }
+        }
+
+        return newest
     }
 
     /// `transform` applied to every input, a few at a time, in the order of the inputs.

@@ -64,7 +64,8 @@ extension Property {
     /// ## Cost and limits
     ///
     /// - One extra request for every response that is written, `.urlSession` responses without a
-    ///   `Content-Length` only. The caller does not wait for it: the response has already been
+    ///   `Content-Length` and with a `Transfer-Encoding` only (what CFNetwork shows of a chunked
+    ///   body; an HTTP/2 response with neither is written without the probe). The caller does not wait for it: the response has already been
     ///   delivered. It goes out through the same session as the request.
     /// - It only runs for a response that sent `Accept-Ranges: bytes`, so a server that ignores
     ///   `Range` is not asked to send the body a second time. One that answers with the whole body
@@ -75,6 +76,11 @@ extension Property {
     ///   ranges on a chunked body, which is common for responses generated on the fly.
     /// - It confirms the length the server reports, not the bytes.
     /// - Without a strong validator, a resource that changed between the two requests can look whole.
+    ///   A `Last-Modified` counts as one only when the response's `Date` is at least a second after
+    ///   it; otherwise the probe sends none.
+    /// - While it runs (up to 30 seconds) the response is still being written, so a request for the
+    ///   same URL reads as a miss. If the probe does not decide, what the cache held for the URL
+    ///   before is left as it was.
     ///
     /// - Parameter isEnabled: Whether the probe is run. Defaults to `true`; it is off unless this
     ///   property is used.

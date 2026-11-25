@@ -50,6 +50,15 @@ struct CompletenessProbeVerdictTests {
     }
 
     @Test
+    func verdict_whenTheRepresentationIsShorterThanWhatWasReceived_isUndecided() {
+        // The resource changed since the body was read: it is now shorter than what arrived, so
+        // the answer says nothing of whether what arrived was whole.
+        let answer = head(416, [("Content-Range", "bytes */500")])
+
+        #expect(Probe.verdict(of: answer, receivedBytes: 1_000) == .undecided)
+    }
+
+    @Test
     func verdict_whenTheUnsatisfiedRangeSaysNothingOfTheLength_isUndecided() {
         #expect(Probe.verdict(of: head(416, []), receivedBytes: 1_000) == .undecided)
         #expect(Probe.verdict(of: head(416, [("Content-Range", "bytes */*")]), receivedBytes: 1_000) == .undecided)
@@ -331,18 +340,48 @@ struct CompletenessProbeRunTests {
         #expect(sent.headers["Cookie"] == ["mine=1"])
     }
 
+    private static let modified = "Mon, 01 Jan 2024 00:00:00 GMT"
+
     @Test
     func run_whenTheEntityTagIsWeak_sendsTheLastModifiedInstead() async throws {
         let recorder = Recorder()
         let probe = probe(recorder: recorder) { self.head(206, [("Content-Range", "bytes 10-10/20")]) }
 
         let verdict = await probe.run(
-            response: head(200, ranges + [("ETag", "W/\"weak\""), ("Last-Modified", " a date ")]),
+            response: head(
+                200,
+                ranges + [
+                    ("ETag", "W/\"weak\""),
+                    ("Last-Modified", " \(Self.modified) "),
+                    ("Date", "Mon, 01 Jan 2024 00:00:05 GMT"),
+                ]
+            ),
             receivedBytes: 10
         )
 
         #expect(verdict == .truncated)
-        #expect(recorder.configurations.first?.headers["If-Range"] == ["a date"])
+        #expect(recorder.configurations.first?.headers["If-Range"] == [Self.modified])
+    }
+
+    /// A `Last-Modified` the response was served within a second of is a weak validator, which
+    /// `If-Range` must not carry: the server would compare it as a mismatch and answer `200`.
+    @Test(arguments: [
+        ["Date": "Mon, 01 Jan 2024 00:00:00 GMT"],
+        ["Date": "Sun, 31 Dec 2023 23:59:59 GMT"],
+        [:],
+        ["Date": "not a date"],
+    ])
+    func run_whenTheLastModifiedIsNotAStrongValidator_sendsNoIfRange(_ extra: [String: String]) async throws {
+        let recorder = Recorder()
+        let probe = probe(recorder: recorder) { self.head(416, [("Content-Range", "bytes */10")]) }
+
+        let verdict = await probe.run(
+            response: head(200, ranges + [("Last-Modified", Self.modified)] + extra.map { ($0.key, $0.value) }),
+            receivedBytes: 10
+        )
+
+        #expect(verdict == .complete)
+        #expect(recorder.configurations.first?.headers["If-Range"] == nil)
     }
 
     @Test

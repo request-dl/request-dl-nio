@@ -51,6 +51,20 @@ These are the main usage methods:
 
 > Note: Just like we use methods to specify the storage location in a request specification, the ``RequestDL/DataCache`` initializers are available with the same options.
 
+### How long a response is kept fresh
+
+A stored response is used by ``RequestDL/CacheStrategy/returnCachedDataElseLoad`` only while it is fresh, and what makes it fresh is what the server said:
+
+1. A `max-age` in `Cache-Control` (less the `Age` the response arrived with), or else an `Expires` date. `max-age=0`, or an `Expires` that is not a date, is already stale.
+2. Without either, a freshness estimated from the response itself, as browsers do (RFC 9111 §4.2.2): a tenth of the time between its `Last-Modified` and its `Date`, and never more than a day. A resource that changed an hour before it was fetched is kept for six minutes, and one that has not changed in a year is kept for a day.
+3. Without a `Last-Modified` to estimate from, it is not fresh at all: the response is stored (its `ETag` and body are still there for ``RequestDL/CacheStrategy/reloadAndValidateCachedData`` and ``RequestDL/CacheStrategy/useCachedDataOnly``), but every ``RequestDL/CacheStrategy/returnCachedDataElseLoad`` request goes to the network.
+
+An error response (`404`, `405`, `410`, `414`, `501`) is stored, and reused, only when it says for how long with a `max-age` or an `Expires`. It is never estimated: a `404` for something that does not exist yet would otherwise outlive its creation.
+
+A stale response is not removed for its age. It stays until a newer response for the URL replaces it, or the disk tier needs the room, so that ``RequestDL/CacheStrategy/useCachedDataOnly`` can still give it to a caller that is offline. The exception is one that must be validated before it is used (`must-revalidate`, or `no-cache`, which a `304` can add): it is not given while stale, and it is kept for a request that revalidates.
+
+A `304 Not Modified` updates the stored response with the `Cache-Control` directives it carries and keeps the ones it does not mention, so one that only says `public` does not take the `max-age` away. A `304` that says `no-store` removes the entry and the request goes to the network; one that says `no-cache` is used for the request that validated it and must be validated again before every later use.
+
 ### Large responses and a slow cache
 
 The response is stored while it downloads, not after: each chunk is handed to the caller and, in parallel, to a writer that puts it in the memory and disk tiers. The network is never slowed down for that writer, so the chunks it has not taken yet wait in memory.
@@ -87,7 +101,7 @@ DataTask {
 }
 ```
 
-Off by default. When it is on, and only for a `.urlSession` response that would otherwise be left out (no `Content-Length`), the cache writer sends **one extra request** once the body has been received and before it stores it: the same `GET`, with `Range: bytes=<n>-<n>` (`n` being the number of bytes received) and, when the response carried a strong `ETag` or a `Last-Modified`, `If-Range` with it. The caller already has its response by then, so this does not delay it. The extra request is part of the cost of every write, goes out through the same session (credentials, proxies and certificates included), and gives up after 30 seconds.
+Off by default. When it is on, and only for a `.urlSession` response that would otherwise be left out (no `Content-Length`, with a `Transfer-Encoding`, which is all CFNetwork shows of a chunked body; an HTTP/2 response without `Content-Length` has neither and is stored without it), the cache writer sends **one extra request** once the body has been received and before it stores it: the same `GET`, with `Range: bytes=<n>-<n>` (`n` being the number of bytes received) and, when the response carried a strong `ETag` or a `Last-Modified`, `If-Range` with it. The caller already has its response by then, so this does not delay it. The extra request is part of the cost of every write, goes out through the same session (credentials, proxies and certificates included), and gives up after 30 seconds.
 
 What the answer says:
 
@@ -113,7 +127,8 @@ A few things to know before turning it on:
 
 1. **Only the disk tier is encrypted.** The in-memory tier (``RequestDL/DataCache/Policy/memory``) is never encrypted — it only ever exists as bytes in your process' own memory, out of scope for this feature. If that matters for your threat model, restrict the policy to ``RequestDL/DataCache/Policy/disk`` for the data you're encrypting.
 2. **RequestDL does not manage the key itself.** Generating, rotating, and securely storing the key bytes (Keychain, a KMS, whatever fits your app) is your responsibility. RequestDL only carries the key across the boundary and uses it to seal/open cache files.
-3. **The key must be supplied on every call that touches that cache directory**, not just once. `.cache(...)`'s `encryptionKey` parameter and ``RequestDL/DataCache/encryptionKey`` write to the same shared storage for a given directory/suite/URL — including with `nil`. Passing the key on the request that writes an entry but omitting it on the request that reads it back doesn't leave the disk tier encrypted with the old key; it clears the key first, and the read then sees ciphertext with no key to open it, which — same as a wrong key — is treated as a plain cache miss.
+3. **The key stays set until you change it.** `.cache(...)`'s `encryptionKey` parameter and ``RequestDL/DataCache/encryptionKey`` write to the same shared storage for a given directory/suite/URL. Passing a key sets it; passing `nil` to `.cache(...)` leaves whatever key that storage already has, so it does not turn encryption off. To stop encrypting, set ``RequestDL/DataCache/encryptionKey`` to `nil` on the cache itself. A storage that has no key reads ciphertext it cannot open, which — same as a wrong key — is treated as a plain cache miss, so set the key before the first request that reads or writes the directory.
+4. **The names of the entries are not hidden.** What is encrypted is the body and the response record (status, headers). Each entry lives in a directory whose name is made from the date of the response and the URL it was stored for (the URL, in base64, or a SHA-256 of it when it is long), and the key does not change that. Anyone who can list the cache directory (a backup, another process with access to the app's container) can read which URLs were fetched and when, query string included. Do not put a secret in the URL of a request whose cache you encrypt for that reason.
 
 #### Generating the key
 

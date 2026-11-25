@@ -676,6 +676,26 @@ struct CacheRevalidationTests {
         #expect(isServed(output) == false)
     }
 
+    @Test(arguments: [["10", "3500"], ["3500", "10"]])
+    func freshness_whenThereAreSeveralAges_theGreatestOneCounts(_ ages: [String]) async throws {
+        // Given: the same response as above, but its age is said twice, and only the greater of
+        // the two uses up the `max-age`.
+        let dataCache = makeCache()
+        let configuration = makeConfiguration(strategy: .returnCachedDataElseLoad)
+
+        await store(
+            response([("Cache-Control", "max-age=3600")] + ages.map { ("Age", $0) }, age: 200),
+            key: configuration.url,
+            in: dataCache
+        )
+
+        // When
+        let output = await decide(configuration, in: dataCache)
+
+        // Then
+        #expect(isServed(output) == false)
+    }
+
     @Test
     func freshness_whenAgeLeavesRoomInTheMaxAge_isStillServed() async throws {
         // Given
