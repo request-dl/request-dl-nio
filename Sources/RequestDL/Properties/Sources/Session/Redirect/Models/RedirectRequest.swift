@@ -15,6 +15,11 @@
 /// ``RedirectDecision/follow(_:)`` whose ``url`` is on another origin than the request it
 /// redirects loses those headers, whoever put them there. A strategy cannot use this to send a
 /// credential to a different origin.
+///
+/// > Important: Those are the only headers removed. Any other header is kept when the origin
+/// changes, a custom API-key header such as `X-Api-Key`, `Api-Key` or `X-Auth-Token` included
+/// (the same as AsyncHTTPClient and curl do): they are not known to be credentials. A strategy that
+/// follows a redirect to another origin removes them itself, from ``headers``.
 public struct RedirectRequest: Sendable {
 
     // MARK: - Public properties
