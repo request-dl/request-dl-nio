@@ -72,12 +72,16 @@ import struct Foundation.URL
 /// ``Session/decompressionAlgorithms(_:limit:)`` works here, custom ``Decompressor``s included.
 /// The system decodes gzip, deflate and brotli by itself, so a list with only those leaves it to
 /// do that, as it always did. Once the list has an algorithm of your own, the request carries an
-/// `Accept-Encoding` naming all of them, which turns the system's decoding off for every one, and
-/// the file is decoded when it has finished downloading: read in pieces, decoded, and written
+/// `Accept-Encoding` naming yours, and the file is decoded when it has finished downloading. Naming
+/// something else does not stop the system from decoding gzip, deflate and brotli when the server
+/// sends them (it did so on macOS 27.2, `Content-Encoding` left as it was), so a ``Decompressor``
+/// of your own that declares one of those three names never runs here: the file arrives decoded
+/// and is handed over as it is. Give a codec of your own a name of its own. The file is read in pieces, decoded, and written
 /// beside `destination` before it takes its place, so it is never held whole in memory. Nothing
 /// is at `destination` until that has worked, and ``BackgroundDownloads/Event/completed(id:destination:)``
-/// follows it. A response encoded in something that is not on the list fails the download with
-/// ``UnsupportedContentEncodingError``, and a corrupt or truncated body with whatever your
+/// follows it. A response encoded in something that was not asked for fails the download with
+/// ``UnsupportedContentEncodingError`` (gzip, deflate or brotli included, though the system decoded
+/// them already), and a corrupt or truncated body with whatever your
 /// decompressor throws. The `limit` of that method bounds this decoding too, when it is not
 /// ``DecompressionLimit/none``: a file that expands past it fails with
 /// ``BackgroundDownloadDecompressionLimitError``, and what had been written is removed.
@@ -88,9 +92,11 @@ import struct Foundation.URL
 /// in the encoded bytes, as that is what travels.
 ///
 /// ``GzipAlgorithm``, ``DeflateAlgorithm`` and ``BrotliURLSessionOnlyAlgorithm`` can't be listed next
-/// to an algorithm of your own: they only stand for the system's decoding, which taking over
-/// `Accept-Encoding` turns off, so a response encoded with one of them could not be decoded.
-/// ``result()`` refuses such a list with ``BackgroundDownloadUnsupportedConfigurationError``, and
+/// to an algorithm of your own: they only stand for the system's decoding, and the request does not
+/// ask for them, so a response encoded with one of them is not one this download asked for. The
+/// system would decode it all the same, but which encodings it decodes next to a header it did not
+/// write is not something this package builds on, so a background download is stricter here than a
+/// foreground `.urlSession` request, which accepts such a list. ``result()`` refuses such a list with ``BackgroundDownloadUnsupportedConfigurationError``, and
 /// not later, when the download is done. Leave them out and the server is asked for yours alone.
 ///
 /// ## Client certificates

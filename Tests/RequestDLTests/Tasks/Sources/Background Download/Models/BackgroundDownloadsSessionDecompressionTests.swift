@@ -392,6 +392,58 @@ struct BackgroundDownloadsSessionDecompressionTests {
         }
     }
 
+    /// CFNetwork decodes `gzip`, `deflate` and `br` whatever `Accept-Encoding` says, and keeps the
+    /// header. An app's own decompressor for one of those names (`br` under `.nio`, which has no
+    /// brotli) was run over the file the system had already decoded.
+    @Test(arguments: ["gzip", "deflate", "br"])
+    func aDecompressorForAnEncodingTheSystemDecodes_isNotRunOverTheFileItDecoded(_ encoding: String) async throws {
+        try await withTemporaryFileURL("destination.txt") { destination in
+            // Given: the file is plain already, as the system hands it over.
+            let plain = "plain: the system decoded this before the delegate saw it"
+            let session = BackgroundDownloads.Session()
+
+            // When
+            let events = try await Self.download(
+                id: "native",
+                scheduledWith: [Self.algorithm(MustNotRunDecompressor(encoding: encoding))],
+                to: destination,
+                encoding: encoding,
+                body: Array(plain.utf8),
+                session: session,
+                acceptedEncodings: [encoding]
+            )
+
+            // Then
+            guard case .completed = try #require(Self.terminal(events).first) else {
+                Issue.record("Expected .completed, got \(events)")
+                return
+            }
+            #expect(try String(contentsOf: destination, encoding: .utf8) == plain)
+            #expect(Self.leftovers(beside: destination).isEmpty)
+        }
+    }
+
+    // MARK: - Counters
+
+    /// The counters of what was read and written are 64 bits wide, so a file that passes `Int`'s
+    /// range on a 32-bit platform is a limit to report instead of an overflow that traps.
+    @Test
+    func theLimit_isCheckedAgainstCountsPastThirtyTwoBits() throws {
+        let beyond = UInt64(Int32.max) * 4
+
+        #expect(throws: BackgroundDownloadDecompressionLimitError.self) {
+            try BackgroundDownloads.Session.enforce(.size(Int(Int32.max)), read: 1, written: beyond)
+        }
+
+        #expect(throws: BackgroundDownloadDecompressionLimitError.self) {
+            try BackgroundDownloads.Session.enforce(.ratio(2), read: UInt64(Int32.max), written: beyond)
+        }
+
+        try BackgroundDownloads.Session.enforce(.size(Int(Int32.max)), read: beyond, written: UInt64(Int32.max))
+        try BackgroundDownloads.Session.enforce(.ratio(4), read: beyond, written: beyond)
+        try BackgroundDownloads.Session.enforce(.none, read: .max, written: .max)
+    }
+
     // MARK: - Pieces
 
     /// A decoder's own unit of input (a pair, here) cut by the boundary between two reads.
@@ -921,6 +973,17 @@ struct BackgroundDownloadsSessionDecompressionTests {
     }
 
     /// Reads every byte and then refuses to finish.
+    /// An app's own decompressor under a name the system decodes: running it at all is the failure.
+    private struct MustNotRunDecompressor: Decompressor {
+        struct RanError: Error {}
+
+        let encoding: String
+
+        var contentEncodingValue: String { encoding }
+
+        func callAsFunction() throws -> any DecompressorStream { throw RanError() }
+    }
+
     private struct NeverFinishesDecompressor: Decompressor {
         struct FinishedError: Error {}
 

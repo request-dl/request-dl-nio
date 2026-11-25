@@ -642,7 +642,10 @@ extension Internals {
                 decompressionDispatch = .skip
 
             case .enabled where decompression.requiresManualURLSessionHandling:
-                decompressionDispatch = .dispatch(algorithms: decompression.urlSessionManualAlgorithms)
+                decompressionDispatch = .dispatch(
+                    algorithms: decompression.urlSessionManualAlgorithms,
+                    nativelyDecoded: decompression.urlSessionAnnouncedNativeEncodings
+                )
 
             case .enabled:
                 decompressionDispatch = .skip

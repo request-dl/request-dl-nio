@@ -59,10 +59,12 @@ public struct BackgroundDownloadUnsupportedConfigurationError: Error, Sendable {
 
         /// ``Session/decompressionAlgorithms(_:limit:)`` lists ``GzipAlgorithm``,
         /// ``DeflateAlgorithm`` or ``BrotliURLSessionOnlyAlgorithm`` next to an algorithm of your
-        /// own. Those three only stand for the system's own decoding, which asking for your
-        /// algorithm turns off for every encoding, so a response encoded with one of them could
-        /// not be decoded: it would fail once the download had finished, possibly hours later and
-        /// in another launch. Refused when the download is scheduled instead.
+        /// own. Those three only stand for the system's own decoding, and the request does not ask for
+        /// them, so a response encoded with one of them is an encoding nobody asked for: it would
+        /// fail once the download had finished, possibly hours later and in another launch, even
+        /// though the system decoded it. Which encodings the system decodes next to a header it
+        /// did not write is not something this package builds on, so the list is refused when the
+        /// download is scheduled instead. A foreground `.urlSession` request accepts it.
         case nativeAlgorithmNextToCustomAlgorithm
 
         // MARK: - Inits
@@ -156,7 +158,7 @@ extension BackgroundDownloadUnsupportedConfigurationError.Reason: CustomStringCo
                 """
                 GzipAlgorithm, DeflateAlgorithm and BrotliURLSessionOnlyAlgorithm can't be listed next \
                 to an algorithm of your own -- they only stand for the system's decoding, which \
-                asking for yours turns off. Leave them out of .decompressionAlgorithms(_:limit:) and \
+                this request does not ask for. Leave them out of .decompressionAlgorithms(_:limit:) and \
                 the server is asked for yours alone.
                 """
         case .spkiPinningAlgorithmNotSupported:

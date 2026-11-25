@@ -33,8 +33,14 @@ extension Internals.Override {
         private static let globalLock = Lock()
         nonisolated(unsafe) private static var _global: Closure?
 
-        package static func installGlobally(_ closure: @escaping Closure) {
-            globalLock.withLockVoid { _global = closure }
+        /// Installs `closure` as the process-wide replacement and returns the one it replaced, so
+        /// a caller that only needs it for a while can put that one back (`nil` removes it).
+        @discardableResult
+        package static func installGlobally(_ closure: Closure?) -> Closure? {
+            globalLock.withLock {
+                defer { _global = closure }
+                return _global
+            }
         }
 
         fileprivate static var global: Closure? {

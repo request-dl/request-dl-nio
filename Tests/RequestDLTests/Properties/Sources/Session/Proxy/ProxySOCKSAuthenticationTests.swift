@@ -232,10 +232,20 @@ struct ProxySOCKSAuthenticationTests {
 
             #expect(outcome.elapsed < 5)
             // The proxy was asked once and rejected: nothing retried the same wrong credentials.
-            try await Task.sleep(nanoseconds: 300_000_000)
-            #expect(proxy.observations.authenticationAttempts.count == 1)
-            #expect(proxy.observations.authenticationAttempts.first?.accepted == false)
-            #expect(proxy.connectAttempts.count == 0)
+            //
+            // Not a fixed sleep, which on a slow machine ends before a late retry would have come
+            // and asserts nothing: a request with the right password goes through the same proxy
+            // and has to finish first. Whatever the first one still had in flight reaches the
+            // proxy ahead of it, so the proxy's record is complete when this returns, however long
+            // that took.
+            let barrier = try await run(
+                through: proxy,
+                executor: executor,
+                authorization: .basic(username: "user", password: "pass")
+            )
+            #expect(try barrier.result.get() == "Hello Through SOCKS")
+            #expect(proxy.observations.authenticationAttempts.map(\.accepted) == [false, true])
+            #expect(proxy.connectAttempts.count == 1)
             // The error says what happened, and not what the password was.
             #expect(String(describing: error).contains("uthentication"))
             #expect(!String(describing: error).contains("WRONG"))
