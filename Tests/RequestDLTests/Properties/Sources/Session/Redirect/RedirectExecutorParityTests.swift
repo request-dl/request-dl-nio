@@ -163,6 +163,55 @@ struct RedirectExecutorParityTests {
         #expect(received.header("Proxy-Authorization") == nil)
     }
 
+    /// A chain that leaves an origin and comes back to it (A, B, A): what was taken off on the way
+    /// to B stays off on the way back. The credentials a hop gets back are the ones of the hop
+    /// before it, not of the first request, and the hop before the way back is B's, which has none.
+    @Test(arguments: TransferTestExecutor.allCases, [Mode.standard, .follow, .strategy])
+    func dataTask_whenRedirectedToAnotherOriginAndBack_doesNotGetTheCredentialsBack(
+        executor: TransferTestExecutor,
+        mode: Mode
+    ) async throws {
+        // Given
+        let originOfB = LockedValueBox<String>("")
+
+        let a = try await ScriptedServer { received in
+            received.uri == "/start" ? .redirect(to: "\(originOfB.withLockedValue { $0 })/mid") : .ok()
+        }
+
+        let b = try await ScriptedServer { _ in .redirect(to: "\(a.origin)/back") }
+        originOfB.withLockedValue { $0 = b.origin }
+
+        // When
+        let result = try await DataTask {
+            BaseURL(.http, host: "127.0.0.1:\(a.port)")
+            Path("/start")
+            CustomHeader(name: "Authorization", value: "Bearer secret")
+            CustomHeader(name: "Proxy-Authorization", value: "Basic c2VjcmV0")
+
+            mode.apply(to: executor.pinnedSession)
+        }
+        .result()
+
+        let requestsOfA = a.requests
+        let requestsOfB = b.requests
+
+        await a.shutdown()
+        await b.shutdown()
+
+        // Then
+        #expect(result.head.status.code == 200)
+        #expect(requestsOfA.map(\.uri) == ["/start", "/back"])
+        #expect(requestsOfB.map(\.uri) == ["/mid"])
+
+        #expect(requestsOfA.first?.header("Authorization") == "Bearer secret")
+        #expect(requestsOfA.first?.header("Proxy-Authorization") == "Basic c2VjcmV0")
+
+        for hop in [requestsOfB.first, requestsOfA.last] {
+            #expect(hop?.header("Authorization") == nil)
+            #expect(hop?.header("Proxy-Authorization") == nil)
+        }
+    }
+
     /// A `303` asks for the target with `GET` or `HEAD` (RFC 9110, 15.4.4). A `HEAD` that is sent
     /// back as `GET` downloads a body nobody asked for, and AsyncHTTPClient keeps `HEAD`.
     @Test(
@@ -193,6 +242,60 @@ struct RedirectExecutorParityTests {
 
         // Then
         #expect(requests.map(\.method) == [methods.original, methods.redirected])
+    }
+
+    /// The server answers a request with the redirect as soon as it has read its body, while the
+    /// client may still be writing it out: following the redirect must not be cancelled because the
+    /// request body stream was. A regression of `requestStreamCancelled`, fixed in the
+    /// `request-dl/async-http-client` fork (#38, #39), which only showed under CPU load.
+    @Test(arguments: TransferTestExecutor.allCases.filter(\.isNIO))
+    func dataTask_whenAPostOrPutIsRedirectedRightAfterItsBody_followsTheRedirect(
+        executor: TransferTestExecutor
+    ) async throws {
+        // Given
+        let statuses = [301, 302, 307]
+        let attempts = 50
+
+        let server = try await ScriptedServer { received in
+            guard received.uri.hasPrefix("/start/") else {
+                return .ok()
+            }
+
+            let attempt = received.uri.split(separator: "/").last.flatMap { Int($0) } ?? 0
+            return .redirect(statuses[attempt % statuses.count], to: "/done/\(attempt)")
+        }
+
+        // When
+        var failures: [String] = []
+
+        for attempt in 0..<attempts {
+            do {
+                let result = try await completing(within: 30) {
+                    try await DataTask {
+                        BaseURL(.http, host: "127.0.0.1:\(server.port)")
+                        Path("/start/\(attempt)")
+                        RequestMethod(attempt.isMultiple(of: 2) ? .post : .put)
+                        Payload(verbatim: "body \(attempt)", contentType: .text)
+
+                        executor.pinnedSession
+                    }
+                    .result()
+                }
+
+                if result.head.status.code != 200 {
+                    failures.append("#\(attempt): status \(result.head.status.code)")
+                }
+            } catch {
+                failures.append("#\(attempt): \(error)")
+            }
+        }
+
+        let redirected = server.requests.filter { $0.uri.hasPrefix("/done/") }
+        await server.shutdown()
+
+        // Then
+        #expect(failures.isEmpty, "\(failures)")
+        #expect(redirected.count == attempts)
     }
 
     /// `.urlSession` stops a chain at 20 redirects on its own, whatever `max` is: what it fails
