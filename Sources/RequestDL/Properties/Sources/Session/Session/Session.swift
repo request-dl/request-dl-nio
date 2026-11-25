@@ -400,6 +400,14 @@ public struct Session: Property {
     /// ``RedirectError/Reason/limitReached``, as it does when `max` is reached. The other
     /// executors honor `max`.
     ///
+    /// > Important: When a redirect leaves the origin (scheme, host and port) of the request it
+    /// redirects, `Authorization`, `Proxy-Authorization`, `Cookie`, `Origin` and an explicit `Host`
+    /// are removed from it. Every other header is forwarded as it is, a custom API-key header such
+    /// as `X-Api-Key`, `Api-Key` or `X-Auth-Token` included: they are not known to be credentials.
+    /// To keep one from reaching another origin, handle the redirect with
+    /// ``redirectStrategy(_:)`` or ``onRedirect(_:)`` and remove it from the
+    /// ``RedirectRequest`` you answer with.
+    ///
     /// - Parameters:
     /// - max: The maximum number of redirects to follow.
     /// - allowCycles: Whether to allow redirect cycles or not.
