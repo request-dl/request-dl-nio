@@ -270,7 +270,10 @@ struct RedirectExecutorParityTests {
 
         for attempt in 0..<attempts {
             do {
-                let result = try await completing(within: 30) {
+                // Only a guard against a hang: the bug is an error thrown, never a slow request, and
+                // a simulator that is starved (watchOS, tvOS and visionOS jobs of the CI) stalls a
+                // whole test run for longer than 30 s.
+                let result = try await completing(within: 180) {
                     try await DataTask {
                         BaseURL(.http, host: "127.0.0.1:\(server.port)")
                         Path("/start/\(attempt)")
@@ -285,6 +288,9 @@ struct RedirectExecutorParityTests {
                 if result.head.status.code != 200 {
                     failures.append("#\(attempt): status \(result.head.status.code)")
                 }
+            } catch is EventuallyTimeoutError {
+                failures.append("#\(attempt): did not finish within 180 s")
+                break
             } catch {
                 failures.append("#\(attempt): \(error)")
             }
@@ -294,8 +300,19 @@ struct RedirectExecutorParityTests {
         await server.shutdown()
 
         // Then
+        // The runners that log only "Recorded an issue" drop the message of an expectation: what
+        // went wrong is printed as well, so it is in the log.
+        if !failures.isEmpty || redirected.count != attempts {
+            let failed = "\(failures.count) failed of \(attempts)"
+            let reached = "\(redirected.count) redirected requests reached the server"
+            print("POST/PUT redirect loop on \(executor): \(failed), \(reached): \(failures)")
+        }
+
         #expect(failures.isEmpty, "\(failures)")
-        #expect(redirected.count == attempts)
+        #expect(
+            redirected.count == attempts,
+            "\(redirected.count) of \(attempts) redirects reached the server"
+        )
     }
 
     /// `.urlSession` stops a chain at 20 redirects on its own, whatever `max` is: what it fails
