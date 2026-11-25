@@ -63,8 +63,12 @@ import struct Foundation.Data
 /// asked for: with a `url` that is the whole answer and no request is made, and with a `task` the
 /// request still runs and its result replaces the copy (the caller controls the cache policy,
 /// headers and credentials, and the key is their own `id`). If that request fails, the copy stays
-/// on screen. To force the request for a URL, remove the copy first with
-/// ``RDLImageLoader/removeCachedImage(url:)``.
+/// on screen.
+///
+/// Pass `refreshing: true` with a `url` to make the request anyway, as `task` does: the copy is
+/// still the first phase, the request's result replaces it, and a failed request leaves it on
+/// screen. ``RDLImageLoader/removeCachedImage(url:)`` forgets the copy for every view instead, and
+/// the view then starts empty.
 ///
 /// - Important: `id` identifies the request for both restarting the load (when it changes, the
 /// current load is cancelled and a new one begins, same as `AsyncImage` reacting to a new `url`)
@@ -81,6 +85,7 @@ public struct RDLImage<Content: View>: View {
     private let key: CacheKey?
     private let loader: RDLImageLoader
     private let scale: CGFloat
+    private let refreshing: Bool
     private let transaction: Transaction
     private let load: (@Sendable () async throws -> PlatformImage)?
     private let content: (RDLImagePhase) -> Content
@@ -119,7 +124,14 @@ public struct RDLImage<Content: View>: View {
     }
 
     /// The plan for `key`, looked up in `loader` at this moment, synchronously.
-    static func plan(for key: CacheKey?, loader: RDLImageLoader, scale: CGFloat) -> LoadPlan {
+    ///
+    /// `refreshing` only changes a URL with a valid copy: its request runs, as a task's does.
+    static func plan(
+        for key: CacheKey?,
+        loader: RDLImageLoader,
+        scale: CGFloat,
+        refreshing: Bool = false
+    ) -> LoadPlan {
         let cached: PlatformImage?
         let hasAnswer: Bool
 
@@ -143,7 +155,7 @@ public struct RDLImage<Content: View>: View {
         return LoadPlan(
             phase: .success(Image(platformImage: cached, scale: scale)),
             isCached: true,
-            runsRequest: !hasAnswer
+            runsRequest: !hasAnswer || refreshing
         )
     }
 
@@ -160,6 +172,9 @@ public struct RDLImage<Content: View>: View {
     ///    backed by `UIImage`; ignored on macOS.
     ///    - transaction: The transaction used when the phase changes.
     ///    - loader: The ``RDLImageLoader`` performing the request. Defaults to ``RDLImageLoader/shared``.
+    ///    - refreshing: Pass `true` to make the request even when the image is in memory. The copy
+    ///    is still the first phase, the request's result replaces it, and a failed request leaves
+    ///    it. Defaults to `false`: a copy in memory is the answer and there is no request.
     ///    - content: A closure producing the view to render for the current phase.
     ///
     public init(
@@ -167,6 +182,7 @@ public struct RDLImage<Content: View>: View {
         scale: CGFloat = 1,
         transaction: Transaction = Transaction(),
         loader: RDLImageLoader = .shared,
+        refreshing: Bool = false,
         @ViewBuilder content: @escaping (RDLImagePhase) -> Content
     ) {
         let key = url.map(CacheKey.url)
@@ -175,9 +191,12 @@ public struct RDLImage<Content: View>: View {
         self.key = key
         self.loader = loader
         self.scale = scale
+        self.refreshing = refreshing
         self.transaction = transaction
         self.content = content
-        self._phase = State(initialValue: Self.plan(for: key, loader: loader, scale: scale).phase)
+        self._phase = State(
+            initialValue: Self.plan(for: key, loader: loader, scale: scale, refreshing: refreshing).phase
+        )
 
         if let url {
             self.load = { try await loader.load(url: url) }
@@ -213,6 +232,7 @@ public struct RDLImage<Content: View>: View {
         self.key = key
         self.loader = loader
         self.scale = scale
+        self.refreshing = false
         self.transaction = transaction
         self.content = content
         self._phase = State(initialValue: Self.plan(for: key, loader: loader, scale: scale).phase)
@@ -229,7 +249,7 @@ public struct RDLImage<Content: View>: View {
 
         // The view that was just created already shows the copy in memory, and this does not take
         // it away: it is looked up again, and what was there is only cleared when there is none.
-        let plan = Self.plan(for: key, loader: loader, scale: scale)
+        let plan = Self.plan(for: key, loader: loader, scale: scale, refreshing: refreshing)
 
         withTransaction(transaction) {
             phase = plan.phase
@@ -281,6 +301,8 @@ extension RDLImage {
     ///    - scale: The scale to interpret the loaded image at. Only meaningful on platforms
     ///    backed by `UIImage`; ignored on macOS.
     ///    - loader: The ``RDLImageLoader`` performing the request. Defaults to ``RDLImageLoader/shared``.
+    ///    - refreshing: Pass `true` to make the request even when the image is in memory. See
+    ///    ``init(url:scale:transaction:loader:refreshing:content:)``.
     ///    - content: A closure producing the view to render once the image has loaded.
     ///    - placeholder: A closure producing the view to render while loading or on failure.
     ///
@@ -288,10 +310,11 @@ extension RDLImage {
         url: URL?,
         scale: CGFloat = 1,
         loader: RDLImageLoader = .shared,
+        refreshing: Bool = false,
         @ViewBuilder content: @escaping (Image) -> I,
         @ViewBuilder placeholder: @escaping () -> P
     ) where Content == _ConditionalContent<I, P> {
-        self.init(url: url, scale: scale, loader: loader) { phase in
+        self.init(url: url, scale: scale, loader: loader, refreshing: refreshing) { phase in
             if let image = phase.image {
                 content(image)
             } else {

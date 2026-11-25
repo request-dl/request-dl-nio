@@ -55,6 +55,42 @@ struct RDLImageMemoryTests {
         #expect(plan.runsRequest)
     }
 
+    /// `refreshing` keeps the copy as the first phase, marks it as one (so a failed request leaves it
+    /// on screen) and makes the request.
+    @Test
+    func plan_forAURLInMemory_whenRefreshing_isTheImageAndTheRequestRuns() async throws {
+        let loader = Self.makeLoader()
+        try await Self.warm(loader, id: Self.url.absoluteString)
+
+        let plan = RDLImage<EmptyView>.plan(for: .url(Self.url), loader: loader, scale: 1, refreshing: true)
+
+        #expect(plan.phase.image != nil)
+        #expect(plan.isCached)
+        #expect(plan.runsRequest)
+    }
+
+    @Test
+    func plan_forAURLNotInMemory_whenRefreshing_isEmptyAndTheRequest() {
+        let plan = RDLImage<EmptyView>.plan(
+            for: .url(Self.url),
+            loader: Self.makeLoader(),
+            scale: 1,
+            refreshing: true
+        )
+
+        #expect(plan.phase.image == nil)
+        #expect(!plan.isCached)
+        #expect(plan.runsRequest)
+    }
+
+    @Test
+    func plan_withoutAKey_whenRefreshing_stillMakesNoRequest() {
+        let plan = RDLImage<EmptyView>.plan(for: nil, loader: Self.makeLoader(), scale: 1, refreshing: true)
+
+        #expect(plan.phase.image == nil)
+        #expect(!plan.runsRequest)
+    }
+
     @Test
     func plan_forAnIDInMemory_isTheImageAndTheRequestStillRuns() async throws {
         let loader = Self.makeLoader()
@@ -155,6 +191,49 @@ struct RDLImageMemoryTests {
 
         let first = try #require(phases.all.first)
         #expect(first.image != nil)
+    }
+
+    @Test
+    func firstBody_withTheURLInMemory_whenRefreshing_isAlreadyASuccess() async throws {
+        let loader = Self.makeLoader()
+        try await Self.warm(loader, id: Self.url.absoluteString)
+        let phases = Phases()
+
+        render(
+            RDLImage(url: Self.url, loader: loader, refreshing: true) { phase -> Color in
+                phases.record(phase)
+                return .clear
+            }
+        )
+
+        let first = try #require(phases.all.first)
+        #expect(first.image != nil)
+    }
+
+    /// The content/placeholder convenience init forwards `refreshing`, and keeps compiling without it.
+    @Test
+    func convenienceInit_acceptsRefreshing_andShowsTheCopyFirst() async throws {
+        let loader = Self.makeLoader()
+        try await Self.warm(loader, id: Self.url.absoluteString)
+        let shown = Phases()
+
+        render(
+            RDLImage(url: Self.url, loader: loader, refreshing: true) { image -> Color in
+                shown.record(.success(image))
+                return Color.clear
+            } placeholder: {
+                Color.red
+            }
+        )
+        render(
+            RDLImage(url: Self.url, loader: loader) { _ -> Color in
+                Color.clear
+            } placeholder: {
+                Color.red
+            }
+        )
+
+        #expect(shown.all.first?.image != nil)
     }
 
     @Test

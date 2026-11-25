@@ -40,7 +40,7 @@ RDLImage(url: url) { phase in
 }
 ```
 
-When the loader has the image in memory (see below), the view's first phase is already `.success`, in the frame it is created in, instead of `.empty`; `RDLImage(url:)` then makes no request, and `RDLImage(id:task:)` still does and replaces the copy.
+When the loader has the image in memory (see below), the view's first phase is already `.success`, in the frame it is created in, instead of `.empty`; `RDLImage(url:)` then makes no request unless you pass `refreshing: true`, and `RDLImage(id:task:)` still does and replaces the copy.
 
 Use the ``RequestDL/RDLImage/init(id:scale:transaction:loader:task:content:)`` initializer when the request needs more than a URL — custom headers, authentication, a specific ``RequestDL/Property/cachePolicy(_:)``, and so on — by building it the same way a ``RequestDL/DataTask`` is built:
 
@@ -91,7 +91,7 @@ Starting a `setImage` also replaces whatever the view is showing right away: wit
 
 When the loader already has the image you ask for, the view gets that image instead, in the same turn: not the placeholder, and not an empty frame. ``RDLImageLoader`` keeps the images it has loaded decoded in memory (64 MB by default, counted in pixels, emptied by the system when memory runs low), and each one is good for 5 minutes from when it was loaded. What happens after that depends on how you asked for the image:
 
-- **By URL** (`setImage(with:)`, `RDLImage(url:)`): a valid copy is the answer, and **no request is made**, with no disk read and no decode. Your `completion` is called at once. The URL is all that identifies the request, so the copy can only be wrong by its age, which the time to live bounds. Pass `refreshing: true` to `setImage(with:)` to make the request anyway (the copy stays on screen until the new image arrives), or call ``RDLImageLoader/removeCachedImage(url:)`` before an `RDLImage(url:)` to force it.
+- **By URL** (`setImage(with:)`, `RDLImage(url:)`): a valid copy is the answer, and **no request is made**, with no disk read and no decode. Your `completion` is called at once. The URL is all that identifies the request, so the copy can only be wrong by its age, which the time to live bounds. Pass `refreshing: true` to `setImage(with:)` to make the request anyway (the copy stays on screen until the new image arrives), or pass `refreshing: true` to `RDLImage(url:)`, which does the same: its first phase is the copy and the request's result replaces it. ``RDLImageLoader/removeCachedImage(url:)`` forgets the copy for every view instead.
 - **By task** (`setImage(id:task:)`, `RDLImage(id:task:)`): the copy is only shown first, and the request **still runs**, with its cache policy, headers and credentials, and replaces it. You control those, and the key is the `id` you chose, so a copy made for another account or another policy is never the final answer. If that request fails, the copy stays.
 
 The copy is keyed by the URL, or by the `id`, and is only written when a load finishes with success: a failed load leaves it as it was. ``RDLImageLoader/load(url:)`` and ``RDLImageLoader/load(id:task:)`` themselves never read it: they always run the request.
