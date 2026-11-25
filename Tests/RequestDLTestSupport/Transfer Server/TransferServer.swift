@@ -299,6 +299,16 @@ package final class TransferServer: @unchecked Sendable {
         lock.withLock { _bodyBytesWritten }
     }
 
+    /// How many connections have written at least one byte of a download body.
+    ///
+    /// ``bodyBytesWritten`` is the sum over every connection, so it is positive as soon as ONE of
+    /// them has written: a test that waits for it before sampling a quiet server can start
+    /// sampling while the others have not begun, and the bytes they write afterwards look like a
+    /// leak. Waiting for this to reach the number of requests in flight closes that window.
+    package var connectionsThatWrote: Int {
+        lock.withLock { _connectionsThatWrote }
+    }
+
     /// Upload body bytes received, over every connection, as they arrive.
     package var uploadBytesReceived: Int {
         lock.withLock { _uploadBytesReceived }
@@ -350,6 +360,8 @@ package final class TransferServer: @unchecked Sendable {
     private var _requests: [ReceivedRequest] = []
     private var _nextArrival = 0
     private var _bodyBytesWritten = 0
+    private var _connectionsThatWrote = 0
+    private var _writingConnections: Set<Int32> = []
     private var _uploadBytesReceived = 0
     private var _acceptedConnections = 0
     private var _stalledConnections = 0
@@ -571,6 +583,7 @@ package final class TransferServer: @unchecked Sendable {
     private func release(_ connection: Int32) {
         lock.withLock {
             _ = _connections.remove(connection)
+            _writingConnections.remove(connection)
             close(connection)
         }
     }
@@ -1075,8 +1088,14 @@ package final class TransferServer: @unchecked Sendable {
 
     // MARK: - Bookkeeping (called from `TransferServerIO`)
 
-    fileprivate func didSendBody(_ count: Int) {
-        lock.withLock { _bodyBytesWritten += count }
+    fileprivate func didSendBody(_ count: Int, on connection: Int32) {
+        lock.withLock {
+            _bodyBytesWritten += count
+
+            if _writingConnections.insert(connection).inserted {
+                _connectionsThatWrote += 1
+            }
+        }
     }
 
     fileprivate func didReceiveUpload(_ count: Int) {
@@ -1386,7 +1405,7 @@ private struct TransferServerIO {
             offset += sent
 
             if counted {
-                server.didSendBody(sent)
+                server.didSendBody(sent, on: connection)
             }
         }
 

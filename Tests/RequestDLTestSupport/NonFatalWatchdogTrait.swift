@@ -48,7 +48,12 @@ import Testing
 package struct NonFatalWatchdogTrait: TestTrait, SuiteTrait, TestScoping {
 
     /// How late work has to have started, at worst, for a held lock to be put down to the machine.
-    package static let lagThreshold = 5.0
+    ///
+    /// A healthy runner measures well under a second. The Linux job that tripped 30 locks at once,
+    /// every holder in `Internals.Buffer.write` with nobody waiting, had measured 4.5 s at worst on
+    /// both the file pool and the cooperative pool, just under the 5 s this used to be: a probe
+    /// only reports once it finishes, so a stall still going on is seen as less than it is.
+    package static let lagThreshold = 3.0
 
     /// How far back that lateness is looked for. Longer than the lock's own 15 s budget, since
     /// the report arrives after the stall that caused it has been going on for that long.
