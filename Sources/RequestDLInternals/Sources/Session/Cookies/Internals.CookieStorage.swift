@@ -56,6 +56,12 @@ extension Internals {
         private let publicSuffixList: PublicSuffixList?
         private var cookies: [Cookie] = []
 
+        /// What was last said, per request host, about cookies left out of the `Cookie` header
+        /// (see ``HeaderOmission``): a digest of which cookies they were. A host is forgotten once
+        /// a request to it leaves nothing out, so it is said again if that happens anew. Guarded
+        /// by `lock`.
+        private var reportedOmissions: [String: Int] = [:]
+
         /// Whoever is observing `changes()`. Its own lock, never held with `lock`: a signal is sent
         /// after a change, once the storage's lock is released.
         private let observersLock = Lock()
@@ -73,6 +79,25 @@ extension Internals {
             for continuation in observers.values {
                 continuation.finish()
             }
+        }
+
+        // MARK: - Internal types
+
+        /// Cookies that match a request but did not fit in ``maximumCookieHeaderLength``, so they
+        /// were not sent.
+        ///
+        /// It carries counts, never a cookie: nothing here is fit for a log but how many were left
+        /// out.
+        package struct HeaderOmission: Sendable, Equatable {
+
+            /// How many cookies were left out.
+            package let count: Int
+
+            /// The host of the request.
+            package let host: String
+
+            /// The limit they did not fit in, in bytes.
+            package let limit: Int
         }
 
         // MARK: - Internal methods
@@ -124,6 +149,34 @@ extension Internals {
         ///
         /// Cookies with longer paths come first, then the ones created earlier (RFC 6265 5.4).
         package func cookieHeader(for url: URL, now: Date = Date()) -> String? {
+            header(for: url, now: now, reportsOmission: false)?.value
+        }
+
+        /// What ``cookieHeader(for:now:)`` returns, and whether cookies that match were left out
+        /// of it because they did not fit in ``maximumCookieHeaderLength``.
+        ///
+        /// The omission is returned the first time a host has cookies left out, and again only
+        /// when the set of cookies left out for that host changes, so asking on every request
+        /// does not repeat it. A request that leaves nothing out clears what is remembered for
+        /// its host. Redirect hops and continuations use ``cookieHeader(for:now:)``, which neither
+        /// reports nor changes that.
+        package func cookieHeaderReportingOmission(
+            for url: URL,
+            now: Date = Date()
+        ) -> (value: String?, omission: HeaderOmission?) {
+            guard let result = header(for: url, now: now, reportsOmission: true) else {
+                return (nil, nil)
+            }
+
+            return (result.value, result.omission)
+        }
+
+        /// `nil` when the URL has no origin the jar can match.
+        private func header(
+            for url: URL,
+            now: Date,
+            reportsOmission: Bool
+        ) -> (value: String?, omission: HeaderOmission?)? {
             guard let origin = Self.origin(of: url) else {
                 return nil
             }
@@ -133,20 +186,51 @@ extension Internals {
 
             cookies.removeAll { $0.isExpired(at: now) }
 
-            let matching = withinHeaderLimit(orderedMatches(for: origin, now: now))
+            let ordered = orderedMatches(for: origin, now: now)
+            let matching = withinHeaderLimit(ordered)
+            let omission = reportsOmission ? omissionToReport(ordered, kept: matching, host: origin.host) : nil
 
             guard !matching.isEmpty else {
-                return nil
+                return (nil, omission)
             }
 
             for index in matching {
                 cookies[index].lastAccess = now
             }
 
-            return
+            let value =
                 matching
                 .map { "\(cookies[$0].name)=\(cookies[$0].value)" }
                 .joined(separator: "; ")
+
+            return (value, omission)
+        }
+
+        /// The omission to tell about, or `nil` when there is none or it was already told. Updates
+        /// what is remembered for `host`. Expects the lock to be held.
+        private func omissionToReport(_ ordered: [Int], kept: [Int], host: String) -> HeaderOmission? {
+            let keptSet = Set(kept)
+            let omitted = ordered.filter { !keptSet.contains($0) }
+
+            guard !omitted.isEmpty else {
+                reportedOmissions[host] = nil
+                return nil
+            }
+
+            // Which cookies they are, not how many: one coming in as another goes out is a change.
+            var hasher = Hasher()
+            for identity in omitted.map({ "\(cookies[$0].name);\(cookies[$0].domain);\(cookies[$0].path)" }).sorted() {
+                hasher.combine(identity)
+            }
+            let digest = hasher.finalize()
+
+            guard reportedOmissions[host] != digest else {
+                return nil
+            }
+
+            reportedOmissions[host] = digest
+
+            return HeaderOmission(count: omitted.count, host: host, limit: Self.maximumCookieHeaderLength)
         }
 
         package func removeAll(now: Date = Date()) {

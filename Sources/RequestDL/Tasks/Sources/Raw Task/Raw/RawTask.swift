@@ -90,13 +90,15 @@ struct RawTask<Content: Property>: RequestTask {
             to: resolvedFromProperties
         )
 
-        let resolved = Self.applyingCookies(to: resumed)
-
+        // Applying the jar changes the headers, never the URL, so the logger is the same either way
+        // and is made first for the jar to say what it left out.
         let logger = Internals.TaskLogger(
-            baseURL: resolved.requestConfiguration.baseURL,
-            pathComponents: resolved.requestConfiguration.pathComponents,
+            baseURL: resumed.requestConfiguration.baseURL,
+            pathComponents: resumed.requestConfiguration.pathComponents,
             logger: environment.logger
         )
+
+        let resolved = Self.applyingCookies(to: resumed, logger: logger)
 
         // Every step from here to the request itself is raced against the same budget. Each one can
         // block for an unbounded stretch on something the caller can't see (a descriptor hook doing
@@ -193,7 +195,7 @@ struct RawTask<Content: Property>: RequestTask {
     /// A request that already carries a `Cookie` header keeps it as it is (the explicit header
     /// wins over the automatic one, as it does for `User-Agent`). The jar still stores what its
     /// responses set, but it neither adds to that header nor recomputes it on redirects.
-    static func applyingCookies(to resolved: Resolved) -> Resolved {
+    static func applyingCookies(to resolved: Resolved, logger: Internals.TaskLogger? = nil) -> Resolved {
         guard let storage = resolved.session.configuration.cookieStorage else {
             return resolved
         }
@@ -201,10 +203,16 @@ struct RawTask<Content: Property>: RequestTask {
         var configuration = resolved.requestConfiguration
         let hasExplicitCookie = configuration.headers.contains(name: "Cookie")
 
-        if !hasExplicitCookie, let url = URL(string: configuration.url),
-            let value = storage.cookieHeader(for: url)
-        {
-            configuration.headers.add(name: "Cookie", value: value)
+        if !hasExplicitCookie, let url = URL(string: configuration.url) {
+            let (value, omission) = storage.cookieHeaderReportingOmission(for: url)
+
+            if let value {
+                configuration.headers.add(name: "Cookie", value: value)
+            }
+
+            if let omission {
+                Self.warnCookiesWereLeftOut(omission, logger: logger)
+            }
         }
 
         configuration.cookies = .init(
@@ -217,6 +225,29 @@ struct RawTask<Content: Property>: RequestTask {
             session: resolved.session,
             requestConfiguration: configuration,
             dataCache: resolved.dataCache
+        )
+    }
+
+    /// Cookies the jar holds for the host were not sent: they did not fit in the `Cookie` header.
+    /// That is silent to the server, which sees a session that was never set, so it is said here.
+    /// Only how many, the limit and the host: never a cookie, name or value.
+    private static func warnCookiesWereLeftOut(
+        _ omission: Internals.CookieStorage.HeaderOmission,
+        logger: Internals.TaskLogger?
+    ) {
+        logger?.log(
+            level: .warning,
+            """
+            \(omission.count) cookie(s) of the jar for \(omission.host) were not sent: they do not fit \
+            in the \(omission.limit) bytes of a `Cookie` header, and the ones with the shortest paths, \
+            then the oldest, are left out first. Said once for each set of cookies left out; remove \
+            cookies from the jar, or shorten them, to send them.
+            """,
+            additionalMetadata: [
+                "cookies_left_out": .string(String(omission.count)),
+                "host": .string(omission.host),
+                "header_limit": .string(String(omission.limit)),
+            ]
         )
     }
 

@@ -196,4 +196,100 @@ struct InternalsCookieHeaderLimitTests {
             storage.cookies(for: target, now: now.addingTimeInterval(10)).map(\.name) == ["b2", "sid"]
         )
     }
+
+    // MARK: - Reporting what was left out
+
+    private func storageWithTwoBigCookies(now: Date) -> Internals.CookieStorage {
+        let storage = Internals.CookieStorage()
+        let big = String(repeating: "x", count: 4_000)
+
+        storage.store(
+            setCookieValues: ["b1=\(big); Domain=example.com", "b2=\(big); Domain=example.com"],
+            for: url("https://example.com/"),
+            now: now
+        )
+
+        return storage
+    }
+
+    @Test
+    func cookieHeaderReportingOmission_whenCookiesAreLeftOut_saysHowManyOnceAndNeverWhich() throws {
+        let storage = storageWithTwoBigCookies(now: now)
+        storage.store(setCookieValues: ["sid=SECRET"], for: url("https://example.com/"), now: now.addingTimeInterval(5))
+
+        let target = url("https://example.com/")
+
+        let first = storage.cookieHeaderReportingOmission(for: target, now: now.addingTimeInterval(10))
+        let second = storage.cookieHeaderReportingOmission(for: target, now: now.addingTimeInterval(11))
+
+        #expect(first.value == second.value)
+        #expect(first.omission == .init(count: 1, host: "example.com", limit: limit))
+        #expect(second.omission == nil)
+    }
+
+    @Test
+    func cookieHeaderReportingOmission_whenNothingIsLeftOut_reportsNothing() throws {
+        let storage = Internals.CookieStorage()
+        storage.store(setCookieValues: ["a=1", "b=2"], for: url("https://example.com/"), now: now)
+
+        let result = storage.cookieHeaderReportingOmission(for: url("https://example.com/"), now: now)
+
+        #expect(result.value == "a=1; b=2")
+        #expect(result.omission == nil)
+    }
+
+    @Test
+    func cookieHeaderReportingOmission_whenTheCookiesLeftOutChange_reportsAgain() throws {
+        let storage = storageWithTwoBigCookies(now: now)
+        let target = url("https://example.com/")
+
+        #expect(storage.cookieHeaderReportingOmission(for: target, now: now).omission?.count == 1)
+        #expect(storage.cookieHeaderReportingOmission(for: target, now: now).omission == nil)
+
+        // Another cookie that does not fit: the set that is left out is no longer the same.
+        storage.store(
+            setCookieValues: ["b3=\(String(repeating: "x", count: 4_000)); Domain=example.com"],
+            for: target,
+            now: now.addingTimeInterval(1)
+        )
+
+        #expect(storage.cookieHeaderReportingOmission(for: target, now: now.addingTimeInterval(2)).omission?.count == 2)
+        #expect(storage.cookieHeaderReportingOmission(for: target, now: now.addingTimeInterval(2)).omission == nil)
+    }
+
+    @Test
+    func cookieHeaderReportingOmission_whenItStopsAndStartsAgain_reportsAgain() throws {
+        let storage = storageWithTwoBigCookies(now: now)
+        let target = url("https://example.com/")
+
+        #expect(storage.cookieHeaderReportingOmission(for: target, now: now).omission != nil)
+
+        // A path the big cookies do not match leaves nothing out, which forgets the host's state.
+        storage.removeAll(forHost: "example.com", includingSubdomains: true)
+        #expect(storage.cookieHeaderReportingOmission(for: target, now: now).omission == nil)
+
+        storage.store(
+            setCookieValues: ["b1=\(String(repeating: "x", count: 4_000)); Domain=example.com"],
+            for: target,
+            now: now
+        )
+        storage.store(
+            setCookieValues: ["b2=\(String(repeating: "x", count: 4_000)); Domain=example.com"],
+            for: target,
+            now: now
+        )
+
+        #expect(storage.cookieHeaderReportingOmission(for: target, now: now).omission != nil)
+    }
+
+    @Test
+    func cookieHeader_neverChangesWhatWasReported() throws {
+        let storage = storageWithTwoBigCookies(now: now)
+        let target = url("https://example.com/")
+
+        // A redirect hop asks without reporting, and must neither report nor use up the report.
+        _ = storage.cookieHeader(for: target, now: now)
+
+        #expect(storage.cookieHeaderReportingOmission(for: target, now: now).omission?.count == 1)
+    }
 }

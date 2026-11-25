@@ -141,7 +141,9 @@ public final class CookieJar: Sendable {
     ///
     /// The `Cookie` header of a request has at most 8000 bytes, and so does this list: when the
     /// cookies that match do not fit, the ones with the shortest paths are left out of both and,
-    /// among equal paths, the oldest, so a cookie that was just set is not the one that goes.
+    /// among equal paths, the oldest, so a cookie that was just set is not the one that goes. A
+    /// request that leaves some out says so once in its logger, with the count, the limit and the
+    /// host, never a cookie.
     ///
     /// - Parameter url: The URL of the request. One without a host has no cookies.
     public func cookies(for url: URL) -> [Cookie] {
