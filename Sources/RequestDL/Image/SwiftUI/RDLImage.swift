@@ -57,6 +57,15 @@ import struct Foundation.Data
 /// Any ``RequestTask`` producing a ``TaskResult`` of `Data` works, so a ``MockedTask`` also drops
 /// in directly, which is handy for previews and tests that shouldn't hit the network.
 ///
+/// An image the `loader` already has in memory and that has not expired (see
+/// ``RDLImageLoader/memoryCacheTimeToLive``) is the first phase of the view, in the same frame it
+/// is created, instead of ``RDLImagePhase/empty``. What happens next depends on how the image is
+/// asked for: with a `url` that is the whole answer and no request is made, and with a `task` the
+/// request still runs and its result replaces the copy (the caller controls the cache policy,
+/// headers and credentials, and the key is their own `id`). If that request fails, the copy stays
+/// on screen. To force the request for a URL, remove the copy first with
+/// ``RDLImageLoader/removeCachedImage(url:)``.
+///
 /// - Important: `id` identifies the request for both restarting the load (when it changes, the
 /// current load is cancelled and a new one begins, same as `AsyncImage` reacting to a new `url`)
 /// and deduplicating concurrent loads in ``RDLImageLoader``. It can't be derived automatically
@@ -66,9 +75,11 @@ public struct RDLImage<Content: View>: View {
 
     // MARK: - Private properties
 
-    @State private var phase: RDLImagePhase = .empty
+    @State private var phase: RDLImagePhase
 
     private let id: String?
+    private let key: CacheKey?
+    private let loader: RDLImageLoader
     private let scale: CGFloat
     private let transaction: Transaction
     private let load: (@Sendable () async throws -> PlatformImage)?
@@ -81,6 +92,59 @@ public struct RDLImage<Content: View>: View {
             .task(id: id) {
                 await runLoad()
             }
+    }
+
+    // MARK: - Private types
+
+    /// What a copy in memory is looked up by, and what that copy means for the request.
+    enum CacheKey: Equatable {
+        /// A URL: a valid copy is the answer, and there is no request.
+        case url(URL)
+
+        /// A task's `id`: a valid copy is shown first, and the request still runs.
+        case id(String)
+    }
+
+    /// What a view starts a load with, given what the loader has in memory.
+    struct LoadPlan {
+
+        /// The phase to show first: the copy in memory when there is one, empty otherwise.
+        let phase: RDLImagePhase
+
+        /// Whether `phase` is a copy in memory, which a failed request must not replace.
+        let isCached: Bool
+
+        /// Whether the request is made. `false` only for a URL with a valid copy.
+        let runsRequest: Bool
+    }
+
+    /// The plan for `key`, looked up in `loader` at this moment, synchronously.
+    static func plan(for key: CacheKey?, loader: RDLImageLoader, scale: CGFloat) -> LoadPlan {
+        let cached: PlatformImage?
+        let hasAnswer: Bool
+
+        switch key {
+        case .url(let url):
+            cached = loader.cachedImage(url: url)
+            hasAnswer = true
+
+        case .id(let id):
+            cached = loader.cachedImage(id: id)
+            hasAnswer = false
+
+        case nil:
+            return LoadPlan(phase: .empty, isCached: false, runsRequest: false)
+        }
+
+        guard let cached else {
+            return LoadPlan(phase: .empty, isCached: false, runsRequest: true)
+        }
+
+        return LoadPlan(
+            phase: .success(Image(platformImage: cached, scale: scale)),
+            isCached: true,
+            runsRequest: !hasAnswer
+        )
     }
 
     // MARK: - Inits
@@ -105,10 +169,15 @@ public struct RDLImage<Content: View>: View {
         loader: RDLImageLoader = .shared,
         @ViewBuilder content: @escaping (RDLImagePhase) -> Content
     ) {
+        let key = url.map(CacheKey.url)
+
         self.id = url?.absoluteString
+        self.key = key
+        self.loader = loader
         self.scale = scale
         self.transaction = transaction
         self.content = content
+        self._phase = State(initialValue: Self.plan(for: key, loader: loader, scale: scale).phase)
 
         if let url {
             self.load = { try await loader.load(url: url) }
@@ -138,10 +207,15 @@ public struct RDLImage<Content: View>: View {
         task: ImageTask,
         @ViewBuilder content: @escaping (RDLImagePhase) -> Content
     ) {
+        let key = CacheKey.id(id)
+
         self.id = id
+        self.key = key
+        self.loader = loader
         self.scale = scale
         self.transaction = transaction
         self.content = content
+        self._phase = State(initialValue: Self.plan(for: key, loader: loader, scale: scale).phase)
         self.load = { try await loader.load(id: id, task: task) }
     }
 
@@ -153,8 +227,16 @@ public struct RDLImage<Content: View>: View {
             return
         }
 
+        // The view that was just created already shows the copy in memory, and this does not take
+        // it away: it is looked up again, and what was there is only cleared when there is none.
+        let plan = Self.plan(for: key, loader: loader, scale: scale)
+
         withTransaction(transaction) {
-            phase = .empty
+            phase = plan.phase
+        }
+
+        guard plan.runsRequest else {
+            return
         }
 
         do {
@@ -170,6 +252,11 @@ public struct RDLImage<Content: View>: View {
             // shouldn't commit a result.
         } catch {
             guard !Task.isCancelled else {
+                return
+            }
+
+            // A copy in memory that is on screen stays when its request fails.
+            guard !plan.isCached else {
                 return
             }
 

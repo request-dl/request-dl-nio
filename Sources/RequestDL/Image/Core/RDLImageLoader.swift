@@ -9,6 +9,7 @@ import FoundationEssentials
 #else
 import struct Foundation.URL
 import struct Foundation.Data
+import typealias Foundation.TimeInterval
 #endif
 
 /// Loads and decodes images through RequestDL's request pipeline, reusing its cache
@@ -21,10 +22,21 @@ import struct Foundation.Data
 /// cache, which is what makes a *later*, non-concurrent request for the same image cheap.
 ///
 /// The images that were loaded are also kept decoded in memory, up to ``memoryCacheLimit``
-/// bytes, so a view can show one at once: see ``cachedImage(id:)``. That copy only ever answers
-/// that question. It never stands in for a request: ``load(id:task:)`` always runs the request,
-/// with its cache policy, its headers and everything else it says, and what it loads replaces the
-/// copy.
+/// bytes and for ``memoryCacheTimeToLive`` seconds each, so a view can show one at once: see
+/// ``cachedImage(id:)``. What the copy in memory stands in for depends on how the image is asked
+/// for:
+///
+/// - **By URL** (``load(url:)``'s callers, `setImage(with:)` and `RDLImage(url:)`): a valid copy
+///   is the answer, and the request is not made at all, with no disk read or decode. The URL is
+///   all that identifies the request, so there is nothing a copy could be wrong about but its age,
+///   which the time to live bounds.
+/// - **By task** (`setImage(id:task:)` and `RDLImage(id:task:)`): the copy is only shown first,
+///   and the request still runs and replaces it. The caller owns the cache policy, headers and
+///   credentials, and the key is the `id` they chose, so a copy made for another account or
+///   another policy must never be the final word.
+///
+/// ``load(url:)`` and ``load(id:task:)`` themselves never read the copy: they always run the
+/// request, and what they load replaces it.
 ///
 /// A call that is cancelled stops waiting at once, with a `CancellationError`, whether it was
 /// alone or one of several. The shared download is cancelled once every call waiting for it has
@@ -50,10 +62,26 @@ public actor RDLImageLoader {
     /// The system also empties the cache when memory runs low, whatever this is. Changing it
     /// applies at once; `0` turns the cache off, drops what it holds, and keeps nothing from then
     /// on, which brings back showing a view empty until an image that was loaded before arrives
-    /// again.
+    /// again, and making the request for every URL.
     public nonisolated var memoryCacheLimit: Int {
         get { memoryCache.limit }
         set { memoryCache.limit = newValue }
+    }
+
+    /// How many seconds an image stays valid in memory, counted from when it was loaded (not
+    /// from when it was last shown). Defaults to 300, 5 minutes. `nil`, or `.infinity`, keeps it
+    /// until the limit or the system evicts it.
+    ///
+    /// Once it is over, the image is a miss and is removed: a view asked for it is cleared (or
+    /// shows its placeholder) and the request runs. Applies to the images already in memory.
+    ///
+    /// It is what bounds how old an image shown without a request can be, so it is short: an
+    /// image that changes behind the same URL is seen again within this time. `0` makes every
+    /// image a miss. To force the request for one call, see `refreshing` in `setImage(with:)`, or
+    /// call ``removeCachedImage(url:)`` first.
+    public nonisolated var memoryCacheTimeToLive: TimeInterval? {
+        get { memoryCache.timeToLive }
+        set { memoryCache.timeToLive = newValue }
     }
 
     // MARK: - Private properties
@@ -123,15 +151,21 @@ public actor RDLImageLoader {
     /// - Parameters:
     ///    - dataCache: The cache ``load(url:)`` uses. See ``dataCache``.
     ///    - memoryCacheLimit: See ``memoryCacheLimit``. `0` keeps no image in memory.
-    public init(dataCache: DataCache, memoryCacheLimit: Int) {
+    ///    - memoryCacheTimeToLive: See ``memoryCacheTimeToLive``. Defaults to 5 minutes.
+    public init(
+        dataCache: DataCache,
+        memoryCacheLimit: Int,
+        memoryCacheTimeToLive: TimeInterval? = 300
+    ) {
         self.dataCache = dataCache
-        self.memoryCache = RDLImageMemoryCache(limit: memoryCacheLimit)
+        self.memoryCache = RDLImageMemoryCache(limit: memoryCacheLimit, timeToLive: memoryCacheTimeToLive)
     }
 
     // MARK: - Public methods
 
     ///
-    /// The image a load for `id` last finished with, when it is still in memory.
+    /// The image a load for `id` last finished with, when it is still in memory and its time to
+    /// live (``memoryCacheTimeToLive``) is not over.
     ///
     /// It answers at once and from any thread, which is what lets a view that is asked to show
     /// `id` again put the image on screen in the same turn, instead of clearing it until the load
@@ -140,10 +174,12 @@ public actor RDLImageLoader {
     ///
     /// An image is only kept when a load finishes with success. Whatever the request's cache
     /// policy says about the response does not apply to this copy, so it can be older than what
-    /// the request would return now: use it to show something sooner, not to answer the request.
+    /// the request would return now, by up to the time to live. It is what a view shows first, and
+    /// for a URL it is also the answer, with no request: see the discussion of this type.
     ///
     /// - Parameter id: The identifier of the load.
-    /// - Returns: The image, or `nil` when none was loaded, it was removed, or it was evicted.
+    /// - Returns: The image, or `nil` when none was loaded, it was removed, it expired, or it was
+    ///   evicted.
     ///
     public nonisolated func cachedImage(id: String) -> PlatformImage? {
         memoryCache.image(for: id)

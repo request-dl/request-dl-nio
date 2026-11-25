@@ -515,6 +515,162 @@ struct NSImageViewRequestDLTests {
         #expect(loader.cachedImage(id: "race-second") != nil)
         #expect(loader.cachedImage(id: "race-first") == nil)
     }
+    // MARK: - A URL in memory is not requested
+
+    /// Nothing listens there, so a request would end in a refused connection and say so to the
+    /// completion: that nothing arrives is how these tests know there was none.
+    private static let unreachable = URL(string: "http://127.0.0.1:1/avatar.png")!
+
+    private static func warmedLoader(
+        url: URL,
+        timeToLive: TimeInterval? = 300
+    ) async throws -> (loader: RDLImageLoader, image: NSImage) {
+        let loader = RDLImageLoader(
+            dataCache: DataCache(suiteName: UUID().uuidString),
+            memoryCacheLimit: 1_024 * 1_024,
+            memoryCacheTimeToLive: timeToLive
+        )
+
+        let image = try await loader.load(
+            id: url.absoluteString,
+            task: StubImageTask { .init(head: .stub, payload: .onePixelPNG) }
+        )
+
+        return (loader, image)
+    }
+
+    @Test
+    func aURLInMemoryIsShownAndCompletedAtOnceWithoutARequest() async throws {
+        // Given
+        let (loader, cached) = try await Self.warmedLoader(url: Self.unreachable)
+        let imageView = NSImageView()
+        imageView.image = NSImage()
+        let results = LockedValueBox<[Result<NSImage, Error>]>([])
+
+        // When
+        imageView.rdl.setImage(with: Self.unreachable, loader: loader) { result in
+            results.withLockedValue { $0.append(result) }
+        }
+
+        // Then: before the method's caller has run again
+        #expect(imageView.image === cached)
+        #expect(results.withLockedValue { $0 }.count == 1)
+        #expect(try results.withLockedValue { $0 }[0].get() === cached)
+        #expect(await loader.waiterCountForTesting(id: Self.unreachable.absoluteString) == 0)
+
+        // A request would have failed by now, and said so.
+        try await Task.sleep(nanoseconds: 400_000_000)
+        #expect(results.withLockedValue { $0 }.count == 1)
+        #expect(imageView.image === cached)
+    }
+
+    @Test
+    func refreshingShowsTheURLInMemoryAndMakesTheRequestAnyway() async throws {
+        // Given
+        let (loader, cached) = try await Self.warmedLoader(url: Self.unreachable)
+        let imageView = NSImageView()
+        let results = LockedValueBox<[Result<NSImage, Error>]>([])
+
+        // When
+        imageView.rdl.setImage(with: Self.unreachable, loader: loader, refreshing: true) { result in
+            results.withLockedValue { $0.append(result) }
+        }
+
+        // Then
+        #expect(imageView.image === cached)
+        #expect(results.withLockedValue { $0 }.isEmpty)
+
+        try await eventually { results.withLockedValue { $0 }.count == 1 }
+
+        // The request failed, and what was on screen stays.
+        if case .success = results.withLockedValue({ $0 })[0] {
+            Issue.record("The request was expected to fail")
+        }
+        #expect(imageView.image === cached)
+        #expect(loader.cachedImage(url: Self.unreachable) === cached)
+    }
+
+    @Test
+    func anExpiredURLInMemoryIsAMissAndRunsTheRequest() async throws {
+        // Given
+        let (loader, _) = try await Self.warmedLoader(url: Self.unreachable, timeToLive: 0.05)
+        try await Task.sleep(nanoseconds: 150_000_000)
+        let imageView = NSImageView()
+        imageView.image = NSImage()
+        let results = LockedValueBox<[Result<NSImage, Error>]>([])
+
+        // When
+        imageView.rdl.setImage(with: Self.unreachable, loader: loader) { result in
+            results.withLockedValue { $0.append(result) }
+        }
+
+        // Then
+        #expect(imageView.image == nil)
+        #expect(loader.cachedImage(url: Self.unreachable) == nil)
+
+        try await eventually { results.withLockedValue { $0 }.count == 1 }
+    }
+
+    @Test
+    func withoutATimeToLiveAURLInMemoryDoesNotExpire() async throws {
+        // Given
+        let (loader, cached) = try await Self.warmedLoader(url: Self.unreachable, timeToLive: nil)
+        try await Task.sleep(nanoseconds: 150_000_000)
+        let imageView = NSImageView()
+
+        // When
+        imageView.rdl.setImage(with: Self.unreachable, loader: loader)
+
+        // Then
+        #expect(imageView.image === cached)
+    }
+
+    @Test
+    func removingTheURLFromMemoryMakesTheNextCallRunTheRequest() async throws {
+        // Given
+        let (loader, _) = try await Self.warmedLoader(url: Self.unreachable)
+        loader.removeCachedImage(url: Self.unreachable)
+        let imageView = NSImageView()
+        let results = LockedValueBox<[Result<NSImage, Error>]>([])
+
+        // When
+        imageView.rdl.setImage(with: Self.unreachable, loader: loader) { result in
+            results.withLockedValue { $0.append(result) }
+        }
+
+        // Then
+        #expect(imageView.image == nil)
+        try await eventually { results.withLockedValue { $0 }.count == 1 }
+    }
+
+    /// The variant with a task is the caller's: its policy, headers and credentials, and its own
+    /// key. A copy in memory is shown first and the request runs, whatever the copy's age.
+    @Test
+    func aTaskAlwaysRunsItsRequestEvenWithAValidImageInMemory() async throws {
+        // Given
+        let (loader, cached) = try await Self.warmedLoader(url: URL(string: "https://example.com/account-a.png")!)
+        let imageView = NSImageView()
+        let ran = Flag()
+        let signal = AsyncSignal()
+
+        // When
+        imageView.rdl.setImage(
+            id: "https://example.com/account-a.png",
+            task: StubImageTask {
+                await ran.set()
+                return .init(head: .stub, payload: .onePixelPNG)
+            },
+            loader: loader
+        ) { _ in
+            signal.signal()
+        }
+
+        #expect(imageView.image === cached)
+        try await signal.wait()
+
+        // Then
+        #expect(await ran.value)
+    }
 }
 
 // MARK: - Test helpers

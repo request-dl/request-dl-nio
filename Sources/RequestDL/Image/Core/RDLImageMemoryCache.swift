@@ -14,26 +14,58 @@ import Foundation
 /// their size in memory in bytes, not by how many there are.
 ///
 /// A limit of `0` turns it off: nothing is kept, and what was kept is dropped.
+///
+/// An entry also has a time to live, counted from the moment it was written (not from the last
+/// time it was read): once it is over, the entry is a miss and is removed. `nil` keeps entries
+/// until the limit or the system evicts them.
 final class RDLImageMemoryCache: @unchecked Sendable {
 
     /// What a loader keeps when it is not told otherwise: room for a few dozen thumbnails or a few
     /// full-screen images.
     static let defaultLimit = 64 * 1_024 * 1_024
 
+    /// What entries live for when a loader is not told otherwise: 5 minutes.
+    static let defaultTimeToLive: TimeInterval = 300
+
     private final class Entry {
         let image: PlatformImage
+        let storedAt: Date
 
-        init(_ image: PlatformImage) {
+        init(_ image: PlatformImage, storedAt: Date) {
             self.image = image
+            self.storedAt = storedAt
         }
     }
 
     private let cache = NSCache<NSString, Entry>()
     private let lock = NSLock()
     private var _limit = 0
+    private var _timeToLive: TimeInterval?
+    private let now: @Sendable () -> Date
 
-    init(limit: Int) {
+    init(
+        limit: Int,
+        timeToLive: TimeInterval? = RDLImageMemoryCache.defaultTimeToLive,
+        now: @escaping @Sendable () -> Date = { Date() }
+    ) {
+        self.now = now
         self.limit = limit
+        self.timeToLive = timeToLive
+    }
+
+    /// How long an entry is good for, in seconds, from when it was written. `nil` (or
+    /// `.infinity`) for as long as it stays in memory. Applies to the entries already there.
+    var timeToLive: TimeInterval? {
+        get {
+            lock.lock()
+            defer { lock.unlock() }
+            return _timeToLive
+        }
+        set {
+            lock.lock()
+            defer { lock.unlock() }
+            _timeToLive = newValue
+        }
     }
 
     var limit: Int {
@@ -57,8 +89,18 @@ final class RDLImageMemoryCache: @unchecked Sendable {
         }
     }
 
+    /// The image kept for `id`, unless its time is over: that entry is removed and counts as a miss.
     func image(for id: String) -> PlatformImage? {
-        cache.object(forKey: id as NSString)?.image
+        guard let entry = cache.object(forKey: id as NSString) else {
+            return nil
+        }
+
+        if let timeToLive, now().timeIntervalSince(entry.storedAt) >= timeToLive {
+            cache.removeObject(forKey: id as NSString)
+            return nil
+        }
+
+        return entry.image
     }
 
     func insert(_ image: PlatformImage, for id: String) {
@@ -66,7 +108,7 @@ final class RDLImageMemoryCache: @unchecked Sendable {
             return
         }
 
-        cache.setObject(Entry(image), forKey: id as NSString, cost: Self.cost(of: image))
+        cache.setObject(Entry(image, storedAt: now()), forKey: id as NSString, cost: Self.cost(of: image))
     }
 
     func remove(_ id: String) {

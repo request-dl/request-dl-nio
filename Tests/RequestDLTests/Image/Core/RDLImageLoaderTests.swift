@@ -512,6 +512,106 @@ struct RDLImageLoaderTests {
         #expect(RDLImageMemoryCache.cost(of: image) < 1_024)
     }
 
+    // MARK: - Time to live
+
+    private func makeImage() throws -> PlatformImage {
+        try #require(PlatformImage(data: .onePixelPNG))
+    }
+
+    @Test
+    func timeToLive_defaultsToFiveMinutes() {
+        #expect(RDLImageLoader().memoryCacheTimeToLive == 300)
+        #expect(RDLImageMemoryCache.defaultTimeToLive == 300)
+        #expect(RDLImageLoader(dataCache: DataCache(suiteName: UUID().uuidString)).memoryCacheTimeToLive == 300)
+        #expect(
+            RDLImageLoader(dataCache: DataCache(suiteName: UUID().uuidString), memoryCacheLimit: 1_024)
+                .memoryCacheTimeToLive == 300
+        )
+    }
+
+    @Test
+    func timeToLive_countsFromWhenTheImageWasWritten_notFromTheLastRead() throws {
+        let clock = LockedValueBox(Date(timeIntervalSince1970: 1_000))
+        let cache = RDLImageMemoryCache(limit: 1_024, timeToLive: 10) { clock.withLockedValue { $0 } }
+        let image = try makeImage()
+
+        cache.insert(image, for: "a")
+
+        clock.withLockedValue { $0 = Date(timeIntervalSince1970: 1_009) }
+        #expect(cache.image(for: "a") === image)
+
+        // Read again at 9 s, so a sliding window would last until 19 s: this one ends at 10.
+        clock.withLockedValue { $0 = Date(timeIntervalSince1970: 1_010) }
+        #expect(cache.image(for: "a") == nil)
+    }
+
+    @Test
+    func timeToLive_removesTheExpiredEntry_andANewWriteStartsItAgain() throws {
+        let clock = LockedValueBox(Date(timeIntervalSince1970: 1_000))
+        let cache = RDLImageMemoryCache(limit: 1_024, timeToLive: 10) { clock.withLockedValue { $0 } }
+        let first = try makeImage()
+        let second = try makeImage()
+
+        cache.insert(first, for: "a")
+        clock.withLockedValue { $0 = Date(timeIntervalSince1970: 1_020) }
+        #expect(cache.image(for: "a") == nil)
+
+        // Still a miss with the clock back: it was removed, not only skipped.
+        clock.withLockedValue { $0 = Date(timeIntervalSince1970: 1_000) }
+        #expect(cache.image(for: "a") == nil)
+
+        cache.insert(second, for: "a")
+        clock.withLockedValue { $0 = Date(timeIntervalSince1970: 1_005) }
+        #expect(cache.image(for: "a") === second)
+    }
+
+    @Test(arguments: [nil, TimeInterval.infinity] as [TimeInterval?])
+    func timeToLive_neverExpiresWithoutOne(timeToLive: TimeInterval?) throws {
+        let clock = LockedValueBox(Date(timeIntervalSince1970: 1_000))
+        let cache = RDLImageMemoryCache(limit: 1_024, timeToLive: timeToLive) { clock.withLockedValue { $0 } }
+        let image = try makeImage()
+
+        cache.insert(image, for: "a")
+        clock.withLockedValue { $0 = Date(timeIntervalSince1970: 1_000_000_000) }
+
+        #expect(cache.image(for: "a") === image)
+    }
+
+    @Test
+    func timeToLive_changingItAppliesToTheEntriesAlreadyThere() throws {
+        let clock = LockedValueBox(Date(timeIntervalSince1970: 1_000))
+        let cache = RDLImageMemoryCache(limit: 1_024, timeToLive: nil) { clock.withLockedValue { $0 } }
+        let image = try makeImage()
+
+        cache.insert(image, for: "a")
+        clock.withLockedValue { $0 = Date(timeIntervalSince1970: 1_100) }
+        #expect(cache.image(for: "a") === image)
+
+        cache.timeToLive = 50
+        #expect(cache.image(for: "a") == nil)
+    }
+
+    @Test
+    func timeToLive_ofALoader_expiresWhatItLoaded() async throws {
+        let loader = RDLImageLoader(
+            dataCache: DataCache(suiteName: UUID().uuidString),
+            memoryCacheLimit: 1_024 * 1_024,
+            memoryCacheTimeToLive: 0.05
+        )
+        _ = try await loader.load(id: "short", task: png())
+        #expect(loader.memoryCacheTimeToLive == 0.05)
+
+        try await Task.sleep(nanoseconds: 150_000_000)
+
+        #expect(loader.cachedImage(id: "short") == nil)
+
+        loader.memoryCacheTimeToLive = nil
+        _ = try await loader.load(id: "long", task: png())
+        try await Task.sleep(nanoseconds: 150_000_000)
+
+        #expect(loader.cachedImage(id: "long") != nil)
+    }
+
 }
 
 // MARK: - Test helpers

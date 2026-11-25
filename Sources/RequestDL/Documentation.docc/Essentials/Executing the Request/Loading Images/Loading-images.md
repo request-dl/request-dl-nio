@@ -40,6 +40,8 @@ RDLImage(url: url) { phase in
 }
 ```
 
+When the loader has the image in memory (see below), the view's first phase is already `.success`, in the frame it is created in, instead of `.empty`; `RDLImage(url:)` then makes no request, and `RDLImage(id:task:)` still does and replaces the copy.
+
 Use the ``RequestDL/RDLImage/init(id:scale:transaction:loader:task:content:)`` initializer when the request needs more than a URL — custom headers, authentication, a specific ``RequestDL/Property/cachePolicy(_:)``, and so on — by building it the same way a ``RequestDL/DataTask`` is built:
 
 ```swift
@@ -87,9 +89,14 @@ Every `setImage` call cancels whatever load is already in flight on that image v
 
 Starting a `setImage` also replaces whatever the view is showing right away: with `placeholder` when you pass one, and with nothing when you don't. This is what keeps a reused cell honest — a recycled cell would otherwise keep the previous row's image on screen, the wrong picture, until the new one arrives.
 
-When the loader already has the image you ask for, the view gets that image instead, in the same turn: not the placeholder, and not an empty frame. ``RDLImageLoader`` keeps the images it has loaded decoded in memory (64 MB by default, counted in pixels, and emptied by the system when memory runs low), so a cell that comes back to a row it already showed has its picture at once. The request still runs after that, with its own cache policy, and the view is set again when it finishes; the copy in memory only shows something sooner, and is never the answer to the request. It is keyed by the URL for `setImage(with:)`, and by `id` for the variant with a task. It is only written when a load finishes with success, and a failed load leaves it as it was.
+When the loader already has the image you ask for, the view gets that image instead, in the same turn: not the placeholder, and not an empty frame. ``RDLImageLoader`` keeps the images it has loaded decoded in memory (64 MB by default, counted in pixels, emptied by the system when memory runs low), and each one is good for 5 minutes from when it was loaded. What happens after that depends on how you asked for the image:
 
-Use the loader to manage it: ``RDLImageLoader/removeCachedImage(id:)``, ``RDLImageLoader/removeCachedImage(url:)`` and ``RDLImageLoader/removeAllCachedImages()`` forget images (for example after the user changes their avatar), and ``RDLImageLoader/memoryCacheLimit`` (or `init(dataCache:memoryCacheLimit:)`) changes the size, with `0` turning it off. On `WKInterfaceImage` an image in memory is also set at once; what it is showing cannot be read, so `placeholder` is still always ignored with `keepsCurrentImageWhileLoading`.
+- **By URL** (`setImage(with:)`, `RDLImage(url:)`): a valid copy is the answer, and **no request is made**, with no disk read and no decode. Your `completion` is called at once. The URL is all that identifies the request, so the copy can only be wrong by its age, which the time to live bounds. Pass `refreshing: true` to `setImage(with:)` to make the request anyway (the copy stays on screen until the new image arrives), or call ``RDLImageLoader/removeCachedImage(url:)`` before an `RDLImage(url:)` to force it.
+- **By task** (`setImage(id:task:)`, `RDLImage(id:task:)`): the copy is only shown first, and the request **still runs**, with its cache policy, headers and credentials, and replaces it. You control those, and the key is the `id` you chose, so a copy made for another account or another policy is never the final answer. If that request fails, the copy stays.
+
+The copy is keyed by the URL, or by the `id`, and is only written when a load finishes with success: a failed load leaves it as it was. ``RDLImageLoader/load(url:)`` and ``RDLImageLoader/load(id:task:)`` themselves never read it: they always run the request.
+
+Use the loader to manage it: ``RDLImageLoader/removeCachedImage(id:)``, ``RDLImageLoader/removeCachedImage(url:)`` and ``RDLImageLoader/removeAllCachedImages()`` forget images (for example after the user changes their avatar), ``RDLImageLoader/memoryCacheLimit`` (or `init(dataCache:memoryCacheLimit:memoryCacheTimeToLive:)`) changes the size, with `0` turning the cache off, and ``RDLImageLoader/memoryCacheTimeToLive`` changes how long an image is good for (`nil` for as long as it stays in memory). A cache that is off, or an image that expired, is a miss, and the view starts empty or with its placeholder as it did before. On `WKInterfaceImage` an image in memory is also set at once; what it is showing cannot be read, so `placeholder` is still always ignored with `keepsCurrentImageWhileLoading`.
 
 > Important: Before this default, `setImage` left the current image untouched when `placeholder` was `nil`. If you relied on that, pass `keepsCurrentImageWhileLoading: true`.
 
