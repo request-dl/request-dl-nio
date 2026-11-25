@@ -45,6 +45,11 @@ import Testing
 /// write taking that long), and says so in the message. With healthy pools it stays an error,
 /// since that is what a real deadlock looks like. Either way the report ends with the lag the
 /// monitor saw from each source, so a report that stays an error still shows what was measured.
+///
+/// Only a lock held by `Internals.Buffer`'s file work (see ``isBufferFileWork(_:)``) is eligible.
+/// The other locks that carry a watchdog, such as the `ClientManager` resolution lock (45 s) and
+/// `Client.shutdown()` (20 s), do not wait on the file pool, so lag there says nothing about
+/// them and a report from them stays an error even on a stalled runner.
 package struct NonFatalWatchdogTrait: TestTrait, SuiteTrait, TestScoping {
 
     /// How late work has to have started, at worst, for a held lock to be put down to the machine.
@@ -87,13 +92,16 @@ package struct NonFatalWatchdogTrait: TestTrait, SuiteTrait, TestScoping {
             return
         }
 
+        // Late machines are only an explanation for the locks that wait on the file pool.
+        let isEligible = isBufferFileWork(message)
+
         let seen = PoolLagMonitor.Source.allCases.compactMap { source in
             lags[source].map { "\(source.rawValue) \(($0 * 10).rounded() / 10)s" }
         }
         let detailed =
             seen.isEmpty ? message : "\(message)\n\nLag in the last \(Int(lagWindow))s: \(seen.joined(separator: ", "))"
 
-        guard lag.seconds > lagThreshold, let source = lag.source else {
+        guard isEligible, lag.seconds > lagThreshold, let source = lag.source else {
             record(detailed, .error)
             return
         }
@@ -108,6 +116,22 @@ package struct NonFatalWatchdogTrait: TestTrait, SuiteTrait, TestScoping {
             """,
             .warning
         )
+    }
+
+    /// Whether the lock in a watchdog `message` is held by `Internals.Buffer`'s file work, the one
+    /// holder a late machine can explain.
+    ///
+    /// The report names the holder as `holder: <operation> (<function> at <file>:<line>)`, so the
+    /// rule is on the holder's *file*, not on the whole message and not on a line number, which
+    /// moves with every edit to that file. Only the `holder:` line is read: a call site that
+    /// merely waits behind another one (`pending`) does not count. Every `Internals.Buffer.swift`
+    /// operation qualifies (`write(at:data:)` is the one that reported in the URLSession-only
+    /// job, `read(at:length:)` the other), since they all hold the lock across the same file pool.
+    package static func isBufferFileWork(_ message: String) -> Bool {
+        message
+            .split(whereSeparator: \.isNewline)
+            .first { $0.drop { $0 == " " }.hasPrefix("holder:") }
+            .map { $0.contains("Internals.Buffer.swift:") } ?? false
     }
 
     /// Forces the one-time install to run now, if it hasn't already.
