@@ -21,19 +21,16 @@ import struct Foundation.Date
 #endif
 
 /// What a SOCKS5 proxy that gets the credentials and then closes the connection, without sending
-/// the RFC 1929 status, does to the request. This documents what the `.nio` executor does today,
-/// not what it should do.
+/// the RFC 1929 status, does to the request.
 ///
-/// ``Proxy``'s documentation says a proxy that rejects the credentials fails the request at once
-/// and is not retried. That holds for a proxy that answers with a failure status (`01 xx`, the
-/// first test), where the fork of AsyncHTTPClient turns the status into a permanent failure. A
-/// proxy that closes without a status (a violation of the RFC that simple implementations and rate
-/// limiters commit) does not reach that path: the fork's `SOCKSEventsHandler` reports it as
-/// `remoteConnectionClosed`, which `isPermanentConnectionFailure` does not recognize, so the
-/// connection is retried, with the same credentials, until the request ends. Closing that gap
-/// needs the forks (`SOCKSClientHandler` in swift-nio-extras and
-/// `HTTPConnectionPool+Backoff` in async-http-client), so the second test fixes the behavior as it
-/// is, and is the one to flip when they change.
+/// A proxy that answers with a failure status (`01 xx`) fails the request at once, and so does
+/// one that closes without a status (a violation of the RFC that simple implementations and rate
+/// limiters commit): the same wrong credentials are never sent again. That used to hold only for
+/// the first: the fork of swift-nio-extras did nothing on the close while waiting for the
+/// credentials' answer, the fork of AsyncHTTPClient reported it as `remoteConnectionClosed`, and
+/// the request was retried with the same credentials until it timed out. swift-nio-extras 1.35.5
+/// raises `SOCKSError.AuthenticationFailed` for that close, and async-http-client 1.42.2 treats it
+/// as permanent, like a status.
 struct ProxySOCKSClosedWithoutStatusTests {
 
     // MARK: - Private types
@@ -150,12 +147,16 @@ struct ProxySOCKSClosedWithoutStatusTests {
     }
 
     @Test
-    func aProxyThatClosesWithoutAStatus_isRetriedWithTheSameCredentials() async throws {
-        let outcome = try await run(answersWithStatus: false, until: { $0 >= 2 })
+    func aProxyThatClosesWithoutAStatus_isAskedOnceAndReportedAsARejection() async throws {
+        let outcome = try await run(answersWithStatus: false)
 
-        // Today: every attempt sends the same wrong credentials again. When the forks treat the
-        // close as a rejection this is 1, and ``Proxy``'s documentation can drop its caveat.
-        #expect(outcome.connections > 1)
+        // The close is taken for a rejection: one attempt, the same typed error as for a status.
+        #expect(outcome.connections == 1)
+
+        let error = try #require(outcome.error)
+        let typed = try #require(error as? ProxyAuthorizationError)
+        #expect(typed.reason == .socksAuthenticationRejected)
+        #expect(String(reflecting: error).contains("AuthenticationFailed"))
     }
 }
 

@@ -53,7 +53,8 @@ public struct ProxyAuthorizationError: Error, Sendable, Hashable {
         ///
         /// The same on every executor. It is not retried, since sending the same wrong
         /// credentials again could only lock the account. A proxy that closes the connection
-        /// without answering is not this, and is not told apart from a dropped connection.
+        /// right after receiving them, without answering, is taken for this too under `.nio` and
+        /// `.nioTransportServices`.
         case socksAuthenticationRejected
     }
 

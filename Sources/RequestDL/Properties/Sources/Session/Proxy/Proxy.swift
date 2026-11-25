@@ -62,19 +62,17 @@ import RequestDLInternals
 ///   anyone who can read the connection to the proxy can read them; use the proxy only over a
 ///   network that is trusted, or tunnel to it. The credentials are never part of the request
 ///   that the tunnel carries.
-/// - A proxy that rejects the credentials by answering with a failure status (RFC 1929 says it
-///   must) fails the request at once with a ``ProxyAuthorizationError`` whose reason is
+/// - A proxy that rejects the credentials fails the request at once with a
+///   ``ProxyAuthorizationError`` whose reason is
 ///   ``ProxyAuthorizationError/Reason-swift.enum/socksAuthenticationRejected``, the same on every
 ///   executor, and it is not retried: sending the same wrong credentials again could only lock the
-///   account. The error never carries the credentials. What the executor itself reported, kept as
+///   account. That is a proxy that answers with a failure status (RFC 1929 says it must), and, under
+///   `.nio` and `.nioTransportServices`, one that closes the connection after receiving the
+///   credentials without answering at all, which is taken for the same rejection. The error never
+///   carries the credentials. What the executor itself reported, kept as
 ///   ``ProxyAuthorizationError/underlyingError`` for diagnosis, is `SOCKSError.AuthenticationFailed`
 ///   (from `NIOSOCKS`, which RequestDL does not re-export) under `.nio` and `.nioTransportServices`,
 ///   and an `NSError` in `NSPOSIXErrorDomain` with code `EAUTH` (80) under `.urlSession`.
-/// - A proxy that closes the connection after receiving the credentials *without* answering is a
-///   different case: the `.nio` and `.nioTransportServices` executors cannot tell that from a
-///   dropped connection, so it is not reported as a rejection. They reconnect and send the same
-///   credentials again until the request's own timeout ends it. Prefer a proxy that answers, and
-///   set a ``Timeout`` if you cannot.
 /// - A proxy that does not require authentication simply does not ask for the credentials,
 ///   which are then not sent.
 /// - Under `.urlSession` a user name or password of more than 254 bytes cannot be sent intact:
