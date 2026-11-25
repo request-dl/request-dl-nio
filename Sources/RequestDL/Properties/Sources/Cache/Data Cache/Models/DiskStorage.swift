@@ -488,6 +488,11 @@ struct DiskStorage: Sendable {
     /// `fileProtection`: `swift-crypto` needs no OS-specific support.
     var encryptionKey: DataCache.EncryptionKey?
 
+    /// What starts the name of every entry written under an encryption key, and nothing else
+    /// does: a `.` cannot be in the base64url of a URL, and the long form (`sha256.`) is not this.
+    /// It is what tells an entry of this kind from one written before names were hidden.
+    private static let hiddenNamePrefix = "hmac."
+
     // MARK: - Inits
     /// - Parameter missRescanInterval: Seconds a cache miss waits after the last directory
     /// scan before it may scan again; see `Index`. Zero scans on every miss.
@@ -518,9 +523,41 @@ struct DiskStorage: Sendable {
 
     // MARK: - Internal methods
 
+    /// What the directory of `key` is called after its date: `key` itself, or, under an
+    /// encryption key, an HMAC of it that the URL cannot be read from.
+    ///
+    /// The index, the scans and the directory names all go by this, and only the encryption
+    /// (`associatedData(forResponseOf:)` and `associatedData(forBodyOf:)`) by `key` itself, which a
+    /// lookup always has. A name of this kind is not an entry of any other key, so one that was
+    /// written under a key that is no longer in use is only ever a miss.
+    func entryName(for key: String) -> String {
+        guard let encryptionKey else {
+            return key
+        }
+
+        let mac = HMAC<SHA256>.authenticationCode(for: Data(key.utf8), using: encryptionKey.nameKey)
+
+        let base64 = Data(mac).base64EncodedString()
+
+        let encoded = String(
+            base64.compactMap { character -> Character? in
+                switch character {
+                case "+": return "-"
+                case "/": return "_"
+                case "=": return nil
+                default: return character
+                }
+            }
+        )
+
+        return Self.hiddenNamePrefix + encoded
+    }
+
     subscript(_ key: String) -> CachedData? {
         get async {
-            guard let record = await record(key) else { return nil }
+            let name = entryName(for: key)
+
+            guard let record = await record(name) else { return nil }
 
             guard let responseData = await readResponseData(at: record.responseURL, key: key) else {
                 return nil
@@ -539,7 +576,7 @@ struct DiskStorage: Sendable {
                 return nil
             }
 
-            index.markUsed(key)
+            index.markUsed(name)
 
             return await .init(
                 cachedResponse: cachedResponse,
@@ -789,7 +826,7 @@ struct DiskStorage: Sendable {
     /// Counts a serve from another tier as a use here too, so an entry the memory tier keeps
     /// answering for is not the first one the disk tier drops.
     func markUsed(_ key: String) {
-        index.markUsed(key)
+        index.markUsed(entryName(for: key))
     }
 
     /// Removes everything stored for `key`: every directory of it, not only the one `index`
@@ -800,9 +837,11 @@ struct DiskStorage: Sendable {
     /// is not in the index at all. Taking away only the newest let the one before it come back at
     /// the next scan.
     func remove(_ key: String) async {
-        for directory in await directories(forKey: key) {
+        let name = entryName(for: key)
+
+        for directory in await directories(forKey: name) {
             await Self.removeItem(at: directory.url.filePath)
-            index.remove(key, ifLocation: directory.url)
+            index.remove(name, ifLocation: directory.url)
         }
     }
 
@@ -860,7 +899,9 @@ struct DiskStorage: Sendable {
         maximumCapacity: Int64,
         knownUsage: Int64? = nil
     ) async -> Int64 {
-        guard let record = await record(key),
+        let name = entryName(for: key)
+
+        guard let record = await record(name),
             let response = try? JSONEncoder().encode(cachedResponse),
             let storedData = await readResponseData(at: record.responseURL, key: key),
             let stored = try? JSONDecoder().decode(CachedResponse.self, from: storedData),
@@ -880,12 +921,12 @@ struct DiskStorage: Sendable {
 
         // The entry being renewed is in use as of now, which keeps it from being the one that is
         // evicted to make room for its own renewal.
-        index.markUsed(key)
+        index.markUsed(name)
 
         await freeSpace(maximumCapacity - spaceNeeded, knownUsage: knownUsage)
 
         guard await record.dataURL.isReachable,
-            let newRecord = await self.record(key, createdAt: cachedResponse.date)
+            let newRecord = await self.record(name, createdAt: cachedResponse.date)
         else { return .zero }
 
         // Whether the body is in `newRecord` yet. Until it is, `record` is untouched, or its body
@@ -911,14 +952,14 @@ struct DiskStorage: Sendable {
             // Only if `key` still points at the record that was revalidated. A write that
             // landed during the awaits above owns the key now, and what was moved here is the
             // body of a record it replaced.
-            if index.replace(key, ifLocation: record.url, with: newRecord.url) {
+            if index.replace(name, ifLocation: record.url, with: newRecord.url) {
                 await Self.removeItem(at: record.url.filePath)
                 return spaceChange
             }
         } catch {}
 
         await Self.removeItem(at: newRecord.url.filePath)
-        index.remove(key, ifLocation: newRecord.url)
+        index.remove(name, ifLocation: newRecord.url)
 
         // The body never left `record`, or something else took it: either way there is nothing of
         // this update to undo there. Removing it, and the index entry that points at it, ahead of
@@ -932,7 +973,7 @@ struct DiskStorage: Sendable {
         // disk for this key. See the comment on `Record.init(directory:key:at:)` for why a failed
         // revalidation loses the entry outright rather than leaving `record`'s directory in place.
         await Self.removeItem(at: record.url.filePath)
-        index.remove(key, ifLocation: record.url)
+        index.remove(name, ifLocation: record.url)
 
         return .zero
     }
@@ -970,7 +1011,9 @@ struct DiskStorage: Sendable {
             knownUsage: knownUsage
         )
 
-        guard let record = await record(key, createdAt: cachedResponse.date) else { return (nil, nil, nil) }
+        let name = entryName(for: key)
+
+        guard let record = await record(name, createdAt: cachedResponse.date) else { return (nil, nil, nil) }
 
         do {
             // Before anything else is in the directory, so that there is no moment at which it
@@ -1002,7 +1045,7 @@ struct DiskStorage: Sendable {
         #endif
 
         let buffer = await dataBuffer(for: record, key: key, retryingEmptyContent: false)
-        index.set(key, location: record.url)
+        index.set(name, location: record.url)
         return (buffer, usageAfterEviction + writableBytes, record.url)
     }
 
@@ -1077,9 +1120,25 @@ struct DiskStorage: Sendable {
 
         await removeOrphans(among: measured.incomplete)
 
+        var entries = measured.entries
+
+        // With a key set, an entry whose name is not one of the key's can never be read again: it
+        // was written before names were hidden (its name is the URL, or a hash of it) or with no
+        // key at all, and does not open under this one. It is not left for the eviction below,
+        // which could take long to get to it, because its name is what keeps the URL readable on
+        // disk. Entries under the names of another key are not touched: they are only a miss, and
+        // are evicted with the rest. With no key nothing is swept, whatever the names.
+        if encryptionKey != nil {
+            for entry in entries where !entry.record.key.hasPrefix(Self.hiddenNamePrefix) {
+                await Self.removeItem(at: entry.record.url.filePath)
+                index.remove(entry.record.key, ifLocation: entry.record.url)
+            }
+
+            entries.removeAll { !$0.record.key.hasPrefix(Self.hiddenNamePrefix) }
+        }
+
         // Least recently used first. An entry nobody read since this process started is ordered
         // by when it was created.
-        var entries = measured.entries
         entries.sort { lastUsed(of: $0.record) < lastUsed(of: $1.record) }
 
         var totalSize = entries.reduce(Int64.zero) { $0 + $1.size }

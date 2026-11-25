@@ -966,8 +966,9 @@ struct DiskStorageTests {
 
             // When: the directory is copied to a name that says it is k2's.
             let source = try await encryptedRecordDirectoryURL(in: directoryURL)
+            let date = try #require(source.lastPathComponent.split(separator: ".").first)
             let copy = directoryURL.appendingPathComponent(
-                source.lastPathComponent.replacingKey("k1", with: "k2"),
+                "\(date).\(storage.entryName(for: "k2")).\(DiskStorage.Record.pathExtension)",
                 isDirectory: true
             )
 
@@ -1578,15 +1579,4 @@ struct DiskStorageTests {
         }
     }
     #endif
-}
-
-extension String {
-
-    /// `self` with `key`, the part of a record directory's name between its date and its
-    /// extension, replaced by `other`.
-    fileprivate func replacingKey(_ key: String, with other: String) -> String {
-        split(separator: ".", omittingEmptySubsequences: false)
-            .map { $0 == key ? other : String($0) }
-            .joined(separator: ".")
-    }
 }
