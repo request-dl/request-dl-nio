@@ -49,7 +49,10 @@ extension RDLWrapper where Base: WKInterfaceImage {
     /// Loads the image at `url` and sets it on this interface image once it arrives.
     ///
     /// The current image is replaced with `placeholder` right away, or cleared when it is
-    /// `nil`, unless `keepsCurrentImageWhileLoading` is `true`.
+    /// `nil`, unless `keepsCurrentImageWhileLoading` is `true`. When `loader` already has this
+    /// image in memory (see ``RDLImageLoader/cachedImage(id:)``), that image is set instead, in
+    /// the same turn, whatever `keepsCurrentImageWhileLoading` is; the load still runs and sets its
+    /// own result when it finishes.
     ///
     /// Cancels any load already in flight on this interface image before starting, so it is safe
     /// to call from a `WKInterfaceTable` row controller even when rows are reused faster than
@@ -79,7 +82,11 @@ extension RDLWrapper where Base: WKInterfaceImage {
     ) {
         cancel()
 
-        if !keepsCurrentImageWhileLoading {
+        // An image this loader already loaded is shown at once. This needs no reading of what the
+        // interface image shows, which is not possible, so it works whatever `keepsCurrentImageWhileLoading` is.
+        if let cached = loader.cachedImage(url: url) {
+            base.setImage(cached)
+        } else if !keepsCurrentImageWhileLoading {
             base.setImage(placeholder)
         }
 
@@ -95,7 +102,10 @@ extension RDLWrapper where Base: WKInterfaceImage {
     /// ``MockedTask`` also drops in directly.
     ///
     /// The current image is replaced with `placeholder` right away, or cleared when it is
-    /// `nil`, unless `keepsCurrentImageWhileLoading` is `true`.
+    /// `nil`, unless `keepsCurrentImageWhileLoading` is `true`. When `loader` already has this
+    /// image in memory (see ``RDLImageLoader/cachedImage(id:)``), that image is set instead, in
+    /// the same turn, whatever `keepsCurrentImageWhileLoading` is; the load still runs and sets its
+    /// own result when it finishes.
     ///
     /// Cancels any load already in flight on this interface image before starting, so it is safe
     /// to call from a `WKInterfaceTable` row controller even when rows are reused faster than
@@ -129,7 +139,11 @@ extension RDLWrapper where Base: WKInterfaceImage {
     ) {
         cancel()
 
-        if !keepsCurrentImageWhileLoading {
+        // An image this loader already loaded is shown at once. This needs no reading of what the
+        // interface image shows, which is not possible, so it works whatever `keepsCurrentImageWhileLoading` is.
+        if let cached = loader.cachedImage(id: id) {
+            base.setImage(cached)
+        } else if !keepsCurrentImageWhileLoading {
             base.setImage(placeholder)
         }
 

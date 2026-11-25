@@ -48,7 +48,10 @@ extension RDLWrapper where Base: UIImageView {
     /// Loads the image at `url` and sets it on this image view once it arrives.
     ///
     /// The current image is replaced with `placeholder` right away, or cleared when it is
-    /// `nil`, unless `keepsCurrentImageWhileLoading` is `true`.
+    /// `nil`, unless `keepsCurrentImageWhileLoading` is `true`. When `loader` already has this
+    /// image in memory (see ``RDLImageLoader/cachedImage(id:)``), that image is set instead, in
+    /// the same turn, and neither the placeholder nor an empty view is shown; the load still runs
+    /// and sets its own result when it finishes.
     ///
     /// Cancels any load already in flight on this image view before starting, so it is safe to
     /// call from `tableView(_:cellForRowAt:)`/`collectionView(_:cellForItemAt:)` even when cells
@@ -78,9 +81,14 @@ extension RDLWrapper where Base: UIImageView {
     ) {
         cancel()
 
-        // Keeping the current image only means something when there is one: an empty view has
-        // nothing to keep and shows the placeholder, which is what the parameter's name promises.
-        if !keepsCurrentImageWhileLoading || base.image == nil {
+        // An image this loader already loaded is shown at once, in place of the placeholder or of
+        // an empty view: the load below still runs and replaces it, but the view never goes
+        // blank for the frames in between.
+        if let cached = loader.cachedImage(url: url) {
+            base.image = cached
+        } else if !keepsCurrentImageWhileLoading || base.image == nil {
+            // Keeping the current image only means something when there is one: an empty view has
+            // nothing to keep and shows the placeholder, which is what the parameter's name promises.
             base.image = placeholder
         }
 
@@ -96,7 +104,10 @@ extension RDLWrapper where Base: UIImageView {
     /// ``MockedTask`` also drops in directly.
     ///
     /// The current image is replaced with `placeholder` right away, or cleared when it is
-    /// `nil`, unless `keepsCurrentImageWhileLoading` is `true`.
+    /// `nil`, unless `keepsCurrentImageWhileLoading` is `true`. When `loader` already has this
+    /// image in memory (see ``RDLImageLoader/cachedImage(id:)``), that image is set instead, in
+    /// the same turn, and neither the placeholder nor an empty view is shown; the load still runs
+    /// and sets its own result when it finishes.
     ///
     /// Cancels any load already in flight on this image view before starting, so it is safe to
     /// call from `tableView(_:cellForRowAt:)`/`collectionView(_:cellForItemAt:)` even when cells
@@ -130,9 +141,14 @@ extension RDLWrapper where Base: UIImageView {
     ) {
         cancel()
 
-        // Keeping the current image only means something when there is one: an empty view has
-        // nothing to keep and shows the placeholder, which is what the parameter's name promises.
-        if !keepsCurrentImageWhileLoading || base.image == nil {
+        // An image this loader already loaded is shown at once, in place of the placeholder or of
+        // an empty view: the load below still runs and replaces it, but the view never goes
+        // blank for the frames in between.
+        if let cached = loader.cachedImage(id: id) {
+            base.image = cached
+        } else if !keepsCurrentImageWhileLoading || base.image == nil {
+            // Keeping the current image only means something when there is one: an empty view has
+            // nothing to keep and shows the placeholder, which is what the parameter's name promises.
             base.image = placeholder
         }
 

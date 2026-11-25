@@ -310,6 +310,220 @@ struct UIImageViewRequestDLTests {
         // Then
         try await eventually { await interrupted.value }
     }
+    // MARK: - Images already in memory
+
+    private static func warmedLoader(id: String) async throws -> (loader: RDLImageLoader, image: UIImage) {
+        let loader = RDLImageLoader()
+        let image = try await loader.load(id: id, task: StubImageTask { .init(head: .stub, payload: .onePixelPNG) })
+        return (loader, image)
+    }
+
+    private static func slow(_ nanoseconds: UInt64 = 300_000_000) -> StubImageTask {
+        StubImageTask {
+            try await Task.sleep(nanoseconds: nanoseconds)
+            return .init(head: .stub, payload: .onePixelPNG)
+        }
+    }
+
+    /// The case the memory cache is for: a cell comes back to an image it already showed. The view
+    /// has to hold that image in the same turn, not an empty frame first.
+    @Test
+    func anImageInMemoryIsShownAtOnceInsteadOfClearingTheView() async throws {
+        // Given
+        let (loader, cached) = try await Self.warmedLoader(id: "warm")
+        let imageView = UIImageView()
+        imageView.image = Self.makeImage(.red)
+
+        // When
+        imageView.rdl.setImage(id: "warm", task: Self.slow(), placeholder: Self.makeImage(.blue), loader: loader)
+
+        // Then
+        #expect(imageView.image === cached)
+        imageView.rdl.cancel()
+    }
+
+    @Test
+    func anImageInMemoryIsShownAtOnceForALoadByURL() async throws {
+        // Given
+        let url = URL(string: "https://invalid.invalid/warm.png")!
+        let loader = RDLImageLoader()
+        let cached = try await loader.load(
+            id: url.absoluteString,
+            task: StubImageTask { .init(head: .stub, payload: .onePixelPNG) }
+        )
+        let imageView = UIImageView()
+
+        // When
+        imageView.rdl.setImage(with: url, loader: loader)
+
+        // Then
+        #expect(loader.cachedImage(url: url) === cached)
+        #expect(imageView.image === cached)
+        imageView.rdl.cancel()
+    }
+
+    @Test
+    func anImageInMemoryIsShownEvenWhenKeepingTheCurrentImageOfAnotherView() async throws {
+        // Given
+        let (loader, cached) = try await Self.warmedLoader(id: "warm-keeps")
+        let imageView = UIImageView()
+        imageView.image = Self.makeImage(.red)
+
+        // When
+        imageView.rdl.setImage(id: "warm-keeps", task: Self.slow(), loader: loader, keepsCurrentImageWhileLoading: true)
+
+        // Then
+        #expect(imageView.image === cached)
+        imageView.rdl.cancel()
+    }
+
+    /// The copy in memory only shows something sooner: the request still runs, with whatever it
+    /// says, and its result replaces the copy.
+    @Test
+    func anImageInMemoryDoesNotStandInForTheRequest() async throws {
+        // Given
+        let (loader, cached) = try await Self.warmedLoader(id: "warm-runs")
+        let imageView = UIImageView()
+        let signal = AsyncSignal()
+        let ran = Flag()
+
+        // When
+        imageView.rdl.setImage(
+            id: "warm-runs",
+            task: StubImageTask {
+                await ran.set()
+                return .init(head: .stub, payload: .onePixelPNG)
+            },
+            loader: loader
+        ) { _ in
+            signal.signal()
+        }
+
+        #expect(imageView.image === cached)
+        try await signal.wait()
+
+        // Then
+        #expect(await ran.value)
+        #expect(imageView.image != nil)
+        #expect(imageView.image !== cached)
+        #expect(loader.cachedImage(id: "warm-runs") !== cached)
+    }
+
+    @Test
+    func anImageInMemoryForAnotherIDDoesNotShowUp() async throws {
+        // Given
+        let (loader, _) = try await Self.warmedLoader(id: "warm-other")
+        let imageView = UIImageView()
+        imageView.image = Self.makeImage(.red)
+
+        // When
+        imageView.rdl.setImage(id: "not-warm", task: Self.slow(), loader: loader)
+
+        // Then
+        #expect(imageView.image == nil)
+        imageView.rdl.cancel()
+    }
+
+    @Test
+    func removingTheImageInMemoryBringsBackClearingTheView() async throws {
+        // Given
+        let (loader, _) = try await Self.warmedLoader(id: "warm-removed")
+        loader.removeCachedImage(id: "warm-removed")
+        let imageView = UIImageView()
+        imageView.image = Self.makeImage(.red)
+        let placeholder = Self.makeImage(.blue)
+
+        // When
+        imageView.rdl.setImage(id: "warm-removed", task: Self.slow(), placeholder: placeholder, loader: loader)
+
+        // Then
+        #expect(imageView.image === placeholder)
+        imageView.rdl.cancel()
+    }
+
+    @Test
+    func aLoaderWithoutAMemoryCacheKeepsClearingTheView() async throws {
+        // Given
+        let loader = RDLImageLoader(dataCache: DataCache(suiteName: UUID().uuidString), memoryCacheLimit: 0)
+        _ = try await loader.load(id: "off", task: StubImageTask { .init(head: .stub, payload: .onePixelPNG) })
+        let imageView = UIImageView()
+        imageView.image = Self.makeImage(.red)
+
+        // When
+        imageView.rdl.setImage(id: "off", task: Self.slow(), loader: loader)
+
+        // Then
+        #expect(loader.cachedImage(id: "off") == nil)
+        #expect(imageView.image == nil)
+        imageView.rdl.cancel()
+    }
+
+    /// Reusing the view for another image cancels the load of the one it showed, and the image of
+    /// that load, which was put on screen at once, does not come back when its request ends late.
+    @Test
+    func reusingAViewShowingAnImageInMemoryNeverBringsItBack() async throws {
+        // Given
+        let (loader, cached) = try await Self.warmedLoader(id: "warm-first")
+        let imageView = UIImageView()
+        let firstCompleted = Flag()
+        let secondSignal = AsyncSignal()
+
+        imageView.rdl.setImage(id: "warm-first", task: Self.slow(), loader: loader) { _ in
+            Task { await firstCompleted.set() }
+        }
+        #expect(imageView.image === cached)
+
+        // When
+        imageView.rdl.setImage(
+            id: "second",
+            task: StubImageTask { .init(head: .stub, payload: .onePixelPNG) },
+            loader: loader
+        ) { _ in
+            secondSignal.signal()
+        }
+
+        // Then
+        #expect(imageView.image == nil)
+        try await secondSignal.wait()
+        try await Task.sleep(nanoseconds: 500_000_000)
+
+        #expect(await !firstCompleted.value)
+        #expect(imageView.image != nil)
+        #expect(imageView.image !== cached)
+    }
+
+    /// Two loads race for one view, and the one started last is the one that arrives first.
+    @Test
+    func theLastLoadStartedWinsWhenTheEarlierOneArrivesAfterIt() async throws {
+        // Given
+        let loader = RDLImageLoader()
+        let imageView = UIImageView()
+        let firstCompleted = Flag()
+        let secondSignal = AsyncSignal()
+
+        // When
+        imageView.rdl.setImage(id: "race-first", task: Self.slow(400_000_000), loader: loader) { _ in
+            Task { await firstCompleted.set() }
+        }
+        imageView.rdl.setImage(
+            id: "race-second",
+            task: StubImageTask { .init(head: .stub, payload: .onePixelPNG) },
+            loader: loader
+        ) { _ in
+            secondSignal.signal()
+        }
+
+        try await secondSignal.wait()
+        let shown = imageView.image
+        try await Task.sleep(nanoseconds: 600_000_000)
+
+        // Then
+        #expect(shown != nil)
+        #expect(imageView.image === shown)
+        #expect(await !firstCompleted.value)
+        #expect(loader.cachedImage(id: "race-second") != nil)
+        #expect(loader.cachedImage(id: "race-first") == nil)
+    }
 }
 
 // MARK: - Test helpers

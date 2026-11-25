@@ -20,6 +20,12 @@ import struct Foundation.Data
 /// starting a second request. This is separate from, and on top of, RequestDL's own response
 /// cache, which is what makes a *later*, non-concurrent request for the same image cheap.
 ///
+/// The images that were loaded are also kept decoded in memory, up to ``memoryCacheLimit``
+/// bytes, so a view can show one at once: see ``cachedImage(id:)``. That copy only ever answers
+/// that question. It never stands in for a request: ``load(id:task:)`` always runs the request,
+/// with its cache policy, its headers and everything else it says, and what it loads replaces the
+/// copy.
+///
 /// A call that is cancelled stops waiting at once, with a `CancellationError`, whether it was
 /// alone or one of several. The shared download is cancelled once every call waiting for it has
 /// been cancelled. While at least one is still waiting it keeps running, so cancelling one call
@@ -38,7 +44,21 @@ public actor RDLImageLoader {
     /// share a cache across loaders.
     public let dataCache: DataCache
 
+    /// How many bytes of decoded images are kept in memory, counted as their pixels at four
+    /// bytes each. Defaults to 64 MB.
+    ///
+    /// The system also empties the cache when memory runs low, whatever this is. Changing it
+    /// applies at once; `0` turns the cache off, drops what it holds, and keeps nothing from then
+    /// on, which brings back showing a view empty until an image that was loaded before arrives
+    /// again.
+    public nonisolated var memoryCacheLimit: Int {
+        get { memoryCache.limit }
+        set { memoryCache.limit = newValue }
+    }
+
     // MARK: - Private properties
+
+    private let memoryCache: RDLImageMemoryCache
 
     /// In-flight downloads, keyed by the caller-supplied `id`.
     ///
@@ -94,10 +114,77 @@ public actor RDLImageLoader {
     ///
     /// - Parameter dataCache: The cache ``load(url:)`` uses. See ``dataCache``.
     public init(dataCache: DataCache) {
+        self.init(dataCache: dataCache, memoryCacheLimit: RDLImageMemoryCache.defaultLimit)
+    }
+
+    /// Creates a new, independent loader backed by `dataCache`, keeping at most
+    /// `memoryCacheLimit` bytes of decoded images in memory.
+    ///
+    /// - Parameters:
+    ///    - dataCache: The cache ``load(url:)`` uses. See ``dataCache``.
+    ///    - memoryCacheLimit: See ``memoryCacheLimit``. `0` keeps no image in memory.
+    public init(dataCache: DataCache, memoryCacheLimit: Int) {
         self.dataCache = dataCache
+        self.memoryCache = RDLImageMemoryCache(limit: memoryCacheLimit)
     }
 
     // MARK: - Public methods
+
+    ///
+    /// The image a load for `id` last finished with, when it is still in memory.
+    ///
+    /// It answers at once and from any thread, which is what lets a view that is asked to show
+    /// `id` again put the image on screen in the same turn, instead of clearing it until the load
+    /// finishes. `id` is the one given to ``load(id:task:)``, and the URL's `absoluteString` for
+    /// ``load(url:)``.
+    ///
+    /// An image is only kept when a load finishes with success. Whatever the request's cache
+    /// policy says about the response does not apply to this copy, so it can be older than what
+    /// the request would return now: use it to show something sooner, not to answer the request.
+    ///
+    /// - Parameter id: The identifier of the load.
+    /// - Returns: The image, or `nil` when none was loaded, it was removed, or it was evicted.
+    ///
+    public nonisolated func cachedImage(id: String) -> PlatformImage? {
+        memoryCache.image(for: id)
+    }
+
+    ///
+    /// The image the load of `url` last finished with, when it is still in memory.
+    ///
+    /// See ``cachedImage(id:)``.
+    ///
+    /// - Parameter url: The URL of the image.
+    ///
+    public nonisolated func cachedImage(url: URL) -> PlatformImage? {
+        memoryCache.image(for: url.absoluteString)
+    }
+
+    ///
+    /// Forgets the image in memory for `id`, so the next view asked to show it starts empty, or
+    /// with its placeholder, until a load finishes. It does not touch ``dataCache``.
+    ///
+    /// - Parameter id: The identifier of the load.
+    ///
+    public nonisolated func removeCachedImage(id: String) {
+        memoryCache.remove(id)
+    }
+
+    ///
+    /// Forgets the image in memory for `url`. See ``removeCachedImage(id:)``.
+    ///
+    /// - Parameter url: The URL of the image.
+    ///
+    public nonisolated func removeCachedImage(url: URL) {
+        memoryCache.remove(url.absoluteString)
+    }
+
+    ///
+    /// Forgets every image in memory. It does not touch ``dataCache``.
+    ///
+    public nonisolated func removeAllCachedImages() {
+        memoryCache.removeAll()
+    }
 
     ///
     /// Loads and decodes the image described by `task`.
@@ -249,6 +336,11 @@ public actor RDLImageLoader {
         }
 
         tasks[id] = nil
+
+        // Only an image that was loaded is kept: a failure leaves what is there as it was.
+        if case .success(let image) = result {
+            memoryCache.insert(image.image, for: id)
+        }
 
         for continuation in inFlight.waiters.values {
             continuation.resume(with: result)
