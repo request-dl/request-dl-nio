@@ -51,6 +51,20 @@ These are the main usage methods:
 
 > Note: Just like we use methods to specify the storage location in a request specification, the ``RequestDL/DataCache`` initializers are available with the same options.
 
+### How long a response is kept fresh
+
+A stored response is used by ``RequestDL/CacheStrategy/returnCachedDataElseLoad`` only while it is fresh, and what makes it fresh is what the server said:
+
+1. A `max-age` in `Cache-Control` (less the `Age` the response arrived with), or else an `Expires` date. `max-age=0`, or an `Expires` that is not a date, is already stale.
+2. Without either, a freshness estimated from the response itself, as browsers do (RFC 9111 §4.2.2): a tenth of the time between its `Last-Modified` and its `Date`, and never more than a day. A resource that changed an hour before it was fetched is kept for six minutes, and one that has not changed in a year is kept for a day.
+3. Without a `Last-Modified` to estimate from, it is not fresh at all: the response is stored (its `ETag` and body are still there for ``RequestDL/CacheStrategy/reloadAndValidateCachedData`` and ``RequestDL/CacheStrategy/useCachedDataOnly``), but every ``RequestDL/CacheStrategy/returnCachedDataElseLoad`` request goes to the network.
+
+An error response (`404`, `405`, `410`, `414`, `501`) is stored, and reused, only when it says for how long with a `max-age` or an `Expires`. It is never estimated: a `404` for something that does not exist yet would otherwise outlive its creation.
+
+A stale response is not removed for its age. It stays until a newer response for the URL replaces it, or the disk tier needs the room, so that ``RequestDL/CacheStrategy/useCachedDataOnly`` can still give it to a caller that is offline. The exception is one that must be validated before it is used (`must-revalidate`, or `no-cache`, which a `304` can add): it is not given while stale, and it is kept for a request that revalidates.
+
+A `304 Not Modified` updates the stored response with the `Cache-Control` directives it carries and keeps the ones it does not mention, so one that only says `public` does not take the `max-age` away. A `304` that says `no-store` removes the entry and the request goes to the network; one that says `no-cache` is used for the request that validated it and must be validated again before every later use.
+
 ### Large responses and a slow cache
 
 The response is stored while it downloads, not after: each chunk is handed to the caller and, in parallel, to a writer that puts it in the memory and disk tiers. The network is never slowed down for that writer, so the chunks it has not taken yet wait in memory.

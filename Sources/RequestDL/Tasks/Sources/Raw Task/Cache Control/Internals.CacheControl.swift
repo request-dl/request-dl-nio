@@ -311,8 +311,25 @@ extension Internals {
                 return nil
 
             case .useCachedDataOnly:
-                return await makeCachedSession(cachedData, startedAt: startedAt, revalidation: revalidation)
-                    ?? emptyCachedDataTask()
+                // The caller asked for what is stored, however old (as `returnCacheDataDontLoad`
+                // does, and OkHttp's `FORCE_CACHE`, which accepts any staleness): its freshness is
+                // not looked at, and it is not removed for its age. What cannot be given stale is
+                // an entry that says it must be validated first (RFC 9111 §4.2.4 and §5.2.2.2),
+                // and that is left where it is for a request that can validate it.
+                if !isFresh(cachedData), requiresValidationWhenStale(cachedData) {
+                    logger?.log(
+                        level: .info,
+                        "Cached data is stale and must be revalidated, but strategy is 'useCachedDataOnly'"
+                    )
+                    return emptyCachedDataTask()
+                }
+
+                return await makeCachedSession(
+                    cachedData,
+                    startedAt: startedAt,
+                    revalidation: revalidation,
+                    validated: true
+                ) ?? emptyCachedDataTask()
 
             case .returnCachedDataElseLoad:
                 return await makeCachedSession(cachedData, startedAt: startedAt, revalidation: revalidation)
@@ -329,7 +346,7 @@ extension Internals {
                 else { return nil }
 
                 // Just confirmed by the origin, so its freshness lifetime does not decide whether
-                // it is served now: see `isCachedDataValid(_:checkingFreshness:)`.
+                // it is served now.
                 return await makeCachedSession(
                     cachedData,
                     startedAt: startedAt,
@@ -359,8 +376,15 @@ extension Internals {
         ) async -> SessionTask? {
             let readDate = cachedData.cachedResponse.date
 
-            if !isCachedDataValid(cachedData, checkingFreshness: !validated) {
+            // A body that does not match what the response says of it is of no use to anyone, and
+            // is removed. An entry that is only old is not: it is what `useCachedDataOnly` serves
+            // when the network is gone, and a response that replaces it takes its place.
+            if !isBodyConsistent(cachedData) {
                 await dataCache.remove(forKey: requestConfiguration.url, ifDated: readDate)
+                return nil
+            }
+
+            if !validated, !isFresh(cachedData) {
                 return nil
             }
 
@@ -555,6 +579,14 @@ extension Internals {
                 )
             else { return nil }
 
+            // The origin says what it confirmed must not be stored. It is not kept, and it is not
+            // used either: the request is answered from the network instead.
+            if directives(headers["Cache-Control"] ?? []).contains(where: { $0.lowercased() == "no-store" }) {
+                logger?.log(level: .info, "Cache not renewed - the validation response says no-store")
+                await dataCache.remove(forKey: requestConfiguration.url, ifDated: cachedData.cachedResponse.date)
+                return nil
+            }
+
             let modifiedHeaders = updateCacheHeaders(
                 RequestDL.HTTPHeaders(cachedData.cachedResponse.response.headers.map { ($0.name, $0.value) }),
                 with: headers
@@ -715,7 +747,7 @@ extension Internals {
         ) -> RequestDL.HTTPHeaders {
             var merged = cachedHeaders
 
-            replaceHeader(&merged, with: newHeaders, for: "Cache-Control")
+            mergeCacheControl(&merged, with: newHeaders)
             replaceHeader(&merged, with: newHeaders, for: "Expires")
 
             // `Age` is how old the response already was when it was received, counted from there
@@ -729,6 +761,57 @@ extension Internals {
             }
 
             return merged
+        }
+
+        /// What the new `Cache-Control` says wins, directive by directive. A directive it does not
+        /// mention keeps what the stored response said.
+        ///
+        /// A `304` rarely repeats everything: one that sends only `public` says nothing about
+        /// freshness, and replacing the header with it took the `max-age` away, which left the entry
+        /// with no lifetime at all (RFC 9111 §4.3.4 updates the stored response with the fields
+        /// the `304` carries, it does not take away the ones it does not).
+        private func mergeCacheControl(
+            _ headers: inout RequestDL.HTTPHeaders,
+            with newHeaders: RequestDL.HTTPHeaders
+        ) {
+            guard let new = newHeaders["Cache-Control"], !new.isEmpty else {
+                return
+            }
+
+            func name(of directive: String) -> String {
+                directive.split(separator: "=", maxSplits: 1).first
+                    .map { $0.trimming(where: \.isWhitespace).lowercased() } ?? ""
+            }
+
+            // The same directives, as they were written: nothing to update.
+            if headers["Cache-Control"] ?? [] == new {
+                return
+            }
+
+            let fresh = Array(directives(new)).filter { !$0.isEmpty }
+            var freshNames = Set(fresh.map(name(of:)))
+
+            // `public` and `private` say opposite things: the one that is new replaces the other.
+            if freshNames.contains("public") {
+                freshNames.insert("private")
+            } else if freshNames.contains("private") {
+                freshNames.insert("public")
+            }
+
+            let kept = directives(headers["Cache-Control"] ?? [])
+                .filter { !$0.isEmpty && !freshNames.contains(name(of: $0)) }
+
+            let merged = (fresh + kept).joined(separator: ", ")
+
+            // A `304` that repeats the stored directives in another order or spacing changes nothing.
+            if Set(directives(headers["Cache-Control"] ?? []).map { $0.lowercased() })
+                == Set((fresh + kept).map { $0.lowercased() })
+            {
+                return
+            }
+
+            headers.remove(name: "Cache-Control")
+            headers.add(name: "Cache-Control", value: merged)
         }
 
         private func replaceHeader(
@@ -781,9 +864,10 @@ extension Internals {
         /// explicit freshness information).
         ///
         /// Storing anything else was actively harmful here: an entry with no `max-age`/`Expires`
-        /// is treated as valid indefinitely (`isCachedDataValid`), so one transient `503` was
-        /// replayed by `.returnCachedDataElseLoad` on every later request, without ever asking
-        /// the network again. `206 Partial Content` is excluded the same way: it would serve a
+        /// was treated as valid indefinitely, so one transient `503` was replayed by
+        /// `.returnCachedDataElseLoad` on every later request, without ever asking the network
+        /// again. The errors left in the set (`404`, `405`, `410`, `414`, `501`) are stored only
+        /// with a freshness of their own. `206 Partial Content` is excluded the same way: it would serve a
         /// byte range to a later request for the whole resource.
         private static func isCacheableByDefault(statusCode: UInt) -> Bool {
             [200, 203, 204, 300, 301, 308, 404, 405, 410, 414, 501].contains(statusCode)
@@ -809,6 +893,8 @@ extension Internals {
 
                 guard
                     Self.isCacheableByDefault(statusCode: head.status.code),
+                    // An error is only kept when it says for how long: see `isHeuristicallyFresh`.
+                    head.status.code < 400 || declaresFreshnessLifetime(headHeaders),
                     !containsNoCache(headers: headHeaders["Cache-Control"] ?? []),
                     !requestForbidsStoring,
                     // `Vary: *` is a response that no later request can be said to match.
@@ -1012,9 +1098,8 @@ extension Internals {
             return !head.headerValues(named: "Transfer-Encoding").isEmpty
         }
 
-        /// - Parameter checkingFreshness: Whether the entry also has to be within its freshness
-        ///   lifetime. Its body is always checked against `Content-Length`.
-        private func isCachedDataValid(_ cachedData: CachedData, checkingFreshness: Bool = true) -> Bool {
+        /// Whether the stored body is the one the response says it has.
+        private func isBodyConsistent(_ cachedData: CachedData) -> Bool {
             let headers = cachedData.response.headers
 
             // The cached byte count is only checked against `Content-Length` when that check can
@@ -1039,8 +1124,20 @@ extension Internals {
                 return false
             }
 
-            guard checkingFreshness else {
-                return true
+            return true
+        }
+
+        /// Whether the entry is within its freshness lifetime (RFC 9111 §4.2).
+        ///
+        /// The lifetime is what the response declares, `max-age` or else `Expires`. A response that
+        /// declares none has the one a cache may estimate (§4.2.2), see
+        /// ``isHeuristicallyFresh(_:)``. An entry that carries `no-cache` is never fresh: it is
+        /// there for its validators, and can only be used after the origin confirmed it.
+        private func isFresh(_ cachedData: CachedData) -> Bool {
+            let headers = cachedData.response.headers
+
+            if containsNoCache(headers: headers["Cache-Control"] ?? []) {
+                return false
             }
 
             // A freshness value that is there and cannot be read is a stale response, not a
@@ -1053,6 +1150,10 @@ extension Internals {
             // a legacy stack adds next to it, is fresh for an hour. A `max-age` that is there and
             // cannot be read is stale on its own account, below.
             let maxAge = maxAgeSeconds(headers: headers["Cache-Control"] ?? [])
+
+            if case .absent = maxAge, (headers["Expires"] ?? []).isEmpty {
+                return isHeuristicallyFresh(cachedData)
+            }
 
             if case .absent = maxAge {
                 let expires = headers["Expires"] ?? []
@@ -1088,6 +1189,82 @@ extension Internals {
             }
 
             return true
+        }
+
+        /// The longest a response with no freshness of its own is kept fresh: a day, as browsers
+        /// cap it, however long ago the resource last changed.
+        private static let heuristicFreshnessCeiling: Double = 86_400
+
+        /// Whether an entry that declares no freshness lifetime is still within the one estimated
+        /// for it: a tenth of the time between `Last-Modified` and the response's `Date`, at most
+        /// a day (RFC 9111 §4.2.2).
+        ///
+        /// A resource that changed an hour before it was fetched is likely to change again soon,
+        /// and one that did not change in a year is not. Without a `Last-Modified` there is nothing
+        /// to estimate from, and the entry is not fresh: it is kept for its validators, for a
+        /// request that revalidates, and for `useCachedDataOnly`.
+        ///
+        /// A response that is an error (4xx, 5xx) is never estimated. It is reused only when it says
+        /// for how long, so that a `404` for something not created yet does not outlive its
+        /// creation, which nothing in the response would tell the cache about.
+        private func isHeuristicallyFresh(_ cachedData: CachedData) -> Bool {
+            guard cachedData.response.status.code < 400 else {
+                return false
+            }
+
+            let headers = cachedData.response.headers
+
+            guard
+                let modified = (headers["Last-Modified"] ?? []).first
+                    .flatMap({ Date(httpDate: $0.trimming(where: \.isWhitespace)) })
+            else {
+                return false
+            }
+
+            // `Date` is when the origin says the response was generated; the time it was stored
+            // stands in when it does not say.
+            let generated =
+                (headers["Date"] ?? []).first
+                .flatMap { Date(httpDate: $0.trimming(where: \.isWhitespace)) }
+                ?? cachedData.cachedResponse.date
+
+            let lifetime = min(generated.timeIntervalSince(modified) / 10, Self.heuristicFreshnessCeiling)
+
+            guard lifetime > .zero else {
+                return false
+            }
+
+            let age = Double(ageSeconds(headers: headers["Age"] ?? []))
+
+            return cachedData.cachedResponse.date.advanced(by: lifetime - age) >= Date()
+        }
+
+        /// Whether a response that is stale may not be used before the origin has confirmed it:
+        /// `must-revalidate` (RFC 9111 §5.2.2.2), or `no-cache`, which is that on every use.
+        private func requiresValidationWhenStale(_ cachedData: CachedData) -> Bool {
+            directives(cachedData.response.headers["Cache-Control"] ?? []).contains {
+                let directive = $0.lowercased()
+                return directive == "must-revalidate" || directive == "no-cache" || directive.hasPrefix("no-cache=")
+            }
+        }
+
+        /// Whether a response says for how long it may be reused, with a `max-age` or an `Expires`
+        /// that has not passed.
+        private func declaresFreshnessLifetime(_ headers: RequestDL.HTTPHeaders) -> Bool {
+            switch maxAgeSeconds(headers: headers["Cache-Control"] ?? []) {
+            case .seconds(let seconds):
+                return seconds > 0
+
+            case .invalid:
+                return false
+
+            case .absent:
+                guard let expires = expiresDate(headers: headers["Expires"] ?? []) else {
+                    return false
+                }
+
+                return expires > Date()
+            }
         }
 
         // MARK: - Private methods, header parsing
