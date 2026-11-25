@@ -66,7 +66,7 @@ extension Internals.SystemProxyResolver {
         let authorization: Internals.Proxy.Authorization?
 
         if connection == .socks {
-            authorization = socksAuthorization(of: proxy)
+            authorization = socksAuthorization(of: proxy, logger: logger)
         } else if let username = proxy.user, let password = proxy.password {
             authorization = .basic(username: username, password: password)
         } else {
@@ -86,19 +86,34 @@ extension Internals.SystemProxyResolver {
     /// way curl reads them. A user with no password (`socks5://user@host`) has an empty one, which
     /// SOCKS5 allows. No user means no credentials.
     ///
+    /// A user name or a password that is written but does not decode (a bad `%` sequence, or
+    /// bytes that are not UTF-8) is not the credential the user wrote, and neither an empty
+    /// password nor the proxy without credentials is: both would spend an attempt on credentials
+    /// the user never configured. The credentials are dropped as a whole and reported through
+    /// `logger`, like the ones RFC 1929 cannot carry.
+    ///
     /// Read from the percent-encoded components and decoded here: `URL.password` is not decoded
     /// the same way on every platform, and a `@` or `:` in a credential can only be written
     /// encoded.
-    private static func socksAuthorization(of proxy: URL) -> Internals.Proxy.Authorization? {
+    private static func socksAuthorization(of proxy: URL, logger: Logger?) -> Internals.Proxy.Authorization? {
         guard
             let components = URLComponents(url: proxy, resolvingAgainstBaseURL: false),
-            let encodedUsername = components.percentEncodedUser,
-            let username = encodedUsername.removingPercentEscapes
+            let encodedUsername = components.percentEncodedUser
         else {
             return nil
         }
 
-        let password = components.percentEncodedPassword?.removingPercentEscapes ?? ""
+        let encodedPassword = components.percentEncodedPassword ?? ""
+
+        guard
+            let username = encodedUsername.removingPercentEscapes,
+            let password = encodedPassword.removingPercentEscapes
+        else {
+            Internals.Log.systemProxySOCKSCredentialsUndecodable()
+                .log(level: .warning, logger: logger)
+
+            return nil
+        }
 
         return .socks(username: username, password: password)
     }

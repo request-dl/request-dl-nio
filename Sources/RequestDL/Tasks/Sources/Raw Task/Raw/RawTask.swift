@@ -323,6 +323,8 @@ struct RawTask<Content: Property>: RequestTask {
             throw ReadTimeoutError()
         } catch let error as Internals.RedirectError {
             throw RedirectError(error)
+        } catch let error as Internals.SOCKSAuthenticationRejectedError {
+            throw ProxyAuthorizationError(error)
         } catch let error as Internals.RequestBodyPartUnreadableError {
             throw RequestBodyUnreadableError(error)
         }

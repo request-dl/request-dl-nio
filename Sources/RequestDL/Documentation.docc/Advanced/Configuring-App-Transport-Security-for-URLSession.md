@@ -6,12 +6,13 @@ Adjust your app's Info.plist when a ``SecureConnection`` TLS policy needs to run
 
 `SecureConnection`'s TLS-version and ALPN modifiers — ``SecureConnection/version(minimum:)``, ``SecureConnection/version(maximum:)``, `version(_:)`, and ``SecureConnection/applicationProtocols(_:)`` — configure real, enforced behavior when a request runs over ``Session/Executor/nioTransportServices`` or the default non-Darwin executor: they're handed straight to SwiftNIO's TLS stack.
 
-None of them have a programmatic equivalent under ``Session/Executor/urlSession``. `URLSessionConfiguration` exposes no API to set a minimum/maximum TLS version or an ALPN protocol list. That policy is instead owned by the OS itself, through **App Transport Security (ATS)**, which your app declares once in its `Info.plist`, not per-request.
+Under ``Session/Executor/urlSession`` the picture is split. `URLSessionConfiguration` exposes `tlsMinimumSupportedProtocolVersion` and `tlsMaximumSupportedProtocolVersion`, and RequestDL sets them from the TLS version range, so both ``SecureConnection/version(minimum:)`` and ``SecureConnection/version(maximum:)`` take effect there. It exposes nothing for an ALPN protocol list. On top of that, the OS enforces **App Transport Security (ATS)**, which your app declares once in its `Info.plist`, not per-request, and which RequestDL cannot relax for you.
 
-RequestDL reacts differently to each of these, because only one of them has an ATS equivalent to fall back on:
+RequestDL reacts differently to each of these:
 
-- ``SecureConnection/version(maximum:)`` and ``SecureConnection/applicationProtocols(_:)``, like `cipherSuites(_:)`, are treated as incompatible with `.urlSession`: automatic executor resolution skips `.urlSession` in favor of a NIO-based executor when either is set, and pinning to `.urlSession` explicitly throws ``ExecutorRequirementError`` instead of silently dropping it. Neither has any ATS key at all, so there's no Info.plist fix for these; see [What ATS cannot do](#What-ATS-cannot-do).
-- ``SecureConnection/version(minimum:)`` is the exception: it's *not* flagged as incompatible, because App Transport Security offers a real, working equivalent for it (`NSExceptionMinimumTLSVersion`). It has no effect at all under `.urlSession`, and RequestDL doesn't warn you; this article's [What you need to do](#What-you-need-to-do) section is what replaces it.
+- ``SecureConnection/applicationProtocols(_:)``, like `cipherSuites(_:)`, is treated as incompatible with `.urlSession`: automatic executor resolution skips `.urlSession` in favor of a NIO-based executor when it is set, and pinning to `.urlSession` explicitly throws ``ExecutorRequirementError`` instead of silently dropping it. It has no ATS key at all, so there's no Info.plist fix; see [What ATS cannot do](#What-ATS-cannot-do).
+- ``SecureConnection/version(maximum:)`` is applied to the `URLSessionConfiguration` and is *not* flagged as incompatible. ATS has no key for it and doesn't need one.
+- ``SecureConnection/version(minimum:)`` is applied to the `URLSessionConfiguration` too, and is *not* flagged as incompatible. It can raise the floor (for example to TLS 1.3), but it cannot lower what ATS allows: below TLS 1.2 the connection is still refused until an ATS exception (`NSExceptionMinimumTLSVersion`) allows it. This article's [What you need to do](#What-you-need-to-do) section covers that exception.
 
 `.urlSession` is also RequestDL's own default executor preference on Darwin whenever the rest of a session's configuration is compatible with it, so a request using ``SecureConnection`` with no executor modifier at all may already be running over `.urlSession`.
 
@@ -45,19 +46,18 @@ The keys that map onto `SecureConnection`'s own modifiers:
 
 | `SecureConnection` modifier | ATS `Info.plist` key | Scope |
 | --- | --- | --- |
-| ``SecureConnection/version(minimum:)`` | `NSExceptionMinimumTLSVersion` | Per exception domain |
+| ``SecureConnection/version(minimum:)`` below TLS 1.2 | `NSExceptionMinimumTLSVersion` | Per exception domain |
 | Plain HTTP instead of HTTPS | `NSExceptionAllowsInsecureHTTPLoads` (or `NSAllowsArbitraryLoads` app-wide) | Per exception domain, or global |
 
 Set `NSIncludesSubdomains` to match whichever domains the request actually targets, and scope the exception as narrowly as possible. App Store review, and your own users' security, are both better served by a domain-specific exception than a blanket `NSAllowsArbitraryLoads`.
 
 ## What ATS cannot do
 
-Two `SecureConnection` modifiers have **no** ATS equivalent at all, under any Info.plist configuration. This is exactly why RequestDL flags both as incompatible with `.urlSession` instead of leaving them to fail silently:
+`SecureConnection`'s ALPN modifier has **no** ATS equivalent at all, under any Info.plist configuration, and no `URLSessionConfiguration` property either. This is exactly why RequestDL flags it as incompatible with `.urlSession` instead of leaving it to fail silently:
 
-- ``SecureConnection/version(maximum:)``: ATS only offers a *minimum* TLS version per exception domain; there's no key to cap the maximum.
 - ``SecureConnection/applicationProtocols(_:)`` (ALPN, deprecated): `URLSession` negotiates ALPN automatically (HTTP/2 vs. HTTP/1.1) and Info.plist has no key to override the protocol list it offers. To keep a session off HTTP/2, use ``Session/httpVersion(_:)`` with ``Session/HTTPVersion/http1Only``, which is treated the same way: it routes the session away from `.urlSession`.
 
-If a request depends on either of these, it needs an executor that actually enforces them: ``Session/preferredExecutor(_:)`` or ``Session/requiredExecutor(_:)`` with ``Session/Executor/nioTransportServices`` (or the default non-Darwin executor) instead of `.urlSession`. Under automatic resolution (no executor pinned) this already happens for you; pinning to `.urlSession` anyway makes the conflict explicit via ``ExecutorRequirementError`` rather than silently dropping the setting.
+If a request depends on it, it needs an executor that actually enforces it: ``Session/preferredExecutor(_:)`` or ``Session/requiredExecutor(_:)`` with ``Session/Executor/nioTransportServices`` (or the default non-Darwin executor) instead of `.urlSession`. Under automatic resolution (no executor pinned) this already happens for you; pinning to `.urlSession` anyway makes the conflict explicit via ``ExecutorRequirementError`` rather than silently dropping the setting.
 
 ## What you do not need to do
 
@@ -71,9 +71,9 @@ ATS applies to `URLSession` on iOS, iPadOS, tvOS, watchOS, and macOS alike. It d
 
 ## Troubleshooting
 
-A request that needs a lower minimum TLS version (or plain HTTP) than ATS's defaults, running over `.urlSession` without a matching exception, fails at the transport level rather than reaching the server. This is commonly surfaced as an `NSURLErrorDomain` error with code `-1022` (`NSURLErrorAppTransportSecurityRequiresSecureConnection`), or a TLS handshake failure logged by the OS mentioning ATS. That failure happens below RequestDL, so no ``SecureConnection`` setting can catch or translate it; check the console log for the ATS-specific message, then add the matching exception domain above.
+A request that needs a minimum TLS version below TLS 1.2 (or plain HTTP) than ATS's defaults, running over `.urlSession` without a matching exception, fails at the transport level rather than reaching the server. This is commonly surfaced as an `NSURLErrorDomain` error with code `-1022` (`NSURLErrorAppTransportSecurityRequiresSecureConnection`), or a TLS handshake failure logged by the OS mentioning ATS. That failure happens below RequestDL, so no ``SecureConnection`` setting can catch or translate it; check the console log for the ATS-specific message, then add the matching exception domain above.
 
-A request that sets `version(maximum:)` or ``SecureConnection/applicationProtocols(_:)`` never gets this far: RequestDL routes it away from `.urlSession` on its own (or throws ``ExecutorRequirementError`` if you pinned `.urlSession` explicitly), well before any ATS-level failure could occur. See [What ATS cannot do](#What-ATS-cannot-do).
+A request that sets ``SecureConnection/applicationProtocols(_:)`` never gets this far: RequestDL routes it away from `.urlSession` on its own (or throws ``ExecutorRequirementError`` if you pinned `.urlSession` explicitly), well before any ATS-level failure could occur. See [What ATS cannot do](#What-ATS-cannot-do).
 
 ## Topics
 

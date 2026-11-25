@@ -5,15 +5,24 @@
 import RequestDLInternals
 
 /// An error thrown when the ``ProxyAuthorization`` of a ``Proxy`` cannot be used with the proxy's
-/// ``Proxy/ConnectionProtocol``.
+/// ``Proxy/ConnectionProtocol``, or when a SOCKS proxy rejects it.
 ///
-/// It is thrown while the request is being built, before anything is sent, so credentials a
-/// proxy cannot take are never silently left out of the connection.
+/// Credentials a proxy cannot take are thrown while the request is being built, before anything
+/// is sent, so they are never silently left out of the connection. A SOCKS5 proxy that rejects
+/// the credentials it was given fails the request later, with ``Reason-swift.enum/socksAuthenticationRejected``.
 ///
 /// A SOCKS5 proxy takes only a user name and a password (RFC 1929), not an HTTP
 /// `Proxy-Authorization` header. ``ProxyAuthorization/basic(username:password:)`` is that user
 /// name and password; ``ProxyAuthorization/basic(credentials:)`` (an already encoded header
 /// value) and ``ProxyAuthorization/bearer(tokens:)`` are not, and are refused.
+///
+/// ```swift
+/// do {
+///     try await DataTask { ... }.result()
+/// } catch let error as ProxyAuthorizationError where error.reason == .socksAuthenticationRejected {
+///     // The proxy does not accept this user name and password.
+/// }
+/// ```
 ///
 /// The error never carries the credentials, only what is wrong with them.
 public struct ProxyAuthorizationError: Error, Sendable, Hashable {
@@ -39,6 +48,14 @@ public struct ProxyAuthorizationError: Error, Sendable, Hashable {
         /// there, so the proxy would be authenticated with other credentials than the NIO
         /// executors send. It is refused so that no executor does either.
         case socksCredentialsContainNUL
+
+        /// A SOCKS5 proxy answered the user name and the password with a rejection (RFC 1929).
+        ///
+        /// The same on every executor. It is not retried, since sending the same wrong
+        /// credentials again could only lock the account. A proxy that closes the connection
+        /// right after receiving them, without answering, is taken for this too under `.nio` and
+        /// `.nioTransportServices`.
+        case socksAuthenticationRejected
     }
 
     // MARK: - Public properties
@@ -46,9 +63,25 @@ public struct ProxyAuthorizationError: Error, Sendable, Hashable {
     /// What is wrong with the authorization.
     public let reason: Reason
 
+    /// The error the executor reported, for ``Reason-swift.enum/socksAuthenticationRejected`` only.
+    ///
+    /// Under `.nio` and `.nioTransportServices` it is `SOCKSError.AuthenticationFailed` (from
+    /// `NIOSOCKS`, which RequestDL does not re-export), and under `.urlSession` an `NSError` in
+    /// `NSPOSIXErrorDomain` with code `EAUTH` (80). Neither carries the credentials. It is only
+    /// for diagnosis: it is not part of the error's equality, which is its ``reason``, and what
+    /// it is may change with the executor or the operating system.
+    public let underlyingError: (any Error)?
+
     // MARK: - Inits
 
+    init(_ error: Internals.SOCKSAuthenticationRejectedError) {
+        self.reason = .socksAuthenticationRejected
+        self.underlyingError = error.underlying
+    }
+
     init(_ mismatch: Internals.Proxy.Authorization.Mismatch) {
+        self.underlyingError = nil
+
         switch mismatch {
         case .httpShapeOnSOCKSProxy:
             self.reason = .socksRequiresUsernameAndPassword
@@ -64,6 +97,19 @@ public struct ProxyAuthorizationError: Error, Sendable, Hashable {
         case .socksPasswordLength(let actual):
             self.reason = .socksPasswordLength(actual: actual)
         }
+    }
+}
+
+// MARK: - Hashable
+
+extension ProxyAuthorizationError {
+
+    public static func == (lhs: ProxyAuthorizationError, rhs: ProxyAuthorizationError) -> Bool {
+        lhs.reason == rhs.reason
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(reason)
     }
 }
 
@@ -99,6 +145,28 @@ extension ProxyAuthorizationError: CustomStringConvertible {
                 or the password has a NUL character, which URLSession would cut the credentials at. \
                 The request was not sent.
                 """
+
+        case .socksAuthenticationRejected:
+            return """
+                The SOCKS proxy rejected the user name and the password it was given, so the \
+                request failed. It was not retried: sending the same credentials again could only \
+                lock the account.
+                """
         }
+    }
+}
+
+// MARK: - CustomDebugStringConvertible
+
+extension ProxyAuthorizationError: CustomDebugStringConvertible {
+
+    /// ``description``, followed by ``underlyingError`` when there is one, which is what
+    /// `String(reflecting:)` and the debugger show.
+    public var debugDescription: String {
+        guard let underlyingError else {
+            return description
+        }
+
+        return "\(description) Underlying error: \(String(reflecting: underlyingError))"
     }
 }

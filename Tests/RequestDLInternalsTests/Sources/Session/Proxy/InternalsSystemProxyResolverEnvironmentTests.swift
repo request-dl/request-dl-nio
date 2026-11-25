@@ -130,6 +130,36 @@ struct InternalsSystemProxyResolverEnvironmentTests {
         #expect(!text.contains("uuuu") && !text.contains("pppp") && !text.contains(":p@"))
     }
 
+    /// Credentials that are written but do not percent-decode used to become an empty password
+    /// (and the empty password was then sent to the proxy) or vanish without a word. They are
+    /// dropped as a whole, and said so.
+    @Test(arguments: [
+        "socks5://user:p%FFss@h",
+        "socks5://us%FFer:pass@h",
+    ])
+    func aSocksProxy_withCredentialsThatDoNotPercentDecode_dropsThemAndSaysWhy(_ value: String) async throws {
+        let records = EnvironmentLogRecords()
+        let url = try #require(URL(string: "http://example.com"))
+
+        let proxy = await Logger.withTestHandler(recorded: records.append) { logger in
+            Internals.SystemProxyResolver.proxy(forURL: url, environment: ["http_proxy": value], logger: logger)
+        }
+
+        #expect(proxy?.host == "h")
+        #expect(proxy?.connectionProtocol == .socks)
+        #expect(proxy?.authorization == nil)
+
+        let recorded = records.all
+        #expect(recorded.count == 1)
+        #expect(recorded.first?.level == .warning)
+        #expect(
+            recorded.first?.metadata["reason"]
+                == .string("the user name or the password is not valid percent-encoded text")
+        )
+        let text = recorded.map(\.description).joined()
+        #expect(!text.contains("%FF") && !text.contains("user:") && !text.contains("pass@"))
+    }
+
     @Test
     func aSocksProxy_withCredentialsItCarries_logsNothing() async throws {
         let records = EnvironmentLogRecords()

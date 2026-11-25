@@ -295,21 +295,20 @@ struct SPKIPinningTests {
     }
 
     @Test
-    func hash_whenDeclaredOutsideSPKIPinning_hasNoEffect() async throws {
+    func hash_whenDeclaredOutsideSPKIPinning_throws() async throws {
         // Given
         let pin = Data(repeating: 0, count: 32)
 
-        // When
-        let resolved = try await resolve(
-            TestProperty {
-                SecureConnection {
-                    SPKIHash(pin)
-                }
-            }
-        )
-
         // Then
-        #expect(resolved.session.configuration.secureConnection?.tlsPins == nil)
+        await #expect(throws: Internals.SPKIHashOutsideSPKIPinningError.self) {
+            _ = try await resolve(
+                TestProperty {
+                    SecureConnection {
+                        SPKIHash(pin)
+                    }
+                }
+            )
+        }
     }
 }
 

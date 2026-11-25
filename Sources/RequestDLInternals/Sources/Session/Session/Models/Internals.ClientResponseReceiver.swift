@@ -376,10 +376,12 @@ extension Internals {
             }
 
             // From here on it is reported, so it is reported the way the other executor reports it:
-            // AsyncHTTPClient's own errors for a redirect that could not be followed are this
-            // package's. Not before, since a reconnection decides what to do with an error from
+            // AsyncHTTPClient's own errors for a redirect that could not be followed, and the SOCKS
+            // client's for a rejected user name and password, are this package's. Not before, since a reconnection decides what to do with an error from
             // what AsyncHTTPClient called it.
-            let error = Internals.RedirectError.translating(error)
+            let error = Internals.SOCKSAuthenticationRejectedError.translating(
+                Internals.RedirectError.translating(error)
+            )
 
             // First, unconditionally, and outside the state machine: whatever state this error
             // lands in, including the `.end`/`.failure` ones that otherwise do nothing, a
@@ -484,7 +486,9 @@ extension Internals {
         package func failIfNotStarted(_ error: Error) {
             // Like `didReceiveError(task:_:)`: whoever reads this gets the same error whichever
             // executor ran the request.
-            let error = Internals.RedirectError.translating(error)
+            let error = Internals.SOCKSAuthenticationRejectedError.translating(
+                Internals.RedirectError.translating(error)
+            )
 
             decide {
                 switch _state {

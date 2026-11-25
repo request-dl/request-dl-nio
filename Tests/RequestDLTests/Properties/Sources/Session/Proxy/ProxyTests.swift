@@ -282,6 +282,7 @@ struct ProxyTests {
         case .socksUsernameLength(let actual): mismatch = .socksUsernameLength(actual)
         case .socksPasswordLength(let actual): mismatch = .socksPasswordLength(actual)
         case .socksCredentialsContainNUL: mismatch = .socksCredentialContainsNUL
+        case .socksAuthenticationRejected: preconditionFailure("Not a mismatch: see the rejection test below.")
         }
 
         // When
@@ -429,6 +430,7 @@ struct ProxyTests {
                 case .socksUsernameLength(let actual): return .socksUsernameLength(actual)
                 case .socksPasswordLength(let actual): return .socksPasswordLength(actual)
                 case .socksCredentialsContainNUL: return .socksCredentialContainsNUL
+                case .socksAuthenticationRejected: preconditionFailure("Not a mismatch: see the rejection test above.")
                 }
             }()
         )
@@ -436,6 +438,28 @@ struct ProxyTests {
         #expect(error.reason == reason)
         #expect(error.description.contains("SOCKS"))
         #expect(error.description.contains("not sent"))
+    }
+
+    @Test
+    func proxyAuthorizationError_whenRejectedByTheProxy_keepsTheCauseAndNoCredentials() {
+        // Given
+        struct Cause: Error, CustomStringConvertible {
+            let description = "status 1"
+        }
+
+        // When
+        let error = ProxyAuthorizationError(Internals.SOCKSAuthenticationRejectedError(underlying: Cause()))
+
+        // Then
+        #expect(error.reason == .socksAuthenticationRejected)
+        #expect(error.underlyingError is Cause)
+        #expect(error.description.contains("rejected the user name and the password"))
+        #expect(!error.description.contains("status 1"))
+        #expect(error.debugDescription.hasSuffix("Underlying error: status 1"))
+        // The cause is for diagnosis, not part of what the error is equal to.
+        let other = ProxyAuthorizationError(Internals.SOCKSAuthenticationRejectedError(underlying: CancellationError()))
+        #expect(error == other)
+        #expect(error != ProxyAuthorizationError(.socksCredentialContainsNUL))
     }
 
     @Test
