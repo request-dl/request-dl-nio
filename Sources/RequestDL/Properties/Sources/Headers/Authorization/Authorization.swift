@@ -86,7 +86,8 @@ public struct Authorization: Property {
                 key: "Authorization",
                 value: "\(property.type.rawValue) \(property.token)",
                 strategy: .setting,
-                separator: nil
+                separator: nil,
+                hiddenOnRedirect: inputs.environment.hiddenOnRedirect
             )
         )
     }

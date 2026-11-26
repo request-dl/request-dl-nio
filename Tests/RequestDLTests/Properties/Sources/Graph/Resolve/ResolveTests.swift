@@ -126,6 +126,7 @@ extension ResolveTests {
                         value = application/json,
                         strategy = .adding,
                         separator = nil,
+                        hiddenOnRedirect = nil,
                         isDefaultUserAgent = false
                     }
                 },
@@ -137,6 +138,7 @@ extension ResolveTests {
                         separator = Optional<String> {
                             some = ,
                         },
+                        hiddenOnRedirect = nil,
                         isDefaultUserAgent = false
                     }
                 },
@@ -192,6 +194,7 @@ extension ResolveTests {
                             value = application/json,
                             strategy = .adding,
                             separator = nil,
+                            hiddenOnRedirect = nil,
                             isDefaultUserAgent = false
                         }
                     },
@@ -203,6 +206,7 @@ extension ResolveTests {
                             separator = Optional<String> {
                                 some = ,
                             },
+                            hiddenOnRedirect = nil,
                             isDefaultUserAgent = false
                         }
                     }

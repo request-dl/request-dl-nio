@@ -30,8 +30,11 @@ extension Internals {
         /// - Parameter urlOverrides: The rules each hop is rewritten with before it is followed.
         /// Empty (the default) follows every `Location` as the server wrote it. Not applied to
         /// `.disallow`, which follows nothing.
+        /// - Parameter hiddenHeaders: The headers each hop is stripped of besides the ones every
+        /// redirect to another origin loses. See ``Internals/RedirectHiddenHeaders``.
         package func build(
-            urlOverrides: Internals.URLOverrides = .init()
+            urlOverrides: Internals.URLOverrides = .init(),
+            hiddenHeaders: Internals.RedirectHiddenHeaders = .init()
         ) -> HTTPClient.Configuration.RedirectConfiguration {
             switch self {
             case .disallow:
@@ -42,12 +45,17 @@ extension Internals {
                     Internals.NIOFollowRedirectStrategy(
                         max: max,
                         allowCycles: allowCycles,
-                        urlOverrides: urlOverrides
+                        urlOverrides: urlOverrides,
+                        hiddenHeaders: hiddenHeaders
                     )
                 )
             case .strategy(let strategy):
                 return .strategy(
-                    Internals.NIORedirectStrategyAdapter(strategy: strategy, urlOverrides: urlOverrides)
+                    Internals.NIORedirectStrategyAdapter(
+                        strategy: strategy,
+                        urlOverrides: urlOverrides,
+                        hiddenHeaders: hiddenHeaders
+                    )
                 )
             }
         }

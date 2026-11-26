@@ -64,6 +64,41 @@ extension InternalsSessionConfigurationTests {
         )
     }
 
+    /// AsyncHTTPClient's own `.follow` knows nothing of the rule that keeps an explicit `Host` from
+    /// another origin, so a session that says nothing about redirects is built with the default
+    /// configuration spelled out, the one `.urlSession` already uses, and not with no configuration.
+    @Test
+    func build_whenNoRedirectConfigurationWasSet_followsRedirectsThroughTheDefaultStrategy() throws {
+        // Given
+        let configuration = Internals.Session.Configuration()
+
+        // When
+        let builtConfiguration = try configuration.build().httpClientConfiguration
+
+        // Then
+        #expect(
+            String(describing: builtConfiguration.redirectConfiguration)
+                != String(describing: HTTPClient.Configuration.RedirectConfiguration.follow(max: 5, allowCycles: false))
+        )
+    }
+
+    /// No configuration is the default one, so telling the two apart would give a session that
+    /// never mentioned redirects a pooled client of its own.
+    @Test
+    func equality_whenOneSideHasNoRedirectConfigurationAndTheOtherTheDefault_isEqual() {
+        // Given
+        var explicit = Internals.Session.Configuration()
+        explicit.redirectConfiguration = .default
+
+        var different = Internals.Session.Configuration()
+        different.redirectConfiguration = .follow(max: 6, allowCycles: false)
+
+        // Then
+        #expect(Internals.Session.Configuration() == explicit)
+        #expect(explicit == Internals.Session.Configuration())
+        #expect(Internals.Session.Configuration() != different)
+    }
+
     @Test
     func configuration_whenSetTimeout_shouldBeEqual() async throws {
         // Given
@@ -310,7 +345,7 @@ extension InternalsSessionConfigurationTests {
                 describing: builtConfiguration.redirectConfiguration
             )
                 == String(
-                    describing: HTTPClient.Configuration.RedirectConfiguration.follow(max: 5, allowCycles: false)
+                    describing: Internals.RedirectConfiguration.default.build()
                 )
         )
         #expect(builtConfiguration.timeout.connect == nil)

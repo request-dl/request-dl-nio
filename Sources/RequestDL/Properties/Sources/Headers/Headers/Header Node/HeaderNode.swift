@@ -11,6 +11,9 @@ struct HeaderNode: PropertyNode {
     let strategy: HeaderStrategy
     let separator: String?
 
+    /// Which redirects remove this header, when `.hiddenOnRedirect(_:)` is in scope, or `nil`.
+    let hiddenOnRedirect: RedirectHeaderScope?
+
     /// Whether this node is RequestDL's own untouched default `User-Agent`
     /// (``UserAgentHeader/init()``), as opposed to a caller-supplied value.
     ///
@@ -30,12 +33,14 @@ struct HeaderNode: PropertyNode {
         value: String,
         strategy: HeaderStrategy,
         separator: String?,
+        hiddenOnRedirect: RedirectHeaderScope? = nil,
         isDefaultUserAgent: Bool = false
     ) {
         self.key = key
         self.value = value
         self.strategy = strategy
         self.separator = separator
+        self.hiddenOnRedirect = hiddenOnRedirect
         self.isDefaultUserAgent = isDefaultUserAgent
     }
 
@@ -43,6 +48,15 @@ struct HeaderNode: PropertyNode {
 
     func make(_ make: inout Make) async throws {
         self(&make.requestConfiguration.headers)
+
+        // Recorded for the redirects, which the executors follow without resolving the request
+        // again. An empty name writes no header, so there is nothing to keep from a redirect.
+        if let hiddenOnRedirect, !key.isEmpty {
+            make.sessionConfiguration.redirectHiddenHeaders.insert(
+                name: key,
+                onAnyRedirect: hiddenOnRedirect == .anyRedirect
+            )
+        }
 
         // `.lowercased()`, not Foundation's `caseInsensitiveCompare(_:)`: unavailable outside
         // Darwin (FoundationEssentials/Linux/Android), and this path runs for every executor,
@@ -144,6 +158,7 @@ extension HeaderNode: CustomReflectable {
                 (label: "value", value: value),
                 (label: "strategy", value: strategy),
                 (label: "separator", value: separator as Any),
+                (label: "hiddenOnRedirect", value: hiddenOnRedirect as Any),
                 (label: "isDefaultUserAgent", value: isDefaultUserAgent),
             ]
         )

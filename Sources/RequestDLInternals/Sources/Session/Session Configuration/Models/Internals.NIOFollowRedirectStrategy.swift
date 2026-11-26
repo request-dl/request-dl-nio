@@ -36,6 +36,9 @@ extension Internals {
         /// Rewrites each hop the way the first request was, before it is checked or followed. See
         /// ``Internals/URLOverrides/rewritingRedirect(_:previous:)``.
         var urlOverrides: Internals.URLOverrides = .init()
+        /// Taken off each hop besides what a redirect to another origin always loses. See
+        /// ``Internals/RedirectHiddenHeaders``.
+        var hiddenHeaders: Internals.RedirectHiddenHeaders = .init()
 
         // MARK: - Internal methods
 
@@ -71,7 +74,12 @@ extension Internals {
             // origin must not carry, `Host` included.
             if let previousURL = context.history.last?.request.url {
                 var headers = Internals.HTTPHeaders(request.headers)
-                Internals.RedirectSanitizer.sanitize(&headers, from: previousURL, to: request.url)
+                Internals.RedirectSanitizer.sanitize(
+                    &headers,
+                    from: previousURL,
+                    to: request.url,
+                    hidden: hiddenHeaders
+                )
                 request.headers = headers.build()
             }
 

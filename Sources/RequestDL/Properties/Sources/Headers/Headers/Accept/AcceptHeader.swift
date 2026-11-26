@@ -41,7 +41,8 @@ public struct AcceptHeader: Property {
                 key: "Accept",
                 value: property.type.rawValue,
                 strategy: inputs.environment.headerStrategy,
-                separator: inputs.environment.headerSeparator
+                separator: inputs.environment.headerSeparator,
+                hiddenOnRedirect: inputs.environment.hiddenOnRedirect
             )
         )
     }

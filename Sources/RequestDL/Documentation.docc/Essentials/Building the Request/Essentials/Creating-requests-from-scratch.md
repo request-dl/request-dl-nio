@@ -206,6 +206,8 @@ Learn more in:
 - ``RequestDL/HeaderStrategy``
 - ``RequestDL/Property/headerStrategy(_:)``
 - ``RequestDL/Property/headerSeparator(_:)``
+- ``RequestDL/Property/hiddenOnRedirect(_:)``
+- ``RequestDL/RedirectHeaderScope``
 
 ### Working with payload
 
@@ -251,6 +253,8 @@ Learn more in:
 - ``RequestDL/RedirectHistoryEntry``
 - ``RequestDL/RedirectDecision``
 - ``RequestDL/RedirectError``
+- ``RequestDL/RedirectHeaderScope``
+- ``RequestDL/Property/hiddenOnRedirect(_:)``
 
 ### Adding request timeout
 

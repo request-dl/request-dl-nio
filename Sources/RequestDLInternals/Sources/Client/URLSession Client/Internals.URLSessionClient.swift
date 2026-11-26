@@ -57,6 +57,7 @@ extension Internals {
         private let operationQueue = Internals.ClientOperationQueue()
         private let redirectConfiguration: Internals.RedirectConfiguration
         private let urlOverrides: Internals.URLOverrides
+        private let hiddenHeaders: Internals.RedirectHiddenHeaders
         private let proxyAuthorization: Internals.Proxy.Authorization?
         private let identityPolicy: Internals.URLSessionIdentityPolicy?
 
@@ -82,6 +83,8 @@ extension Internals {
         /// gets identical behavior regardless of which executor the session resolves to.
         /// - Parameter urlOverrides: The rules every redirect hop is rewritten with before it is
         /// followed, the way the first request already was. See ``Internals/URLOverrides``.
+        /// - Parameter hiddenHeaders: The headers each redirect hop is stripped of besides the ones
+        /// every redirect to another origin loses. See ``Internals/RedirectHiddenHeaders``.
         /// - Parameter proxy: Both `.http` (`.server`) and `.socks` (with RFC 1929
         /// username/password, through `SOCKSUser`/`SOCKSPassword`) are mapped onto
         /// `configuration`. Throws `Internals.Proxy.Authorization.Mismatch` when the authorization
@@ -106,6 +109,7 @@ extension Internals {
             secureConnection: Internals.SecureConnection? = nil,
             redirectConfiguration: Internals.RedirectConfiguration = .follow(max: 5, allowCycles: false),
             urlOverrides: Internals.URLOverrides = .init(),
+            hiddenHeaders: Internals.RedirectHiddenHeaders = .init(),
             proxy: Internals.Proxy? = nil,
             maximumConcurrentConnections: Int? = nil,
             throttledExecutor: Internals.ThrottledExecutor? = nil,
@@ -148,6 +152,7 @@ extension Internals {
                 ?? Internals.ThrottledExecutor(maximumConcurrentConnections: maximumConcurrentConnections)
             self.redirectConfiguration = redirectConfiguration
             self.urlOverrides = urlOverrides
+            self.hiddenHeaders = hiddenHeaders
             self.proxyAuthorization = proxy?.authorization
             self.identityPolicy = identityPolicy
             self.acceptEncoding = acceptEncoding
@@ -234,6 +239,7 @@ extension Internals {
             let taskDelegate = TaskDelegate(
                 redirectConfiguration: redirectConfiguration,
                 urlOverrides: urlOverrides,
+                hiddenHeaders: hiddenHeaders,
                 initialRequest: request,
                 proxyAuthorization: proxyAuthorization,
                 tls: tlsDelegate,
@@ -316,6 +322,7 @@ extension Internals {
             let taskDelegate = TaskDelegate(
                 redirectConfiguration: redirectConfiguration,
                 urlOverrides: urlOverrides,
+                hiddenHeaders: hiddenHeaders,
                 initialRequest: request,
                 proxyAuthorization: proxyAuthorization,
                 tls: tlsDelegate,
@@ -412,6 +419,7 @@ extension Internals {
             let taskDelegate = TaskDelegate(
                 redirectConfiguration: redirectConfiguration,
                 urlOverrides: urlOverrides,
+                hiddenHeaders: hiddenHeaders,
                 initialRequest: request,
                 proxyAuthorization: proxyAuthorization,
                 tls: tlsDelegate,
@@ -718,11 +726,13 @@ extension Internals {
 
             let redirectConfiguration = redirectConfiguration
             let urlOverrides = urlOverrides
+            let hiddenHeaders = hiddenHeaders
             let proxyAuthorization = proxyAuthorization
 
             let taskDelegate = TaskDelegate(
                 redirectConfiguration: redirectConfiguration,
                 urlOverrides: urlOverrides,
+                hiddenHeaders: hiddenHeaders,
                 initialRequest: request,
                 proxyAuthorization: proxyAuthorization,
                 tls: tlsDelegate,
@@ -744,6 +754,7 @@ extension Internals {
                 TaskDelegate(
                     redirectConfiguration: redirectConfiguration,
                     urlOverrides: urlOverrides,
+                    hiddenHeaders: hiddenHeaders,
                     initialRequest: continuation,
                     proxyAuthorization: proxyAuthorization,
                     tls: tlsDelegate,
@@ -1464,6 +1475,7 @@ extension Internals.URLSessionClient {
 
         private let redirectConfiguration: Internals.RedirectConfiguration
         private let urlOverrides: Internals.URLOverrides
+        private let hiddenHeaders: Internals.RedirectHiddenHeaders
         private let proxyAuthorization: Internals.Proxy.Authorization?
         private let tlsDelegate: TLSDelegate?
         private let forwardingDelegate: URLSessionTaskDelegate?
@@ -1575,6 +1587,7 @@ extension Internals.URLSessionClient {
         init(
             redirectConfiguration: Internals.RedirectConfiguration,
             urlOverrides: Internals.URLOverrides = .init(),
+            hiddenHeaders: Internals.RedirectHiddenHeaders = .init(),
             initialRequest: URLRequest,
             proxyAuthorization: Internals.Proxy.Authorization?,
             tls tlsDelegate: TLSDelegate?,
@@ -1590,6 +1603,7 @@ extension Internals.URLSessionClient {
         ) {
             self.redirectConfiguration = redirectConfiguration
             self.urlOverrides = urlOverrides
+            self.hiddenHeaders = hiddenHeaders
             self.proxyAuthorization = proxyAuthorization
             self.tlsDelegate = tlsDelegate
             self.forwardingDelegate = delegate
@@ -1627,7 +1641,8 @@ extension Internals.URLSessionClient {
         /// `Proxy-Authorization`, and an explicit `Host`, from `request` when it no longer shares
         /// the previously sent request's origin (scheme, host, and port); see
         /// ``Internals/RedirectSanitizer``. `URLSession` does not do this on its own (it only ever
-        /// removes `Authorization`, on every redirect), unlike the NIO executor's
+        /// removes `Authorization`, on every redirect, which is put back when the origin is the
+        /// same: see `nextHop(_:after:)`), unlike the NIO executor's
         /// `followingRedirect`/`transformRequestForRedirect`, which this mirrors so a redirect
         /// leaking credentials to a different host fails the same way under either transport.
         ///
@@ -1641,30 +1656,27 @@ extension Internals.URLSessionClient {
             newRequest proposedRequest: URLRequest,
             completionHandler: @escaping (URLRequest?) -> Void
         ) {
-            // The hop as it is going to be requested: a `Location` that names a host a
-            // `URLOverride` stands in for is mapped to its destination, before anything below
-            // counts, compares or follows it.
-            let request: URLRequest
-
-            do {
-                request = try rewrittenByURLOverrides(proposedRequest)
-            } catch {
-                // A rule covers this hop and its destination cannot be built: following the
-                // `Location` as the server wrote it would reach the host the rule stands in for.
-                lock.withLock { _redirectError = error }
-                completionHandler(nil)
-                return
-            }
-
             // Before anything below decides what to do with this hop: the next request, whichever
             // way it is built, must be owed what this redirect just set.
             storeCookies(from: response)
 
             switch redirectConfiguration {
             case .disallow:
+                // Nothing is followed, so no hop is built: a rule that cannot build one is no
+                // reason to fail a redirect that is handed back as the response.
                 completionHandler(nil)
 
             case .follow(let max, let allowCycles):
+                let request: URLRequest
+
+                do {
+                    request = try nextHop(proposedRequest, after: response)
+                } catch {
+                    lock.withLock { _redirectError = error }
+                    completionHandler(nil)
+                    return
+                }
+
                 let redirectURL = request.url?.absoluteString ?? ""
 
                 let outcome: Result<Void, Error> = lock.withLock {
@@ -1698,6 +1710,16 @@ extension Internals.URLSessionClient {
                 }
 
             case .strategy(let strategy):
+                let request: URLRequest
+
+                do {
+                    request = try nextHop(proposedRequest, after: response)
+                } catch {
+                    lock.withLock { _redirectError = error }
+                    completionHandler(nil)
+                    return
+                }
+
                 let sanitizedRequest = sanitizedForRedirect(request)
                 let entry = historyEntry(for: response)
 
@@ -1825,6 +1847,55 @@ extension Internals.URLSessionClient {
             return request
         }
 
+        /// The hop as it is going to be requested, from what `URLSession` proposed: a `Location`
+        /// that names a host a `URLOverride` stands in for is mapped to its destination, before
+        /// anything that follows counts, compares or follows it, and what `URLSession` changed on
+        /// its own is put back to what the other executor does.
+        ///
+        /// - Throws: ``Internals/RedirectError`` when a rule covers the `Location` and its
+        /// destination cannot be built: following it as the server wrote it would reach the host
+        /// the rule stands in for.
+        private func nextHop(
+            _ proposedRequest: URLRequest,
+            after response: HTTPURLResponse
+        ) throws -> URLRequest {
+            var request = try rewrittenByURLOverrides(proposedRequest)
+            let previous = lock.withLock { _lastRequest }
+
+            // `Authorization` and `Proxy-Authorization` stay with a redirect that does not leave
+            // the origin they were sent to, as with AsyncHTTPClient and as `RedirectRequest`
+            // documents; `URLSession` takes them off every redirect. What leaves the origin is
+            // removed by the sanitizer afterwards, so this only ever gives back what was owed.
+            if let previousURL = previous.url,
+                let newURL = request.url,
+                previousURL.hasTheSameOrigin(as: newURL)
+            {
+                for header in Self.headersURLSessionDropsOnRedirect
+                where request.value(forHTTPHeaderField: header) == nil
+                    && !hiddenHeaders.anyRedirect.contains(header.lowercased())
+                {
+                    if let value = previous.value(forHTTPHeaderField: header) {
+                        request.setValue(value, forHTTPHeaderField: header)
+                    }
+                }
+            }
+
+            // A `303` asks for the target with `GET` or `HEAD` (RFC 9110, 15.4.4). `URLSession`
+            // always picks `GET`, which downloads a body the caller did not ask for; AsyncHTTPClient
+            // keeps `HEAD`.
+            if response.statusCode == 303,
+                previous.httpMethod?.uppercased() == "HEAD",
+                request.httpMethod?.uppercased() == "GET"
+            {
+                request.httpMethod = "HEAD"
+            }
+
+            return request
+        }
+
+        /// The headers `URLSession` removes from a redirect to the very origin it was sent to.
+        private static let headersURLSessionDropsOnRedirect = ["Authorization", "Proxy-Authorization"]
+
         /// `request` with its URL mapped through the `URLOverride` rules, when one covers it.
         ///
         /// The cross-origin decision of what follows is taken on the URLs actually requested, the
@@ -1871,21 +1942,23 @@ extension Internals.URLSessionClient {
         }
 
         /// Strips ``Internals/RedirectSanitizer/crossOriginHeaders`` from `request` when it
-        /// no longer shares `_lastRequest`'s origin. See the doc comment on
-        /// `urlSession(_:task:willPerformHTTPRedirection:newRequest:completionHandler:)`.
+        /// no longer shares `_lastRequest`'s origin, and the headers the caller marked with
+        /// `hiddenOnRedirect(_:)` (``Internals/RedirectHiddenHeaders``): the ones marked for
+        /// another origin under the same condition, the ones marked for any redirect always. See the
+        /// doc comment on `urlSession(_:task:willPerformHTTPRedirection:newRequest:completionHandler:)`.
         private func sanitizedForRedirect(_ request: URLRequest) -> URLRequest {
             let previousURL = lock.withLock { _lastRequest.url }
 
-            guard
-                let previousURL,
-                let newURL = request.url,
-                !previousURL.hasTheSameOrigin(as: newURL)
-            else {
-                return request
+            // Without both URLs there is no origin to compare, and the built-in headers stay as
+            // they were; what the caller marked for any redirect is taken off regardless.
+            var sameOrigin = true
+
+            if let previousURL, let newURL = request.url {
+                sameOrigin = previousURL.hasTheSameOrigin(as: newURL)
             }
 
             var sanitized = request
-            for header in Internals.RedirectSanitizer.crossOriginHeaders {
+            for header in Internals.RedirectSanitizer.removedHeaders(sameOrigin: sameOrigin, hidden: hiddenHeaders) {
                 sanitized.setValue(nil, forHTTPHeaderField: header)
             }
             return sanitized
@@ -2104,7 +2177,17 @@ extension Internals.URLSessionClient {
                 return error
             }
 
-            return lock.withLock { _redirectError } ?? error
+            if let redirectError = lock.withLock({ _redirectError }) {
+                return redirectError
+            }
+
+            // `URLSession` stops at 20 redirects on its own, whatever `max` was asked for, and says
+            // so with its own error. It is the limit being reached all the same.
+            if (error as? URLError)?.code == .httpTooManyRedirects {
+                return Internals.RedirectError(.limitReached)
+            }
+
+            return error
         }
 
         /// The redirect `willPerformHTTPRedirection` deferred to `runExchange` (see

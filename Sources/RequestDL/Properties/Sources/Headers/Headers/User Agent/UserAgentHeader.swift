@@ -84,6 +84,7 @@ public struct UserAgentHeader: Property {
                 value: property.value.trimming(where: \.isWhitespace),
                 strategy: inputs.environment.headerStrategy,
                 separator: " ",
+                hiddenOnRedirect: inputs.environment.hiddenOnRedirect,
                 isDefaultUserAgent: property.isDefault
             )
         )
