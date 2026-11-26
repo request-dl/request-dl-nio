@@ -543,8 +543,8 @@ extension Internals {
         /// `"URLSession."` prefix, keeping this entry apart from any `.nio` one the same provider
         /// might also have cached under its bare (or `"NTW."`-prefixed) id.
         ///
-        /// `Internals.URLSessionClient.init` is routed through `Internals.FileSystemManager.run`
-        /// rather than called directly: it reads the certificate/private-key files a
+        /// With a `secureConnection`, `Internals.URLSessionClient.init` is routed through
+        /// `Internals.FileSystemManager.run` rather than called directly: it reads the certificate/private-key files a
         /// `SecureConnection` names (`Internals.Certificate.resolvedDERBytes()`, portable and
         /// NIOSSL-backed alike) and, for mTLS, builds the client identity
         /// (`Internals.RawBytesIdentityBuilder`), none of which is `async`. Calling it inline here would block whichever
@@ -561,7 +561,7 @@ extension Internals {
                 maximumConcurrentConnections: sessionConfiguration.maximumConcurrentConnections
             )
 
-            let client = try await Internals.FileSystemManager.run {
+            let makeClient: @Sendable () throws -> Internals.URLSessionClient = {
                 try Internals.URLSessionClient(
                     configuration: sessionConfiguration.buildURLSessionConfiguration(),
                     secureConnection: sessionConfiguration.secureConnection,
@@ -574,6 +574,19 @@ extension Internals {
                         for: sessionConfiguration.decompression
                     )
                 )
+            }
+
+            // Without a `secureConnection` there is no file to read and no identity to build, and
+            // what is left is making a `URLSession`, which does not block. Sent to the file
+            // system's pool all the same, every request of a session that is never pooled (one with
+            // an `onRedirect`, say) would wait in the line of that pool, which a burst of disk
+            // writes keeps full, just to have a client made.
+            let client: Internals.URLSessionClient
+
+            if sessionConfiguration.secureConnection == nil {
+                client = try makeClient()
+            } else {
+                client = try await Internals.FileSystemManager.run(makeClient)
             }
 
             // A configuration that can never be pooled (`isPoolable == false`) is not tracked,

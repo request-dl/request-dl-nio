@@ -446,6 +446,49 @@ extension InternalsClientManagerExecutorTests {
         #expect(manager.count == 1)
     }
 
+    /// Making a client without a `secureConnection` reads no file, so it does not queue for the file
+    /// system's thread pool: a pool kept full by disk writes would otherwise hold every request of a
+    /// session that is never pooled (one with an `onRedirect`) just to have a `URLSession` made.
+    @Test
+    func resolvedClient_whenNotPoolableAndWithoutTLS_doesNotWaitForTheFileSystemPool() async throws {
+        // Given: every thread of the pool busy, and more work than it has threads for behind them.
+        let manager = Internals.ClientManager(lifetime: 5 * 60 * 1_000_000_000)
+        let provider = Internals.SharedSessionProvider()
+        let sessionConfiguration = Self.redirectStrategyConfiguration()
+        let gate = DispatchSemaphore(value: 0)
+        let blockers = max(16, ProcessInfo.processInfo.activeProcessorCount * 4) + 8
+
+        for _ in 0..<blockers {
+            _Concurrency.Task {
+                try? await Internals.FileSystemManager.run { gate.wait() }
+            }
+        }
+
+        defer {
+            for _ in 0..<blockers {
+                gate.signal()
+            }
+        }
+
+        try await _Concurrency.Task.sleep(nanoseconds: 300_000_000)
+
+        // When / Then
+        let isURLSession = try await completing(within: 30) {
+            let resolved = try await manager.resolvedClient(
+                provider: provider,
+                sessionConfiguration: sessionConfiguration
+            )
+
+            if case .urlSession = resolved {
+                return true
+            }
+
+            return false
+        }
+
+        #expect(isURLSession)
+    }
+
     // MARK: - Private static methods
 
     private static func redirectStrategyConfiguration() -> Internals.Session.Configuration {

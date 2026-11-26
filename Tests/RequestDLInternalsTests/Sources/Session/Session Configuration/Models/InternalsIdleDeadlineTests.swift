@@ -185,6 +185,84 @@ struct InternalsIdleDeadlineTests {
         #expect(seed.cancellations == 1)
     }
 
+    /// Time spent waiting in line for a connection is not the server's silence, however long.
+    @Test
+    func timeSpentPaused_doesNotCount() async throws {
+        // Given
+        let clock = FakeIdleClock()
+        let seed = Probe()
+        let deadline = clock.makeDeadline(nanoseconds: Self.budget)
+
+        deadline.attach(seed.seed)
+        deadline.start()
+        deadline.pause()
+
+        // When: far more than the budget goes by.
+        for _ in 0..<5 {
+            #expect(await clock.advance(by: Self.budget))
+        }
+
+        // Then
+        #expect(!deadline.isExpired)
+        #expect(seed.cancellations == 0)
+
+        // And the end of the wait gives the server the whole budget, which then runs out as usual.
+        deadline.resume()
+
+        await clock.advance(by: Self.budget - 1)
+        #expect(!deadline.isExpired)
+
+        await clock.advanceUntilDone(deadline, by: Self.budget)
+        #expect(deadline.isExpired)
+        #expect(seed.cancellations == 1)
+    }
+
+    /// Two waits at once (a revalidation and a request that queue together) are one for as long as
+    /// either lasts.
+    @Test
+    func pausesNest_andTheBudgetCountsAgainOnlyWhenTheLastOneEnds() async throws {
+        // Given
+        let clock = FakeIdleClock()
+        let deadline = clock.makeDeadline(nanoseconds: Self.budget)
+
+        deadline.start()
+        deadline.pause()
+        deadline.pause()
+
+        // When
+        deadline.resume()
+
+        // Then: one wait is still on.
+        for _ in 0..<3 {
+            #expect(await clock.advance(by: Self.budget))
+        }
+
+        #expect(!deadline.isExpired)
+
+        deadline.resume()
+        await clock.advanceUntilDone(deadline, by: Self.budget)
+        #expect(deadline.isExpired)
+    }
+
+    /// A deadline that already ran out stays out: a wait ending is not something that moved on a
+    /// request that has been ended.
+    @Test
+    func resuming_afterTheBudgetWasSpent_doesNotRevive() async throws {
+        // Given
+        let clock = FakeIdleClock()
+        let deadline = clock.makeDeadline(nanoseconds: Self.budget)
+
+        deadline.start()
+        await clock.advanceUntilDone(deadline, by: Self.budget)
+
+        // When
+        deadline.pause()
+        deadline.resume()
+
+        // Then
+        #expect(deadline.isExpired)
+    }
+
     /// Time the client spent holding the exchange back is nobody's silence.
     @Test
     func timeTheClientHeldTheExchangeBack_doesNotCount() async throws {

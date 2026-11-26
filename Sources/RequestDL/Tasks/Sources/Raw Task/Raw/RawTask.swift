@@ -150,15 +150,20 @@ struct RawTask<Content: Property>: RequestTask {
         let idle = transferControl?.observer?.idle
         idle?.start()
 
-        let (sessionTask, onResponseHead) = try await runSession(
-            resolved: resolved,
-            client: client,
-            isURLSessionExecutor: isURLSessionExecutor,
-            cacheControl: cacheControl,
-            logger: logger,
-            deadline: deadline,
-            transferControl: transferControl
-        )
+        // The wait in line for a connection (`maximumConcurrentConnections`) is the application
+        // holding the request back, not the server staying silent, so the executors pause the
+        // idle deadline for it: they find it through this task local.
+        let (sessionTask, onResponseHead) = try await Internals.IdleDeadline.$queueing.withValue(idle) {
+            try await runSession(
+                resolved: resolved,
+                client: client,
+                isURLSessionExecutor: isURLSessionExecutor,
+                cacheControl: cacheControl,
+                logger: logger,
+                deadline: deadline,
+                transferControl: transferControl
+            )
+        }
 
         idle?.attach(sessionTask.seed)
 

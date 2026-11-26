@@ -259,6 +259,50 @@ struct ResumableUploadExecutionStubTests {
         }
     }
 
+    /// The request that tells the server waits for a slot like any other (`maximumConcurrentConnections`),
+    /// and a session full of requests that never end never gives one. It is given as long as the
+    /// answer is worth, in all, and then stops waiting, instead of holding the client and the
+    /// request's configuration for good.
+    @Test
+    func aTerminationThatNeverStarts_isGivenUpOn() async throws {
+        // Given: the executor does not start the request that tells the server until it is cancelled.
+        let methods = LockedValueBox<[String]>([])
+        let gate = Gate()
+        let cancelled = LockedValueBox(false)
+
+        let execution = try await Self.execution(
+            client: ScriptedClient { configuration in
+                methods.withLockedValue { $0.append(configuration.method ?? "") }
+
+                if configuration.method == "DELETE" {
+                    try await withTaskCancellationHandler {
+                        try await _Concurrency.Task.sleep(nanoseconds: 600_000_000_000)
+                    } onCancel: {
+                        cancelled.withLockedValue { $0 = true }
+                    }
+                }
+
+                if configuration.method == "PATCH" {
+                    await gate.wait()
+                }
+
+                return await Self.sessionTask(head: Self.head(status: 201, headers: [("Location", "/uploads/1")]))
+            }
+        )
+
+        execution.start()
+        try await eventually { methods.withLockedValue { $0 }.contains("PATCH") }
+
+        // When
+        execution.makeSeed()()
+        gate.open()
+
+        try await eventually { methods.withLockedValue { $0 }.contains("DELETE") }
+
+        // Then: it stops waiting once the budget for it is spent.
+        try await eventually(timeout: 30) { cancelled.withLockedValue { $0 } }
+    }
+
     @Test
     func aProtocolWithNoWayToAbandonAnUpload_isNeverTold() async throws {
         // Given

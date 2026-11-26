@@ -34,6 +34,9 @@
 /// It is RequestDL's own, the same on every executor, and it is not counting while the
 /// application is the one holding the exchange back: the time a transfer spends suspended through a
 /// ``RequestController``, or waiting for the body to be read, does not count against the server.
+/// The same goes for the time a request waits in line for a free connection, when the session sets
+/// ``Session/maximumConcurrentConnections(_:)``: it is not on the network yet, and the budget starts
+/// when it is let go. ``Timeout/Source/resource``, which bounds the whole execution, does count it.
 ///
 /// Without a `Timeout` for ``Timeout/Source/read``, a request fails once it has been silent for
 /// 60 seconds. A body that stays silent for longer than that, such as an event stream without

@@ -4,7 +4,8 @@
 
 import Dispatch
 import Logging
-import RequestDLInternals
+@_spi(Testing) import RequestDLInternals
+@_spi(Testing) import SwiftAsyncStream
 import Testing
 
 @testable import RequestDL
@@ -33,6 +34,18 @@ struct ReadTimeoutTests {
     private static let budget = UnitTime.seconds(60)
 
     private typealias Executor = TransferTestExecutor
+
+    /// Waits until `count` requests are in the line of the default session's limit of one
+    /// connection: queued, and not yet on the network.
+    private static func waitForRequestsInLine(_ count: Int) async throws {
+        let semaphore = try #require(
+            Internals.ClientManager.shared
+                .throttledExecutor(provider: Session().provider, maximumConcurrentConnections: 1)
+                .semaphoreForTesting
+        )
+
+        try await semaphore.waitForWaiters(count, timeout: 60)
+    }
 
     private static func uploadBody() -> Data {
         var data = Data()
@@ -150,6 +163,180 @@ struct ReadTimeoutTests {
             controller.resume()
             #expect(await running.error == nil)
             #expect(received.withLockedValue { $0 } == Self.largeBody)
+        }
+    }
+
+    /// Waiting in the line of `maximumConcurrentConnections` is the application holding the request
+    /// back: it is not on the network yet, so the server has not been silent about it. A request
+    /// that queued for longer than its budget goes out when its turn comes and completes.
+    @Test(arguments: Executor.allCases)
+    private func aRequestQueuedBehindTheConnectionLimit_isNotIdle(_ executor: Executor) async throws {
+        try await withTransferServer(.init(length: 4 * 1_048_576)) { server in
+            // Given: the only slot is held by a request the server keeps in the middle of its body.
+            let clock = FakeIdleClock()
+            server.holdsDownloadAt = 1_048_576
+            defer { server.holdsDownloadAt = nil }
+
+            let first = Running(clock) {
+                try await DataTask {
+                    BaseURL(.http, host: "127.0.0.1:\(server.port)")
+                    Path("/resource")
+                    executor.pinnedSession.maximumConcurrentConnections(1)
+                    Timeout(.infinity, for: .read)
+                }
+                .result()
+                .payload.count
+            }
+
+            try await eventually(timeout: 60) { server.bodyBytesWritten >= 1_048_576 }
+
+            let second = Running(clock) {
+                try await DataTask {
+                    BaseURL(.http, host: "127.0.0.1:\(server.port)")
+                    Path("/resource")
+                    executor.pinnedSession.maximumConcurrentConnections(1)
+                    Timeout(Self.budget, for: .read)
+                }
+                .result()
+                .payload.count
+            }
+
+            // When: it waits for the slot for longer than its whole budget.
+            try await Self.waitForRequestsInLine(1)
+
+            for _ in 0..<2 {
+                #expect(await clock.advance(by: Self.budget.nanoseconds))
+            }
+
+            #expect(!second.isDone)
+
+            // The server lets the first one finish, which hands the slot to the second.
+            server.holdsDownloadAt = nil
+
+            // Then
+            #expect(await first.value == 4 * 1_048_576)
+            #expect(await second.error == nil)
+            #expect(await second.value == 4 * 1_048_576)
+        }
+    }
+
+    /// The budget of a request that queued starts when it is admitted, not never: a server that
+    /// then goes silent still ends it.
+    @Test(arguments: Executor.allCases)
+    private func aRequestAdmittedAfterQueueing_stillFailsWhenTheServerGoesSilent(_ executor: Executor) async throws {
+        try await withTransferServer(.init(length: Self.largeBody)) { server in
+            // Given
+            let clock = FakeIdleClock()
+            server.holdsDownloadAt = 1_048_576
+            defer { server.holdsDownloadAt = nil }
+
+            let first = Running(clock) {
+                try await DataTask {
+                    BaseURL(.http, host: "127.0.0.1:\(server.port)")
+                    Path("/resource")
+                    executor.pinnedSession.maximumConcurrentConnections(1)
+                    Timeout(.infinity, for: .read)
+                }
+                .result()
+                .payload.count
+            }
+
+            try await eventually(timeout: 60) { server.bodyBytesWritten >= 1_048_576 }
+
+            let second = Running(clock) {
+                try await DataTask {
+                    BaseURL(.http, host: "127.0.0.1:\(server.port)")
+                    Path("/resource")
+                    executor.pinnedSession.maximumConcurrentConnections(1)
+                    Timeout(Self.budget, for: .read)
+                }
+                .result()
+                .payload.count
+            }
+
+            try await Self.waitForRequestsInLine(1)
+            #expect(await clock.advance(by: Self.budget.nanoseconds))
+
+            // When: the first one is cancelled, the slot goes to the second, and the server holds
+            // that one in the middle of its body too.
+            first.cancel()
+            _ = await first.error
+
+            try await eventually(timeout: 60) { server.bodyBytesWritten >= 2 * 1_048_576 }
+
+            // Then
+            await clock.advance(by: Self.budget.nanoseconds, until: { second.isDone })
+            #expect(await second.error is ReadTimeoutError)
+        }
+    }
+
+    /// A download that reconnects takes its place in the line again, and the wait is not idle time
+    /// either: the continuation goes out when its turn comes, and the download ends intact.
+    @Test(arguments: Executor.allCases)
+    private func aReconnectionQueuedBehindTheConnectionLimit_isNotIdle(_ executor: Executor) async throws {
+        try await withTransferServer(.init(length: 4 * 1_048_576)) { server in
+            // Given: a download whose connection is cut early while it is suspended, so it goes to
+            // wait for the resume, which gives its slot back.
+            let clock = FakeIdleClock()
+            let controller = RequestController()
+            controller.suspend()
+            server.dropPlan = [1_000]
+
+            let download = Running(clock) {
+                let result = try await DownloadTask {
+                    BaseURL(.http, host: "127.0.0.1:\(server.port)")
+                    Path("/resource")
+                    executor.pinnedSession.maximumConcurrentConnections(1)
+                    Timeout(Self.budget, for: .read)
+                }
+                .resumingDownloads(.enabled(delay: 0))
+                .controller(controller)
+                .result()
+
+                var count = 0
+
+                for try await chunk in result.payload {
+                    count += chunk.count
+                }
+
+                return count
+            }
+
+            try await awaitRecordedRequests(server, atLeast: 1)
+
+            // And another request takes the free slot and keeps it, held by the server.
+            server.holdsDownloadAt = 1_048_576
+            defer { server.holdsDownloadAt = nil }
+
+            let holder = Running(clock) {
+                try await DataTask {
+                    BaseURL(.http, host: "127.0.0.1:\(server.port)")
+                    Path("/other")
+                    executor.pinnedSession.maximumConcurrentConnections(1)
+                    Timeout(.infinity, for: .read)
+                }
+                .result()
+                .payload.count
+            }
+
+            try await eventually(timeout: 60) { server.bodyBytesWritten >= 1_048_576 }
+
+            // When: resumed, so the continuation asks for a slot, and waits for it for two budgets.
+            controller.resume()
+            try await Self.waitForRequestsInLine(1)
+
+            for _ in 0..<2 {
+                #expect(await clock.advance(by: Self.budget.nanoseconds))
+            }
+
+            #expect(!download.isDone)
+
+            server.holdsDownloadAt = nil
+
+            // Then
+            #expect(await holder.value == 4 * 1_048_576)
+            #expect(await download.error == nil)
+            #expect(await download.value == 4 * 1_048_576)
         }
     }
 
@@ -544,6 +731,11 @@ private final class Running<Value: Sendable>: @unchecked Sendable {
     }
 
     struct DidNotEnd: Error {}
+
+    /// Cancels the request, as a caller who gave up on it would.
+    func cancel() {
+        task.cancel()
+    }
 
     private func ends() async -> Bool {
         do {

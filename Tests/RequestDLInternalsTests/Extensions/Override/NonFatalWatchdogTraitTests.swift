@@ -15,7 +15,20 @@ import Testing
 /// thing under test.
 struct NonFatalWatchdogTraitTests {
 
-    private static let heldLock = "🐞 RequestDL bug: AsyncLock held for more than 15.0s\nAsyncLock\n  holder: running"
+    /// A held lock as the URLSession-only job reported it: `Internals.Buffer`'s file write.
+    private static let heldLock = held(by: "write(at:data:) at RequestDLInternals/Internals.Buffer.swift:222")
+
+    private static func held(by holder: String, pending: [String] = []) -> String {
+        let queue = pending.isEmpty ? "  - none" : pending.map { "  - \($0)" }.joined(separator: "\n")
+
+        return """
+            🐞 RequestDL bug: AsyncLock held for more than 15.0s
+            AsyncLock
+            holder: running (\(holder))
+            pending (\(pending.count)):
+            \(queue)
+            """
+    }
 
     private typealias Recorded = [(message: String, severity: Issue.Severity)]
 
@@ -68,6 +81,65 @@ struct NonFatalWatchdogTraitTests {
         #expect(message.contains(Self.heldLock))
         #expect(message.contains(source.rawValue))
         #expect(message.contains("18s"))
+    }
+
+    /// Lag explains a lock that waits on the file pool, not the others: the `ClientManager`
+    /// resolution lock and `Client.shutdown()` carry a watchdog too, and a report from either
+    /// stays an error on a runner that is stalled, since the stall says nothing about them.
+    @Test(arguments: [
+        "resolve(configuration:) at RequestDLInternals/Internals.ClientManager.swift:120",
+        "shutdown() at RequestDLInternals/Internals.Client.swift:88",
+    ])
+    func aHeldLock_ofAnotherHolder_withLag_staysAnError(_ holder: String) {
+        // Given
+        let message = Self.held(by: holder)
+
+        // When
+        let recorded = Self.record(message, lag: .init(seconds: 18.4, source: .filePool))
+
+        // Then
+        #expect(recorded.map(\.severity) == [.error])
+        #expect(recorded.first?.message == message)
+    }
+
+    /// Both operations of `Internals.Buffer` that reported in CI are file work, wherever in the
+    /// file they sit now.
+    @Test(arguments: [
+        "write(at:data:) at RequestDLInternals/Internals.Buffer.swift:222",
+        "write(at:data:) at RequestDLInternals/Internals.Buffer.swift:9999",
+        "read(at:length:) at RequestDLInternals/Internals.Buffer.swift:187",
+    ])
+    func aHeldLock_ofTheBufferFileWork_withLag_isAWarning(_ holder: String) {
+        // When
+        let recorded = Self.record(Self.held(by: holder), lag: .init(seconds: 18.4, source: .filePool))
+
+        // Then
+        #expect(recorded.map(\.severity) == [.warning])
+    }
+
+    /// Only the holder counts: a Buffer call site that is merely waiting behind another holder
+    /// does not make the report one of file work.
+    @Test
+    func aHeldLock_withTheBufferOnlyWaiting_withLag_staysAnError() {
+        // Given
+        let message = Self.held(
+            by: "shutdown() at RequestDLInternals/Internals.Client.swift:88",
+            pending: ["write(at:data:) at RequestDLInternals/Internals.Buffer.swift:222"]
+        )
+
+        // When
+        let recorded = Self.record(message, lag: .init(seconds: 18.4, source: .filePool))
+
+        // Then
+        #expect(recorded.map(\.severity) == [.error])
+    }
+
+    /// A report without a holder line (or with none of ours) is not file work.
+    @Test
+    func isBufferFileWork_readsTheHolderLine() {
+        #expect(NonFatalWatchdogTrait.isBufferFileWork(Self.heldLock))
+        #expect(!NonFatalWatchdogTrait.isBufferFileWork("AsyncLock held for more than 15.0s"))
+        #expect(!NonFatalWatchdogTrait.isBufferFileWork("AsyncLock\nholder: none"))
     }
 
     /// The downgrade is for held locks only: any other report from the same hook stays an error,

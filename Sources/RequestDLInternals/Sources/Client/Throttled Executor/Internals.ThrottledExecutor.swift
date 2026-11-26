@@ -63,9 +63,21 @@ extension Internals {
         /// starts them. The caller owns calling the returned closure exactly once, whenever it
         /// considers the throttled operation complete.
         ///
+        /// - Parameter idle: The read timeout of the execution that waits, which does not count the
+        /// wait: until a slot is free the request is not on the network, and it is the session's own
+        /// limit that holds it back, not the server's silence. The execution this task is part of
+        /// (`Internals.IdleDeadline.queueing`) unless told otherwise, for a caller on a task of its
+        /// own.
         /// - Throws: `CancellationError` if the current task is cancelled while waiting for a slot.
-        package func acquire() async throws -> @Sendable () -> Void {
-            try await semaphore?.wait()
+        package func acquire(
+            pausing idle: Internals.IdleDeadline? = Internals.IdleDeadline.queueing
+        ) async throws -> @Sendable () -> Void {
+            if let semaphore {
+                idle?.pause()
+                defer { idle?.resume() }
+
+                try await semaphore.wait()
+            }
 
             let semaphore = self.semaphore
             return { semaphore?.signal() }
