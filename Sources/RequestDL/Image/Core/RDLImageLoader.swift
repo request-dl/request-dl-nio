@@ -110,6 +110,10 @@ public actor RDLImageLoader {
     private struct InFlight {
         let task: Task<Void, Never>
         let generation: Int
+
+        /// ``RDLImageMemoryCache/removals`` when the download began: if it is not the same when the
+        /// download ends, an image was removed meanwhile and the result is not kept in memory.
+        let removalsAtStart: Int
         var waiters: [Int: CheckedContinuation<SendableImage, Error>]
     }
 
@@ -200,6 +204,9 @@ public actor RDLImageLoader {
     /// Forgets the image in memory for `id`, so the next view asked to show it starts empty, or
     /// with its placeholder, until a load finishes. It does not touch ``dataCache``.
     ///
+    /// A load that was already running when this is called does not put its result back in
+    /// memory: it still returns the image to whoever waited for it, but a later look-up is a miss.
+    ///
     /// - Parameter id: The identifier of the load.
     ///
     public nonisolated func removeCachedImage(id: String) {
@@ -243,6 +250,7 @@ public actor RDLImageLoader {
 
         let generation = nextGeneration
         nextGeneration += 1
+        let removalsAtStart = memoryCache.removals
 
         // `.detached` rather than a plain `Task { ... }`: a plain `Task` would inherit this actor's
         // executor and run the CPU-bound `PlatformImage(data:)` decode on it. The decode touches no
@@ -266,7 +274,7 @@ public actor RDLImageLoader {
             await self.complete(id: id, generation: generation, with: result)
         }
 
-        tasks[id] = InFlight(task: newTask, generation: generation, waiters: [:])
+        tasks[id] = InFlight(task: newTask, generation: generation, removalsAtStart: removalsAtStart, waiters: [:])
 
         return try await waitFor(id: id, generation: generation).image
     }
@@ -375,7 +383,7 @@ public actor RDLImageLoader {
 
         // Only an image that was loaded is kept: a failure leaves what is there as it was.
         if case .success(let image) = result {
-            memoryCache.insert(image.image, for: id)
+            memoryCache.insert(image.image, for: id, ifRemovalsAre: inFlight.removalsAtStart)
         }
 
         for continuation in inFlight.waiters.values {

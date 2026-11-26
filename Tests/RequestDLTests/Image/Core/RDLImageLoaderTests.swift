@@ -457,6 +457,73 @@ struct RDLImageLoaderTests {
         #expect(loader.cachedImage(id: "b") != nil)
     }
 
+    /// An image removed while its request was still running (a new avatar was uploaded, say) is
+    /// not put back by that request finishing with the old bytes.
+    @Test
+    func removeCachedImage_whileTheLoadIsRunning_isNotUndoneWhenItFinishes() async throws {
+        // Given
+        let probe = RequestProbe()
+        let gate = Gate()
+        let task = StubImageTask {
+            await probe.started()
+            await gate.wait()
+
+            return .init(head: .stub, payload: .onePixelPNG)
+        }
+
+        let loader = RDLImageLoader()
+        let running = Task { try await loader.load(id: "avatar", task: task) }
+        try await eventually { await probe.didStart }
+
+        // When
+        loader.removeCachedImage(id: "avatar")
+        await gate.open()
+
+        // Then: whoever waited still gets the image, but memory does not.
+        #expect(try await running.value.size.width > 0)
+        #expect(loader.cachedImage(id: "avatar") == nil)
+    }
+
+    @Test
+    func removeAllCachedImages_whileTheLoadIsRunning_isNotUndoneWhenItFinishes() async throws {
+        // Given
+        let probe = RequestProbe()
+        let gate = Gate()
+        let task = StubImageTask {
+            await probe.started()
+            await gate.wait()
+
+            return .init(head: .stub, payload: .onePixelPNG)
+        }
+
+        let loader = RDLImageLoader()
+        let running = Task { try await loader.load(id: "avatar", task: task) }
+        try await eventually { await probe.didStart }
+
+        // When
+        loader.removeAllCachedImages()
+        await gate.open()
+
+        // Then
+        _ = try await running.value
+        #expect(loader.cachedImage(id: "avatar") == nil)
+    }
+
+    /// The counter is global: a removal of another image costs a running load its write, which is
+    /// a miss later, not a stale image. A load that begins after the removal is kept as usual.
+    @Test
+    func aLoadThatBeginsAfterARemoval_isKept() async throws {
+        // Given
+        let loader = RDLImageLoader()
+        loader.removeCachedImage(id: "other")
+
+        // When
+        _ = try await loader.load(id: "avatar", task: png())
+
+        // Then
+        #expect(loader.cachedImage(id: "avatar") != nil)
+    }
+
     @Test
     func removeAllCachedImages_forgetsEveryImage_butNotTheDataCache() async throws {
         let loader = RDLImageLoader()

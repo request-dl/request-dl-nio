@@ -41,6 +41,7 @@ final class RDLImageMemoryCache: @unchecked Sendable {
     private let lock = NSLock()
     private var _limit = 0
     private var _timeToLive: TimeInterval?
+    private var _removals = 0
     private let now: @Sendable () -> Date
 
     init(
@@ -68,6 +69,19 @@ final class RDLImageMemoryCache: @unchecked Sendable {
         }
     }
 
+    /// How many times an image was removed, or the cache was emptied, since it was created.
+    ///
+    /// A load notes it before it starts and hands it back to ``insert(_:for:ifRemovalsAre:)``,
+    /// which keeps the image only when it has not changed: a removal that happened while the load
+    /// was running is not undone by the load finishing. It counts every removal, not just the
+    /// one of the same `id`, so an unrelated removal can cost a running load its write; that is
+    /// a miss later, never a stale image.
+    var removals: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return _removals
+    }
+
     var limit: Int {
         get {
             lock.lock()
@@ -84,6 +98,7 @@ final class RDLImageMemoryCache: @unchecked Sendable {
             cache.totalCostLimit = max(1, _limit)
 
             if _limit == 0 {
+                _removals += 1
                 cache.removeAllObjects()
             }
         }
@@ -103,8 +118,16 @@ final class RDLImageMemoryCache: @unchecked Sendable {
         return entry.image
     }
 
-    func insert(_ image: PlatformImage, for id: String) {
-        guard limit > 0 else {
+    /// Keeps `image` for `id`.
+    ///
+    /// - Parameter removals: The value of ``removals`` when the load that produced `image` began.
+    /// When it is not the current one, something was removed since, so the image is dropped
+    /// instead of kept. `nil` keeps it whatever happened.
+    func insert(_ image: PlatformImage, for id: String, ifRemovalsAre removals: Int? = nil) {
+        lock.lock()
+        defer { lock.unlock() }
+
+        guard _limit > 0, removals == nil || removals == _removals else {
             return
         }
 
@@ -112,10 +135,18 @@ final class RDLImageMemoryCache: @unchecked Sendable {
     }
 
     func remove(_ id: String) {
+        lock.lock()
+        defer { lock.unlock() }
+
+        _removals += 1
         cache.removeObject(forKey: id as NSString)
     }
 
     func removeAll() {
+        lock.lock()
+        defer { lock.unlock() }
+
+        _removals += 1
         cache.removeAllObjects()
     }
 
