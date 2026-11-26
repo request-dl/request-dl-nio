@@ -29,6 +29,11 @@ extension DataCache {
 
         let symmetricKey: SymmetricKey
 
+        /// The key the names of the entries on disk are made with (see ``DiskStorage``), derived
+        /// from `symmetricKey` with a label of its own. The key that seals the entries is never
+        /// used as a MAC key as well.
+        let nameKey: SymmetricKey
+
         // MARK: - Inits
 
         /// - Parameter data: Raw key bytes. 32 bytes is recommended, for AES-256-GCM.
@@ -55,6 +60,12 @@ extension DataCache {
                     outputByteCount: 32
                 )
             }
+
+            self.nameKey = HKDF<SHA256>.deriveKey(
+                inputKeyMaterial: self.symmetricKey,
+                info: Data("request-dl.cache.entry-name.v1".utf8),
+                outputByteCount: 32
+            )
         }
     }
 }
