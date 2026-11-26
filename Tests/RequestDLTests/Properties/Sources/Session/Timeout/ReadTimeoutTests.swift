@@ -272,15 +272,21 @@ struct ReadTimeoutTests {
 
     /// A download that reconnects takes its place in the line again, and the wait is not idle time
     /// either: the continuation goes out when its turn comes, and the download ends intact.
+    ///
+    /// The order is made by the line itself, not by suspending the download so that it finds out
+    /// about its lost connection only when it resumes: a client that is not reading is not told
+    /// promptly that the server closed the connection. NIOTransportServices took a minute to
+    /// notice, on an idle machine, and on the loaded simulators of the CI the NIO one had not in
+    /// four minutes, which left the only slot held and every case after it without one.
     @Test(arguments: Executor.allCases)
     private func aReconnectionQueuedBehindTheConnectionLimit_isNotIdle(_ executor: Executor) async throws {
         try await withTransferServer(.init(length: 4 * 1_048_576)) { server in
-            // Given: a download whose connection is cut early while it is suspended, so it goes to
-            // wait for the resume, which gives its slot back.
+            // Given: a download holding the only slot, its server keeping it at its head and cutting
+            // its connection after a thousand bytes once let go.
             let clock = FakeIdleClock()
-            let controller = RequestController()
-            controller.suspend()
             server.dropPlan = [1_000]
+            server.holdsDownloadAt = 0
+            defer { server.holdsDownloadAt = nil }
 
             let download = Running(clock) {
                 let result = try await DownloadTask {
@@ -290,7 +296,6 @@ struct ReadTimeoutTests {
                     Timeout(Self.budget, for: .read)
                 }
                 .resumingDownloads(.enabled(delay: 0))
-                .controller(controller)
                 .result()
 
                 var count = 0
@@ -302,12 +307,11 @@ struct ReadTimeoutTests {
                 return count
             }
 
-            try await awaitRecordedRequests(server, atLeast: 1)
+            defer { download.cancel() }
 
-            // And another request takes the free slot and keeps it, held by the server.
-            server.holdsDownloadAt = 1_048_576
-            defer { server.holdsDownloadAt = nil }
+            try await eventually(timeout: 60) { server.acceptedConnections >= 1 }
 
+            // And another request in the line behind it, which is next for the slot.
             let holder = Running(clock) {
                 try await DataTask {
                     BaseURL(.http, host: "127.0.0.1:\(server.port)")
@@ -319,12 +323,18 @@ struct ReadTimeoutTests {
                 .payload.count
             }
 
-            try await eventually(timeout: 60) { server.bodyBytesWritten >= 1_048_576 }
+            defer { holder.cancel() }
 
-            // When: resumed, so the continuation asks for a slot, and waits for it for two budgets.
-            controller.resume()
             try await Self.waitForRequestsInLine(1)
 
+            // When: the connection of the download is cut, which hands the slot to the other
+            // request, whom the server keeps in the middle of its body. The download reconnects, and
+            // is behind it now: the thousand bytes it got and the megabyte the other one did.
+            server.holdsDownloadAt = 1_048_576
+            try await eventually(timeout: 60) { server.bodyBytesWritten >= 1_048_576 + 1_000 }
+            try await Self.waitForRequestsInLine(1)
+
+            // It waits for the slot for two budgets.
             for _ in 0..<2 {
                 #expect(await clock.advance(by: Self.budget.nanoseconds))
             }
