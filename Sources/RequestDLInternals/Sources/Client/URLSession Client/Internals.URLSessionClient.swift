@@ -57,6 +57,7 @@ extension Internals {
         private let operationQueue = Internals.ClientOperationQueue()
         private let redirectConfiguration: Internals.RedirectConfiguration
         private let urlOverrides: Internals.URLOverrides
+        private let hiddenHeaders: Internals.RedirectHiddenHeaders
         private let proxyAuthorization: Internals.Proxy.Authorization?
         private let identityPolicy: Internals.URLSessionIdentityPolicy?
 
@@ -82,6 +83,8 @@ extension Internals {
         /// gets identical behavior regardless of which executor the session resolves to.
         /// - Parameter urlOverrides: The rules every redirect hop is rewritten with before it is
         /// followed, the way the first request already was. See ``Internals/URLOverrides``.
+        /// - Parameter hiddenHeaders: The headers each redirect hop is stripped of besides the ones
+        /// every redirect to another origin loses. See ``Internals/RedirectHiddenHeaders``.
         /// - Parameter proxy: Both `.http` (`.server`) and `.socks` (with RFC 1929
         /// username/password, through `SOCKSUser`/`SOCKSPassword`) are mapped onto
         /// `configuration`. Throws `Internals.Proxy.Authorization.Mismatch` when the authorization
@@ -106,6 +109,7 @@ extension Internals {
             secureConnection: Internals.SecureConnection? = nil,
             redirectConfiguration: Internals.RedirectConfiguration = .follow(max: 5, allowCycles: false),
             urlOverrides: Internals.URLOverrides = .init(),
+            hiddenHeaders: Internals.RedirectHiddenHeaders = .init(),
             proxy: Internals.Proxy? = nil,
             maximumConcurrentConnections: Int? = nil,
             throttledExecutor: Internals.ThrottledExecutor? = nil,
@@ -148,6 +152,7 @@ extension Internals {
                 ?? Internals.ThrottledExecutor(maximumConcurrentConnections: maximumConcurrentConnections)
             self.redirectConfiguration = redirectConfiguration
             self.urlOverrides = urlOverrides
+            self.hiddenHeaders = hiddenHeaders
             self.proxyAuthorization = proxy?.authorization
             self.identityPolicy = identityPolicy
             self.acceptEncoding = acceptEncoding
@@ -234,6 +239,7 @@ extension Internals {
             let taskDelegate = TaskDelegate(
                 redirectConfiguration: redirectConfiguration,
                 urlOverrides: urlOverrides,
+                hiddenHeaders: hiddenHeaders,
                 initialRequest: request,
                 proxyAuthorization: proxyAuthorization,
                 tls: tlsDelegate,
@@ -316,6 +322,7 @@ extension Internals {
             let taskDelegate = TaskDelegate(
                 redirectConfiguration: redirectConfiguration,
                 urlOverrides: urlOverrides,
+                hiddenHeaders: hiddenHeaders,
                 initialRequest: request,
                 proxyAuthorization: proxyAuthorization,
                 tls: tlsDelegate,
@@ -412,6 +419,7 @@ extension Internals {
             let taskDelegate = TaskDelegate(
                 redirectConfiguration: redirectConfiguration,
                 urlOverrides: urlOverrides,
+                hiddenHeaders: hiddenHeaders,
                 initialRequest: request,
                 proxyAuthorization: proxyAuthorization,
                 tls: tlsDelegate,
@@ -718,11 +726,13 @@ extension Internals {
 
             let redirectConfiguration = redirectConfiguration
             let urlOverrides = urlOverrides
+            let hiddenHeaders = hiddenHeaders
             let proxyAuthorization = proxyAuthorization
 
             let taskDelegate = TaskDelegate(
                 redirectConfiguration: redirectConfiguration,
                 urlOverrides: urlOverrides,
+                hiddenHeaders: hiddenHeaders,
                 initialRequest: request,
                 proxyAuthorization: proxyAuthorization,
                 tls: tlsDelegate,
@@ -744,6 +754,7 @@ extension Internals {
                 TaskDelegate(
                     redirectConfiguration: redirectConfiguration,
                     urlOverrides: urlOverrides,
+                    hiddenHeaders: hiddenHeaders,
                     initialRequest: continuation,
                     proxyAuthorization: proxyAuthorization,
                     tls: tlsDelegate,
@@ -1464,6 +1475,7 @@ extension Internals.URLSessionClient {
 
         private let redirectConfiguration: Internals.RedirectConfiguration
         private let urlOverrides: Internals.URLOverrides
+        private let hiddenHeaders: Internals.RedirectHiddenHeaders
         private let proxyAuthorization: Internals.Proxy.Authorization?
         private let tlsDelegate: TLSDelegate?
         private let forwardingDelegate: URLSessionTaskDelegate?
@@ -1575,6 +1587,7 @@ extension Internals.URLSessionClient {
         init(
             redirectConfiguration: Internals.RedirectConfiguration,
             urlOverrides: Internals.URLOverrides = .init(),
+            hiddenHeaders: Internals.RedirectHiddenHeaders = .init(),
             initialRequest: URLRequest,
             proxyAuthorization: Internals.Proxy.Authorization?,
             tls tlsDelegate: TLSDelegate?,
@@ -1590,6 +1603,7 @@ extension Internals.URLSessionClient {
         ) {
             self.redirectConfiguration = redirectConfiguration
             self.urlOverrides = urlOverrides
+            self.hiddenHeaders = hiddenHeaders
             self.proxyAuthorization = proxyAuthorization
             self.tlsDelegate = tlsDelegate
             self.forwardingDelegate = delegate
@@ -1857,7 +1871,9 @@ extension Internals.URLSessionClient {
                 previousURL.hasTheSameOrigin(as: newURL)
             {
                 for header in Self.headersURLSessionDropsOnRedirect
-                where request.value(forHTTPHeaderField: header) == nil {
+                where request.value(forHTTPHeaderField: header) == nil
+                    && !hiddenHeaders.anyRedirect.contains(header.lowercased())
+                {
                     if let value = previous.value(forHTTPHeaderField: header) {
                         request.setValue(value, forHTTPHeaderField: header)
                     }
@@ -1926,21 +1942,23 @@ extension Internals.URLSessionClient {
         }
 
         /// Strips ``Internals/RedirectSanitizer/crossOriginHeaders`` from `request` when it
-        /// no longer shares `_lastRequest`'s origin. See the doc comment on
-        /// `urlSession(_:task:willPerformHTTPRedirection:newRequest:completionHandler:)`.
+        /// no longer shares `_lastRequest`'s origin, and the headers the caller marked with
+        /// `hiddenOnRedirect(_:)` (``Internals/RedirectHiddenHeaders``): the ones marked for
+        /// another origin under the same condition, the ones marked for any redirect always. See the
+        /// doc comment on `urlSession(_:task:willPerformHTTPRedirection:newRequest:completionHandler:)`.
         private func sanitizedForRedirect(_ request: URLRequest) -> URLRequest {
             let previousURL = lock.withLock { _lastRequest.url }
 
-            guard
-                let previousURL,
-                let newURL = request.url,
-                !previousURL.hasTheSameOrigin(as: newURL)
-            else {
-                return request
+            // Without both URLs there is no origin to compare, and the built-in headers stay as
+            // they were; what the caller marked for any redirect is taken off regardless.
+            var sameOrigin = true
+
+            if let previousURL, let newURL = request.url {
+                sameOrigin = previousURL.hasTheSameOrigin(as: newURL)
             }
 
             var sanitized = request
-            for header in Internals.RedirectSanitizer.crossOriginHeaders {
+            for header in Internals.RedirectSanitizer.removedHeaders(sameOrigin: sameOrigin, hidden: hiddenHeaders) {
                 sanitized.setValue(nil, forHTTPHeaderField: header)
             }
             return sanitized

@@ -568,6 +568,7 @@ extension Internals {
                     redirectConfiguration: sessionConfiguration.redirectConfiguration
                         ?? .default,
                     urlOverrides: sessionConfiguration.urlOverrides,
+                    hiddenHeaders: sessionConfiguration.redirectHiddenHeaders,
                     proxy: sessionConfiguration.proxy,
                     throttledExecutor: throttledExecutor,
                     acceptEncoding: Internals.URLSessionClient.announcedAcceptEncoding(

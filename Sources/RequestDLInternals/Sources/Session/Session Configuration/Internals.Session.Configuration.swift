@@ -24,6 +24,13 @@ extension Internals.Session {
         ///
         /// Part of `==`: a pooled client follows redirects with the rules it was built with.
         package var urlOverrides: Internals.URLOverrides = .init()
+
+        /// The headers the request marked with `hiddenOnRedirect(_:)` as not to follow a redirect,
+        /// which the redirects of either executor remove from each hop they follow. See
+        /// ``Internals/RedirectHiddenHeaders``.
+        ///
+        /// Part of `==`: a pooled client follows redirects with the names it was built with.
+        package var redirectHiddenHeaders: Internals.RedirectHiddenHeaders = .init()
         package var timeout: Internals.Timeout = .init()
         package var connectionPool: Internals.ConnectionPool = .init()
         package var proxy: Internals.Proxy?
@@ -148,7 +155,10 @@ extension Internals.Session {
 
             var configuration = HTTPClient.Configuration.init(
                 tlsConfiguration: secureConnectionOutput?.tlsConfiguration,
-                redirectConfiguration: redirectConfiguration.build(urlOverrides: urlOverrides),
+                redirectConfiguration: redirectConfiguration.build(
+                    urlOverrides: urlOverrides,
+                    hiddenHeaders: redirectHiddenHeaders
+                ),
                 timeout: timeout.build(),
                 connectionPool: connectionPool.build(),
                 proxy: try proxy?.build(),
@@ -410,6 +420,7 @@ extension Internals.Session.Configuration: Equatable {
             // a session that never mentioned redirects a client of its own.
             && (lhs.redirectConfiguration ?? .default) == (rhs.redirectConfiguration ?? .default)
             && lhs.urlOverrides == rhs.urlOverrides
+            && lhs.redirectHiddenHeaders == rhs.redirectHiddenHeaders
             && lhs.timeout == rhs.timeout
             && lhs.connectionPool == rhs.connectionPool
             && lhs.proxy == rhs.proxy

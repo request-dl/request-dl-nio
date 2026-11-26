@@ -90,7 +90,8 @@ public struct CacheHeader: Property {
                 key: "Cache-Control",
                 value: value,
                 strategy: inputs.environment.headerStrategy,
-                separator: ","
+                separator: ",",
+                hiddenOnRedirect: inputs.environment.hiddenOnRedirect
             )
         )
     }

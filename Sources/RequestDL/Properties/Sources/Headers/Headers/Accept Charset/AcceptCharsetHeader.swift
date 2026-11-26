@@ -61,7 +61,8 @@ public struct AcceptCharsetHeader: Property {
                 key: "Accept-Charset",
                 value: property.charset.rawValue,
                 strategy: inputs.environment.headerStrategy,
-                separator: inputs.environment.headerSeparator
+                separator: inputs.environment.headerSeparator,
+                hiddenOnRedirect: inputs.environment.hiddenOnRedirect
             )
         )
     }

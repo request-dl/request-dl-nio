@@ -63,7 +63,8 @@ public struct OriginHeader: Property {
                 key: "Origin",
                 value: property.value,
                 strategy: inputs.environment.headerStrategy,
-                separator: inputs.environment.headerSeparator
+                separator: inputs.environment.headerSeparator,
+                hiddenOnRedirect: inputs.environment.hiddenOnRedirect
             )
         )
     }
