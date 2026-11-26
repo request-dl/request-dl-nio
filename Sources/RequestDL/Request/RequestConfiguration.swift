@@ -139,6 +139,10 @@ public struct RequestConfiguration: Sendable {
     /// ``Property/cacheCompletenessProbe(_:)``.
     var probesCacheCompleteness = false
 
+    /// The account this request declares it is made for (see ``CacheIdentity``), as written.
+    /// Only the cache reads it; it is not part of the cache key.
+    var cacheIdentity: String?
+
     /// Whether the requests of a resumable upload that go to another origin than this one, where
     /// the server sent them, keep the headers that identify the caller. Set by the upload itself
     /// from `forwardsCredentialsToOtherOrigins`, never by a node.

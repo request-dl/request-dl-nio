@@ -1778,7 +1778,7 @@ extension CachedRequestTests {
         )
     }
 
-    private func makeHeaders(
+    func makeHeaders(
         eTag: UUID? = nil,
         noCache: Bool = false,
         maxAge: Bool = true,
@@ -1921,6 +1921,7 @@ extension CachedRequestTests {
         cacheHeader: CacheHeader? = nil,
         includesAuthorizationHeader: Bool = false,
         requestHeaders: [(String, String)] = [],
+        identity: String? = nil,
         output: String? = nil,
         executor: Session.Executor? = nil,
         logger: Logger? = nil,
@@ -1969,6 +1970,10 @@ extension CachedRequestTests {
 
             PropertyForEach(requestHeaders, id: \.0) {
                 CustomHeader(name: $0.0, value: $0.1)
+            }
+
+            if let identity {
+                CacheIdentity(identity)
             }
         }
         .environment(\.logger, logger)

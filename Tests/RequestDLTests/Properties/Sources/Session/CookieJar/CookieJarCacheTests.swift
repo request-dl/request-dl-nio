@@ -81,7 +81,8 @@ struct CookieJarCacheTests {
         executor: Executor,
         jar: CookieJar?,
         cached: Bool = true,
-        strategy: CacheStrategy = .returnCachedDataElseLoad
+        strategy: CacheStrategy = .returnCachedDataElseLoad,
+        identity: String? = nil
     ) async throws -> HTTPResult<String> {
         let data = try await DataTask {
             BaseURL(fixture.server.baseURL)
@@ -107,6 +108,10 @@ struct CookieJarCacheTests {
 
             SecureConnection {
                 TrustRoots(Certificates().server().certificateURL.absolutePath(percentEncoded: false))
+            }
+
+            if let identity {
+                CacheIdentity(identity)
             }
         }
         .extractPayload()
@@ -252,6 +257,61 @@ struct CookieJarCacheTests {
 
         // Then
         #expect(offline.receivedCookieHeader == "session=a")
+
+        await fixture.dataCache.removeAll()
+    }
+
+    /// The session cookie the server re-issues on every response is a new value for the same
+    /// account: the jar of the second request holds `session=a2` where the first held `session=a`.
+    /// Without an identity that is a miss; with one the account is what is compared.
+    @Test(arguments: CookieJarTests.executors)
+    func cachedResponse_whenTheSessionCookieIsReissued_isServedToTheSameIdentity(executor: Executor) async throws {
+        // Given: the resource is fetched by account `user-1` with `session=a`.
+        let fixture = try await Self.makeFixture(resourceResponses: 3)
+        defer {
+            fixture.paths.forEach(fixture.server.cleanup(at:))
+        }
+
+        let before = try await Self.jar(holding: "a", executor: executor, fixture)
+        let afterReissue = try await Self.jar(holding: "a2", executor: executor, fixture)
+        let otherAccount = try await Self.jar(holding: "b", executor: executor, fixture)
+
+        let first = try await Self.get(
+            fixture.resourcePath,
+            fixture: fixture,
+            executor: executor,
+            jar: before,
+            identity: "user-1"
+        )
+        #expect(first.receivedCookieHeader == "session=a")
+
+        // When
+        let reissued = try await Self.get(
+            fixture.resourcePath,
+            fixture: fixture,
+            executor: executor,
+            jar: afterReissue,
+            identity: "user-1"
+        )
+        let anotherIdentity = try await Self.get(
+            fixture.resourcePath,
+            fixture: fixture,
+            executor: executor,
+            jar: otherAccount,
+            identity: "user-2"
+        )
+        let noIdentity = try await Self.get(
+            fixture.resourcePath,
+            fixture: fixture,
+            executor: executor,
+            jar: afterReissue
+        )
+
+        // Then: the same account is served what it fetched, across the new cookie; the other
+        // identity, and a request that declares none, are not.
+        #expect(reissued.receivedCookieHeader == "session=a")
+        #expect(anotherIdentity.receivedCookieHeader == "session=b")
+        #expect(noIdentity.receivedCookieHeader == "session=a2")
 
         await fixture.dataCache.removeAll()
     }
