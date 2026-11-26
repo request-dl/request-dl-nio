@@ -45,7 +45,8 @@ public struct RefererHeader: Property {
                 key: "Referer",
                 value: property.value,
                 strategy: inputs.environment.headerStrategy,
-                separator: inputs.environment.headerSeparator
+                separator: inputs.environment.headerSeparator,
+                hiddenOnRedirect: inputs.environment.hiddenOnRedirect
             )
         )
     }

@@ -29,6 +29,11 @@ extension Internals {
         /// ``Internals/URLOverrides/rewritingRedirect(_:previous:)``.
         var urlOverrides: Internals.URLOverrides = .init()
 
+        /// Taken off each hop besides what a redirect to another origin always loses, on the
+        /// candidate and again on what the strategy answers with. See
+        /// ``Internals/RedirectHiddenHeaders``.
+        var hiddenHeaders: Internals.RedirectHiddenHeaders = .init()
+
         // MARK: - Internal methods
 
         func redirectDecision(for context: HTTPClientRedirectContext) throws -> HTTPClientRedirectDecision {
@@ -46,7 +51,7 @@ extension Internals {
 
             // AsyncHTTPClient has already stripped what it knows to strip for a redirect to
             // another origin, which does not include an explicit `Host`.
-            Self.sanitize(&candidate, from: previousURL)
+            sanitize(&candidate, from: previousURL)
 
             let decision = try strategy.redirectDecision(
                 for: .init(
@@ -73,7 +78,7 @@ extension Internals {
 
                 // Again, on what the strategy answered with: nothing it did to the URL or the
                 // headers has been checked against the origin it is now going to.
-                Self.sanitize(&redirectRequest, from: previousURL)
+                sanitize(&redirectRequest, from: previousURL)
 
                 // `.RAW(value:)` is written on the request line as it is, and this method comes from
                 // a strategy: no more trusted than the caller's own.
@@ -91,16 +96,21 @@ extension Internals {
             }
         }
 
-        // MARK: - Private static methods
+        // MARK: - Private methods
 
-        private static func sanitize(_ request: inout Internals.RedirectRequest, from previousURL: String?) {
+        private func sanitize(_ request: inout Internals.RedirectRequest, from previousURL: String?) {
             // Without a previous hop there is nothing to compare against; AsyncHTTPClient always
             // supplies one, so this is only a guard.
             guard let previousURL else {
                 return
             }
 
-            Internals.RedirectSanitizer.sanitize(&request.headers, from: previousURL, to: request.url)
+            Internals.RedirectSanitizer.sanitize(
+                &request.headers,
+                from: previousURL,
+                to: request.url,
+                hidden: hiddenHeaders
+            )
         }
     }
 }

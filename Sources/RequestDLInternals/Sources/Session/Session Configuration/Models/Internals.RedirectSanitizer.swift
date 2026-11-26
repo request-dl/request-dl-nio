@@ -61,18 +61,33 @@ extension Internals {
             return lhs.hasTheSameOrigin(as: rhs)
         }
 
+        /// The names of the headers a hop must not carry: those of ``crossOriginHeaders`` and of
+        /// `hidden`'s `otherOrigins` when it goes to another origin, and `hidden`'s `anyRedirect`
+        /// on every hop.
+        ///
+        /// For the executor that removes them from a request type of its own.
+        package static func removedHeaders(
+            sameOrigin: Bool,
+            hidden: Internals.RedirectHiddenHeaders = .init()
+        ) -> [String] {
+            guard !sameOrigin else {
+                return hidden.anyRedirect.sorted()
+            }
+
+            return crossOriginHeaders + hidden.otherOrigins.sorted() + hidden.anyRedirect.sorted()
+        }
+
         /// Removes ``crossOriginHeaders`` from `headers` when a request that was sent to
-        /// `previousURL` is about to be sent to `newURL` instead and the two don't share an origin.
+        /// `previousURL` is about to be sent to `newURL` instead and the two don't share an origin,
+        /// and `hidden`'s headers: its `otherOrigins` under the same condition, its `anyRedirect`
+        /// whatever the origin.
         package static func sanitize(
             _ headers: inout Internals.HTTPHeaders,
             from previousURL: String,
-            to newURL: String
+            to newURL: String,
+            hidden: Internals.RedirectHiddenHeaders = .init()
         ) {
-            guard !isSameOrigin(previousURL, newURL) else {
-                return
-            }
-
-            for name in crossOriginHeaders {
+            for name in removedHeaders(sameOrigin: isSameOrigin(previousURL, newURL), hidden: hidden) {
                 headers.remove(name: name)
             }
         }

@@ -404,9 +404,9 @@ public struct Session: Property {
     /// redirects, `Authorization`, `Proxy-Authorization`, `Cookie`, `Origin` and an explicit `Host`
     /// are removed from it. Every other header is forwarded as it is, a custom API-key header such
     /// as `X-Api-Key`, `Api-Key` or `X-Auth-Token` included: they are not known to be credentials.
-    /// To keep one from reaching another origin, handle the redirect with
-    /// ``redirectStrategy(_:)`` or ``onRedirect(_:)`` and remove it from the
-    /// ``RedirectRequest`` you answer with.
+    /// To keep one from reaching another origin, mark it with ``Property/hiddenOnRedirect(_:)``
+    /// (``RedirectHeaderScope``), or handle the redirect with ``redirectStrategy(_:)`` or
+    /// ``onRedirect(_:)`` and remove it from the ``RedirectRequest`` you answer with.
     ///
     /// - Parameters:
     /// - max: The maximum number of redirects to follow.
