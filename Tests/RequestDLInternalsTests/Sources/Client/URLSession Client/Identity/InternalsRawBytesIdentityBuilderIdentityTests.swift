@@ -6,6 +6,7 @@
 
 import CryptoKit
 import Security
+import SwiftAsyncStream
 import Testing
 import X509
 import _CryptoExtras
@@ -511,7 +512,7 @@ private final class IdentityDelegate: NSObject, URLSessionTaskDelegate, @uncheck
 
     private let identity: SecIdentity
     private let serverTrustPolicy: Internals.ServerTrustPolicy
-    private let lock = NSLock()
+    private let lock = Lock()
     private var _presentedIdentity = false
 
     var presentedIdentity: Bool {

@@ -24,7 +24,7 @@ struct InternalsURLSessionClientUploadCancellationTests {
     /// the source a caller cannot interrupt.
     private final class Gate: @unchecked Sendable {
 
-        private let lock = NSLock()
+        private let lock = Lock()
         private var continuation: UnsafeContinuation<Void, Never>?
         private var isReleased = false
 

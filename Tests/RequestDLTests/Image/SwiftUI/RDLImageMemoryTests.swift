@@ -3,6 +3,7 @@
 //
 
 import Foundation
+import SwiftAsyncStream
 import Testing
 
 @_spi(Private) @testable import RequestDL
@@ -151,7 +152,7 @@ struct RDLImageMemoryTests {
     // MARK: - The first body
 
     private final class Phases: @unchecked Sendable {
-        private let lock = NSLock()
+        private let lock = Lock()
         private var _phases: [RDLImagePhase] = []
 
         var all: [RDLImagePhase] {
