@@ -119,6 +119,32 @@ The probe only runs when the response advertised `Accept-Ranges: bytes`, which k
 
 > Important: The probe says the body is as long as the server says it is. It does not check the bytes themselves.
 
+### Responses to requests with credentials
+
+A cache is keyed by URL, and a ``RequestDL/DataCache`` is often one store for the whole process, so a response fetched with one account's credentials must not be given to another. A request that sends `Authorization`, `Cookie` or `Proxy-Authorization` (a `Cookie` the session's cookie jar adds counts) has its response stored with a SHA-256 digest of each of the three, never their values, and the response is only served to a request that sends the same: not to another account, and not to a request with none. A response stored for a request with none of them is public and is served to every request.
+
+That is right for a credential that does not change, and wrong for one that does. An OAuth token that is refreshed, or a session cookie that the server re-issues with every response, is a new value for the same account, so the stored response is never found again after the refresh. Declare the account yourself with ``RequestDL/CacheIdentity`` and the cache compares that instead:
+
+```swift
+DataTask {
+    BaseURL("https://api.example.com")
+    Path("/me/orders")
+    Authorization(.bearer, token: session.accessToken)
+    CacheIdentity(session.userID)
+}
+.cachePolicy(.all)
+.cacheStrategy(.returnCachedDataElseLoad)
+```
+
+With an identity:
+
+- The response is stored with a digest of the identity and none of the credentials, and is served to a request that declares the same identity, whatever `Authorization` or `Cookie` it sends. The identity itself is not written to the disk.
+- It is not served to another identity, nor to a request that declares none; a response stored with no identity (for credentials, or a public one) is not an identity's own, so only the public one is served to it.
+- A `Vary` of `Authorization`, `Cookie` or `Proxy-Authorization` is satisfied by the identity. Any other field in `Vary` is compared as usual.
+- An empty identity, or one that is only whitespace, is ignored: the request is cached by its credentials.
+
+The identity is a claim by the app: the cache does not check that the credentials belong to it, and two accounts given the same identity share what they cache. It is not part of the cache key, which stays the URL, and nothing is sent to the server. Records written before ``RequestDL/CacheIdentity`` existed keep matching as they did.
+
 ### Encrypting the disk tier
 
 By default, cached responses are written to disk as plaintext. If the cached content is sensitive — auth-protected API responses, personal data, anything you wouldn't want readable by something else with access to the device's file system — set an ``RequestDL/DataCache/EncryptionKey`` so RequestDL encrypts the disk tier at rest with AES-GCM.
@@ -210,6 +236,10 @@ cache.encryptionKey = encryptionKey
 - ``RequestDL/DataCache/Policy``
 - ``RequestDL/DataCache/Policy/Set``
 - ``RequestDL/Property/cachePolicy(_:)``
+
+### Telling accounts apart
+
+- ``RequestDL/CacheIdentity``
 
 ### Encrypting the disk tier
 

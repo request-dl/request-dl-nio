@@ -158,7 +158,15 @@ extension Internals {
                     return false
                 }
 
-                return fields.allSatisfy { recorded[$0] == requestValue(forVaryField: $0) }
+                // The identity, which matched above, stands in for the credential headers.
+                let standInForIdentity =
+                    requestIdentityDigest != nil && recorded[Self.identityField] != nil
+                    ? Self.credentialFields
+                    : []
+
+                return fields.allSatisfy {
+                    standInForIdentity.contains($0) || recorded[$0] == requestValue(forVaryField: $0)
+                }
             }
         }
 
@@ -169,7 +177,8 @@ extension Internals {
         /// without them.
         private static let credentialFields = ["authorization", "cookie", "proxy-authorization"]
 
-        /// Whether the stored response was stored for the credentials this request sends.
+        /// Whether the stored response was stored for the credentials this request sends, or for
+        /// the account it declares.
         ///
         /// `DataCache` keys entries by URL alone and is commonly one store for the whole process
         /// (`DataCache.shared`), so an app where more than one account is signed in over its
@@ -179,17 +188,68 @@ extension Internals {
         /// not to another account, and not to a request with no credentials at all. A response
         /// stored for a request with none carries no such record and is given to any request, as
         /// it always was.
+        ///
+        /// A request that declares a ``CacheIdentity`` is told apart by that instead, because the
+        /// credentials of one account change (a refreshed token, a re-issued session cookie): its
+        /// response records one digest of the identity (``identityField``) and no credential, and
+        /// is given to a request that declares the same identity, and to no other. A request
+        /// without an identity is not given a response that has one. A request with an identity is
+        /// not given a response that was stored for credentials and no identity, since whose it
+        /// is cannot be told; it is given one stored for none, which is public.
         private func matchesCredentials(of cachedResponse: CachedResponse) -> Bool {
-            guard
-                let recorded = cachedResponse.varyRequestHeaders,
-                Self.credentialFields.allSatisfy({ recorded[$0] != nil })
-            else {
+            let recorded = cachedResponse.varyRequestHeaders
+            let storedIdentity = recorded?[Self.identityField]
+
+            if let requestIdentity = requestIdentityDigest {
+                if let storedIdentity {
+                    return storedIdentity == requestIdentity
+                }
+
+                return !recordsCredentials(recorded)
+            }
+
+            guard storedIdentity == nil else {
+                return false
+            }
+
+            guard let recorded, recordsCredentials(recorded) else {
                 return true
             }
 
             return Self.credentialFields.allSatisfy {
                 recorded[$0] == requestValue(forVaryField: $0) || ($0 == "cookie" && coversRecordedCookies(recorded))
             }
+        }
+
+        /// Whether the record was written for a request that carried credentials: all three
+        /// credential headers are in it.
+        private func recordsCredentials(_ recorded: [String: String]?) -> Bool {
+            guard let recorded else {
+                return false
+            }
+
+            return Self.credentialFields.allSatisfy { recorded[$0] != nil }
+        }
+
+        /// Where a stored response keeps the digest of the ``CacheIdentity`` it was stored for.
+        /// Not a header name, so it never collides with a `Vary` field.
+        private static let identityField = "x-request-dl-identity"
+
+        /// The digest of the identity this request declares, or `nil` when it declares none.
+        ///
+        /// Leading and trailing whitespace does not count, and an identity that is empty after
+        /// that is none: such a request is told apart by its credentials, which is the safe side
+        /// (it is never taken for another account's). Digested with a field of its own, so that
+        /// the same bytes as a credential are not the same value, and so that the identity is not
+        /// written to the record as it is.
+        private var requestIdentityDigest: String? {
+            guard let identity = requestConfiguration.cacheIdentity?.trimming(where: \.isWhitespace),
+                !identity.isEmpty
+            else {
+                return nil
+            }
+
+            return Self.digest(ofCredential: identity, field: "cache-identity")
         }
 
         /// Where a stored response keeps the digest of each cookie it was fetched with, comma
@@ -978,23 +1038,35 @@ extension Internals {
 
                 // What the response varies on, and, when the request carried credentials, which
                 // ones: all three headers, `""` for those it did not send, so that the entry is
-                // not given to a request with none.
+                // not given to a request with none. A request that declared an identity records
+                // that instead, and none of the credentials: they change with the account's
+                // session, and the identity is what the account is.
                 var fields: [String] = []
 
                 if case .fields(let varyFields) = vary {
                     fields = varyFields
                 }
 
-                if requestCarriesCredentials {
+                let identityDigest = requestIdentityDigest
+
+                if identityDigest != nil {
+                    fields.removeAll { Self.credentialFields.contains($0) }
+                } else if requestCarriesCredentials {
                     fields = Array(Set(fields).union(Self.credentialFields)).sorted()
                 }
 
                 let varyRequestHeaders: [String: String]? = {
-                    guard !fields.isEmpty else {
+                    guard !fields.isEmpty || identityDigest != nil else {
                         return nil
                     }
 
                     var recorded = Dictionary(uniqueKeysWithValues: fields.map { ($0, requestValue(forVaryField: $0)) })
+
+                    if let identityDigest {
+                        recorded[Self.identityField] = identityDigest
+                        return recorded
+                    }
+
                     let cookiePairs = requestCookiePairDigests()
 
                     if !cookiePairs.isEmpty {
