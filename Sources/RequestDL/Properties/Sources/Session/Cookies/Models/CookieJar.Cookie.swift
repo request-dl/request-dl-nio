@@ -27,10 +27,11 @@ extension CookieJar {
 
         // MARK: - Public properties
 
-        /// The name of the cookie. Not empty, and without `;`, `=` or control characters.
+        /// The name of the cookie. Not empty, ASCII only, and without `;`, `=` or control characters.
         public var name: String
 
-        /// The value of the cookie, sent back as it is. Without `;` or control characters.
+        /// The value of the cookie, sent back as it is. ASCII only (RFC 6265), and without `;` or control
+        /// characters.
         public var value: String
 
         /// The domain the cookie belongs to: lowercase, in Punycode, without a leading dot. The jar

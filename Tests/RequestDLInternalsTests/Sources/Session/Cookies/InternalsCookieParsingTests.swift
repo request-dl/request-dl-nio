@@ -79,4 +79,26 @@ struct InternalsCookieParsingTests {
         #expect(!Internals.Cookie.isIPAddress("example.com"))
         #expect(!Internals.Cookie.isIPAddress("1.2.3.4.example.com"))
     }
+
+    @Test
+    func store_whenPathHasAControlCharacter_usesTheDefaultPathAndSurvivesASnapshot() throws {
+        // Given
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let storage = Internals.CookieStorage()
+
+        // When: HTAB is allowed in a header value, so it reaches the parser.
+        storage.store(
+            setCookieValues: ["a=1; Path=/x\ty; Max-Age=1000"],
+            for: URL(string: "https://example.com/dir/page")!,
+            now: now
+        )
+
+        // Then: the `Path` is treated as absent, so the cookie gets the default path.
+        let snapshot = storage.snapshot(now: now)
+        #expect(snapshot.map(\.path) == ["/dir"])
+
+        let restored = Internals.CookieStorage()
+        // `restore` returns how many cookies it did not add.
+        #expect(restored.restore(snapshot, now: now) == 0)
+    }
 }

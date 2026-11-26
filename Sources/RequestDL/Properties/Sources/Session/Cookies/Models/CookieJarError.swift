@@ -9,10 +9,10 @@ import RequestDLInternals
 /// The cases say which part was wrong and carry nothing of the cookie, so an error is safe to log.
 public enum CookieJarError: Error, Sendable, Equatable {
 
-    /// The name is empty, has a control character, a `;` or a `=`, or starts or ends with a blank.
+    /// The name is empty, has a control character or a non-ASCII character, a `;` or a `=`, or starts or ends with a blank.
     case invalidName
 
-    /// The value has a control character, a `;`, or starts or ends with a blank. A `;` is refused
+    /// The value has a control character, a non-ASCII character, a `;`, or starts or ends with a blank. A `;` is refused
     /// because it would put a second cookie in the `Cookie` header.
     case invalidValue
 

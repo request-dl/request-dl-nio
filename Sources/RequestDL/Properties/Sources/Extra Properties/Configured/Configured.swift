@@ -98,6 +98,19 @@ import Crypto
 ///   is present, chained onto the same ``Session`` value: same as declaring
 ///   `Session().maximumConnectionsPerHost(x).maximumConcurrentConnections(y)` directly.
 ///
+/// A key that only means something next to another is an error when the other is missing, not
+/// ignored: `secureConnection.spkiPinning.policy` without `pins`, `secureConnection.privateKey.format`
+/// or `password` without `file`, `authorization.username`/`password`/`credentials`/`token` without
+/// `scheme`, and `redirect.maxRedirects`/`allowCycles` without `mode`. A typo in the key that turns
+/// the rest on would otherwise resolve with no pinning, no client certificate, no `Authorization`
+/// and no redirect limit, without a word. (`proxy.*` without `proxy.enabled: true` is still skipped,
+/// so that a file can switch the proxy off and keep its settings.) `maximumConcurrentConnections`
+/// below `1`, and `redirect.maxRedirects` below `0`, are errors too: `0` would read as no limit.
+///
+/// `urlOverrides` and `proxy.connectHeaders` resolve to the same session configuration every time,
+/// whatever the order the provider (or a `Dictionary`) hands the entries in, so they do not make a
+/// new connection pool of every resolve.
+///
 /// Every key is read independently and is optional: a missing key simply contributes nothing, the
 /// same as any other absent property. A key that is present with a value of the wrong type (`pins`
 /// written as one string, `tlsMinimumVersion` as a number, `proxy.enabled` as `"true"`, `timeout`
@@ -140,7 +153,9 @@ import Crypto
 ///   none of the recognized values, if `secureConnection.spkiPinning.pins` is specified but empty
 ///   or `secureConnection.spkiPinning.policy` is specified but is neither `"strict"` nor `"audit"`,
 ///   if `redirect.mode` is specified but is neither `"follow"` nor `"disallow"`, or if `timeout` is
-///   specified but negative, or if `baseURL` has a user name or a password in its authority.
+///   specified but negative, if `baseURL` has a user name or a password in its authority, if a key
+///   that depends on another is present without it (see above), or if
+///   `maximumConcurrentConnections` is below `1` or `redirect.maxRedirects` is negative.
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 public struct Configured: Property {
 
@@ -335,6 +350,12 @@ public struct Configured: Property {
         let maximumConnectionsPerHost = try await Self.int(reader, "maximumConnectionsPerHost")
         let maximumConcurrentConnections = try await Self.int(reader, "maximumConcurrentConnections")
 
+        // `Internals.ClientManager` reads a limit of zero or less as "no limit": a file that
+        // asks for `0` or `-1` would get the opposite of a cap.
+        guard (maximumConcurrentConnections ?? 1) >= 1 else {
+            throw ConfiguredError(context: .invalidConfigurationValue)
+        }
+
         guard maximumConnectionsPerHost != nil || maximumConcurrentConnections != nil else {
             return nil
         }
@@ -370,13 +391,29 @@ public struct Configured: Property {
 
     private static func redirect(_ reader: ConfigReader) async throws -> Session? {
         guard let mode = try await Self.string(reader, "mode", context: .invalidRedirectConfiguration) else {
+            // `maxRedirects` and `allowCycles` only mean something once `mode` turns following on:
+            // without it they would be dropped, and the request would follow redirects the file
+            // meant to bound.
+            guard
+                try await Self.int(reader, "maxRedirects", context: .invalidRedirectConfiguration) == nil,
+                try await Self.bool(reader, "allowCycles", context: .invalidRedirectConfiguration) == nil
+            else {
+                throw ConfiguredError(context: .invalidRedirectConfiguration)
+            }
+
             return nil
         }
 
         switch mode {
         case "follow":
+            let maximum = try await Self.int(reader, "maxRedirects", context: .invalidRedirectConfiguration) ?? 5
+
+            guard maximum >= 0 else {
+                throw ConfiguredError(context: .invalidRedirectConfiguration)
+            }
+
             return Session().enableRedirectFollow(
-                max: try await Self.int(reader, "maxRedirects", context: .invalidRedirectConfiguration) ?? 5,
+                max: maximum,
                 allowCycles: try await Self.bool(reader, "allowCycles", context: .invalidRedirectConfiguration)
                     ?? false
             )
@@ -390,13 +427,21 @@ public struct Configured: Property {
     private static func spkiPinning(
         _ reader: ConfigReader
     ) async throws -> SPKIPinning<PropertyForEach<[String], String, SPKIHash<SHA256>>>? {
-        guard
-            let pins = try await Self.stringArray(
-                reader,
-                "pins",
-                context: .invalidSecureConnectionConfiguration
-            )
-        else {
+        let pins = try await Self.stringArray(
+            reader,
+            "pins",
+            context: .invalidSecureConnectionConfiguration
+        )
+
+        let policyValue = try await Self.string(reader, "policy", context: .invalidSecureConnectionConfiguration)
+
+        guard let pins else {
+            // A `policy` with no `pins` (a typo in `pins`, say) would resolve with no pinning at
+            // all, which loosens the connection without a word.
+            guard policyValue == nil else {
+                throw ConfiguredError(context: .invalidSecureConnectionConfiguration)
+            }
+
             return nil
         }
 
@@ -404,9 +449,7 @@ public struct Configured: Property {
             throw ConfiguredError(context: .invalidSecureConnectionConfiguration)
         }
 
-        let policy = try Self.spkiPinningPolicy(
-            try await Self.string(reader, "policy", context: .invalidSecureConnectionConfiguration) ?? "strict"
-        )
+        let policy = try Self.spkiPinningPolicy(policyValue ?? "strict")
 
         return SPKIPinning(policy: policy) {
             PropertyForEach(pins, id: \.self) {
@@ -427,20 +470,27 @@ public struct Configured: Property {
     }
 
     private static func privateKey(_ reader: ConfigReader) async throws -> PrivateKey? {
-        guard let file = try await Self.string(reader, "file", context: .invalidSecureConnectionConfiguration) else {
-            return nil
-        }
-
-        let format = try Self.certificateFormat(
-            try await Self.string(reader, "format", context: .invalidSecureConnectionConfiguration) ?? "pem"
-        )
-
-        if let password = try await Self.string(
+        let file = try await Self.string(reader, "file", context: .invalidSecureConnectionConfiguration)
+        let formatValue = try await Self.string(reader, "format", context: .invalidSecureConnectionConfiguration)
+        let password = try await Self.string(
             reader,
             "password",
             isSecret: true,
             context: .invalidSecureConnectionConfiguration
-        ) {
+        )
+
+        guard let file else {
+            // A `format` or a `password` with no `file` would resolve with no client certificate.
+            guard formatValue == nil, password == nil else {
+                throw ConfiguredError(context: .invalidSecureConnectionConfiguration)
+            }
+
+            return nil
+        }
+
+        let format = try Self.certificateFormat(formatValue ?? "pem")
+
+        if let password {
             return PrivateKey(file, format: format, password: SecureBytes(password.utf8))
         }
 
@@ -573,10 +623,14 @@ public struct Configured: Property {
 
             let authorization = credentials.map(Self.proxyAuthorization)
 
+            // Sorted: a `Dictionary` iterates in an order that changes from one build of it to
+            // the next, and the connect headers are part of the pool key, so each resolve of the
+            // same file would have asked for another client.
             let connectHeaders =
                 try connectHeaderPairs.map {
                     Self.dictionary(try Self.pairs($0, separatedBy: ":", context: .invalidProxyConfiguration))
-                } ?? [:]
+                        .sorted { $0.key < $1.key }
+                } ?? []
 
             return AnyProperty(
                 Proxy(host: host, port: port, authorization: authorization) { () -> ProxyConnectHeaders in
@@ -622,7 +676,7 @@ public struct Configured: Property {
         }
     }
 
-    private typealias ProxyConnectHeaders = PropertyForEach<[String: String], String, CustomHeader>
+    private typealias ProxyConnectHeaders = PropertyForEach<[Dictionary<String, String>.Element], String, CustomHeader>
 
     private static func proxyAuthorization(_ credentials: Credentials) -> ProxyAuthorization {
         switch credentials {
@@ -662,6 +716,14 @@ public struct Configured: Property {
         let invalid = ConfiguredError.Context.invalidAuthorizationConfiguration
 
         guard let scheme = try await Self.string(reader, "scheme", context: invalid) else {
+            // The fields only mean something under a `scheme`: without one the request would go
+            // out with no `Authorization` at all.
+            for key in ["username", "password", "credentials", "token"] as [ConfigKey] {
+                guard try await Self.string(reader, key, isSecret: true, context: invalid) == nil else {
+                    throw ConfiguredError(context: invalid)
+                }
+            }
+
             return nil
         }
 

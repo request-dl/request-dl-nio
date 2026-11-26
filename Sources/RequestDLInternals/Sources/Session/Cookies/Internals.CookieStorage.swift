@@ -46,8 +46,8 @@ extension Internals {
         /// servers most often found in front of an app (nginx's `large_client_header_buffers`,
         /// Apache's `LimitRequestFieldSize` of 8190, Tomcat's `maxHttpHeaderSize`), and leaves room
         /// for `Cookie: ` and the line ending. It holds any one cookie (4096 bytes at most). The
-        /// cookies that do not fit are not sent: the ones last in the order of RFC 6265 section 5.4,
-        /// which are those with the shortest paths and the most recent ones.
+        /// cookies that do not fit are not sent: the ones with the shortest paths and, among equal
+        /// paths, the oldest, so a cookie just set (a login) is not the one that is left out.
         package static let maximumCookieHeaderLength = 8_000
 
         // MARK: - Private properties
@@ -55,6 +55,12 @@ extension Internals {
         private let lock = Lock()
         private let publicSuffixList: PublicSuffixList?
         private var cookies: [Cookie] = []
+
+        /// What was last said, per request host, about cookies left out of the `Cookie` header
+        /// (see ``HeaderOmission``): a digest of which cookies they were. A host is forgotten once
+        /// a request to it leaves nothing out, so it is said again if that happens anew. Guarded
+        /// by `lock`.
+        private var reportedOmissions: [String: Int] = [:]
 
         /// Whoever is observing `changes()`. Its own lock, never held with `lock`: a signal is sent
         /// after a change, once the storage's lock is released.
@@ -73,6 +79,25 @@ extension Internals {
             for continuation in observers.values {
                 continuation.finish()
             }
+        }
+
+        // MARK: - Internal types
+
+        /// Cookies that match a request but did not fit in ``maximumCookieHeaderLength``, so they
+        /// were not sent.
+        ///
+        /// It carries counts, never a cookie: nothing here is fit for a log but how many were left
+        /// out.
+        package struct HeaderOmission: Sendable, Equatable {
+
+            /// How many cookies were left out.
+            package let count: Int
+
+            /// The host of the request.
+            package let host: String
+
+            /// The limit they did not fit in, in bytes.
+            package let limit: Int
         }
 
         // MARK: - Internal methods
@@ -124,6 +149,34 @@ extension Internals {
         ///
         /// Cookies with longer paths come first, then the ones created earlier (RFC 6265 5.4).
         package func cookieHeader(for url: URL, now: Date = Date()) -> String? {
+            header(for: url, now: now, reportsOmission: false)?.value
+        }
+
+        /// What ``cookieHeader(for:now:)`` returns, and whether cookies that match were left out
+        /// of it because they did not fit in ``maximumCookieHeaderLength``.
+        ///
+        /// The omission is returned the first time a host has cookies left out, and again only
+        /// when the set of cookies left out for that host changes, so asking on every request
+        /// does not repeat it. A request that leaves nothing out clears what is remembered for
+        /// its host. Redirect hops and continuations use ``cookieHeader(for:now:)``, which neither
+        /// reports nor changes that.
+        package func cookieHeaderReportingOmission(
+            for url: URL,
+            now: Date = Date()
+        ) -> (value: String?, omission: HeaderOmission?) {
+            guard let result = header(for: url, now: now, reportsOmission: true) else {
+                return (nil, nil)
+            }
+
+            return (result.value, result.omission)
+        }
+
+        /// `nil` when the URL has no origin the jar can match.
+        private func header(
+            for url: URL,
+            now: Date,
+            reportsOmission: Bool
+        ) -> (value: String?, omission: HeaderOmission?)? {
             guard let origin = Self.origin(of: url) else {
                 return nil
             }
@@ -133,20 +186,51 @@ extension Internals {
 
             cookies.removeAll { $0.isExpired(at: now) }
 
-            let matching = withinHeaderLimit(orderedMatches(for: origin, now: now))
+            let ordered = orderedMatches(for: origin, now: now)
+            let matching = withinHeaderLimit(ordered)
+            let omission = reportsOmission ? omissionToReport(ordered, kept: matching, host: origin.host) : nil
 
             guard !matching.isEmpty else {
-                return nil
+                return (nil, omission)
             }
 
             for index in matching {
                 cookies[index].lastAccess = now
             }
 
-            return
+            let value =
                 matching
                 .map { "\(cookies[$0].name)=\(cookies[$0].value)" }
                 .joined(separator: "; ")
+
+            return (value, omission)
+        }
+
+        /// The omission to tell about, or `nil` when there is none or it was already told. Updates
+        /// what is remembered for `host`. Expects the lock to be held.
+        private func omissionToReport(_ ordered: [Int], kept: [Int], host: String) -> HeaderOmission? {
+            let keptSet = Set(kept)
+            let omitted = ordered.filter { !keptSet.contains($0) }
+
+            guard !omitted.isEmpty else {
+                reportedOmissions[host] = nil
+                return nil
+            }
+
+            // Which cookies they are, not how many: one coming in as another goes out is a change.
+            var hasher = Hasher()
+            for identity in omitted.map({ "\(cookies[$0].name);\(cookies[$0].domain);\(cookies[$0].path)" }).sorted() {
+                hasher.combine(identity)
+            }
+            let digest = hasher.finalize()
+
+            guard reportedOmissions[host] != digest else {
+                return nil
+            }
+
+            reportedOmissions[host] = digest
+
+            return HeaderOmission(count: omitted.count, host: host, limit: Self.maximumCookieHeaderLength)
         }
 
         package func removeAll(now: Date = Date()) {
@@ -431,28 +515,46 @@ extension Internals {
             return matching
         }
 
-        /// The first of `ordered` whose `Cookie` header stays within ``maximumCookieHeaderLength``.
-        /// Stops at the first cookie that does not fit, instead of skipping it: a smaller one after
-        /// it could be a less specific cookie of the same name, which the server would then read
-        /// in place of the one that was left out. Expects the lock to be held.
+        /// The cookies of `ordered` that fit in ``maximumCookieHeaderLength``, in the same order.
+        ///
+        /// What is left out is chosen from the end of the priority, not of the send order: the
+        /// shortest paths first and, among equal paths, the oldest. RFC 6265 sends equal paths
+        /// oldest first, so cutting the tail of that order dropped the newest cookie, which is
+        /// the one a login has just set: two big cookies from a sibling subdomain were enough to
+        /// leave `sid` out. Stops at the first cookie that does not fit, instead of skipping it: a
+        /// smaller one after it could be a less specific cookie of the same name, which the
+        /// server would then read in place of the one that was left out. Expects the lock to be
+        /// held.
         private func withinHeaderLimit(_ ordered: [Int]) -> [Int] {
             var length = 0
-            var fitting: [Int] = []
+            var kept: Set<Int> = []
 
-            for index in ordered {
+            for index in ordered.sorted(by: { isHigherPriority($0, than: $1) }) {
                 let cookie = cookies[index]
                 // `name=value`, and the `; ` that comes before every cookie but the first.
-                let added = cookie.name.utf8.count + 1 + cookie.value.utf8.count + (fitting.isEmpty ? 0 : 2)
+                let added = cookie.name.utf8.count + 1 + cookie.value.utf8.count + (kept.isEmpty ? 0 : 2)
 
                 guard length + added <= Self.maximumCookieHeaderLength else {
                     break
                 }
 
                 length += added
-                fitting.append(index)
+                kept.insert(index)
             }
 
-            return fitting
+            return ordered.filter(kept.contains)
+        }
+
+        /// Whether the cookie at `lhs` is kept before the one at `rhs` when the header is full:
+        /// the longer path, then the newer one.
+        private func isHigherPriority(_ lhs: Int, than rhs: Int) -> Bool {
+            let (lhsCookie, rhsCookie) = (cookies[lhs], cookies[rhs])
+
+            if lhsCookie.path.count != rhsCookie.path.count {
+                return lhsCookie.path.count > rhsCookie.path.count
+            }
+
+            return lhsCookie.creation != rhsCookie.creation ? lhsCookie.creation > rhsCookie.creation : lhs > rhs
         }
 
         /// Expects the lock to be held.

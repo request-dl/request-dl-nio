@@ -26,5 +26,10 @@ public struct ServerSentEvent: Sendable, Hashable {
     public let data: String
 
     /// The reconnection time, in milliseconds, from the most recently seen `retry:` line.
+    ///
+    /// A value too large for `Int` saturates at `Int.max` instead of being dropped, which is
+    /// what the specification asks for, and a stream can send it on purpose. Bound the value
+    /// before you turn it into a delay (`min(retry, 86_400_000)`, say): multiplying it to
+    /// nanoseconds, or adding it to a `Date`, overflows.
     public let retry: Int?
 }

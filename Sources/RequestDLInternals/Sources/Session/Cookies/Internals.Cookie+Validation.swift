@@ -115,6 +115,7 @@ extension Internals.Cookie {
         guard
             !name.isEmpty,
             !hasControlCharacters(name),
+            !hasNonASCII(name),
             !name.contains(";"),
             !name.contains("="),
             !hasBlankEdge(name)
@@ -124,6 +125,7 @@ extension Internals.Cookie {
 
         guard
             !hasControlCharacters(value),
+            !hasNonASCII(value),
             !value.contains(";"),
             !hasBlankEdge(value)
         else {
@@ -144,6 +146,14 @@ extension Internals.Cookie {
         publicSuffixList: Internals.PublicSuffixList?
     ) -> Bool {
         !attribute.contains(".") || (publicSuffixList?.isPublicSuffix(attribute) ?? false)
+    }
+
+    /// RFC 6265 only allows ASCII in a cookie (`cookie-octet`), and the executors do not agree on
+    /// anything else: `.nio` sends UTF-8, `URLSession` sends Latin-1 and cuts the whole header at
+    /// the first character with no Latin-1 form, taking every cookie after it along. A jar filled
+    /// by one executor and read by the other would lose cookies it never had a problem with.
+    static func hasNonASCII(_ string: String) -> Bool {
+        string.utf8.contains { $0 >= 0x80 }
     }
 
     static func hasControlCharacters(_ string: String) -> Bool {

@@ -164,7 +164,10 @@ public struct URLOverride: Property {
     /// valued by the full `"scheme://host[/path]"` destination it resolves to.
     ///
     public init(_ overrides: [String: String]) {
-        self.pairs = overrides.map { (origin: $0.key, destination: $0.value) }
+        // Sorted by origin: a `Dictionary` iterates in an order that changes from one build of it
+        // to the next, and the rules are part of the session configuration's identity (the pool
+        // key), so the same table has to produce the same rules every time.
+        self.pairs = overrides.sorted { $0.key < $1.key }.map { (origin: $0.key, destination: $0.value) }
     }
 
     // MARK: - Public static methods

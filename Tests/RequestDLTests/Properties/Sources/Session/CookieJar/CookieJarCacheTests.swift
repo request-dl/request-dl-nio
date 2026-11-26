@@ -223,4 +223,36 @@ struct CookieJarCacheTests {
 
         await fixture.dataCache.removeAll()
     }
+
+    @Test(arguments: CookieJarTests.executors)
+    func cachedResponse_whenTheJarGainsAnUnrelatedCookie_isStillServedFromCache(executor: Executor) async throws {
+        // Given: the resource is fetched by an account whose jar holds `session=a`, then the jar
+        // gains a cookie that has nothing to do with who the account is (`_ga`, say).
+        let fixture = try await Self.makeFixture(resourceResponses: 3)
+        defer {
+            fixture.paths.forEach(fixture.server.cleanup(at:))
+        }
+
+        let jar = try await Self.jar(holding: "a", executor: executor, fixture)
+        let first = try await Self.get(fixture.resourcePath, fixture: fixture, executor: executor, jar: jar)
+        #expect(first.receivedCookieHeader == "session=a")
+
+        try jar.insert(
+            CookieJar.Cookie(name: "_ga", value: "1", domain: "localhost", hostOnly: true, path: "/", secure: false)
+        )
+
+        // When
+        let offline = try await Self.get(
+            fixture.resourcePath,
+            fixture: fixture,
+            executor: executor,
+            jar: jar,
+            strategy: .useCachedDataOnly
+        )
+
+        // Then
+        #expect(offline.receivedCookieHeader == "session=a")
+
+        await fixture.dataCache.removeAll()
+    }
 }

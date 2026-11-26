@@ -204,6 +204,23 @@ struct ServerSentEventParserTests {
     }
 
     @Test
+    func feed_whenRetryIsTooLargeForInt_saturatesAtIntMax() {
+        // Given
+        var parser = ServerSentEventParser()
+
+        // When
+        let events = parser.feed(Data("retry: 99999999999999999999\ndata: hello\n\n".utf8))
+
+        // Then: the value is kept as the largest one there is, as `ServerSentEvent.retry` documents,
+        // so whoever uses it as a delay has to bound it first.
+        #expect(
+            events == [
+                ServerSentEvent(id: nil, event: "message", data: "hello", retry: .max)
+            ]
+        )
+    }
+
+    @Test
     func feed_whenRetryIsNotDigitsOnly_shouldBeIgnored() {
         // Given
         var parser = ServerSentEventParser()

@@ -359,6 +359,259 @@ struct RDLImageLoaderTests {
         #expect(image.size.width > 0)
         #expect(await probe.startCount == 2)
     }
+
+    // MARK: - Memory cache
+
+    private func png() -> StubImageTask {
+        StubImageTask { .init(head: .stub, payload: .onePixelPNG) }
+    }
+
+    @Test
+    func cachedImage_isEmptyUntilALoadFinishesWithSuccess() async throws {
+        let loader = RDLImageLoader()
+
+        #expect(loader.cachedImage(id: "never") == nil)
+
+        let image = try await loader.load(id: "kept", task: png())
+
+        #expect(loader.cachedImage(id: "kept") === image)
+        #expect(loader.cachedImage(id: "other") == nil)
+    }
+
+    @Test
+    func cachedImage_forAURLIsKeyedByItsAbsoluteString() async throws {
+        let loader = RDLImageLoader()
+        let url = URL(string: "https://example.com/a.png?size=2")!
+
+        let image = try await loader.load(id: url.absoluteString, task: png())
+
+        #expect(loader.cachedImage(url: url) === image)
+        #expect(loader.cachedImage(url: URL(string: "https://example.com/a.png")!) == nil)
+    }
+
+    @Test
+    func cachedImage_isNotKeptWhenALoadFails() async throws {
+        let loader = RDLImageLoader()
+
+        await #expect(throws: RDLImageDecodingError.self) {
+            _ = try await loader.load(
+                id: "bad",
+                task: StubImageTask { .init(head: .stub, payload: Data("not an image".utf8)) }
+            )
+        }
+
+        struct Failure: Error {}
+
+        await #expect(throws: Failure.self) {
+            _ = try await loader.load(id: "fails", task: StubImageTask { throw Failure() })
+        }
+
+        #expect(loader.cachedImage(id: "bad") == nil)
+        #expect(loader.cachedImage(id: "fails") == nil)
+    }
+
+    @Test
+    func cachedImage_isKeptWhenALaterLoadOfTheSameIDFails() async throws {
+        let loader = RDLImageLoader()
+        let image = try await loader.load(id: "same", task: png())
+
+        struct Failure: Error {}
+
+        await #expect(throws: Failure.self) {
+            _ = try await loader.load(id: "same", task: StubImageTask { throw Failure() })
+        }
+
+        #expect(loader.cachedImage(id: "same") === image)
+    }
+
+    @Test
+    func load_alwaysRunsTheRequest_andTheNewImageReplacesTheOneInMemory() async throws {
+        let loader = RDLImageLoader()
+        let counter = Counter()
+        let task = StubImageTask {
+            await counter.increment()
+            return .init(head: .stub, payload: .onePixelPNG)
+        }
+
+        let first = try await loader.load(id: "again", task: task)
+        let second = try await loader.load(id: "again", task: task)
+
+        #expect(await counter.value == 2)
+        #expect(first !== second)
+        #expect(loader.cachedImage(id: "again") === second)
+    }
+
+    @Test
+    func removeCachedImage_forgetsOnlyThatImage() async throws {
+        let loader = RDLImageLoader()
+        let url = URL(string: "https://example.com/b.png")!
+        _ = try await loader.load(id: "a", task: png())
+        _ = try await loader.load(id: "b", task: png())
+        _ = try await loader.load(id: url.absoluteString, task: png())
+
+        loader.removeCachedImage(id: "a")
+        loader.removeCachedImage(url: url)
+
+        #expect(loader.cachedImage(id: "a") == nil)
+        #expect(loader.cachedImage(url: url) == nil)
+        #expect(loader.cachedImage(id: "b") != nil)
+    }
+
+    @Test
+    func removeAllCachedImages_forgetsEveryImage_butNotTheDataCache() async throws {
+        let loader = RDLImageLoader()
+        _ = try await loader.load(id: "a", task: png())
+        _ = try await loader.load(id: "b", task: png())
+
+        loader.removeAllCachedImages()
+
+        #expect(loader.cachedImage(id: "a") == nil)
+        #expect(loader.cachedImage(id: "b") == nil)
+    }
+
+    @Test
+    func memoryCacheLimit_zeroKeepsNothing_andDropsWhatWasKept() async throws {
+        let off = RDLImageLoader(dataCache: DataCache(suiteName: UUID().uuidString), memoryCacheLimit: 0)
+        _ = try await off.load(id: "a", task: png())
+
+        #expect(off.memoryCacheLimit == 0)
+        #expect(off.cachedImage(id: "a") == nil)
+
+        let loader = RDLImageLoader()
+        #expect(loader.memoryCacheLimit == 64 * 1_024 * 1_024)
+        _ = try await loader.load(id: "a", task: png())
+        #expect(loader.cachedImage(id: "a") != nil)
+
+        loader.memoryCacheLimit = 0
+        #expect(loader.cachedImage(id: "a") == nil)
+
+        _ = try await loader.load(id: "b", task: png())
+        #expect(loader.cachedImage(id: "b") == nil)
+
+        loader.memoryCacheLimit = 1_024
+        _ = try await loader.load(id: "c", task: png())
+        #expect(loader.cachedImage(id: "c") != nil)
+    }
+
+    @Test
+    func memoryCacheLimit_isNotSharedBetweenLoaders() async throws {
+        let first = RDLImageLoader()
+        let second = RDLImageLoader()
+        _ = try await first.load(id: "a", task: png())
+
+        #expect(second.cachedImage(id: "a") == nil)
+    }
+
+    @Test
+    func memoryCache_costIsTheSizeOfThePixels() async throws {
+        let loader = RDLImageLoader()
+        let image = try await loader.load(id: "pixel", task: png())
+
+        // 1x1 pixel, four bytes: never zero, and nowhere near the file's size in a real image.
+        #expect(RDLImageMemoryCache.cost(of: image) >= 4)
+        #expect(RDLImageMemoryCache.cost(of: image) < 1_024)
+    }
+
+    // MARK: - Time to live
+
+    private func makeImage() throws -> PlatformImage {
+        try #require(PlatformImage(data: .onePixelPNG))
+    }
+
+    @Test
+    func timeToLive_defaultsToFiveMinutes() {
+        #expect(RDLImageLoader().memoryCacheTimeToLive == 300)
+        #expect(RDLImageMemoryCache.defaultTimeToLive == 300)
+        #expect(RDLImageLoader(dataCache: DataCache(suiteName: UUID().uuidString)).memoryCacheTimeToLive == 300)
+        #expect(
+            RDLImageLoader(dataCache: DataCache(suiteName: UUID().uuidString), memoryCacheLimit: 1_024)
+                .memoryCacheTimeToLive == 300
+        )
+    }
+
+    @Test
+    func timeToLive_countsFromWhenTheImageWasWritten_notFromTheLastRead() throws {
+        let clock = LockedValueBox(Date(timeIntervalSince1970: 1_000))
+        let cache = RDLImageMemoryCache(limit: 1_024, timeToLive: 10) { clock.withLockedValue { $0 } }
+        let image = try makeImage()
+
+        cache.insert(image, for: "a")
+
+        clock.withLockedValue { $0 = Date(timeIntervalSince1970: 1_009) }
+        #expect(cache.image(for: "a") === image)
+
+        // Read again at 9 s, so a sliding window would last until 19 s: this one ends at 10.
+        clock.withLockedValue { $0 = Date(timeIntervalSince1970: 1_010) }
+        #expect(cache.image(for: "a") == nil)
+    }
+
+    @Test
+    func timeToLive_removesTheExpiredEntry_andANewWriteStartsItAgain() throws {
+        let clock = LockedValueBox(Date(timeIntervalSince1970: 1_000))
+        let cache = RDLImageMemoryCache(limit: 1_024, timeToLive: 10) { clock.withLockedValue { $0 } }
+        let first = try makeImage()
+        let second = try makeImage()
+
+        cache.insert(first, for: "a")
+        clock.withLockedValue { $0 = Date(timeIntervalSince1970: 1_020) }
+        #expect(cache.image(for: "a") == nil)
+
+        // Still a miss with the clock back: it was removed, not only skipped.
+        clock.withLockedValue { $0 = Date(timeIntervalSince1970: 1_000) }
+        #expect(cache.image(for: "a") == nil)
+
+        cache.insert(second, for: "a")
+        clock.withLockedValue { $0 = Date(timeIntervalSince1970: 1_005) }
+        #expect(cache.image(for: "a") === second)
+    }
+
+    @Test(arguments: [nil, TimeInterval.infinity] as [TimeInterval?])
+    func timeToLive_neverExpiresWithoutOne(timeToLive: TimeInterval?) throws {
+        let clock = LockedValueBox(Date(timeIntervalSince1970: 1_000))
+        let cache = RDLImageMemoryCache(limit: 1_024, timeToLive: timeToLive) { clock.withLockedValue { $0 } }
+        let image = try makeImage()
+
+        cache.insert(image, for: "a")
+        clock.withLockedValue { $0 = Date(timeIntervalSince1970: 1_000_000_000) }
+
+        #expect(cache.image(for: "a") === image)
+    }
+
+    @Test
+    func timeToLive_changingItAppliesToTheEntriesAlreadyThere() throws {
+        let clock = LockedValueBox(Date(timeIntervalSince1970: 1_000))
+        let cache = RDLImageMemoryCache(limit: 1_024, timeToLive: nil) { clock.withLockedValue { $0 } }
+        let image = try makeImage()
+
+        cache.insert(image, for: "a")
+        clock.withLockedValue { $0 = Date(timeIntervalSince1970: 1_100) }
+        #expect(cache.image(for: "a") === image)
+
+        cache.timeToLive = 50
+        #expect(cache.image(for: "a") == nil)
+    }
+
+    @Test
+    func timeToLive_ofALoader_expiresWhatItLoaded() async throws {
+        let loader = RDLImageLoader(
+            dataCache: DataCache(suiteName: UUID().uuidString),
+            memoryCacheLimit: 1_024 * 1_024,
+            memoryCacheTimeToLive: 0.05
+        )
+        _ = try await loader.load(id: "short", task: png())
+        #expect(loader.memoryCacheTimeToLive == 0.05)
+
+        try await Task.sleep(nanoseconds: 150_000_000)
+
+        #expect(loader.cachedImage(id: "short") == nil)
+
+        loader.memoryCacheTimeToLive = nil
+        _ = try await loader.load(id: "long", task: png())
+        try await Task.sleep(nanoseconds: 150_000_000)
+
+        #expect(loader.cachedImage(id: "long") != nil)
+    }
+
 }
 
 // MARK: - Test helpers

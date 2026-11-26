@@ -83,6 +83,41 @@ struct InternalsCookieChangesTests {
     }
 
     @Test
+    func changes_whenAResponseRenewsAMaxAge_signals() async throws {
+        // `Max-Age` is relative to the response, so the expiry it gives is later every time: that
+        // is a change (a snapshot would have to save it), as `CookieJar.changes` documents.
+        let count = try await signals(
+            setup: { $0.store(setCookieValues: ["a=1; Max-Age=3600"], for: url("https://example.com/"), now: now) },
+            act: {
+                $0.store(
+                    setCookieValues: ["a=1; Max-Age=3600"],
+                    for: url("https://example.com/"),
+                    now: now.addingTimeInterval(2)
+                )
+            }
+        )
+
+        #expect(count == 1)
+    }
+
+    @Test
+    func changes_whenAResponseSetsTheSameExpiresAgain_doesNotSignal() async throws {
+        let value = "a=1; Expires=Wed, 21 Oct 2037 07:28:00 GMT"
+        let count = try await signals(
+            setup: { $0.store(setCookieValues: [value], for: url("https://example.com/"), now: now) },
+            act: {
+                $0.store(
+                    setCookieValues: [value],
+                    for: url("https://example.com/"),
+                    now: now.addingTimeInterval(2)
+                )
+            }
+        )
+
+        #expect(count == 0)
+    }
+
+    @Test
     func changes_whenAResponseChangesAValueOrAFlag_signals() async throws {
         let count = try await signals(
             setup: { $0.store(setCookieValues: ["a=1"], for: url("https://example.com/"), now: now) },

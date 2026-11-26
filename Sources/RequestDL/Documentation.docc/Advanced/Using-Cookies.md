@@ -21,6 +21,8 @@ struct MyAppConfiguration: Property {
 
 The jar is yours: keep it for as long as the cookies should live, share it between sessions that should share a login, and call ``CookieJar/removeAll()`` to sign out. To look at what it holds, change it, watch it, or keep it across launches, see <doc:Using-Cookies#Managing-the-cookies> and <doc:Using-Cookies#Keeping-a-jar-across-launches>. Two sessions with different jars never see each other's cookies, even when they share a connection.
 
+A response fetched with cookies is given back from a ``DataCache`` only to a request that sends all of the cookies it was fetched with, so a cookie the jar gains later (an analytics id, say) does not make the stored response unreachable, which would break `.useCachedDataOnly`. A request that sends a different value for one of them, or none, still does not get it, so a session cookie that the server renews with a new value on every response keeps missing the cache.
+
 The jar does not make a ``DataCache`` private to it. A response kept in a cache shared by several sessions is still kept with the `Set-Cookie` it came with, and a later request served from it does not feed that header into its own jar. A response fetched through a redirect that was sent cookies the first request did not carry is never stored in the cache, because the cache could not tell whose it is.
 
 ### What the jar does
@@ -48,7 +50,7 @@ Parse the list once and reuse it. A file that is not a list, such as the HTML or
 
 A domain holds at most 50 cookies and a jar at most 3000, and when one of those limits is reached the least recently used cookies go first. A single response may set at most 50: the first 50 `Set-Cookie` headers are read and the rest are ignored. The limit is per response, and every hop of a redirect is a response of its own.
 
-Those limits count cookies, not bytes, and a cookie may have up to 4096, so a server could still set 50 large cookies that make every later request to its domain too big for any server to accept. The `Cookie` header a request is sent therefore has at most 8000 bytes (under the 8 KB a header line may have by default in common servers, such as nginx, Apache and Tomcat). When the cookies that match do not fit, the ones that come last in the order RFC 6265 gives are left out, which are the ones with the shortest paths and the newest ones, and none after the first that does not fit is sent. A cookie that is left out stays in the jar and is not counted as used. ``CookieJar/cookies(for:)`` lists what would be sent, so it leaves them out too.
+Those limits count cookies, not bytes, and a cookie may have up to 4096, so a server could still set 50 large cookies that make every later request to its domain too big for any server to accept. The `Cookie` header a request is sent therefore has at most 8000 bytes (under the 8 KB a header line may have by default in common servers, such as nginx, Apache and Tomcat). When the cookies that match do not fit, the ones with the shortest paths are left out and, among equal paths, the oldest, so a cookie that was just set (a login) is not the one that goes; and none that is less specific than the first that does not fit is sent. A cookie that is left out stays in the jar and is not counted as used. The request's logger (`environment(\.logger, ...)`) gets a `.warning` the first time a host has cookies left out, and again only when the set of cookies left out changes, with how many were left out, the limit and the host, never a cookie's name or value. Redirect hops and resumed downloads are not reported. ``CookieJar/cookies(for:)`` lists what would be sent, so it leaves them out too.
 
 ### Managing the cookies
 
@@ -76,7 +78,7 @@ try jar.insert(
 )
 ```
 
-Insertion refuses what a received cookie would be refused for, and throws a ``CookieJarError`` that says which part: control characters, a name and value over 4096 bytes, the `__Secure-` and `__Host-` prefix rules, and, for a cookie that is not host-only, a single-label domain or a public suffix of the jar's list. Because the cookie has no response to come from, three checks are not made: that its domain covers the host that sent it (the domain you give is its origin), that a `Secure` cookie arrived over HTTPS (it is accepted, and still only sent over HTTPS), and the limit of 50 per response. It is stricter than a response in one way: a `;` in a name or value, and a path that does not start with `/`, are refused, since a value like `x; admin=1` would otherwise add a second cookie to the `Cookie` header.
+Insertion refuses what a received cookie would be refused for, and throws a ``CookieJarError`` that says which part: control characters, a non-ASCII character in the name or value (RFC 6265 allows only ASCII, and `URLSession` cuts the whole `Cookie` header at the first character it cannot encode, so one such cookie would cost the others after it; a received cookie with one is dropped the same way), a name and value over 4096 bytes, the `__Secure-` and `__Host-` prefix rules, and, for a cookie that is not host-only, a single-label domain or a public suffix of the jar's list. Because the cookie has no response to come from, three checks are not made: that its domain covers the host that sent it (the domain you give is its origin), that a `Secure` cookie arrived over HTTPS (it is accepted, and still only sent over HTTPS), and the limit of 50 per response. It is stricter than a response in one way: a `;` in a name or value, and a path that does not start with `/`, are refused, since a value like `x; admin=1` would otherwise add a second cookie to the `Cookie` header.
 
 To remove cookies:
 
@@ -111,7 +113,9 @@ An element says that the jar changed, not what changed or how many times. Change
 
 Every read of `changes` is a new stream, registered when you read it, not when you start iterating: take it before you read the jar, so a change in between is not missed. It ends when the jar is deallocated, and the jar stops tracking it when you cancel the task.
 
-A cookie expiring is not a change (nothing happens at that instant: it stops being listed), nor is a cookie being sent, a response that sets a cookie just as it already is, or clearing an empty jar.
+A cookie expiring is not a change (nothing happens at that instant: it stops being listed), nor is a cookie being sent, a response that sets a cookie with the same value, flags and `Expires` it already has, or clearing an empty jar.
+
+A response that renews a `Max-Age` is a change: the expiry it gives is later every time, and a snapshot would have to save it. A server with sliding sessions (`Max-Age=3600` on every response) therefore gives you an element per response, so wait a moment before you write to disk or to the Keychain, and merge what arrives in the meantime.
 
 ### Keeping a jar across launches
 
