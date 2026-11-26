@@ -66,6 +66,9 @@ jobs:
       package-name: "request-dl"
       xcode-version: '27.2'
       apple-coverage-enabled: true
+      # Xcode's compilation cache for the Apple tests (request-dl/.github#121). Pull requests only
+      # restore it; a push to main saves it, so the first run after this lands on main fills it.
+      apple-tests-compilation-cache-enabled: true
       apple-tests-max-parallelization-width: '2'
       apple-tests-parallel-testing-worker-count: '2'
       # 30 (the workflow's own default) was observed getting hit by a legitimately still-running
