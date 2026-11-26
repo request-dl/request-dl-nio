@@ -3,6 +3,7 @@
 //
 
 import Foundation
+import SwiftAsyncStream
 import Testing
 import Tracing
 
@@ -143,7 +144,7 @@ private final class SpanRecordingTracer: Tracer, @unchecked Sendable {
 
     static let injectedTraceParent = "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01"
 
-    private let lock = NSLock()
+    private let lock = Lock()
     private var _span: RecordedSpan?
 
     var operationName: String? {
@@ -185,7 +186,7 @@ private final class SpanRecordingTracer: Tracer, @unchecked Sendable {
 
 private final class RecordedSpan: Tracing.Span, @unchecked Sendable {
 
-    private let lock = NSLock()
+    private let lock = Lock()
     private var _operationName: String
     private var _attributes = SpanAttributes()
 

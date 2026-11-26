@@ -5,6 +5,7 @@
 #if canImport(Darwin)
 
 import Security
+import SwiftAsyncStream
 import Testing
 
 @testable import RequestDLInternals
@@ -417,7 +418,7 @@ struct InternalsLegacyIdentityItemsTests {
 /// A Keychain that lives in memory. The cleanup is tested on this and nothing else.
 final class FakeKeychainItemStore: Internals.KeychainItemStore, @unchecked Sendable {
 
-    private let lock = NSLock()
+    private let lock = Lock()
     private var storage: [Internals.KeychainItem]
     private var deleted: [Data] = []
     private var attempts: [Data] = []

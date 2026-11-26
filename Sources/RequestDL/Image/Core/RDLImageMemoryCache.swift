@@ -5,6 +5,7 @@
 #if canImport(UIKit) || canImport(AppKit)
 
 import Foundation
+import SwiftAsyncStream
 
 /// The decoded images an ``RDLImageLoader`` has loaded, kept in memory so a view can show one in
 /// the same turn it is asked to, instead of after a read from the disk and a decode.
@@ -38,7 +39,7 @@ final class RDLImageMemoryCache: @unchecked Sendable {
     }
 
     private let cache = NSCache<NSString, Entry>()
-    private let lock = NSLock()
+    private let lock = Lock()
     private var _limit = 0
     private var _timeToLive: TimeInterval?
     private var _removals = 0

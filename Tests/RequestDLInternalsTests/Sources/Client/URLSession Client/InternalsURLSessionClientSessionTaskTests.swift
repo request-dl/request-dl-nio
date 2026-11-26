@@ -2,6 +2,7 @@
 // See LICENSE for this package's licensing information.
 //
 
+import SwiftAsyncStream
 import Testing
 
 @testable import RequestDLInternals
@@ -414,7 +415,7 @@ private struct IdentityTestAlgorithm: Internals.DecompressionAlgorithm {
 /// `@Sendable` closure; this is the smallest thing that can.
 private final class CacheInvocationFlag: @unchecked Sendable {
 
-    private let lock = NSLock()
+    private let lock = Lock()
     private var _invoked = false
 
     var invoked: Bool {

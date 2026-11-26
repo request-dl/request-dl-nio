@@ -3,6 +3,7 @@
 //
 
 import Dispatch
+import SwiftAsyncStream
 import Testing
 
 @testable import RequestDL
@@ -96,7 +97,7 @@ struct AsyncBytesServerTests {
 private final class EndlessLineServer: @unchecked Sendable {
 
     private let listener: Int32
-    private let lock = NSLockBox()
+    private let lock = Lock()
     private var _writeFailed = false
 
     let port: Int
@@ -221,20 +222,3 @@ private final class EndlessLineServer: @unchecked Sendable {
 }
 
 private struct POSIXError: Error {}
-
-/// A lock for a few flags, without pulling a library in.
-private final class NSLockBox: @unchecked Sendable {
-
-    private var mutex = pthread_mutex_t()
-
-    init() {
-        pthread_mutex_init(&mutex, nil)
-    }
-
-    func withLock<Result>(_ body: () -> Result) -> Result {
-        pthread_mutex_lock(&mutex)
-        defer { pthread_mutex_unlock(&mutex) }
-
-        return body()
-    }
-}
