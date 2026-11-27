@@ -144,12 +144,12 @@ DataTask {
 
 With an identity:
 
-- The response is stored with a digest of the identity and none of the credentials, and is served to a request that declares the same identity, whatever `Authorization` or `Cookie` it sends. The identity itself is not written to the disk.
+- The response is stored with a digest of the identity and none of the credentials, and is served to a request that declares the same identity, whatever `Authorization` or `Cookie` it sends. The identity itself is not written to the disk, but its digest is, and **the digest is not a secret unless the cache has an ``RequestDL/DataCache/EncryptionKey``**: with one it is an HMAC-SHA256 under a key derived from it, which cannot be computed or tested against a guess without the key; without one it is a plain SHA-256, and whoever can read the cache directory (a backup, another process of the same user) can recover a user ID or an email address by trying candidates. Declare an opaque identifier, one that means nothing outside the app, or set an encryption key.
 - It is not served to another identity, nor to a request that declares none; a response stored with no identity (for credentials, or a public one) is not an identity's own, so only the public one is served to it.
 - A `Vary` of `Authorization`, `Cookie` or `Proxy-Authorization` is satisfied by the identity. Any other field in `Vary` is compared as usual.
 - An empty identity, or one that is only whitespace, is ignored: the request is cached by its credentials.
 
-The identity is a claim by the app: the cache does not check that the credentials belong to it, and two accounts given the same identity share what they cache. It is not part of the cache key, which stays the URL, and nothing is sent to the server. Records written before ``RequestDL/CacheIdentity`` existed keep matching as they did.
+The identity is a claim by the app: the cache does not check that the credentials belong to it, and two accounts given the same identity share what they cache. It is not part of the cache key, which stays the URL, and nothing is sent to the server. Records written before ``RequestDL/CacheIdentity`` existed keep matching as they did. A record whose identity was stored with the other kind of digest, or under another key, is not matched (the next request is a miss, and its response replaces the record), so setting or rotating the encryption key starts the identities over.
 
 ### Encrypting the disk tier
 

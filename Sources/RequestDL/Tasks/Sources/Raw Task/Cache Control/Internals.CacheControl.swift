@@ -243,6 +243,13 @@ extension Internals {
         /// (it is never taken for another account's). Digested with a field of its own, so that
         /// the same bytes as a credential are not the same value, and so that the identity is not
         /// written to the record as it is.
+        ///
+        /// When the cache has an `encryptionKey` the digest is an HMAC under a key derived from
+        /// it (`hmac-sha256:`), which nobody can compute, or test a guess against, without that
+        /// key. Without one it is the plain SHA-256 (`sha256:`), which is not a secret: an
+        /// identity with little entropy (a numeric user ID, an email address) can be recovered
+        /// from a record someone can read. A record written with the other kind of digest, or
+        /// under another key, does not match: it is a miss, and is replaced by the response.
         private var requestIdentityDigest: String? {
             guard let identity = requestConfiguration.cacheIdentity?.trimming(where: \.isWhitespace),
                 !identity.isEmpty
@@ -250,7 +257,37 @@ extension Internals {
                 return nil
             }
 
-            return Self.digest(ofCredential: identity, field: "cache-identity")
+            guard let encryptionKey = dataCache.encryptionKey else {
+                return Self.digest(ofCredential: identity, field: "cache-identity")
+            }
+
+            return Self.keyedDigest(ofIdentity: identity, key: encryptionKey)
+        }
+
+        /// An HMAC-SHA256 of the identity under a key derived from the encryption key with a label
+        /// of its own, so that the key that seals the entries (and the one that names them) is
+        /// never used as a MAC key for this as well.
+        static func keyedDigest(ofIdentity identity: String, key: DataCache.EncryptionKey) -> String {
+            let identityKey = HKDF<SHA256>.deriveKey(
+                inputKeyMaterial: key.symmetricKey,
+                info: Data("request-dl.cache.identity.v1".utf8),
+                outputByteCount: 32
+            )
+
+            let mac = HMAC<SHA256>.authenticationCode(
+                for: Data("request-dl.cache.credential.v1\ncache-identity\n\(identity)".utf8),
+                using: identityKey
+            )
+
+            return "hmac-sha256:" + hex(of: mac)
+        }
+
+        private static func hex<Bytes: Sequence>(of bytes: Bytes) -> String where Bytes.Element == UInt8 {
+            bytes.map { byte in
+                let digits = String(byte, radix: 16)
+                return digits.count == 1 ? "0" + digits : digits
+            }
+            .joined()
         }
 
         /// Where a stored response keeps the digest of each cookie it was fetched with, comma
@@ -331,12 +368,8 @@ extension Internals {
         /// can read, which is what `DataCache.EncryptionKey` is for.
         static func digest(ofCredential value: String, field: String) -> String {
             let hash = SHA256.hash(data: Data("request-dl.cache.credential.v1\n\(field)\n\(value)".utf8))
-            let hex = hash.map { byte in
-                let digits = String(byte, radix: 16)
-                return digits.count == 1 ? "0" + digits : digits
-            }
 
-            return "sha256:" + hex.joined()
+            return "sha256:" + hex(of: hash)
         }
 
         /// The strategy actually applied, folding request-side ``CacheHeader`` directives on top

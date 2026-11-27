@@ -31,6 +31,7 @@ extension CachedRequestTests {
         vary: String? = nil,
         requestHeaders: [(String, String)] = [],
         identity: String? = nil,
+        encryptionKey: DataCache.EncryptionKey? = nil,
         output: String
     ) async throws -> String {
         var headers = makeHeaders(maxAgeSeconds: 3_600)
@@ -43,6 +44,7 @@ extension CachedRequestTests {
             testState: testState,
             headers: headers,
             cacheStrategy: .returnCachedDataElseLoad,
+            encryptionKey: encryptionKey,
             requestHeaders: requestHeaders,
             identity: identity,
             output: output
@@ -536,5 +538,183 @@ extension CachedRequestTests {
         )
 
         #expect(withIdentity == "network")
+    }
+
+    // MARK: - The digest of the identity
+
+    private static let keyA = DataCache.EncryptionKey(Data(repeating: 0x0A, count: 32))
+    private static let keyB = DataCache.EncryptionKey(Data(repeating: 0x0B, count: 32))
+
+    /// Without a key the digest is the plain SHA-256: documented as not a secret.
+    @Test
+    func identity_withoutAnEncryptionKey_recordsThePlainSHA256() async throws {
+        let testState = try await TestState()
+        defer { _ = testState }
+
+        _ = try await identityRequest(testState, identity: "alice", output: "first")
+
+        let record = try await storedRecord(testState)
+
+        #expect(
+            record[Self.identityField] == Internals.CacheControl.digest(ofCredential: "alice", field: "cache-identity")
+        )
+    }
+
+    /// With a key it is an HMAC, which the SHA-256 of the identity (that anybody can compute) does
+    /// not reproduce: a stored value cannot be tested against a list of guesses without the key.
+    @Test
+    func identity_withAnEncryptionKey_recordsAnHMACThatThePlainDigestDoesNotReproduce() async throws {
+        let testState = try await TestState()
+        defer { _ = testState }
+
+        let identity = "273205"
+
+        _ = try await identityRequest(testState, identity: identity, encryptionKey: Self.keyA, output: "first")
+
+        let recorded = try #require(try await storedRecord(testState)[Self.identityField])
+
+        #expect(recorded.hasPrefix("hmac-sha256:"))
+        #expect(recorded == Internals.CacheControl.keyedDigest(ofIdentity: identity, key: Self.keyA))
+        #expect(recorded != Internals.CacheControl.digest(ofCredential: identity, field: "cache-identity"))
+        #expect(recorded != Internals.CacheControl.keyedDigest(ofIdentity: identity, key: Self.keyB))
+        #expect(recorded.count == "hmac-sha256:".count + 64)
+    }
+
+    @Test
+    func identity_withAnEncryptionKey_servesTheSameIdentity() async throws {
+        let testState = try await TestState()
+        defer { _ = testState }
+
+        _ = try await identityRequest(
+            testState,
+            requestHeaders: [("Authorization", "Bearer token-1")],
+            identity: "user-1",
+            encryptionKey: Self.keyA,
+            output: "first"
+        )
+
+        let same = try await identityRequest(
+            testState,
+            requestHeaders: [("Authorization", "Bearer token-2")],
+            identity: "user-1",
+            encryptionKey: Self.keyA,
+            output: "second"
+        )
+
+        #expect(same == "first")
+    }
+
+    @Test
+    func identity_withAnEncryptionKey_doesNotServeAnotherIdentity() async throws {
+        let testState = try await TestState()
+        defer { _ = testState }
+
+        _ = try await identityRequest(
+            testState,
+            requestHeaders: [("Authorization", "Bearer shared-token")],
+            identity: "user-1",
+            encryptionKey: Self.keyA,
+            output: "first"
+        )
+
+        let other = try await identityRequest(
+            testState,
+            requestHeaders: [("Authorization", "Bearer shared-token")],
+            identity: "user-2",
+            encryptionKey: Self.keyA,
+            output: "second"
+        )
+
+        #expect(other == "second")
+    }
+
+    /// A record written with the plain digest, before the cache had a key (or by a version that
+    /// had no other), is a miss for the keyed digest: never taken for the same account.
+
+    /// Writes a record that belongs to the identity `identityDigest` says, the response of which
+    /// is `stored`, as a request that sent it would have left it.
+    private func seedRecord(_ testState: TestState, identityDigest: String) async {
+        let body = (try? HTTPResult(receivedBytes: 0, response: "stored").encode()) ?? Data()
+        let stored = await mockCachedData(makeHeaders(maxAgeSeconds: 3_600), body: body)
+
+        await testState.dataCache.setCachedData(
+            CachedData(
+                cachedResponse: CachedResponse(
+                    response: stored.cachedResponse.response,
+                    policy: .all,
+                    varyRequestHeaders: [Self.identityField: identityDigest]
+                ),
+                buffer: stored.buffer
+            ),
+            forKey: "https://localhost:8888" + testState.uri
+        )
+    }
+
+    @Test
+    func identity_whenTheRecordHasThePlainDigestAndTheCacheHasAKey_isAMiss() async throws {
+        let testState = try await TestState()
+        defer { _ = testState }
+
+        testState.dataCache.encryptionKey = Self.keyA
+
+        await seedRecord(
+            testState,
+            identityDigest: Internals.CacheControl.digest(ofCredential: "alice", field: "cache-identity")
+        )
+
+        let served = try await identityRequest(
+            testState,
+            identity: "alice",
+            encryptionKey: Self.keyA,
+            output: "network"
+        )
+
+        #expect(served == "network")
+    }
+
+    /// The same record, kept by the keyed digest of another key, is a miss too.
+    @Test
+    func identity_whenTheRecordWasKeyedWithAnotherKey_isAMiss() async throws {
+        let testState = try await TestState()
+        defer { _ = testState }
+
+        testState.dataCache.encryptionKey = Self.keyB
+
+        await seedRecord(
+            testState,
+            identityDigest: Internals.CacheControl.keyedDigest(ofIdentity: "alice", key: Self.keyA)
+        )
+
+        let served = try await identityRequest(
+            testState,
+            identity: "alice",
+            encryptionKey: Self.keyB,
+            output: "network"
+        )
+
+        #expect(served == "network")
+    }
+
+    /// The control of the two above: the same record, keyed with the key of the cache, is served.
+    @Test
+    func identity_whenTheRecordWasKeyedWithTheKeyOfTheCache_isServed() async throws {
+        let testState = try await TestState()
+        defer { _ = testState }
+
+        testState.dataCache.encryptionKey = Self.keyA
+
+        await seedRecord(
+            testState,
+            identityDigest: Internals.CacheControl.keyedDigest(ofIdentity: "alice", key: Self.keyA)
+        )
+
+        let served = try await identityRequest(
+            testState,
+            identity: "alice",
+            encryptionKey: Self.keyA,
+            output: "network"
+        )
+
+        #expect(served == "stored")
     }
 }
