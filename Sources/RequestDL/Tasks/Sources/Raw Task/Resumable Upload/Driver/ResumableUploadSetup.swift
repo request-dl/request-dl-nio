@@ -113,19 +113,23 @@ extension RequestTask {
     /// that is created for one that doesn't isn't one the server can be asked about afterwards.
     ///
     /// The upload is created first, which is one more request, and the body is then sent to it. When
-    /// the connection is lost, or the server answers that it can't say where the upload stands right
-    /// now, the request waits while a ``RequestController`` it is attached to is suspended, waits
-    /// `delay`, asks the server how much it holds, and sends the rest. The response to the request
-    /// that completes the upload is the response of the upload: its head, and its body.
+    /// the connection is lost, or the server answers "not now" (a `5xx`, `408`, `425` or `429`)
+    /// to the request that sends the body or to the one that asks how much of it holds, the
+    /// request waits while a ``RequestController`` it is attached to is suspended, waits `delay`,
+    /// asks the server how much it holds, and sends the rest. The response to the request that
+    /// completes the upload is the response of the upload: its head, and its body. So is any other
+    /// `4xx` that answers the body (a `413`, say), since the server has said no. When the attempts
+    /// run out, the upload fails with the failure of the last one.
     ///
     /// - Parameters:
     ///   - protocol: The protocol to speak. Defaults to ``IETFResumableUpload``, written
     ///   `.ietf`.
     ///   - maximumAttemptsWithoutProgress: How many attempts after a loss may end without the
     ///   server holding a single new byte before the upload fails for good, with the failure of
-    ///   the last one. Any progress starts the count over, so a long upload over a flaky network
-    ///   isn't capped, while a server that keeps failing is given up on. Values below one are
-    ///   treated as one.
+    ///   the last one (``UploadResumptionError/Reason/serverUnavailable(status:)`` for a server that
+    ///   kept answering "not now"). Any progress starts the count over, so a long upload over a
+    ///   flaky network isn't capped, while a server that keeps failing is given up on. Values below
+    ///   one are treated as one.
     ///   - delay: Seconds to wait before each attempt. Negative values are treated as zero.
     ///   - onCancellation: What is done on the server when the request is cancelled. Defaults to
     ///   ``UploadCancellation/terminate``.

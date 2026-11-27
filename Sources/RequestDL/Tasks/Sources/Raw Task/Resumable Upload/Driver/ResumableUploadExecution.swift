@@ -23,10 +23,14 @@ import struct Foundation.Data
 ///
 /// 1. Creates the upload, with the request the dialect builds from the one the caller wrote.
 /// 2. Sends the body to the upload, from the offset the server holds.
-/// 3. If the connection is lost, or the server answers "not now": waits while suspended, waits
+/// 3. If the connection is lost, or the server answers "not now" (a `408`, `425`, `429` or a
+///    `5xx`, to the `PATCH` as much as to the query for the offset): waits while suspended, waits
 ///    ``ResumableUploadSetup/delay``, asks the server how much of the upload it holds, and sends
 ///    the rest from there. The count of attempts that end with the server holding nothing new
-///    starts over whenever it does.
+///    starts over whenever it does. When the count runs out, the upload fails with the failure
+///    of the last attempt: ``UploadResumptionError/Reason/serverUnavailable(status:)`` for a
+///    server that kept answering "not now", ``UploadResumptionError/Reason/conflictingOffsets``
+///    for one that kept answering the query but moving nothing.
 /// 4. Hands the response to the `PATCH` that completes the upload to the caller, as the response
 ///    of the request they wrote, and nothing else: not what answered the creation, an offset
 ///    query, or a `PATCH` that had to be sent again.
@@ -34,6 +38,8 @@ import struct Foundation.Data
 /// The one exception is a creation that is answered with something that is not a success: that
 /// response is the response of the upload, since it is what the server has to say about the
 /// request the caller wrote (a `401`, say), which is what they would have got without any of this.
+/// A `PATCH` answered with any other `4xx` than the "not now" ones is the response of the upload
+/// too; retrying it would be asking again for what the server has already refused.
 ///
 /// ## What it reports
 ///
@@ -317,6 +323,13 @@ final class ResumableUploadExecution: @unchecked Sendable {
 
                     continue
 
+                case .transient:
+                    // Not what the caller is owed: the server failed, it did not answer. What it
+                    // holds is asked for, as after a lost connection, since a `PATCH` it failed
+                    // may have kept some of the body or none.
+                    sent.discard()
+                    throw ResumableUploadTransientResponse(status: UInt(sent.head.status.code))
+
                 case .gone:
                     sent.discard()
                     throw UploadResumptionError(.uploadLost(status: UInt(sent.head.status.code)))
@@ -389,13 +402,12 @@ final class ResumableUploadExecution: @unchecked Sendable {
 
         exchange.discard()
 
-        switch head.status.code {
-        case 404, 410:
+        if head.status.code == 404 || head.status.code == 410 {
             throw UploadResumptionError(.uploadLost(status: head.status.code))
-        case 408, 425, 429, 500..<600:
+        }
+
+        if ResumableUploadTransientResponse.isTransient(status: head.status.code) {
             throw ResumableUploadTransientResponse(status: head.status.code)
-        default:
-            break
         }
 
         do {

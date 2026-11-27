@@ -165,9 +165,9 @@ What happens:
 
 1. The upload is created, which is one more request, and the server answers with where it is. If the server answers the request you wrote with something that isn't a success (a `401`, say), that is the response of the upload, as it would be without any of this. If it doesn't say where the upload is, the task fails with ``UploadResumptionError/Reason/notSupported``.
 2. The body is sent to the upload.
-3. When the connection is lost, or the server answers that it can't say where the upload stands right now (a `5xx`, `408`, `425` or `429`), the request waits while a ``RequestController`` it is attached to is suspended, waits `delay` seconds, asks the server how much it holds, and sends the rest. A server that disagrees about where to continue from is believed.
+3. When the connection is lost, or the server answers "not now" (a `5xx`, `408`, `425` or `429`) to the request that sends the body or to the one that asks how much of it holds, the request waits while a ``RequestController`` it is attached to is suspended, waits `delay` seconds, asks the server how much it holds, and sends the rest. A server that disagrees about where to continue from is believed. Any other `4xx` that answers the body (a `413`, say) is the response of the upload: the server has said no, and sending the same bytes again would not change it.
 
-`maximumAttemptsWithoutProgress` is how many attempts after a loss may end without the server holding a single new byte before the upload fails for good, with the failure of the last one. Any progress starts the count over, so a long upload over a flaky network is not capped.
+`maximumAttemptsWithoutProgress` is how many attempts after a loss may end without the server holding a single new byte before the upload fails for good, with the failure of the last one: ``UploadResumptionError/Reason/serverUnavailable(status:)`` for a server that kept answering "not now". Any progress starts the count over, so a long upload over a flaky network is not capped.
 
 What to know:
 

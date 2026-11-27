@@ -141,6 +141,8 @@ struct TUSResumableUploadDialect: ResumableUploadDialect {
             }
 
             return .finished
+        case let status where ResumableUploadTransientResponse.isTransient(status: status):
+            return .transient
         default:
             return .other
         }

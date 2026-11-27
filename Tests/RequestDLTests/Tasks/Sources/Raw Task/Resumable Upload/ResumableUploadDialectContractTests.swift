@@ -368,9 +368,16 @@ struct ResumableUploadDialectContractTests {
     }
 
     @Test(arguments: ResumableUploadDialectKind.allCases)
-    func outcome_whenTheServerFails_isOther(_ kind: ResumableUploadDialectKind) {
-        for status: UInt in [400, 401, 500, 503] {
+    func outcome_whenTheServerRefuses_isOther(_ kind: ResumableUploadDialectKind) {
+        for status: UInt in [400, 401, 413, 422] {
             #expect(kind.dialect.outcome(of: Fixtures.head(status), offset: 0, length: 10) == .other)
+        }
+    }
+
+    @Test(arguments: ResumableUploadDialectKind.allCases)
+    func outcome_whenTheServerSaysNotNow_isTransient(_ kind: ResumableUploadDialectKind) {
+        for status: UInt in [408, 425, 429, 500, 502, 503, 504, 599] {
+            #expect(kind.dialect.outcome(of: Fixtures.head(status), offset: 0, length: 10) == .transient)
         }
     }
 

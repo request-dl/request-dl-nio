@@ -36,9 +36,9 @@ public struct UploadResumptionError: Error, Sendable, Hashable, CustomStringConv
         /// The server keeps disagreeing about where to continue from.
         case conflictingOffsets
 
-        /// The server kept answering "not now" (a `5xx`, `408`, `425` or `429`) every time it was
-        /// asked how much of the upload it holds, until the attempts ran out. The status is the
-        /// last one it answered with.
+        /// The server kept answering "not now" (a `5xx`, `408`, `425` or `429`), to the request that
+        /// sends the body or to the one that asks how much of the upload it holds, until the
+        /// attempts ran out. The status is the last one it answered with.
         case serverUnavailable(status: UInt)
 
         /// The body is sent with a `Content-Encoding` (it was compressed, or the request says so),
