@@ -202,12 +202,15 @@ extension Internals.Log {
 
 extension Internals.Log {
 
-    package static func systemProxySOCKSCredentialsUndecodable() -> Internals.Log {
+    package static func systemProxyCredentialsUndecodable(
+        connection: Internals.Proxy.ConnectionProtocol
+    ) -> Internals.Log {
         let reason = "the user name or the password is not valid percent-encoded text"
+        let kind = connection == .socks ? "SOCKS" : "HTTP"
 
         return Internals.Log(
             """
-            The user name and password of the system's SOCKS proxy were ignored, because \(reason) \
+            The user name and password of the system's \(kind) proxy were ignored, because \(reason) \
             (a % that is not followed by two hex digits, or encoded bytes that are not UTF-8). \
             The request goes to the proxy without credentials, which fails if the proxy requires \
             them. Fix the encoding of the proxy URL, or declare \

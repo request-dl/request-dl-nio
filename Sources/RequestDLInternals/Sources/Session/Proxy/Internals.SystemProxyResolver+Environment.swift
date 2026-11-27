@@ -63,14 +63,13 @@ extension Internals.SystemProxyResolver {
         let connection: Internals.Proxy.ConnectionProtocol =
             proxy.scheme?.lowercased().hasPrefix("socks") == true ? .socks : .http
 
-        let authorization: Internals.Proxy.Authorization?
-
-        if connection == .socks {
-            authorization = socksAuthorization(of: proxy, logger: logger)
-        } else if let username = proxy.user, let password = proxy.password {
-            authorization = .basic(username: username, password: password)
-        } else {
-            authorization = nil
+        let authorization = credentials(of: proxy, connection: connection, logger: logger).map {
+            switch connection {
+            case .http:
+                return Internals.Proxy.Authorization.basic(username: $0.username, password: $0.password)
+            case .socks:
+                return Internals.Proxy.Authorization.socks(username: $0.username, password: $0.password)
+            }
         }
 
         return .init(
@@ -82,9 +81,10 @@ extension Internals.SystemProxyResolver {
         .droppingUnusableSOCKSCredentials(logger: logger)
     }
 
-    /// The RFC 1929 credentials of a `socks5://user:password@host` value, percent-decoded, the
-    /// way curl reads them. A user with no password (`socks5://user@host`) has an empty one, which
-    /// SOCKS5 allows. No user means no credentials.
+    /// The credentials of a `scheme://user:password@host` value, percent-decoded, the way curl
+    /// reads them, for an HTTP proxy (`Proxy-Authorization: Basic`) and a SOCKS one (RFC 1929)
+    /// alike. A user with no password (`socks5://user@host`, `http://user@host`) has an empty
+    /// one, which both allow. No user means no credentials.
     ///
     /// A user name or a password that is written but does not decode (a bad `%` sequence, or
     /// bytes that are not UTF-8) is not the credential the user wrote, and neither an empty
@@ -95,7 +95,11 @@ extension Internals.SystemProxyResolver {
     /// Read from the percent-encoded components and decoded here: `URL.password` is not decoded
     /// the same way on every platform, and a `@` or `:` in a credential can only be written
     /// encoded.
-    private static func socksAuthorization(of proxy: URL, logger: Logger?) -> Internals.Proxy.Authorization? {
+    private static func credentials(
+        of proxy: URL,
+        connection: Internals.Proxy.ConnectionProtocol,
+        logger: Logger?
+    ) -> (username: String, password: String)? {
         guard
             let components = URLComponents(url: proxy, resolvingAgainstBaseURL: false),
             let encodedUsername = components.percentEncodedUser
@@ -109,13 +113,13 @@ extension Internals.SystemProxyResolver {
             let username = encodedUsername.removingPercentEscapes,
             let password = encodedPassword.removingPercentEscapes
         else {
-            Internals.Log.systemProxySOCKSCredentialsUndecodable()
+            Internals.Log.systemProxyCredentialsUndecodable(connection: connection)
                 .log(level: .warning, logger: logger)
 
             return nil
         }
 
-        return .socks(username: username, password: password)
+        return (username, password)
     }
 
     // MARK: - no_proxy

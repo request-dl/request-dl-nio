@@ -178,7 +178,7 @@ struct InternalsSystemProxyResolverEnvironmentTests {
 
     @Test
     func anHTTPProxy_withEmptyUser_isLeftAlone() throws {
-        // The drop is for SOCKS only: an HTTP proxy never validated its credentials.
+        // The drop is for SOCKS only: an HTTP proxy does not validate its credentials.
         let proxy = try proxy("http://example.com", ["http_proxy": "http://:p@h"])
 
         #expect(proxy?.authorization == .basic(username: "", password: "p"))
@@ -287,11 +287,74 @@ struct InternalsSystemProxyResolverEnvironmentTests {
         #expect(try proxy("http://example.com", ["http_proxy": "http://proxy.example"])?.port == 8_080)
     }
 
+    /// curl sends `user:` (an empty password) for `http://user@proxy`, as it does for SOCKS.
     @Test
-    func aProxyWithAUserAndNoPassword_hasNoAuthorization() throws {
+    func anHTTPProxy_withAUserAndNoPassword_hasAnEmptyPassword() throws {
         let proxy = try proxy("http://example.com", ["http_proxy": "http://user@proxy.example:1"])
 
+        #expect(proxy?.connectionProtocol == .http)
+        #expect(proxy?.authorization == .basic(username: "user", password: ""))
+    }
+
+    @Test
+    func anHTTPProxy_percentDecodesItsCredentials() throws {
+        let proxy = try proxy(
+            "http://example.com",
+            ["http_proxy": "http://us%40er:p%40ss%3Aw%C3%A9%25@proxy.example:3128"]
+        )
+
+        #expect(proxy?.connectionProtocol == .http)
+        #expect(proxy?.authorization == .basic(username: "us@er", password: "p@ss:wé%"))
+    }
+
+    @Test
+    func anHTTPProxy_withoutAUser_hasNoCredentials() throws {
+        let proxy = try proxy("http://example.com", ["http_proxy": "http://proxy.example:1"])
+
         #expect(proxy?.authorization == nil)
+    }
+
+    @Test(arguments: [
+        "http://user:p%FFss@h",
+        "http://us%FFer:pass@h",
+    ])
+    func anHTTPProxy_withCredentialsThatDoNotPercentDecode_dropsThemAndSaysWhy(_ value: String) async throws {
+        let records = EnvironmentLogRecords()
+        let url = try #require(URL(string: "http://example.com"))
+
+        let proxy = await Logger.withTestHandler(recorded: records.append) { logger in
+            Internals.SystemProxyResolver.proxy(forURL: url, environment: ["http_proxy": value], logger: logger)
+        }
+
+        #expect(proxy?.host == "h")
+        #expect(proxy?.connectionProtocol == .http)
+        #expect(proxy?.authorization == nil)
+
+        let recorded = records.all
+        #expect(recorded.count == 1)
+        #expect(recorded.first?.level == .warning)
+        #expect(
+            recorded.first?.metadata["reason"]
+                == .string("the user name or the password is not valid percent-encoded text")
+        )
+        let text = recorded.map(\.description).joined()
+        #expect(!text.contains("%FF") && !text.contains("user:") && !text.contains("pass@"))
+    }
+
+    @Test
+    func anHTTPProxy_withCredentialsItCarries_logsNothing() async throws {
+        let records = EnvironmentLogRecords()
+        let url = try #require(URL(string: "http://example.com"))
+
+        await Logger.withTestHandler(recorded: records.append) { logger in
+            _ = Internals.SystemProxyResolver.proxy(
+                forURL: url,
+                environment: ["http_proxy": "http://us%40er:p%40ss@h"],
+                logger: logger
+            )
+        }
+
+        #expect(records.all.isEmpty)
     }
 
     @Test(arguments: [
