@@ -103,12 +103,12 @@ extension Internals {
                 throw MalformedPEMError()
             }
 
-            return documents.map { document in
+            return try documents.map { document in
                 let der = Data(document.derBytes)
 
                 // OpenSSL's `TRUSTED CERTIFICATE` appends a trust block after the certificate,
                 // which `SecCertificate` doesn't tolerate; only the certificate is kept.
-                return document.discriminator == "TRUSTED CERTIFICATE" ? Self.certificatePrefix(of: der) : der
+                return document.discriminator == "TRUSTED CERTIFICATE" ? try Self.certificatePrefix(of: der) : der
             }
         }
 
@@ -123,18 +123,24 @@ extension Internals {
 
         /// `der` up to the end of its first DER `SEQUENCE`, or `der` itself if it doesn't start with
         /// a well-formed one (the certificate is then left for the platform to reject).
-        private static func certificatePrefix(of der: Data) -> Data {
+        ///
+        /// A `SEQUENCE` that declares more content than `der` holds, whatever the length, is
+        /// corrupt or truncated: that throws `MalformedPEMError`. The length is accumulated in
+        /// `UInt64`, so a four-byte one (`30 84 7F FF FF FF`) is compared with the size of `der`
+        /// instead of overflowing `Int` on a 32-bit platform (watchOS arm64_32), where it would
+        /// trap.
+        static func certificatePrefix(of der: Data) throws -> Data {
             let bytes = Array(der)
 
             guard bytes.count >= 2, bytes[0] == 0x30 else {
                 return der
             }
 
-            var length = 0
+            var length: UInt64 = 0
             var headerCount = 2
 
             if bytes[1] < 0x80 {
-                length = Int(bytes[1])
+                length = UInt64(bytes[1])
             } else {
                 let lengthByteCount = Int(bytes[1] & 0x7F)
 
@@ -143,19 +149,21 @@ extension Internals {
                 }
 
                 for byte in bytes[2..<(2 + lengthByteCount)] {
-                    length = length << 8 | Int(byte)
+                    length = length << 8 | UInt64(byte)
                 }
 
                 headerCount = 2 + lengthByteCount
             }
 
-            let total = headerCount + length
+            // At most 6 + 0xFFFF_FFFF: far from overflowing `UInt64`, and only converted to `Int`
+            // once it is known to fit in `bytes`.
+            let total = UInt64(headerCount) + length
 
-            guard total <= bytes.count else {
-                return der
+            guard total <= UInt64(bytes.count) else {
+                throw MalformedPEMError()
             }
 
-            return Data(bytes[0..<total])
+            return Data(bytes[0..<Int(total)])
         }
 
         // MARK: - Internal methods (build)
