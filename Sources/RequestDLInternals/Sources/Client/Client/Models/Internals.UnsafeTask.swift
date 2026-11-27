@@ -70,8 +70,10 @@ extension Internals {
                     // something that just succeeded.
                     //
                     // A shut down loop drops the closure rather than running it. That releases
-                    // `completion`, and with it the operation, whose own `deinit` releases the
-                    // slot, so nothing is left counted as busy.
+                    // `completion`, and with it the operation, whose `deinit` completes it, so
+                    // the client is not left counted as busy. That is all a drop gives back: the
+                    // throttle permit that `completion` returns is not released by any `deinit`,
+                    // so it is not returned in this case.
                     task.eventLoop.execute {
                         guard state.finish() else {
                             return

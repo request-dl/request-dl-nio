@@ -71,7 +71,7 @@ try await BackgroundDownloadTask(
     BaseURL("api.example.com")
     Path("episodes/42/audio")
     Session()
-        .decompressionAlgorithms([MyCodec(), .gzip])
+        .decompressionAlgorithms([MyCodec()])
 }
 .result()
 ```

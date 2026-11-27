@@ -30,19 +30,31 @@ public struct ExecutorRequirementError: Error, Sendable {
         case proxyBearerAuthorizationUnderURLSession
         case proxySOCKSCredentialsTooLongUnderURLSession
         case decompressionRequiresURLSession
+        /// Not thrown any more, and deprecated: `.urlSession` applies the maximum TLS version
+        /// through `tlsMaximumSupportedProtocolVersion`, so a maximum no longer rules that
+        /// executor out. The case stays so that code that names it keeps compiling. A `switch`
+        /// with a `default` can drop it; an exhaustive one cannot, because it stops compiling
+        /// without it.
+        @available(
+            *,
+            deprecated,
+            message:
+                "A maximum TLS version now runs on .urlSession, so this is never thrown. Add a default to your switch to drop it."
+        )
         case maximumTLSVersionUnderURLSession
         case applicationProtocolsUnderURLSession
 
         /// Not thrown any more, and deprecated: a client certificate chain with intermediates is
         /// presented in full under `.nioTransportServices` (Network.framework), so it no longer
-        /// rules that executor out. The case stays so that code that names it keeps compiling,
-        /// and a `switch` can drop it. `Internals.ExecutorIncompatibilityReason` no longer has a
+        /// rules that executor out. The case stays so that code that names it keeps compiling.
+        /// A `switch` with a `default` can drop it; an exhaustive one cannot, because it stops
+        /// compiling without it. `Internals.ExecutorIncompatibilityReason` no longer has a
         /// counterpart, so nothing maps to it.
         @available(
             *,
             deprecated,
             message:
-                "A client certificate chain with intermediates now runs on .nioTransportServices, so this is never thrown. Remove it from your switch."
+                "A client certificate chain with intermediates now runs on .nioTransportServices, so this is never thrown. Add a `default` to your switch to drop it."
         )
         case multipleClientCertificatesUnderNetworkFramework
 
