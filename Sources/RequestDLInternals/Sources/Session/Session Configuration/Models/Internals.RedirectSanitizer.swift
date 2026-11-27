@@ -6,6 +6,7 @@
 import FoundationEssentials
 #else
 import struct Foundation.URL
+import struct Foundation.URLComponents
 #endif
 
 extension Internals {
@@ -59,6 +60,35 @@ extension Internals {
             }
 
             return lhs.hasTheSameOrigin(as: rhs)
+        }
+
+        /// Whether a response with `statusCode` is never followed, even with a `Location`: `304`
+        /// answers a conditional request with what the caller already has, and `305` is a
+        /// deprecated hint about a proxy (RFC 9110, 15.4.5 and 15.4.6). AsyncHTTPClient treats
+        /// both as redirects; `URLSession` does not, and the executors have to agree.
+        package static func isNotARedirect(statusCode: UInt) -> Bool {
+            statusCode == 304 || statusCode == 305
+        }
+
+        /// `url` without the user and password it names, for a URL that is reported and not
+        /// requested: a `Location` such as `http://user:pw@host/path` is followed as the server
+        /// wrote it, but the URL of the response that comes back often goes to a log, and the
+        /// credentials the server put in it are not the caller's to spread (see
+        /// ``Internals/RedirectError``, which leaves the URL out for the same reason).
+        ///
+        /// `url` itself when it names none, or does not parse.
+        package static func removingUserInfo(from url: String) -> String {
+            guard
+                url.contains("@"),
+                var components = URLComponents(string: url),
+                components.user != nil || components.password != nil
+            else {
+                return url
+            }
+
+            components.user = nil
+            components.password = nil
+            return components.string ?? url
         }
 
         /// The names of the headers a hop must not carry: those of ``crossOriginHeaders`` and of

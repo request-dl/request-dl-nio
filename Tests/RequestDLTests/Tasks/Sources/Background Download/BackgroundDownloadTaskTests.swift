@@ -107,6 +107,36 @@ struct BackgroundDownloadTaskTests {
         }
     }
 
+    /// The system follows the redirects of a background download by itself, so the marker could
+    /// not be honored; it is refused before anything is scheduled rather than ignored.
+    @Test(arguments: [RedirectHeaderScope.otherOrigins, .anyRedirect])
+    func result_whenAHeaderIsHiddenOnRedirect_throwsUnsupportedConfigurationError(
+        scope: RedirectHeaderScope
+    ) async throws {
+        let task = BackgroundDownloadTask(
+            id: "episode-42",
+            destination: URL(fileURLWithPath: "/tmp/episode-42.mp3")
+        ) {
+            BaseURL("localhost")
+
+            CustomHeader(name: "X-Api-Key", value: "secret")
+                .hiddenOnRedirect(scope)
+        }
+
+        do {
+            try await task.result()
+            Issue.record("Expected BackgroundDownloadUnsupportedConfigurationError")
+        } catch let error as BackgroundDownloadUnsupportedConfigurationError {
+            guard case .hiddenOnRedirectHeaders = error.reason else {
+                Issue.record("Expected .hiddenOnRedirectHeaders, got \(error.reason)")
+                return
+            }
+            #expect((error as any Error).localizedDescription == error.description)
+            #expect(error.description.contains("hiddenOnRedirect"))
+            #expect(!error.description.contains("secret"))
+        }
+    }
+
     private struct UppercaseDecompressor: Decompressor {
         var contentEncodingValue: String { "upper" }
 

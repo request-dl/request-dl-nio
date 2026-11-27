@@ -37,6 +37,12 @@ extension Internals {
         // MARK: - Internal methods
 
         func redirectDecision(for context: HTTPClientRedirectContext) throws -> HTTPClientRedirectDecision {
+            // Not a redirect, whatever `Location` it carries: `URLSession` never asks the strategy
+            // about it, and neither does this.
+            guard !Internals.RedirectSanitizer.isNotARedirect(statusCode: context.response.status.code) else {
+                return .doNotFollow
+            }
+
             let history = context.history.map(Internals.RedirectHistoryEntry.init)
 
             // The request this redirect answers: the one `context.response` came back for.

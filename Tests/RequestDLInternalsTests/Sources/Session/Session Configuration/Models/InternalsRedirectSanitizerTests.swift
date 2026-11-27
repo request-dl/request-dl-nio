@@ -145,4 +145,30 @@ struct InternalsRedirectSanitizerTests {
         // Then
         #expect(lhs != rhs)
     }
+
+    // MARK: - Reported URL
+
+    @Test(
+        arguments: [
+            ("http://user:pw@example.com/next", "http://example.com/next"),
+            ("https://user@example.com:8443/a?q=a@b#frag", "https://example.com:8443/a?q=a@b#frag"),
+            ("http://:pw@example.com/", "http://example.com/"),
+            ("http://example.com/a?mail=a@b", "http://example.com/a?mail=a@b"),
+            ("http://example.com/", "http://example.com/"),
+            ("http://[bad", "http://[bad"),
+            ("", ""),
+        ]
+    )
+    func removingUserInfo_takesTheUserAndPasswordOutOfTheReportedURL(url: String, expected: String) {
+        #expect(Internals.RedirectSanitizer.removingUserInfo(from: url) == expected)
+    }
+
+    @Test(
+        arguments: [
+            (UInt(304), true), (305, true), (301, false), (302, false), (303, false), (307, false), (200, false),
+        ]
+    )
+    func isNotARedirect_isTrueForNotModifiedAndUseProxyOnly(statusCode: UInt, expected: Bool) {
+        #expect(Internals.RedirectSanitizer.isNotARedirect(statusCode: statusCode) == expected)
+    }
 }

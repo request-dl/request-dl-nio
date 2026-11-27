@@ -696,6 +696,47 @@ struct BackgroundDownloadsSessionDecompressionTests {
         }
     }
 
+    /// The app wrote `Accept-Encoding` itself, naming `zstd` next to the system's own: a new
+    /// download delivers the file as it came (no decompressor was configured), and so must the
+    /// same download continued from resume data, which used to download all of it and fail with
+    /// `BackgroundDownloadMissingDecompressorError`, without resume data.
+    @Test
+    func aResumedDownloadWhoseRequestHasTheAppsOwnAcceptEncoding_isTreatedAsANewOne() async throws {
+        try await withTemporaryFileURL("destination.txt") { destination in
+            // Given
+            var request = URLRequest(url: try #require(URL(string: "https://example.invalid")))
+            request.setValue("gzip, deflate, br, zstd", forHTTPHeaderField: "Accept-Encoding")
+
+            // When: decided when it is scheduled, before anything is downloaded
+            let accepted = BackgroundDownloads.Session.acceptedEncodings(nil, resumedFrom: request)
+
+            // Then
+            #expect(accepted == nil)
+
+            let events = try await Self.download(
+                id: "resumed",
+                to: destination,
+                encoding: "zstd",
+                body: Array("raw".utf8),
+                session: BackgroundDownloads.Session(),
+                acceptedEncodings: accepted
+            )
+
+            #expect(Self.terminal(events).count == 1)
+            #expect(try String(contentsOf: destination, encoding: .utf8) == "raw")
+        }
+    }
+
+    @Test
+    func aResumedDownloadWhoseRequestMixesCustomNamesWithTheSystemsOwn_isNotDecoded() throws {
+        var request = URLRequest(url: try #require(URL(string: "https://example.invalid")))
+
+        for header in ["gzip, deflate, br, zstd", "zstd, gzip;q=0.5", "rle, *", "identity, rle"] {
+            request.setValue(header, forHTTPHeaderField: "Accept-Encoding")
+            #expect(BackgroundDownloads.Session.acceptedEncodings(nil, resumedFrom: request) == nil)
+        }
+    }
+
     @Test
     func aResumedDownload_keepsWhatTheRequestAndContentAgreeOn() throws {
         var request = URLRequest(url: try #require(URL(string: "https://example.invalid")))

@@ -52,6 +52,10 @@ import struct Foundation.URL
 ///   `Proxy-Authorization` or an API-key header set on the request is sent to whichever host the
 ///   redirect names, so only point a background download at a server you trust not to redirect
 ///   somewhere else, or authenticate with `Authorization` or a signed URL.
+/// - `hiddenOnRedirect(_:)` can't be honored either, so ``result()`` refuses it with
+///   ``BackgroundDownloadUnsupportedConfigurationError`` (``BackgroundDownloadUnsupportedConfigurationError/Reason/hiddenOnRedirectHeaders``)
+///   instead of ignoring it. Authenticate with `Authorization` or a signed URL, or use
+///   ``DownloadTask``.
 /// - ``Session/disableRedirect()``, ``Session/enableRedirectFollow(max:allowCycles:)`` and
 ///   ``Session/redirectStrategy(_:)`` have no effect.
 /// - ``URLOverride`` rewrites the request that starts the download, but not the hops of a redirect
@@ -179,8 +183,9 @@ public struct BackgroundDownloadTask<Content: Property> {
     ///
     /// - Throws: `CocoaError.fileWriteUnsupportedScheme` if `destination` is not a file URL.
     ///   ``BackgroundDownloadUnsupportedConfigurationError`` if `content` configures a
-    ///   client certificate or SPKI pin this executor can't rebuild after a relaunch, or lists a
-    ///   system-decoded algorithm next to one of your own (see its own documentation for the
+    ///   client certificate or SPKI pin this executor can't rebuild after a relaunch, lists a
+    ///   system-decoded algorithm next to one of your own, or marks a header with
+    ///   `hiddenOnRedirect(_:)` (see its own documentation for the
     ///   specific cases), or any error `content` itself throws while being
     ///   resolved into a request (an invalid URL, a certificate file that can't be read, etc.),
     ///   the same errors any other task can throw at this stage.
@@ -196,6 +201,13 @@ public struct BackgroundDownloadTask<Content: Property> {
             root: content,
             environment: RequestEnvironmentValues()
         ).build()
+
+        // The system follows the redirects of a background download by itself, so a header marked
+        // with `hiddenOnRedirect(_:)` would reach whichever host the redirect names. Refused
+        // rather than ignored.
+        guard resolved.session.configuration.redirectHiddenHeaders.isEmpty else {
+            throw BackgroundDownloadUnsupportedConfigurationError(reason: .hiddenOnRedirectHeaders)
+        }
 
         let serverTrust: Internals.ServerTrustPolicy.Descriptor?
         do {

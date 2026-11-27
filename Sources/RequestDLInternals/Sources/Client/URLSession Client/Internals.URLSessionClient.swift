@@ -2515,7 +2515,8 @@ extension Internals.ResponseHead {
 
     init(_ response: HTTPURLResponse) {
         self.init(
-            url: response.url?.absoluteString ?? "",
+            // Without the user and password a `Location` may have carried, as the other executors.
+            url: Internals.RedirectSanitizer.removingUserInfo(from: response.url?.absoluteString ?? ""),
             status: Status(
                 code: UInt(response.statusCode),
                 reason: HTTPURLResponse.localizedString(forStatusCode: response.statusCode)

@@ -276,10 +276,18 @@ extension BackgroundDownloads.Session {
     /// as `.completed`; this way a missing decompressor fails the download, as it does for any
     /// other.
     ///
-    /// The names the system decodes on its own (`gzip`, `deflate`, `br`) are left out of what is
-    /// read from the header: a request that took over `Accept-Encoding` never lists them, so they
-    /// only show up when the app set the header, or the system added it, and the system decoded
-    /// those.
+    /// A header that names one of the encodings the system decodes on its own (`gzip`, `deflate`,
+    /// `br`) is the app's own, and decides nothing here: a request that took over `Accept-Encoding`
+    /// never lists them (a list that does is refused when the download is scheduled, see
+    /// `takingOverAcceptEncoding(of:for:)`), so they only show up when the app set the header, or
+    /// the system added it. Such a download is decoded by the system and what it did not decode is
+    /// delivered as it came, the same answer a new download with that header gets. Without this, a
+    /// header like `gzip, deflate, br, zstd` written by the app, that was delivered raw the first
+    /// time, would download all of the file again and fail with
+    /// ``BackgroundDownloadMissingDecompressorError`` for `zstd`, with no resume data. What is
+    /// left after the others are removed cannot be told from a takeover by the header alone, so a
+    /// header with custom names only (`zstd`) still decides, and fails without a decompressor, as
+    /// a takeover does.
     static func acceptedEncodings(
         _ decompression: [any Internals.DecompressionAlgorithm]?,
         resumedFrom request: URLRequest?
@@ -302,7 +310,11 @@ extension BackgroundDownloads.Session {
             .split(separator: ",")
             .compactMap { $0.split(separator: ";").first }
             .map { $0.trimmingCharacters(in: .whitespaces).lowercased() }
-            .filter { !$0.isEmpty && !systemDecoded.contains($0) }
+            .filter { !$0.isEmpty }
+
+        guard !encodings.contains(where: systemDecoded.contains) else {
+            return nil
+        }
 
         return encodings.isEmpty ? nil : encodings
     }
