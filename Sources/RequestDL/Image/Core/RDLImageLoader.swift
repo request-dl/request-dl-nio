@@ -21,6 +21,16 @@ import typealias Foundation.TimeInterval
 /// starting a second request. This is separate from, and on top of, RequestDL's own response
 /// cache, which is what makes a *later*, non-concurrent request for the same image cheap.
 ///
+/// Calls by URL (``load(url:)``) and calls by task (``load(id:task:)``) are told apart even when
+/// the `id` of the second is the `absoluteString` of the first: a task carries headers,
+/// credentials and a cache policy of its own, so a download made for it is never handed to a
+/// call by URL, and the other way around. Two calls by URL for the same URL do share one, and so
+/// do two calls by task for the same `id`. A call that starts after ``removeCachedImage(id:)`` (or
+/// ``removeAllCachedImages()``) does not join a download that began before it either: that
+/// download would hand it what the removal was meant to get rid of (the old avatar, after the
+/// user changed it), so it starts its own. The earlier download is not cancelled, and still
+/// returns to the calls that were waiting for it.
+///
 /// The images that were loaded are also kept decoded in memory, up to ``memoryCacheLimit``
 /// bytes and for ``memoryCacheTimeToLive`` seconds each, so a view can show one at once: see
 /// ``cachedImage(id:)``. What the copy in memory stands in for depends on how the image is asked
@@ -29,14 +39,20 @@ import typealias Foundation.TimeInterval
 /// - **By URL** (``load(url:)``'s callers, `setImage(with:)` and `RDLImage(url:)`): a valid copy
 ///   is the answer, and the request is not made at all, with no disk read or decode. The URL is
 ///   all that identifies the request, so there is nothing a copy could be wrong about but its age,
-///   which the time to live bounds.
+///   which the time to live bounds. Only a copy that ``load(url:)`` made counts: an image loaded
+///   by ``load(id:task:)`` is not the answer for that URL, even when its `id` is the same string,
+///   because the task may have sent credentials the URL path does not.
 /// - **By task** (`setImage(id:task:)` and `RDLImage(id:task:)`): the copy is only shown first,
 ///   and the request still runs and replaces it. The caller owns the cache policy, headers and
 ///   credentials, and the key is the `id` they chose, so a copy made for another account or
-///   another policy must never be the final word.
+///   another policy must never be the final word: when the request fails, the views go back to
+///   what they showed before the copy.
 ///
 /// ``load(url:)`` and ``load(id:task:)`` themselves never read the copy: they always run the
 /// request, and what they load replaces it.
+///
+/// The key of a copy is only the `id` (or the URL), not who is signed in. When the account
+/// changes, call ``removeAllCachedImages()``.
 ///
 /// A call that is cancelled stops waiting at once, with a `CancellationError`, whether it was
 /// alone or one of several. The shared download is cancelled once every call waiting for it has
@@ -88,12 +104,20 @@ public actor RDLImageLoader {
 
     private let memoryCache: RDLImageMemoryCache
 
-    /// In-flight downloads, keyed by the caller-supplied `id`.
+    /// In-flight downloads, by generation.
     ///
     /// Cleared as soon as the task finishes (success or failure): this tracks concurrency, not
     /// results. A request that lands after this is cleared starts fresh, and RequestDL's own
     /// cache is what makes that repeat request cheap.
-    private var tasks: [String: InFlight] = [:]
+    ///
+    /// More than one can be there for the same `id` and origin: a download that began before an
+    /// image was removed goes on for the calls that were waiting for it, while the calls that came
+    /// after the removal wait for a new one.
+    private var flights: [Int: InFlight] = [:]
+
+    /// The download new calls join, for each origin and `id`: the latest one, unless an image was
+    /// removed since it began.
+    private var current: [FlightKey: Int] = [:]
 
     private var nextGeneration = 0
 
@@ -105,16 +129,34 @@ public actor RDLImageLoader {
     /// stop waiting on its own: awaiting a `Task` is not interrupted by the cancellation of the
     /// caller, and the download has to go on for the others.
     ///
-    /// `generation` tells one download for an `id` from the next one, so a late cancellation of
-    /// a call that waited for an earlier download never touches a newer one.
+    /// The generation, the key of ``flights``, tells one download for an `id` from the next one,
+    /// so a late cancellation of a call that waited for an earlier download never touches a newer
+    /// one.
     private struct InFlight {
         let task: Task<Void, Never>
-        let generation: Int
+        let key: FlightKey
 
         /// ``RDLImageMemoryCache/removals`` when the download began: if it is not the same when the
         /// download ends, an image was removed meanwhile and the result is not kept in memory.
         let removalsAtStart: Int
         var waiters: [Int: CheckedContinuation<SendableImage, Error>]
+    }
+
+    /// What a download is for: the calls that share one.
+    private struct FlightKey: Hashable {
+        let origin: Origin
+        let id: String
+    }
+
+    /// Which kind of call made a download, and so what the image it produced may stand in for.
+    enum Origin: Hashable, Sendable {
+
+        /// ``load(url:)``: the request is the URL alone.
+        case url
+
+        /// ``load(id:task:)``: the request is the caller's, with whatever headers and credentials
+        /// it carries.
+        case task
     }
 
     // MARK: - Inits
@@ -174,7 +216,8 @@ public actor RDLImageLoader {
     /// It answers at once and from any thread, which is what lets a view that is asked to show
     /// `id` again put the image on screen in the same turn, instead of clearing it until the load
     /// finishes. `id` is the one given to ``load(id:task:)``, and the URL's `absoluteString` for
-    /// ``load(url:)``.
+    /// ``load(url:)``: that image is shown first by a view that loads by task, which then runs its
+    /// own request, but it is not the answer for that request.
     ///
     /// An image is only kept when a load finishes with success. Whatever the request's cache
     /// policy says about the response does not apply to this copy, so it can be older than what
@@ -190,14 +233,16 @@ public actor RDLImageLoader {
     }
 
     ///
-    /// The image the load of `url` last finished with, when it is still in memory.
+    /// The image ``load(url:)`` last finished with for `url`, when it is still in memory.
     ///
-    /// See ``cachedImage(id:)``.
+    /// See ``cachedImage(id:)``. An image that ``load(id:task:)`` loaded is not returned, even
+    /// when its `id` is `url.absoluteString`: this is the answer for a request made with the URL
+    /// alone, and that image came from a request that may have carried credentials.
     ///
     /// - Parameter url: The URL of the image.
     ///
     public nonisolated func cachedImage(url: URL) -> PlatformImage? {
-        memoryCache.image(for: url.absoluteString)
+        memoryCache.image(for: url.absoluteString, origin: .url)
     }
 
     ///
@@ -244,18 +289,32 @@ public actor RDLImageLoader {
         id: String,
         task: Content
     ) async throws -> PlatformImage {
-        if let existing = tasks[id] {
-            return try await waitFor(id: id, generation: existing.generation).image
+        try await load(origin: .task, id: id, task: task)
+    }
+
+    /// Loads `task` for `origin`, sharing the download with the calls of the same origin and `id`
+    /// that began since the last removal from memory.
+    func load<Content: RequestTask<TaskResult<Data>>>(
+        origin: Origin,
+        id: String,
+        task: Content
+    ) async throws -> PlatformImage {
+        let key = FlightKey(origin: origin, id: id)
+        let removalsAtStart = memoryCache.removals
+
+        // A download that began before an image was removed is not joined, and not cancelled: its
+        // waiters are still waiting for it, and `current` moves on to the new one.
+        if let generation = current[key], flights[generation]?.removalsAtStart == removalsAtStart {
+            return try await waitFor(generation: generation).image
         }
 
         let generation = nextGeneration
         nextGeneration += 1
-        let removalsAtStart = memoryCache.removals
 
         // `.detached` rather than a plain `Task { ... }`: a plain `Task` would inherit this actor's
         // executor and run the CPU-bound `PlatformImage(data:)` decode on it. The decode touches no
         // actor state, and running it there would serialize every decode behind one another and
-        // block unrelated `load()` calls from reaching their `tasks[id]` lookup.
+        // block unrelated `load()` calls from reaching their `current` lookup.
         let newTask = Task.detached {
             let result: Result<SendableImage, Error>
 
@@ -271,12 +330,13 @@ public actor RDLImageLoader {
                 result = .failure(error)
             }
 
-            await self.complete(id: id, generation: generation, with: result)
+            await self.complete(generation: generation, with: result)
         }
 
-        tasks[id] = InFlight(task: newTask, generation: generation, removalsAtStart: removalsAtStart, waiters: [:])
+        flights[generation] = InFlight(task: newTask, key: key, removalsAtStart: removalsAtStart, waiters: [:])
+        current[key] = generation
 
-        return try await waitFor(id: id, generation: generation).image
+        return try await waitFor(generation: generation).image
     }
 
     ///
@@ -293,6 +353,7 @@ public actor RDLImageLoader {
         let dataCache = self.dataCache
 
         return try await load(
+            origin: .url,
             id: url.absoluteString,
             task: DataTask {
                 URLImageProperty(url: url)
@@ -324,38 +385,37 @@ public actor RDLImageLoader {
 
     // MARK: - Private methods
 
-    /// Waits for the download of `id`, as one of the calls it is shared by.
+    /// Waits for the download of `generation`, as one of the calls it is shared by.
     ///
     /// The call's place is taken in the same turn of the actor that found or made the download,
     /// so the download cannot finish before there is a continuation to hand its result to. When
     /// the call is cancelled it leaves at once: its continuation is resumed with a
     /// `CancellationError` and the download goes on for the others, or is cancelled if it was
     /// the last.
-    private func waitFor(id: String, generation: Int) async throws -> SendableImage {
+    private func waitFor(generation: Int) async throws -> SendableImage {
         let waiter = nextWaiter
         nextWaiter += 1
 
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
-                guard var inFlight = tasks[id], inFlight.generation == generation else {
+                guard var inFlight = flights[generation] else {
                     continuation.resume(throwing: CancellationError())
                     return
                 }
 
                 inFlight.waiters[waiter] = continuation
-                tasks[id] = inFlight
+                flights[generation] = inFlight
             }
         } onCancel: {
-            Task { await self.leave(id: id, generation: generation, waiter: waiter) }
+            Task { await self.leave(generation: generation, waiter: waiter) }
         }
     }
 
     /// Gives up one call's place, resuming it with a `CancellationError`, and cancels the
     /// download when it was the last.
-    private func leave(id: String, generation: Int, waiter: Int) {
+    private func leave(generation: Int, waiter: Int) {
         guard
-            var inFlight = tasks[id],
-            inFlight.generation == generation,
+            var inFlight = flights[generation],
             let continuation = inFlight.waiters.removeValue(forKey: waiter)
         else {
             return
@@ -364,26 +424,31 @@ public actor RDLImageLoader {
         continuation.resume(throwing: CancellationError())
 
         guard inFlight.waiters.isEmpty else {
-            tasks[id] = inFlight
+            flights[generation] = inFlight
             return
         }
 
         inFlight.task.cancel()
-        tasks[id] = nil
+        forget(generation: generation, key: inFlight.key)
     }
 
     /// Hands the outcome of the download to every call still waiting for it, and forgets it.
     /// Nothing is left to do when the download was cancelled with its last call.
-    private func complete(id: String, generation: Int, with result: Result<SendableImage, Error>) {
-        guard let inFlight = tasks[id], inFlight.generation == generation else {
+    private func complete(generation: Int, with result: Result<SendableImage, Error>) {
+        guard let inFlight = flights[generation] else {
             return
         }
 
-        tasks[id] = nil
+        forget(generation: generation, key: inFlight.key)
 
         // Only an image that was loaded is kept: a failure leaves what is there as it was.
         if case .success(let image) = result {
-            memoryCache.insert(image.image, for: id, ifRemovalsAre: inFlight.removalsAtStart)
+            memoryCache.insert(
+                image.image,
+                for: inFlight.key.id,
+                origin: inFlight.key.origin,
+                ifRemovalsAre: inFlight.removalsAtStart
+            )
         }
 
         for continuation in inFlight.waiters.values {
@@ -391,9 +456,20 @@ public actor RDLImageLoader {
         }
     }
 
-    /// How many calls are waiting for the download of `id`.
-    func waiterCountForTesting(id: String) -> Int {
-        tasks[id]?.waiters.count ?? 0
+    /// Drops `generation`, and stops new calls from joining it when it is the one they would.
+    private func forget(generation: Int, key: FlightKey) {
+        flights[generation] = nil
+
+        if current[key] == generation {
+            current[key] = nil
+        }
+    }
+
+    /// How many calls are waiting for the downloads of `id`, of the given origin or of any.
+    func waiterCountForTesting(id: String, origin: Origin? = nil) -> Int {
+        flights.values
+            .filter { $0.key.id == id && (origin == nil || $0.key.origin == origin) }
+            .reduce(0) { $0 + $1.waiters.count }
     }
 }
 

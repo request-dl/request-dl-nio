@@ -30,10 +30,12 @@ final class RDLImageMemoryCache: @unchecked Sendable {
 
     private final class Entry {
         let image: PlatformImage
+        let origin: RDLImageLoader.Origin
         let storedAt: Date
 
-        init(_ image: PlatformImage, storedAt: Date) {
+        init(_ image: PlatformImage, origin: RDLImageLoader.Origin, storedAt: Date) {
             self.image = image
+            self.origin = origin
             self.storedAt = storedAt
         }
     }
@@ -106,8 +108,16 @@ final class RDLImageMemoryCache: @unchecked Sendable {
     }
 
     /// The image kept for `id`, unless its time is over: that entry is removed and counts as a miss.
-    func image(for id: String) -> PlatformImage? {
+    ///
+    /// - Parameter origin: When not `nil`, only an entry written by that kind of load is a hit. An
+    /// entry of the other kind is left where it is: it is a miss for this look-up, not an expired
+    /// one.
+    func image(for id: String, origin: RDLImageLoader.Origin? = nil) -> PlatformImage? {
         guard let entry = cache.object(forKey: id as NSString) else {
+            return nil
+        }
+
+        if let origin, entry.origin != origin {
             return nil
         }
 
@@ -119,12 +129,18 @@ final class RDLImageMemoryCache: @unchecked Sendable {
         return entry.image
     }
 
-    /// Keeps `image` for `id`.
+    /// Keeps `image` for `id`, remembering which kind of load produced it. A later write for the
+    /// same `id` replaces it, whatever its origin.
     ///
     /// - Parameter removals: The value of ``removals`` when the load that produced `image` began.
     /// When it is not the current one, something was removed since, so the image is dropped
     /// instead of kept. `nil` keeps it whatever happened.
-    func insert(_ image: PlatformImage, for id: String, ifRemovalsAre removals: Int? = nil) {
+    func insert(
+        _ image: PlatformImage,
+        for id: String,
+        origin: RDLImageLoader.Origin,
+        ifRemovalsAre removals: Int? = nil
+    ) {
         lock.lock()
         defer { lock.unlock() }
 
@@ -132,7 +148,11 @@ final class RDLImageMemoryCache: @unchecked Sendable {
             return
         }
 
-        cache.setObject(Entry(image, storedAt: now()), forKey: id as NSString, cost: Self.cost(of: image))
+        cache.setObject(
+            Entry(image, origin: origin, storedAt: now()),
+            forKey: id as NSString,
+            cost: Self.cost(of: image)
+        )
     }
 
     func remove(_ id: String) {

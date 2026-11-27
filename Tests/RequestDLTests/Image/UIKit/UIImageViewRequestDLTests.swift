@@ -348,6 +348,7 @@ struct UIImageViewRequestDLTests {
         let url = URL(string: "https://invalid.invalid/warm.png")!
         let loader = RDLImageLoader()
         let cached = try await loader.load(
+            origin: .url,
             id: url.absoluteString,
             task: StubImageTask { .init(head: .stub, payload: .onePixelPNG) }
         )
@@ -541,6 +542,7 @@ struct UIImageViewRequestDLTests {
         )
 
         let image = try await loader.load(
+            origin: .url,
             id: url.absoluteString,
             task: StubImageTask { .init(head: .stub, payload: .onePixelPNG) }
         )

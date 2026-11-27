@@ -32,12 +32,21 @@ struct RDLImageMemoryTests {
         _ = try await loader.load(id: id, task: StubImageTask { .init(head: .stub, payload: .onePixelPNG) })
     }
 
+    /// What `loader.load(url:)` leaves in memory, without the network.
+    private static func warm(_ loader: RDLImageLoader, url: URL) async throws {
+        _ = try await loader.load(
+            origin: .url,
+            id: url.absoluteString,
+            task: StubImageTask { .init(head: .stub, payload: .onePixelPNG) }
+        )
+    }
+
     // MARK: - The plan
 
     @Test
     func plan_forAURLInMemory_isTheImageAndNoRequest() async throws {
         let loader = Self.makeLoader()
-        try await Self.warm(loader, id: Self.url.absoluteString)
+        try await Self.warm(loader, url: Self.url)
 
         let plan = RDLImage<EmptyView>.plan(for: .url(Self.url), loader: loader, scale: 1)
 
@@ -61,7 +70,7 @@ struct RDLImageMemoryTests {
     @Test
     func plan_forAURLInMemory_whenRefreshing_isTheImageAndTheRequestRuns() async throws {
         let loader = Self.makeLoader()
-        try await Self.warm(loader, id: Self.url.absoluteString)
+        try await Self.warm(loader, url: Self.url)
 
         let plan = RDLImage<EmptyView>.plan(for: .url(Self.url), loader: loader, scale: 1, refreshing: true)
 
@@ -116,6 +125,35 @@ struct RDLImageMemoryTests {
         #expect(plan.runsRequest)
     }
 
+    /// Only an image `load(url:)` made is the answer for a URL. An authenticated task loaded under
+    /// the same string and its copy is not it: the view starts empty and the request runs.
+    @Test
+    func plan_forAURL_ignoresAnImageLoadedByATaskWithTheURLAsItsID() async throws {
+        let loader = Self.makeLoader()
+        try await Self.warm(loader, id: Self.url.absoluteString)
+
+        let plan = RDLImage<EmptyView>.plan(for: .url(Self.url), loader: loader, scale: 1)
+
+        #expect(plan.phase.image == nil)
+        #expect(!plan.isCached)
+        #expect(plan.runsRequest)
+    }
+
+    /// A task's copy is shown first but did not come from its request, so a failure does not keep
+    /// it. A URL's does: it is an answer for that URL, and `refreshing` only asks again.
+    @Test
+    func plan_aFailedRequestKeepsOnlyTheCopyOfAURL() async throws {
+        let loader = Self.makeLoader()
+        try await Self.warm(loader, url: Self.url)
+        try await Self.warm(loader, id: "avatar")
+
+        let byURL = RDLImage<EmptyView>.plan(for: .url(Self.url), loader: loader, scale: 1, refreshing: true)
+        let byID = RDLImage<EmptyView>.plan(for: .id("avatar"), loader: loader, scale: 1)
+
+        #expect(byURL.isCached && byURL.keepsCopyOnFailure)
+        #expect(byID.isCached && !byID.keepsCopyOnFailure)
+    }
+
     @Test
     func plan_withoutAKey_isEmptyAndNoRequest() {
         let plan = RDLImage<EmptyView>.plan(for: nil, loader: Self.makeLoader(), scale: 1)
@@ -127,7 +165,7 @@ struct RDLImageMemoryTests {
     @Test
     func plan_forAnExpiredImage_isAMiss() async throws {
         let loader = Self.makeLoader(timeToLive: 0.05)
-        try await Self.warm(loader, id: Self.url.absoluteString)
+        try await Self.warm(loader, url: Self.url)
         try await Task.sleep(nanoseconds: 150_000_000)
 
         let plan = RDLImage<EmptyView>.plan(for: .url(Self.url), loader: loader, scale: 1)
@@ -140,7 +178,7 @@ struct RDLImageMemoryTests {
     @Test
     func plan_whenTheURLChanges_followsTheNewOne() async throws {
         let loader = Self.makeLoader()
-        try await Self.warm(loader, id: Self.url.absoluteString)
+        try await Self.warm(loader, url: Self.url)
 
         let first = RDLImage<EmptyView>.plan(for: .url(Self.url), loader: loader, scale: 1)
         let second = RDLImage<EmptyView>.plan(for: .url(Self.otherURL), loader: loader, scale: 1)
@@ -180,7 +218,7 @@ struct RDLImageMemoryTests {
     @Test
     func firstBody_withTheURLInMemory_isAlreadyASuccess() async throws {
         let loader = Self.makeLoader()
-        try await Self.warm(loader, id: Self.url.absoluteString)
+        try await Self.warm(loader, url: Self.url)
         let phases = Phases()
 
         render(
@@ -197,7 +235,7 @@ struct RDLImageMemoryTests {
     @Test
     func firstBody_withTheURLInMemory_whenRefreshing_isAlreadyASuccess() async throws {
         let loader = Self.makeLoader()
-        try await Self.warm(loader, id: Self.url.absoluteString)
+        try await Self.warm(loader, url: Self.url)
         let phases = Phases()
 
         render(
@@ -215,7 +253,7 @@ struct RDLImageMemoryTests {
     @Test
     func convenienceInit_acceptsRefreshing_andShowsTheCopyFirst() async throws {
         let loader = Self.makeLoader()
-        try await Self.warm(loader, id: Self.url.absoluteString)
+        try await Self.warm(loader, url: Self.url)
         let shown = Phases()
 
         render(

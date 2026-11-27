@@ -106,7 +106,7 @@ extension RDLWrapper where Base: WKInterfaceImage {
             base.setImage(placeholder)
         }
 
-        run({ try await loader.load(url: url) }, completion: completion)
+        run({ try await loader.load(url: url) }, restoringOnFailure: nil, completion: completion)
     }
 
     ///
@@ -126,7 +126,11 @@ extension RDLWrapper where Base: WKInterfaceImage {
     /// Unlike ``setImage(with:placeholder:loader:keepsCurrentImageWhileLoading:refreshing:completion:)``,
     /// the request is always made: the caller controls its cache policy, headers and credentials,
     /// and the key is the `id` they chose, so a copy in memory made for another account or another
-    /// policy must never be the final answer.
+    /// policy must never be the final answer: when the request fails, the copy is taken off, and
+    /// the interface image gets `placeholder` (what it showed before cannot be read back). Only
+    /// an image loaded by URL is the answer for a URL, so one loaded here with an `id` equal to a
+    /// URL's `absoluteString` is not what ``setImage(with:placeholder:loader:keepsCurrentImageWhileLoading:refreshing:completion:)``
+    /// shows for it. When the account changes, call ``RDLImageLoader/removeAllCachedImages()``.
     ///
     /// Cancels any load already in flight on this interface image before starting, so it is safe
     /// to call from a `WKInterfaceTable` row controller even when rows are reused faster than
@@ -135,7 +139,8 @@ extension RDLWrapper where Base: WKInterfaceImage {
     /// - Parameters:
     ///    - id: A stable identifier for the request, used to deduplicate concurrent loads. It
     ///    can't be derived automatically from an arbitrary ``RequestTask``, so callers supply it
-    ///    explicitly, typically the URL or endpoint the request resolves to.
+    ///    explicitly. Use a name that tells the request apart, such as the endpoint plus whatever
+    ///    changes the answer (the user, the size); it does not have to be a URL.
     ///    - task: The task that performs the request, e.g. a ``DataTask``.
     ///    - placeholder: The image to set immediately, shown until the load finishes. Passing
     ///    `nil` (the default) clears the interface image instead, so a reused view never keeps
@@ -162,19 +167,33 @@ extension RDLWrapper where Base: WKInterfaceImage {
 
         // An image this loader already loaded is shown at once. This needs no reading of what the
         // interface image shows, which is not possible, so it works whatever `keepsCurrentImageWhileLoading` is.
+        // It was not made by this request, so when the request fails it is taken off: what was on
+        // screen before it cannot be read back, so the interface image gets `placeholder`.
+        let interfaceImage = base
+        let restore: (@MainActor () -> Void)?
+
         if let cached = loader.cachedImage(id: id) {
-            base.setImage(cached)
-        } else if !keepsCurrentImageWhileLoading {
-            base.setImage(placeholder)
+            interfaceImage.setImage(cached)
+            restore = { interfaceImage.setImage(placeholder) }
+        } else {
+            if !keepsCurrentImageWhileLoading {
+                interfaceImage.setImage(placeholder)
+            }
+
+            restore = nil
         }
 
-        run({ try await loader.load(id: id, task: task) }, completion: completion)
+        run({ try await loader.load(id: id, task: task) }, restoringOnFailure: restore, completion: completion)
     }
 
     // MARK: - Private methods
 
+    /// - Parameter restoringOnFailure: Called when the load fails, before `completion`, to take an
+    /// image from memory off the interface image that the load was meant to confirm. `nil` leaves it
+    /// as it is.
     private func run(
         _ load: @escaping @Sendable () async throws -> UIImage,
+        restoringOnFailure restore: (@MainActor () -> Void)?,
         completion: (@Sendable (Result<UIImage, Error>) -> Void)?
     ) {
         let interfaceImage = base
@@ -193,6 +212,7 @@ extension RDLWrapper where Base: WKInterfaceImage {
                     return
                 }
 
+                restore?()
                 completion?(.failure(error))
             }
         }
