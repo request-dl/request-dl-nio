@@ -509,6 +509,102 @@ struct RDLImageLoaderTests {
         #expect(loader.cachedImage(id: "avatar") == nil)
     }
 
+    /// The case of the user changing their avatar: the old download is still running when the
+    /// image is removed and the screen loads again. The new load runs its own task and gets its
+    /// own bytes, instead of joining the old download.
+    @Test
+    func aLoadThatBeginsAfterARemoval_doesNotJoinTheDownloadThatBeganBefore() async throws {
+        // Given: the old avatar, held in flight.
+        let oldGate = Gate()
+        let oldProbe = RequestProbe()
+        let oldTask = StubImageTask {
+            await oldProbe.started()
+            await oldGate.wait()
+
+            return .init(head: .stub, payload: .onePixelPNG)
+        }
+
+        let freshProbe = RequestProbe()
+        let freshTask = StubImageTask {
+            await freshProbe.started()
+
+            return .init(head: .stub, payload: .onePixelPNG)
+        }
+
+        let loader = RDLImageLoader()
+        let first = Task { try await loader.load(id: "avatar", task: oldTask) }
+        try await eventually { await oldProbe.didStart }
+
+        // When
+        loader.removeCachedImage(id: "avatar")
+        let secondLoad = Task { try await loader.load(id: "avatar", task: freshTask) }
+        try await eventually { await freshProbe.didStart }
+        let second = try await secondLoad.value
+
+        // Then: the new task ran, and the load did not have to wait for the old download.
+        #expect(await freshProbe.startCount == 1)
+        #expect(await oldProbe.startCount == 1)
+        #expect(loader.cachedImage(id: "avatar") === second)
+
+        // And the first caller, which was waiting for the old download, is still resumed with its
+        // result, which is not put back in memory over the new one.
+        await oldGate.open()
+        let old = try await first.value
+        #expect(old !== second)
+        #expect(loader.cachedImage(id: "avatar") === second)
+    }
+
+    /// A call that was waiting for the old download can still leave it by being cancelled, and
+    /// the old download is cancelled with its last one, whatever the new one is doing.
+    @Test
+    func cancellingTheLastCallOfASupersededDownload_cancelsOnlyThatDownload() async throws {
+        // Given
+        let oldProbe = RequestProbe()
+        let oldTask = StubImageTask {
+            await oldProbe.started()
+
+            do {
+                try await Task.sleep(nanoseconds: 30_000_000_000)
+            } catch {
+                await oldProbe.cancelled()
+                throw error
+            }
+
+            return .init(head: .stub, payload: .onePixelPNG)
+        }
+
+        let loader = RDLImageLoader()
+        let first = Task { try await loader.load(id: "avatar", task: oldTask) }
+        try await eventually { await oldProbe.didStart }
+        try await eventually { await loader.waiterCountForTesting(id: "avatar") == 1 }
+
+        loader.removeCachedImage(id: "avatar")
+        let gate = Gate()
+        let freshTask = StubImageTask {
+            await gate.wait()
+
+            return .init(head: .stub, payload: .onePixelPNG)
+        }
+        let second = Task { try await loader.load(id: "avatar", task: freshTask) }
+        try await eventually { await loader.waiterCountForTesting(id: "avatar") == 2 }
+
+        // When
+        first.cancel()
+
+        // Then
+        do {
+            _ = try await first.value
+            Issue.record("The cancelled call was expected to throw")
+        } catch is CancellationError {
+        }
+
+        try await eventually { await oldProbe.wasCancelled }
+        #expect(await loader.waiterCountForTesting(id: "avatar") == 1)
+
+        await gate.open()
+        _ = try await second.value
+    }
+
     /// The counter is global: a removal of another image costs a running load its write, which is
     /// a miss later, not a stale image. A load that begins after the removal is kept as usual.
     @Test

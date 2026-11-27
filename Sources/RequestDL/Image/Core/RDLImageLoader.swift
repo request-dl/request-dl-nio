@@ -25,7 +25,11 @@ import typealias Foundation.TimeInterval
 /// the `id` of the second is the `absoluteString` of the first: a task carries headers,
 /// credentials and a cache policy of its own, so a download made for it is never handed to a
 /// call by URL, and the other way around. Two calls by URL for the same URL do share one, and so
-/// do two calls by task for the same `id`.
+/// do two calls by task for the same `id`. A call that starts after ``removeCachedImage(id:)`` (or
+/// ``removeAllCachedImages()``) does not join a download that began before it either: that
+/// download would hand it what the removal was meant to get rid of (the old avatar, after the
+/// user changed it), so it starts its own. The earlier download is not cancelled, and still
+/// returns to the calls that were waiting for it.
 ///
 /// The images that were loaded are also kept decoded in memory, up to ``memoryCacheLimit``
 /// bytes and for ``memoryCacheTimeToLive`` seconds each, so a view can show one at once: see
@@ -105,9 +109,14 @@ public actor RDLImageLoader {
     /// Cleared as soon as the task finishes (success or failure): this tracks concurrency, not
     /// results. A request that lands after this is cleared starts fresh, and RequestDL's own
     /// cache is what makes that repeat request cheap.
+    ///
+    /// More than one can be there for the same `id` and origin: a download that began before an
+    /// image was removed goes on for the calls that were waiting for it, while the calls that came
+    /// after the removal wait for a new one.
     private var flights: [Int: InFlight] = [:]
 
-    /// The download new calls join, for each origin and `id`: the latest one.
+    /// The download new calls join, for each origin and `id`: the latest one, unless an image was
+    /// removed since it began.
     private var current: [FlightKey: Int] = [:]
 
     private var nextGeneration = 0
@@ -283,7 +292,8 @@ public actor RDLImageLoader {
         try await load(origin: .task, id: id, task: task)
     }
 
-    /// Loads `task` for `origin`, sharing the download with the calls of the same origin and `id`.
+    /// Loads `task` for `origin`, sharing the download with the calls of the same origin and `id`
+    /// that began since the last removal from memory.
     func load<Content: RequestTask<TaskResult<Data>>>(
         origin: Origin,
         id: String,
@@ -292,7 +302,9 @@ public actor RDLImageLoader {
         let key = FlightKey(origin: origin, id: id)
         let removalsAtStart = memoryCache.removals
 
-        if let generation = current[key] {
+        // A download that began before an image was removed is not joined, and not cancelled: its
+        // waiters are still waiting for it, and `current` moves on to the new one.
+        if let generation = current[key], flights[generation]?.removalsAtStart == removalsAtStart {
             return try await waitFor(generation: generation).image
         }
 
