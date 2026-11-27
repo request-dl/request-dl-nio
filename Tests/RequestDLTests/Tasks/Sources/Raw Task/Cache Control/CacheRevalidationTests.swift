@@ -310,6 +310,132 @@ struct CacheRevalidationTests {
         #expect(client.requests == 1)
     }
 
+    /// What the stored `Cache-Control` says, as one string.
+    private func storedCacheControl(_ configuration: RequestConfiguration, in dataCache: DataCache) async -> String {
+        let stored = await dataCache.getCachedData(forKey: configuration.url, policy: .all)
+
+        return stored?.cachedResponse.response.headers
+            .filter { $0.name.lowercased() == "cache-control" }
+            .map(\.value)
+            .joined(separator: ", ") ?? ""
+    }
+
+    /// RFC 9111 §4.3.4: the `Cache-Control` of a `304` replaces the stored one. A requirement to
+    /// revalidate that the server stopped sending is not kept, while the freshness the `304` did
+    /// not repeat is (see `...CarriesOnlyPublic...` below).
+    @Test(arguments: ["no-cache", "must-revalidate", "proxy-revalidate"])
+    func revalidation_whenA304DropsARevalidationDirective_theEntryNoLongerHasIt(directive: String) async throws {
+        // Given
+        let dataCache = makeCache()
+        let configuration = makeConfiguration(strategy: .reloadAndValidateCachedData)
+
+        await store(
+            response([("ETag", "\"v1\""), ("Cache-Control", "\(directive), max-age=3600")], age: 7_200),
+            key: configuration.url,
+            in: dataCache
+        )
+
+        // When
+        _ = await decide(
+            configuration,
+            in: dataCache,
+            client: Client(head: head(status: 304, [("Cache-Control", "max-age=3600")]))
+        )
+
+        // Then
+        let stored = await storedCacheControl(configuration, in: dataCache)
+        #expect(!stored.contains(directive), "\(stored)")
+        #expect(stored.contains("max-age=3600"), "\(stored)")
+    }
+
+    /// The probe of the review: a `304` says `no-cache`, a later one `max-age=3600`: the entry is
+    /// then fresh for an hour, and `.returnCachedDataElseLoad` serves it without the network.
+    @Test
+    func revalidation_whenALater304NoLongerSaysNoCache_theEntryIsFreshAgain() async throws {
+        // Given
+        let dataCache = makeCache()
+        let configuration = makeConfiguration(strategy: .reloadAndValidateCachedData)
+
+        await store(
+            response([("ETag", "\"v1\""), ("Cache-Control", "max-age=3600")], age: 7_200),
+            key: configuration.url,
+            in: dataCache
+        )
+
+        let noCache = Client(head: head(status: 304, [("Cache-Control", "no-cache")]))
+        _ = await decide(configuration, in: dataCache, client: noCache)
+        #expect(await storedCacheControl(configuration, in: dataCache).contains("no-cache"))
+
+        // When
+        let freshAgain = Client(head: head(status: 304, [("Cache-Control", "max-age=3600")]))
+        _ = await decide(configuration, in: dataCache, client: freshAgain)
+
+        // Then
+        #expect(await storedCacheControl(configuration, in: dataCache) == "max-age=3600")
+
+        var again = configuration
+        again.cacheStrategy = .returnCachedDataElseLoad
+        let reused = await decide(again, in: dataCache, client: freshAgain)
+
+        #expect(sources(reused) == [.cache])
+        #expect(freshAgain.requests == 1)
+    }
+
+    /// A `304` that repeats the requirement keeps it.
+    @Test
+    func revalidation_whenA304RepeatsAMustRevalidate_theEntryKeepsIt() async throws {
+        // Given
+        let dataCache = makeCache()
+        let configuration = makeConfiguration(strategy: .reloadAndValidateCachedData)
+
+        await store(
+            response([("ETag", "\"v1\""), ("Cache-Control", "must-revalidate, max-age=3600")], age: 7_200),
+            key: configuration.url,
+            in: dataCache
+        )
+
+        // When
+        _ = await decide(
+            configuration,
+            in: dataCache,
+            client: Client(head: head(status: 304, [("Cache-Control", "must-revalidate, max-age=7200")]))
+        )
+
+        // Then
+        let stored = await storedCacheControl(configuration, in: dataCache)
+        #expect(stored.contains("must-revalidate"), "\(stored)")
+        #expect(stored.contains("max-age=7200"), "\(stored)")
+        #expect(!stored.contains("max-age=3600"), "\(stored)")
+    }
+
+    /// What a `304` that says nothing about freshness leaves alone: the lifetime of the entry.
+    @Test
+    func revalidation_whenA304CarriesOnlyPublic_theEntryKeepsItsFreshness() async throws {
+        // Given
+        let dataCache = makeCache()
+        let configuration = makeConfiguration(strategy: .reloadAndValidateCachedData)
+
+        await store(
+            response([("ETag", "\"v1\""), ("Cache-Control", "no-cache, max-age=3600, immutable")], age: 7_200),
+            key: configuration.url,
+            in: dataCache
+        )
+
+        // When
+        _ = await decide(
+            configuration,
+            in: dataCache,
+            client: Client(head: head(status: 304, [("Cache-Control", "public")]))
+        )
+
+        // Then
+        let stored = await storedCacheControl(configuration, in: dataCache)
+        #expect(stored.contains("public"), "\(stored)")
+        #expect(stored.contains("max-age=3600"), "\(stored)")
+        #expect(stored.contains("immutable"), "\(stored)")
+        #expect(!stored.contains("no-cache"), "\(stored)")
+    }
+
     @Test
     func revalidation_whenA304CarriesNoCacheControlAtAll_stillRenewsTheEntry() async throws {
         // Given

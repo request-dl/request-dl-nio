@@ -894,12 +894,19 @@ extension Internals {
         }
 
         /// What the new `Cache-Control` says wins, directive by directive. A directive it does not
-        /// mention keeps what the stored response said.
+        /// mention keeps what the stored response said, except the ones that demand revalidation.
         ///
         /// A `304` rarely repeats everything: one that sends only `public` says nothing about
         /// freshness, and replacing the header with it took the `max-age` away, which left the entry
-        /// with no lifetime at all (RFC 9111 §4.3.4 updates the stored response with the fields
-        /// the `304` carries, it does not take away the ones it does not).
+        /// with no lifetime at all. So what the stored response said about freshness (`max-age`,
+        /// `immutable`, `stale-while-revalidate`...) stays when the `304` does not repeat it.
+        ///
+        /// What it said about revalidation does not (`no-cache`, `no-store`, `must-revalidate`,
+        /// `proxy-revalidate`): a `Cache-Control` that is on the `304` replaces the field the
+        /// stored response had (RFC 9111 §4.3.4), so a requirement the server stopped sending is
+        /// one it no longer makes. Kept, it made the entry stale for good: `isFresh` is `false`
+        /// for a `no-cache`, so every later request went to the network and `.useCachedDataOnly`
+        /// refused the entry, until a `200` replaced it.
         private func mergeCacheControl(
             _ headers: inout RequestDL.HTTPHeaders,
             with newHeaders: RequestDL.HTTPHeaders
@@ -929,7 +936,11 @@ extension Internals {
             }
 
             let kept = directives(headers["Cache-Control"] ?? [])
-                .filter { !$0.isEmpty && !freshNames.contains(name(of: $0)) }
+                .filter {
+                    !$0.isEmpty
+                        && !freshNames.contains(name(of: $0))
+                        && !Self.revalidationDirectives.contains(name(of: $0))
+                }
 
             let merged = (fresh + kept).joined(separator: ", ")
 
@@ -943,6 +954,11 @@ extension Internals {
             headers.remove(name: "Cache-Control")
             headers.add(name: "Cache-Control", value: merged)
         }
+
+        /// The directives that make a stored response need the origin before it is served.
+        private static let revalidationDirectives: Set<String> = [
+            "no-cache", "no-store", "must-revalidate", "proxy-revalidate",
+        ]
 
         private func replaceHeader(
             _ headers: inout RequestDL.HTTPHeaders,

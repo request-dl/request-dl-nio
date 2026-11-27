@@ -63,7 +63,7 @@ An error response (`404`, `405`, `410`, `414`, `501`) is stored, and reused, onl
 
 A stale response is not removed for its age. It stays until a newer response for the URL replaces it, or the disk tier needs the room, so that ``RequestDL/CacheStrategy/useCachedDataOnly`` can still give it to a caller that is offline. The exception is one that must be validated before it is used (`must-revalidate`, or `no-cache`, which a `304` can add): it is not given while stale, and it is kept for a request that revalidates.
 
-A `304 Not Modified` updates the stored response with the `Cache-Control` directives it carries and keeps the ones it does not mention, so one that only says `public` does not take the `max-age` away. A `304` that says `no-store` removes the entry and the request goes to the network; one that says `no-cache` is used for the request that validated it and must be validated again before every later use.
+A `304 Not Modified` updates the stored response with the `Cache-Control` directives it carries and keeps the freshness ones it does not mention (`max-age`, `immutable`...), so one that only says `public` does not take the `max-age` away. What the stored response said about revalidation (`no-cache`, `must-revalidate`, `proxy-revalidate`) is the `304`'s to say: when it carries a `Cache-Control` that does not repeat them, the entry no longer has them, so a requirement the server stopped sending does not outlive it. A `304` that says `no-store` removes the entry and the request goes to the network; one that says `no-cache` is used for the request that validated it and must be validated again before every later use.
 
 ### Large responses and a slow cache
 
