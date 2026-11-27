@@ -309,6 +309,10 @@ struct NSImageViewRequestDLTests {
         return (loader, image)
     }
 
+    private static func failing() -> StubImageTask {
+        StubImageTask { throw OfflineError() }
+    }
+
     private static func slow(_ nanoseconds: UInt64 = 300_000_000) -> StubImageTask {
         StubImageTask {
             try await Task.sleep(nanoseconds: nanoseconds)
@@ -339,6 +343,7 @@ struct NSImageViewRequestDLTests {
         let url = URL(string: "https://invalid.invalid/warm.png")!
         let loader = RDLImageLoader()
         let cached = try await loader.load(
+            origin: .url,
             id: url.absoluteString,
             task: StubImageTask { .init(head: .stub, payload: .onePixelPNG) }
         )
@@ -532,6 +537,7 @@ struct NSImageViewRequestDLTests {
         )
 
         let image = try await loader.load(
+            origin: .url,
             id: url.absoluteString,
             task: StubImageTask { .init(head: .stub, payload: .onePixelPNG) }
         )
@@ -671,6 +677,141 @@ struct NSImageViewRequestDLTests {
         // Then
         #expect(await ran.value)
     }
+
+    // MARK: - A copy the request did not confirm
+
+    /// Account A's avatar is in memory under the id account B uses too. B's request fails (offline,
+    /// 401, 5xx): the view must not stay showing A's picture.
+    @Test
+    func aFailedRequestTakesTheImageInMemoryOffTheView() async throws {
+        // Given
+        let (loader, cached) = try await Self.warmedLoader(id: "avatar")
+        let imageView = NSImageView()
+        let signal = AsyncSignal()
+        let results = LockedValueBox<[Result<NSImage, Error>]>([])
+
+        // When
+        imageView.rdl.setImage(id: "avatar", task: Self.failing(), loader: loader) { result in
+            results.withLockedValue { $0.append(result) }
+            signal.signal()
+        }
+
+        // Then: shown first, and gone once the request is known to have failed.
+        #expect(imageView.image === cached)
+        try await signal.wait()
+
+        #expect(imageView.image == nil)
+        #expect(results.withLockedValue { $0 }.count == 1)
+        if case .success = results.withLockedValue({ $0 })[0] {
+            Issue.record("The request was expected to fail")
+        }
+    }
+
+    @Test
+    func aFailedRequestPutsThePlaceholderBackInsteadOfTheImageInMemory() async throws {
+        // Given
+        let (loader, cached) = try await Self.warmedLoader(id: "avatar")
+        let imageView = NSImageView()
+        let placeholder = NSImage()
+        let signal = AsyncSignal()
+
+        // When
+        imageView.rdl.setImage(id: "avatar", task: Self.failing(), placeholder: placeholder, loader: loader) { _ in
+            signal.signal()
+        }
+
+        #expect(imageView.image === cached)
+        try await signal.wait()
+
+        // Then
+        #expect(imageView.image === placeholder)
+    }
+
+    /// Keeping the current image is what the view would show without the copy, so it is what it
+    /// goes back to.
+    @Test
+    func aFailedRequestPutsBackTheImageTheViewKeptInsteadOfTheImageInMemory() async throws {
+        // Given
+        let (loader, cached) = try await Self.warmedLoader(id: "avatar")
+        let imageView = NSImageView()
+        let before = NSImage()
+        imageView.image = before
+        let signal = AsyncSignal()
+
+        // When
+        imageView.rdl.setImage(
+            id: "avatar",
+            task: Self.failing(),
+            placeholder: NSImage(),
+            loader: loader,
+            keepsCurrentImageWhileLoading: true
+        ) { _ in
+            signal.signal()
+        }
+
+        #expect(imageView.image === cached)
+        try await signal.wait()
+
+        // Then
+        #expect(imageView.image === before)
+    }
+
+    /// A view that did not get an image from memory is left as it was by a failure.
+    @Test
+    func aFailedRequestLeavesAViewWithoutAnImageInMemoryAsItWas() async throws {
+        // Given
+        let imageView = NSImageView()
+        let placeholder = NSImage()
+        let signal = AsyncSignal()
+
+        // When
+        imageView.rdl.setImage(
+            id: "nothing-in-memory",
+            task: Self.failing(),
+            placeholder: placeholder,
+            loader: RDLImageLoader()
+        ) { _ in
+            signal.signal()
+        }
+
+        try await signal.wait()
+
+        // Then
+        #expect(imageView.image === placeholder)
+    }
+
+    /// The task path writes under the `id` it was given: that image was loaded with the task's
+    /// headers and credentials, not with the URL alone, so for `setImage(with:)` it is a miss and
+    /// the request is made.
+    @Test
+    func anImageLoadedByATaskWithTheURLAsItsIDIsNotTheAnswerForTheURL() async throws {
+        // Given
+        let loader = RDLImageLoader()
+        _ = try await loader.load(
+            id: Self.unreachable.absoluteString,
+            task: StubImageTask { .init(head: .stub, payload: .onePixelPNG) }
+        )
+
+        let imageView = NSImageView()
+        imageView.image = NSImage()
+        let results = LockedValueBox<[Result<NSImage, Error>]>([])
+
+        // When
+        imageView.rdl.setImage(with: Self.unreachable, loader: loader) { result in
+            results.withLockedValue { $0.append(result) }
+        }
+
+        // Then: not completed before the method returned, and the request is the one that ends it.
+        #expect(loader.cachedImage(url: Self.unreachable) == nil)
+        #expect(imageView.image == nil)
+        #expect(results.withLockedValue { $0 }.isEmpty)
+
+        try await eventually { results.withLockedValue { $0 }.count == 1 }
+
+        if case .success = results.withLockedValue({ $0 })[0] {
+            Issue.record("The request was expected to fail")
+        }
+    }
 }
 
 // MARK: - Test helpers
@@ -683,6 +824,8 @@ private struct StubImageTask: RequestTask {
         try await onResult()
     }
 }
+
+private struct OfflineError: Error {}
 
 private actor Flag {
 

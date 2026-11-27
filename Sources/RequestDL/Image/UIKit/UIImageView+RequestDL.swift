@@ -106,7 +106,7 @@ extension RDLWrapper where Base: UIImageView {
             base.image = placeholder
         }
 
-        run({ try await loader.load(url: url) }, completion: completion)
+        run({ try await loader.load(url: url) }, restoringOnFailure: nil, completion: completion)
     }
 
     ///
@@ -126,7 +126,12 @@ extension RDLWrapper where Base: UIImageView {
     /// Unlike ``setImage(with:placeholder:loader:keepsCurrentImageWhileLoading:refreshing:completion:)``,
     /// the request is always made: the caller controls its cache policy, headers and credentials,
     /// and the key is the `id` they chose, so a copy in memory made for another account or another
-    /// policy must never be the final answer.
+    /// policy must never be the final answer: when the request fails, the view goes back to what it
+    /// would have shown without the copy (`placeholder`, or what it was showing when
+    /// `keepsCurrentImageWhileLoading` is `true`). Only an image loaded by URL is the answer for a
+    /// URL, so one loaded here with an `id` equal to a URL's `absoluteString` is not what
+    /// ``setImage(with:placeholder:loader:keepsCurrentImageWhileLoading:refreshing:completion:)``
+    /// shows for it. When the account changes, call ``RDLImageLoader/removeAllCachedImages()``.
     ///
     /// Cancels any load already in flight on this image view before starting, so it is safe to
     /// call from `tableView(_:cellForRowAt:)`/`collectionView(_:cellForItemAt:)` even when cells
@@ -135,7 +140,8 @@ extension RDLWrapper where Base: UIImageView {
     /// - Parameters:
     ///    - id: A stable identifier for the request, used to deduplicate concurrent loads. It
     ///    can't be derived automatically from an arbitrary ``RequestTask``, so callers supply it
-    ///    explicitly, typically the URL or endpoint the request resolves to.
+    ///    explicitly. Use a name that tells the request apart, such as the endpoint plus whatever
+    ///    changes the answer (the user, the size); it does not have to be a URL.
     ///    - task: The task that performs the request, e.g. a ``DataTask``.
     ///    - placeholder: The image to set immediately, shown until the load finishes. Passing
     ///    `nil` (the default) clears the image view instead, so a reused view never keeps
@@ -160,24 +166,38 @@ extension RDLWrapper where Base: UIImageView {
     ) {
         cancel()
 
+        // What the view shows while the load runs when the loader has nothing for `id`. Keeping the
+        // current image only means something when there is one: an empty view has nothing to keep
+        // and shows the placeholder, which is what the parameter's name promises.
+        let before = base.image
+        let fallback = !keepsCurrentImageWhileLoading || before == nil ? placeholder : before
+
         // An image this loader already loaded is shown at once, in place of the placeholder or of
         // an empty view: the load below still runs and replaces it, but the view never goes
-        // blank for the frames in between.
+        // blank for the frames in between. It was not made by this request, so when the request
+        // fails the view goes back to what it would show without it.
+        let imageView = base
+        let restore: (@MainActor () -> Void)?
+
         if let cached = loader.cachedImage(id: id) {
-            base.image = cached
-        } else if !keepsCurrentImageWhileLoading || base.image == nil {
-            // Keeping the current image only means something when there is one: an empty view has
-            // nothing to keep and shows the placeholder, which is what the parameter's name promises.
-            base.image = placeholder
+            imageView.image = cached
+            restore = { imageView.image = fallback }
+        } else {
+            imageView.image = fallback
+            restore = nil
         }
 
-        run({ try await loader.load(id: id, task: task) }, completion: completion)
+        run({ try await loader.load(id: id, task: task) }, restoringOnFailure: restore, completion: completion)
     }
 
     // MARK: - Private methods
 
+    /// - Parameter restoringOnFailure: Called when the load fails, before `completion`, to take an
+    /// image from memory off the view that the load was meant to confirm. `nil` leaves the view as
+    /// it is.
     private func run(
         _ load: @escaping @Sendable () async throws -> UIImage,
+        restoringOnFailure restore: (@MainActor () -> Void)?,
         completion: (@Sendable (Result<UIImage, Error>) -> Void)?
     ) {
         let imageView = base
@@ -196,6 +216,7 @@ extension RDLWrapper where Base: UIImageView {
                     return
                 }
 
+                restore?()
                 completion?(.failure(error))
             }
         }

@@ -383,7 +383,7 @@ struct RDLImageLoaderTests {
         let loader = RDLImageLoader()
         let url = URL(string: "https://example.com/a.png?size=2")!
 
-        let image = try await loader.load(id: url.absoluteString, task: png())
+        let image = try await loader.load(origin: .url, id: url.absoluteString, task: png())
 
         #expect(loader.cachedImage(url: url) === image)
         #expect(loader.cachedImage(url: URL(string: "https://example.com/a.png")!) == nil)
@@ -447,7 +447,7 @@ struct RDLImageLoaderTests {
         let url = URL(string: "https://example.com/b.png")!
         _ = try await loader.load(id: "a", task: png())
         _ = try await loader.load(id: "b", task: png())
-        _ = try await loader.load(id: url.absoluteString, task: png())
+        _ = try await loader.load(origin: .url, id: url.absoluteString, task: png())
 
         loader.removeCachedImage(id: "a")
         loader.removeCachedImage(url: url)
@@ -522,6 +522,119 @@ struct RDLImageLoaderTests {
 
         // Then
         #expect(loader.cachedImage(id: "avatar") != nil)
+    }
+
+    // MARK: - Loads by URL and loads by task
+
+    /// An image an authenticated task loaded under an `id` that is a URL's `absoluteString` is
+    /// not the answer for that URL: the URL path has no credentials. A view that loads by task
+    /// still gets it first, through `cachedImage(id:)`.
+    @Test
+    func cachedImage_forAURL_isNotTheImageOfATaskWithTheSameID() async throws {
+        let loader = RDLImageLoader()
+        let url = URL(string: "https://cdn.example.com/private/avatar/123.png")!
+
+        let image = try await loader.load(id: url.absoluteString, task: png())
+
+        #expect(loader.cachedImage(url: url) == nil)
+        #expect(loader.cachedImage(id: url.absoluteString) === image)
+    }
+
+    @Test
+    func cachedImage_forAURL_isStillTheImageOfALoadByURL_whichAnIDLookUpAlsoSees() async throws {
+        let loader = RDLImageLoader()
+        let url = URL(string: "https://example.com/public.png")!
+
+        let image = try await loader.load(origin: .url, id: url.absoluteString, task: png())
+
+        #expect(loader.cachedImage(url: url) === image)
+        #expect(loader.cachedImage(id: url.absoluteString) === image)
+    }
+
+    /// The last load to finish owns the entry: a task that loads under the URL's string takes the
+    /// URL path's copy away, and a load by URL takes the task's place.
+    @Test
+    func theLastLoadToFinish_decidesWhatTheURLPathMayUse() async throws {
+        let loader = RDLImageLoader()
+        let url = URL(string: "https://example.com/avatar.png")!
+
+        _ = try await loader.load(origin: .url, id: url.absoluteString, task: png())
+        _ = try await loader.load(id: url.absoluteString, task: png())
+        #expect(loader.cachedImage(url: url) == nil)
+
+        let byURL = try await loader.load(origin: .url, id: url.absoluteString, task: png())
+        #expect(loader.cachedImage(url: url) === byURL)
+    }
+
+    /// The request a load by URL makes is the URL alone. It does not wait for a download a task
+    /// started under the same string, which may be carrying a token (and may fail or answer
+    /// something else without it), and neither does a task wait for the URL's.
+    @Test
+    func aLoadByURL_doesNotJoinTheDownloadOfATaskWithTheSameID_andTheOtherWayAround() async throws {
+        // Given: a task with credentials, in flight under the URL's string.
+        let gate = Gate()
+        let authenticatedProbe = RequestProbe()
+        let authenticated = StubImageTask {
+            await authenticatedProbe.started()
+            await gate.wait()
+
+            return .init(head: .stub, payload: .onePixelPNG)
+        }
+
+        let urlProbe = RequestProbe()
+        let urlRequest = StubImageTask {
+            await urlProbe.started()
+            await gate.wait()
+
+            return .init(head: .stub, payload: .onePixelPNG)
+        }
+
+        let loader = RDLImageLoader()
+        let id = "https://cdn.example.com/private/avatar/123.png"
+        let first = Task { try await loader.load(id: id, task: authenticated) }
+        try await eventually { await authenticatedProbe.didStart }
+
+        // When: a load by URL arrives for the same string, and then a second task.
+        let byURL = Task { try await loader.load(origin: .url, id: id, task: urlRequest) }
+        try await eventually { await urlProbe.didStart }
+        let second = Task { try await loader.load(id: id, task: authenticated) }
+        try await eventually { await loader.waiterCountForTesting(id: id, origin: .task) == 2 }
+
+        // Then: each kind has a download of its own, and the second task joined the first.
+        #expect(await loader.waiterCountForTesting(id: id, origin: .url) == 1)
+        #expect(await authenticatedProbe.startCount == 1)
+        #expect(await urlProbe.startCount == 1)
+
+        await gate.open()
+        _ = try await first.value
+        _ = try await byURL.value
+        _ = try await second.value
+    }
+
+    /// The deduplication that is legitimate stays: two loads of the same URL are one request.
+    @Test
+    func twoLoadsByURL_ofTheSameURL_shareOneRequest() async throws {
+        let gate = Gate()
+        let probe = RequestProbe()
+        let task = StubImageTask {
+            await probe.started()
+            await gate.wait()
+
+            return .init(head: .stub, payload: .onePixelPNG)
+        }
+
+        let loader = RDLImageLoader()
+        let id = "https://example.com/avatar.png"
+        let first = Task { try await loader.load(origin: .url, id: id, task: task) }
+        try await eventually { await probe.didStart }
+        let second = Task { try await loader.load(origin: .url, id: id, task: task) }
+        try await eventually { await loader.waiterCountForTesting(id: id, origin: .url) == 2 }
+
+        await gate.open()
+
+        _ = try await first.value
+        _ = try await second.value
+        #expect(await probe.startCount == 1)
     }
 
     @Test
@@ -602,7 +715,7 @@ struct RDLImageLoaderTests {
         let cache = RDLImageMemoryCache(limit: 1_024, timeToLive: 10) { clock.withLockedValue { $0 } }
         let image = try makeImage()
 
-        cache.insert(image, for: "a")
+        cache.insert(image, for: "a", origin: .task)
 
         clock.withLockedValue { $0 = Date(timeIntervalSince1970: 1_009) }
         #expect(cache.image(for: "a") === image)
@@ -619,7 +732,7 @@ struct RDLImageLoaderTests {
         let first = try makeImage()
         let second = try makeImage()
 
-        cache.insert(first, for: "a")
+        cache.insert(first, for: "a", origin: .task)
         clock.withLockedValue { $0 = Date(timeIntervalSince1970: 1_020) }
         #expect(cache.image(for: "a") == nil)
 
@@ -627,9 +740,26 @@ struct RDLImageLoaderTests {
         clock.withLockedValue { $0 = Date(timeIntervalSince1970: 1_000) }
         #expect(cache.image(for: "a") == nil)
 
-        cache.insert(second, for: "a")
+        cache.insert(second, for: "a", origin: .task)
         clock.withLockedValue { $0 = Date(timeIntervalSince1970: 1_005) }
         #expect(cache.image(for: "a") === second)
+    }
+
+    /// A look-up for the other origin is a miss, not an expiry: the entry is left for the one it
+    /// belongs to, and it still expires on its own time.
+    @Test
+    func anEntryOfAnotherOrigin_isAMissForTheLookUp_andIsNotRemovedByIt() throws {
+        let clock = LockedValueBox(Date(timeIntervalSince1970: 1_000))
+        let cache = RDLImageMemoryCache(limit: 1_024, timeToLive: 10) { clock.withLockedValue { $0 } }
+        let image = try makeImage()
+
+        cache.insert(image, for: "a", origin: .task)
+        #expect(cache.image(for: "a", origin: .url) == nil)
+        #expect(cache.image(for: "a", origin: .task) === image)
+        #expect(cache.image(for: "a") === image)
+
+        clock.withLockedValue { $0 = Date(timeIntervalSince1970: 1_010) }
+        #expect(cache.image(for: "a", origin: .task) == nil)
     }
 
     @Test(arguments: [nil, TimeInterval.infinity] as [TimeInterval?])
@@ -638,7 +768,7 @@ struct RDLImageLoaderTests {
         let cache = RDLImageMemoryCache(limit: 1_024, timeToLive: timeToLive) { clock.withLockedValue { $0 } }
         let image = try makeImage()
 
-        cache.insert(image, for: "a")
+        cache.insert(image, for: "a", origin: .task)
         clock.withLockedValue { $0 = Date(timeIntervalSince1970: 1_000_000_000) }
 
         #expect(cache.image(for: "a") === image)
@@ -650,7 +780,7 @@ struct RDLImageLoaderTests {
         let cache = RDLImageMemoryCache(limit: 1_024, timeToLive: nil) { clock.withLockedValue { $0 } }
         let image = try makeImage()
 
-        cache.insert(image, for: "a")
+        cache.insert(image, for: "a", origin: .task)
         clock.withLockedValue { $0 = Date(timeIntervalSince1970: 1_100) }
         #expect(cache.image(for: "a") === image)
 

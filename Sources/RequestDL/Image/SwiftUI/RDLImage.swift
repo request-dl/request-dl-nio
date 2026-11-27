@@ -62,19 +62,27 @@ import struct Foundation.Data
 /// is created, instead of ``RDLImagePhase/empty``. What happens next depends on how the image is
 /// asked for: with a `url` that is the whole answer and no request is made, and with a `task` the
 /// request still runs and its result replaces the copy (the caller controls the cache policy,
-/// headers and credentials, and the key is their own `id`). If that request fails, the copy stays
-/// on screen.
+/// headers and credentials, and the key is their own `id`). If that request fails, the view goes
+/// to ``RDLImagePhase/failure(_:)``: a copy the request did not confirm, which may have been made
+/// for another account, is not left on screen.
 ///
-/// Pass `refreshing: true` with a `url` to make the request anyway, as `task` does: the copy is
-/// still the first phase, the request's result replaces it, and a failed request leaves it on
-/// screen. ``RDLImageLoader/removeCachedImage(url:)`` forgets the copy for every view instead, and
-/// the view then starts empty.
+/// Only an image that was loaded by a `url` is the answer for a `url`. One loaded with an `id`
+/// and a `task` is not, even when its `id` is that URL's `absoluteString`: the task may have sent
+/// credentials the URL path does not. When the account changes, call
+/// ``RDLImageLoader/removeAllCachedImages()``.
+///
+/// Pass `refreshing: true` with a `url` to make the request anyway: the copy is still the first
+/// phase, the request's result replaces it, and a failed request leaves it on screen, since it is
+/// an answer for that same URL. ``RDLImageLoader/removeCachedImage(url:)`` forgets the copy for
+/// every view instead, and the view then starts empty.
 ///
 /// - Important: `id` identifies the request for both restarting the load (when it changes, the
 /// current load is cancelled and a new one begins, same as `AsyncImage` reacting to a new `url`)
 /// and deduplicating concurrent loads in ``RDLImageLoader``. It can't be derived automatically
-/// from an arbitrary ``RequestTask``, so callers supply it explicitly, typically the URL or
-/// endpoint the request resolves to.
+/// from an arbitrary ``RequestTask``, so callers supply it explicitly. Use a name that tells the
+/// request apart, such as the endpoint plus whatever changes the answer (the user, the size); it
+/// does not have to be a URL, and one that equals a URL does not make the image visible to
+/// `RDLImage(url:)`.
 public struct RDLImage<Content: View>: View {
 
     // MARK: - Private properties
@@ -116,8 +124,12 @@ public struct RDLImage<Content: View>: View {
         /// The phase to show first: the copy in memory when there is one, empty otherwise.
         let phase: RDLImagePhase
 
-        /// Whether `phase` is a copy in memory, which a failed request must not replace.
+        /// Whether `phase` is a copy in memory.
         let isCached: Bool
+
+        /// Whether a failed request leaves `phase` on screen. Only a URL's copy, which is an answer
+        /// for that URL: a task's copy was not confirmed by its request.
+        let keepsCopyOnFailure: Bool
 
         /// Whether the request is made. `false` only for a URL with a valid copy.
         let runsRequest: Bool
@@ -145,16 +157,17 @@ public struct RDLImage<Content: View>: View {
             hasAnswer = false
 
         case nil:
-            return LoadPlan(phase: .empty, isCached: false, runsRequest: false)
+            return LoadPlan(phase: .empty, isCached: false, keepsCopyOnFailure: false, runsRequest: false)
         }
 
         guard let cached else {
-            return LoadPlan(phase: .empty, isCached: false, runsRequest: true)
+            return LoadPlan(phase: .empty, isCached: false, keepsCopyOnFailure: false, runsRequest: true)
         }
 
         return LoadPlan(
             phase: .success(Image(platformImage: cached, scale: scale)),
             isCached: true,
+            keepsCopyOnFailure: hasAnswer,
             runsRequest: !hasAnswer || refreshing
         )
     }
@@ -275,8 +288,9 @@ public struct RDLImage<Content: View>: View {
                 return
             }
 
-            // A copy in memory that is on screen stays when its request fails.
-            guard !plan.isCached else {
+            // A URL's copy that is on screen stays when its request fails. A task's does not: the
+            // request did not confirm it, and it may have been made for another account.
+            guard !plan.keepsCopyOnFailure else {
                 return
             }
 
