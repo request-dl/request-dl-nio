@@ -400,6 +400,12 @@ public struct Session: Property {
     /// ``RedirectError/Reason/limitReached``, as it does when `max` is reached. The other
     /// executors honor `max`.
     ///
+    /// > Note: A `Location` that is not a URL at all (`http://[bad`) is not followed by the
+    /// `.nio` and `.nioTransportServices` executors, which return the `3xx` response. The
+    /// `URLSession` executor fails the request with the system's own error (`NSURLErrorDomain`,
+    /// code -1003), because the system fails it before the redirect reaches this package.
+    /// A `304` or `305` is never followed, with a `Location` or not, by any executor.
+    ///
     /// > Important: When a redirect leaves the origin (scheme, host and port) of the request it
     /// redirects, `Authorization`, `Proxy-Authorization`, `Cookie`, `Origin` and an explicit `Host`
     /// are removed from it. Every other header is forwarded as it is, a custom API-key header such

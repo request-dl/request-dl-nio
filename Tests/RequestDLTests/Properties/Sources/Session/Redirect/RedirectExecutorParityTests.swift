@@ -244,6 +244,116 @@ struct RedirectExecutorParityTests {
         #expect(requests.map(\.method) == [methods.original, methods.redirected])
     }
 
+    /// A `304` answers a conditional request with what the caller already has, and a `305` is a
+    /// deprecated hint about a proxy: neither is a redirect, whatever `Location` they carry.
+    /// `URLSession` hands the response back; AsyncHTTPClient followed them.
+    @Test(arguments: TransferTestExecutor.allCases, [Mode.standard, .follow, .strategy])
+    func dataTask_whenAnsweredWith304Or305AndALocation_returnsTheStatusInsteadOfFollowing(
+        executor: TransferTestExecutor,
+        mode: Mode
+    ) async throws {
+        for status in [304, 305] {
+            // Given
+            let asked = LockedValueBox(false)
+
+            let server = try await ScriptedServer { received in
+                received.uri == "/start" ? .redirect(status, to: "/next") : .ok()
+            }
+
+            // When
+            let result = try await DataTask {
+                BaseURL(.http, host: "127.0.0.1:\(server.port)")
+                Path("/start")
+
+                if mode == .strategy {
+                    executor.pinnedSession.onRedirect { context in
+                        asked.withLockedValue { $0 = true }
+                        return .follow(context.redirectRequest)
+                    }
+                } else {
+                    mode.apply(to: executor.pinnedSession)
+                }
+            }
+            .result()
+
+            let requests = server.requests
+            await server.shutdown()
+
+            // Then
+            #expect(result.head.status.code == UInt(status))
+            #expect(requests.map(\.uri) == ["/start"])
+            #expect(!asked.withLockedValue { $0 })
+        }
+    }
+
+    /// A `Location` that is no URL at all (`http://[bad`): the redirect is not followed and the
+    /// `3xx` is the response. Only the AsyncHTTPClient executors: `URLSession` fails the exchange
+    /// with `NSURLErrorDomain` -1003 before the redirect reaches the delegate, which cannot be
+    /// changed from here, and `Session.enableRedirectFollow(max:allowCycles:)` documents it.
+    @Test(arguments: TransferTestExecutor.allCases.filter(\.isNIO), [Mode.standard, .follow, .strategy])
+    func dataTask_whenTheLocationIsNotAURL_returnsTheRedirectResponse(
+        executor: TransferTestExecutor,
+        mode: Mode
+    ) async throws {
+        // Given
+        let server = try await ScriptedServer { _ in .redirect(to: "http://[bad") }
+
+        // When
+        let result = try await DataTask {
+            BaseURL(.http, host: "127.0.0.1:\(server.port)")
+            Path("/start")
+
+            mode.apply(to: executor.pinnedSession)
+        }
+        .result()
+
+        let requests = server.requests
+        await server.shutdown()
+
+        // Then
+        #expect(result.head.status.code == 302)
+        #expect(requests.map(\.uri) == ["/start"])
+    }
+
+    /// The `Location` is followed as the server wrote it, but the user and password in it are not
+    /// reported back in `ResponseHead.url`, which goes to logs as often as not.
+    @Test(arguments: TransferTestExecutor.allCases, [Mode.standard, .follow, .strategy])
+    func dataTask_whenTheLocationHasUserInfo_doesNotReportItInTheResponseURL(
+        executor: TransferTestExecutor,
+        mode: Mode
+    ) async throws {
+        // Given
+        let origin = LockedValueBox("")
+
+        let server = try await ScriptedServer { received in
+            received.uri == "/start"
+                ? .redirect(to: "http://user:s3cret@\(origin.withLockedValue { $0 })/next?q=1")
+                : .ok()
+        }
+
+        origin.withLockedValue { $0 = "127.0.0.1:\(server.port)" }
+
+        // When
+        let result = try await DataTask {
+            BaseURL(.http, host: "127.0.0.1:\(server.port)")
+            Path("/start")
+
+            mode.apply(to: executor.pinnedSession)
+        }
+        .result()
+
+        let requests = server.requests
+        await server.shutdown()
+
+        // Then
+        #expect(result.head.status.code == 200)
+        #expect(requests.map(\.uri) == ["/start", "/next?q=1"])
+
+        let reported = try #require(result.head.url?.absoluteString)
+        #expect(reported == "http://127.0.0.1:\(server.port)/next?q=1")
+        #expect(!reported.contains("s3cret"))
+    }
+
     /// The server answers a request with the redirect as soon as it has read its body, while the
     /// client may still be writing it out: following the redirect must not be cancelled because the
     /// request body stream was. A regression of `requestStreamCancelled`, fixed in the

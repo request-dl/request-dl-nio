@@ -43,6 +43,12 @@ extension Internals {
         // MARK: - Internal methods
 
         func redirectDecision(for context: HTTPClientRedirectContext) throws -> HTTPClientRedirectDecision {
+            // Not a redirect (RFC 9110, 15.4.5 and 15.4.6), whatever `Location` it carries:
+            // `URLSession` hands the response back, and so does this.
+            guard !Internals.RedirectSanitizer.isNotARedirect(statusCode: context.response.status.code) else {
+                return .doNotFollow
+            }
+
             // `.follow` tracks the URLs visited so far, the first request's included, and refuses
             // once there are more than `max` of them. `history` holds exactly those requests.
             guard context.history.count <= max else {

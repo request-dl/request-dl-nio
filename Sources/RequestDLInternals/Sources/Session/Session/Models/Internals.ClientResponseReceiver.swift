@@ -204,7 +204,7 @@ extension Internals {
                 }
 
                 let responseHead = ResponseHead(
-                    url: _redirectedURL ?? url,
+                    url: Internals.RedirectSanitizer.removingUserInfo(from: _redirectedURL ?? url),
                     status: ResponseHead.Status(
                         code: head.status.code,
                         reason: head.status.reasonPhrase
