@@ -30,6 +30,15 @@ struct MemoryStorage: Sendable {
         let cachedResponse: CachedResponse
         var dataURL: Internals.ByteURL
 
+        /// Whether the whole body is in `dataURL`. A record that a write allocated is not, until
+        /// that write is finished (see ``MemoryStorage/finish(_:ifDataURL:)``); one that was
+        /// installed with its bytes already in place, or renewed from a finished one, is.
+        ///
+        /// Only a finished record is worth putting back when the write that replaced it is given
+        /// up on: an unfinished one is a body that may stop anywhere, and that nobody is left to
+        /// complete.
+        var isFinished = false
+
         // MARK: - Inits
 
         init(
@@ -138,6 +147,7 @@ struct MemoryStorage: Sendable {
         )
 
         newRecord.dataURL = record.dataURL
+        newRecord.isFinished = record.isFinished
 
         records[key] = newRecord
     }
@@ -199,10 +209,22 @@ struct MemoryStorage: Sendable {
             cachedResponse: cachedResponse
         )
 
-        let replaced = records[key]
+        // What an earlier write of the key left in the middle is not something to go back to: its
+        // body is partial, and if that write fails too, nothing would ever complete it.
+        let replaced = records[key].flatMap { $0.isFinished ? $0 : nil }
         records[key] = record
 
         return (record.dataURL, usageAfterEviction + contentLength, replaced)
+    }
+
+    /// Marks the record at `key` as whole, when it is still the one `dataURL` identifies: the write
+    /// that allocated it has written its whole body.
+    mutating func finish(_ key: String, ifDataURL dataURL: Internals.ByteURL) {
+        guard records[key]?.dataURL === dataURL else {
+            return
+        }
+
+        records[key]?.isFinished = true
     }
 
     /// Puts back the record that a write replaced, when that write is given up on and its own
@@ -248,6 +270,7 @@ struct MemoryStorage: Sendable {
         )
 
         record.dataURL = dataURL
+        record.isFinished = true
         records[key] = record
 
         return (true, usageAfterEviction + size)
