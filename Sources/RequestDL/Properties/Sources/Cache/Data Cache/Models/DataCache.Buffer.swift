@@ -40,6 +40,10 @@ extension DataCache {
         /// a concurrent request.
         let memoryDataURL: Internals.ByteURL?
 
+        /// The storage key this write is for. Only needed to tell the memory tier the write is
+        /// whole: see ``DataCache/finalizeWrite(_:contentLengthHint:)``.
+        let key: String?
+
         /// The record in the memory tier that this write replaced, `nil` when there was none or the
         /// write has no memory tier. A write that is given up on puts it back: see
         /// ``DataCache/discardFailedWrite(_:forKey:)``.
@@ -81,6 +85,7 @@ extension DataCache {
         init(
             memoryBuffer: Internals.AnyBuffer?,
             diskBuffer: Internals.AnyBuffer?,
+            key: String? = nil,
             diskRecordURL: URL? = nil,
             memoryDataURL: Internals.ByteURL? = nil,
             replacedMemoryRecord: MemoryStorage.Record? = nil,
@@ -91,6 +96,7 @@ extension DataCache {
         ) {
             self.memoryBuffer = memoryBuffer
             self.diskBuffer = diskBuffer
+            self.key = key
             self.diskRecordURL = diskRecordURL
             self.memoryDataURL = memoryDataURL
             self.replacedMemoryRecord = replacedMemoryRecord

@@ -192,6 +192,75 @@ struct DataCacheRenewalTests {
         #expect(etag(of: cached) == "\"v3\"")
     }
 
+    @Test
+    func twoFailedWritesOfTheKey_theOlderFailingFirst_doNotBringBackTheBodyOfTheOlder() async throws {
+        // Given: two writes of the same key going on at once, the second began while the first
+        // had only part of its body.
+        let cache = DataCache(memoryCapacity: 8_000_000, diskCapacity: 0, suiteName: UUID().uuidString)
+        let key = "https://example.com/" + UUID().uuidString
+
+        var first = try #require(
+            await cache.allocateBuffer(
+                key: key,
+                cachedResponse: response("\"v1\"", date: Date(), policy: .memory),
+                contentLength: 0
+            )
+        )
+        await first.writeData(Data("PARTIAL-W1".utf8))
+
+        var second = try #require(
+            await cache.allocateBuffer(
+                key: key,
+                cachedResponse: response("\"v2\"", date: Date(), policy: .memory),
+                contentLength: 0
+            )
+        )
+        await second.writeData(Data("W2".utf8))
+
+        // When: the older one fails first, then the other.
+        await cache.discardFailedWrite(first, forKey: key)
+        await cache.discardFailedWrite(second, forKey: key)
+
+        // Then: nothing is served, and above all not the body that stopped half way.
+        #expect(await cache.getCachedData(forKey: key, policy: .memory) == nil)
+    }
+
+    @Test
+    func twoFailedWritesOfTheKey_neverLeaveAPartialBody_overAnEntryThatWasWhole() async throws {
+        // Given: an entry, and two refreshes of it that go on at once.
+        let cache = DataCache(memoryCapacity: 8_000_000, diskCapacity: 0, suiteName: UUID().uuidString)
+        let key = "https://example.com/" + UUID().uuidString
+
+        await store(response("\"v0\"", date: Date().addingTimeInterval(-100), policy: .memory), key: key, in: cache)
+
+        var first = try #require(
+            await cache.allocateBuffer(
+                key: key,
+                cachedResponse: response("\"v1\"", date: Date(), policy: .memory),
+                contentLength: 0
+            )
+        )
+        await first.writeData(Data("PARTIAL-W1".utf8))
+
+        let second = try #require(
+            await cache.allocateBuffer(
+                key: key,
+                cachedResponse: response("\"v2\"", date: Date(), policy: .memory),
+                contentLength: 0
+            )
+        )
+
+        // When
+        await cache.discardFailedWrite(first, forKey: key)
+        await cache.discardFailedWrite(second, forKey: key)
+
+        // Then: what is served, if anything, is the whole entry from before, never the partial one.
+        if let cached = await cache.getCachedData(forKey: key, policy: .memory) {
+            #expect(etag(of: cached) == "\"v0\"")
+            #expect(await cached.data == Data(repeating: 7, count: 1_000))
+        }
+    }
+
     // MARK: - The cost of a renewal
 
     @Test

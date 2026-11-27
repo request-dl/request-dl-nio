@@ -988,6 +988,7 @@ public struct DataCache: Sendable, Equatable {
         return .init(
             memoryBuffer: memoryBuffer,
             diskBuffer: diskBuffer,
+            key: key,
             diskRecordURL: diskRecordURL,
             memoryDataURL: memoryDataURL,
             replacedMemoryRecord: replacedMemoryRecord,
@@ -1053,6 +1054,12 @@ public struct DataCache: Sendable, Equatable {
         // of the key before it are no longer needed. A tier the body outgrew has no record left.
         if let diskRecordURL = buffer.diskRecordURL, !buffer.diskOverflowed {
             await storage.diskStorage.finishRecord(at: diskRecordURL)
+        }
+
+        // From here the record is whole, and a later write that replaces it may put it back if
+        // that write is given up on. Not before: see `MemoryStorage.Record.isFinished`.
+        if let key = buffer.key, let memoryDataURL = buffer.memoryDataURL, !buffer.memoryOverflowed {
+            storage.withMemoryStorage { $0.finish(key, ifDataURL: memoryDataURL) }
         }
 
         let actualSize = Int64(buffer.readableBytes)
