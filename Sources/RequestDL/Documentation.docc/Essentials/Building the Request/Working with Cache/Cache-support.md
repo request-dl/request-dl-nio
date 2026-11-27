@@ -119,6 +119,12 @@ The probe only runs when the response advertised `Accept-Ranges: bytes`, which k
 
 > Important: The probe says the body is as long as the server says it is. It does not check the bytes themselves.
 
+### Responses that came through a redirect
+
+An entry is stored under the URL that was requested, and a response that was reached through a redirect is not the answer of that URL: `/latest` can be a `302` to `/v1` today and to `/v2` tomorrow. A response that was answered by another URL than the one requested (the session followed a redirect, whatever its status) is therefore **not cached under the URL that redirected**, and the next request for it goes out and meets the redirect again.
+
+The URL that answered it is cached when it is requested directly: `GET /v1` stores `/v1`, and serves it. To have a redirect's target cached, ask for the target. A redirect that the session does not follow (its own `3xx` is the response) is stored as any other response.
+
 ### Responses to requests with credentials
 
 A cache is keyed by URL, and a ``RequestDL/DataCache`` is often one store for the whole process, so a response fetched with one account's credentials must not be given to another. A request that sends `Authorization`, `Cookie` or `Proxy-Authorization` (a `Cookie` the session's cookie jar adds counts) has its response stored with a SHA-256 digest of each of the three, never their values, and the response is only served to a request that sends the same: not to another account, and not to a request with none. A response stored for a request with none of them is public and is served to every request.

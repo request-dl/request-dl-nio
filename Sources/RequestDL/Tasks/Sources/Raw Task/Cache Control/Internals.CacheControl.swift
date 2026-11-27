@@ -11,6 +11,7 @@ import FoundationEssentials
 import struct Foundation.Data
 import struct Foundation.Date
 import struct Foundation.URL
+import struct Foundation.URLComponents
 #endif
 
 extension Internals {
@@ -969,6 +970,42 @@ extension Internals {
             [200, 203, 204, 300, 301, 308, 404, 405, 410, 414, 501].contains(statusCode)
         }
 
+        /// Whether `head` was answered by another URL than `requestURL`, which is what a followed
+        /// redirect looks like from here.
+        ///
+        /// Compared as the key is: the scheme and the host in lowercase, no fragment, and an empty
+        /// path as `/`, so that the two spellings of one URL are not taken for a redirect (that
+        /// would leave a response out of the cache for no reason). A trailing slash, the query and
+        /// the port do count, since `301 /docs` to `/docs/` is a redirect. A head that does not say
+        /// where it came from is not one.
+        static func isRedirected(_ head: Internals.ResponseHead, from requestURL: String) -> Bool {
+            guard !head.url.isEmpty, head.url != requestURL else {
+                return false
+            }
+
+            func normalized(_ string: String) -> String? {
+                guard var components = URLComponents(string: string) else {
+                    return nil
+                }
+
+                components.fragment = nil
+                components.scheme = components.scheme?.lowercased()
+                components.host = components.host?.lowercased()
+
+                if components.path.isEmpty {
+                    components.path = "/"
+                }
+
+                return components.string
+            }
+
+            guard let answered = normalized(head.url), let requested = normalized(requestURL) else {
+                return true
+            }
+
+            return answered != requested
+        }
+
         private func cacheIfNeeded(
             dataCache: DataCache,
             requestConfiguration: RequestConfiguration
@@ -996,6 +1033,19 @@ extension Internals {
                     // `Vary: *` is a response that no later request can be said to match.
                     !isAny(vary)
                 else {
+                    return nil
+                }
+
+                // The entry is keyed by the URL that was asked for. What a redirect led to is not
+                // what that URL answers: `/latest` is `302 /v1` today and `302 /v2` tomorrow, and
+                // storing `/v1`'s body under `/latest` would keep serving it, for as long as it
+                // is fresh, without the redirect that decides which one it is ever being seen
+                // again. The target is stored when it is asked for directly.
+                guard !Self.isRedirected(head, from: requestConfiguration.url) else {
+                    logger?.log(
+                        level: .info,
+                        "Response will not be cached - it answered a redirect, not the URL that was requested"
+                    )
                     return nil
                 }
 
