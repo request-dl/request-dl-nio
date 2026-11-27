@@ -75,9 +75,11 @@ extension Internals {
         /// its stream as if the body were whole. Zero is what an unreadable file looks like to
         /// everything upstream: a buffer opened over it (`Internals.Buffer.init(addressing:)`,
         /// after waiting out the empty-content retry) is empty and its read ends at once, with no
-        /// error. That is not a failure, only a body that is never more than whole: it can reach
-        /// here only through a file already on disk past 2 GiB on a 32-bit platform, since what
-        /// this package writes there is refused beforehand by `BufferBounds`.
+        /// error. That would send a body of zero bytes in place of the file, so it must never be
+        /// what a caller meets: what this package writes on a 32-bit platform is refused beforehand
+        /// by `BufferBounds`, and a file of the caller's (`Payload(url:)`, `Form(... url:)`) past 2 GiB
+        /// is refused by `FilePayloadFactory`, with a `FilePayloadError`, before a buffer is built over
+        /// it. Only a file that grew past the limit after that check can still read as empty here.
         ///
         /// - Parameter limit: The largest size that is representable; only a test sets it, to
         ///   stand in for a 32-bit `Int` without a file of 2 GiB.

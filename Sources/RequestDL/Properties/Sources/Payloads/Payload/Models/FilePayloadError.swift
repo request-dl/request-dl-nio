@@ -27,6 +27,11 @@ public struct FilePayloadError: Error, Sendable {
         /// A file exists at ``url``, but the file system refused to report on it, most often
         /// because of a permissions problem.
         case cantAccessFile(reason: any Error)
+
+        /// The file has `size` bytes, more than this platform can address (on 32-bit platforms,
+        /// such as watchOS' `arm64_32`, a file of more than 2 GiB). Sent anyway, the body would
+        /// be empty and declare a length of zero, with no error anywhere.
+        case tooLarge(size: Int64)
     }
 
     // MARK: - Public properties
@@ -67,6 +72,12 @@ extension FilePayloadError: CustomStringConvertible {
         case .cantAccessFile(let reason):
             return """
                 RequestDL couldn't read the file at "\(path)" for this Form/Payload upload: \(reason)
+                """
+        case .tooLarge(let size):
+            return """
+                RequestDL couldn't read the file at "\(path)" for this Form/Payload upload: it has \
+                \(size) bytes, more than this platform can address (\(Int.max)). Send it in parts \
+                that do, or from a platform that can.
                 """
         }
     }
