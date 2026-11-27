@@ -136,7 +136,10 @@ struct TUSResumableUploadDialect: ResumableUploadDialect {
                 return .other
             }
 
-            if let length, held < length {
+            // Not the whole body: more is to be sent. An offset past it is `.partial` as well, so
+            // that whoever drives the upload refuses it, instead of finishing an upload on the
+            // word of a server that holds more than the body has.
+            if let length, held != length {
                 return .partial(offset: held)
             }
 

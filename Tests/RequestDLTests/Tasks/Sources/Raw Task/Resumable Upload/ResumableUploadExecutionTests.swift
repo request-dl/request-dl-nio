@@ -283,6 +283,44 @@ struct ResumableUploadExecutionTests {
         }
     }
 
+    /// A server that says the upload is as long as what it holds, for a body that is longer, is
+    /// not to be believed: `Upload-Offset: 100000, Upload-Length: 100000` would end the upload.
+    @Test(arguments: cases)
+    private func aServerThatStatesAnotherLength_isAnError(_ scenario: Case) async throws {
+        try await Self.withUploadServer(scenario) { server in
+            // Given
+            server.uploadDropPlan = [100_000]
+            server.headStatesLength = 100_000
+
+            // Then
+            await #expect(throws: UploadResumptionError(.lengthMismatch(declared: 100_000, length: Int64(Self.size)))) {
+                _ = try await Self.upload(to: server, scenario).result()
+            }
+
+            try await Self.waitForRequests("PATCH", in: server, atLeast: 1)
+
+            #expect(server.requests.filter { $0.method == "PATCH" }.count == 1)
+        }
+    }
+
+    @Test(arguments: Executor.allCases)
+    private func aPatchThatAnswersAnOffsetPastTheBody_isAnError(_ executor: Executor) async throws {
+        let scenario = Case(executor: executor, kind: .tus)
+
+        try await Self.withUploadServer(scenario) { server in
+            // Given: the server answers that it holds more than the body has.
+            server.patchOverstatesOffsetBy = 1_000
+
+            // Then
+            let offset = Int64(Self.size + 1_000)
+
+            await #expect(throws: UploadResumptionError(.offsetBeyondLength(offset: offset, length: Int64(Self.size))))
+            {
+                _ = try await Self.upload(to: server, scenario).result()
+            }
+        }
+    }
+
     @Test(arguments: cases)
     private func aServerThatDoesNotSayWhereItStands_isAnError(_ scenario: Case) async throws {
         try await Self.withUploadServer(scenario) { server in

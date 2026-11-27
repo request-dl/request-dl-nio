@@ -410,11 +410,21 @@ final class ResumableUploadExecution: @unchecked Sendable {
             throw ResumableUploadTransientResponse(status: head.status.code)
         }
 
+        let report: UploadOffsetReport
+
         do {
-            return (try setup.dialect.report(from: head), head)
+            report = try setup.dialect.report(from: head)
         } catch {
             throw UploadResumptionError(.offsetRejected(status: head.status.code))
         }
+
+        // The server's word about how long the upload is can't be trusted over what is known: an
+        // answer of "10 of 10" for a body of 1,000 bytes would end the upload as a success.
+        if let declared = report.length, declared != source.length {
+            throw UploadResumptionError(.lengthMismatch(declared: declared, length: source.length))
+        }
+
+        return (report, head)
     }
 
     /// Waits ``ResumableUploadSetup/delay``, which is what keeps a server that does not make up its

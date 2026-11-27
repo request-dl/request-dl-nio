@@ -31,7 +31,8 @@ public enum UploadAppendOutcome: Sendable, Hashable {
     /// The server has the whole body. The response is the response of the upload as a whole.
     case finished
 
-    /// The server took part of the body and holds `offset` bytes now: more is still to be sent.
+    /// The server took part of the body and holds `offset` bytes now: more is still to be sent. An
+    /// `offset` past the end of the body is reported as well, for the driver to refuse.
     case partial(offset: Int64)
 
     /// The server holds another number of bytes than the offset that was sent from. The offset is

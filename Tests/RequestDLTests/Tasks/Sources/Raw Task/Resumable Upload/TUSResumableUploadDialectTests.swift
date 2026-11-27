@@ -127,6 +127,14 @@ struct TUSResumableUploadDialectTests {
     }
 
     @Test
+    func outcome_whenTheServerHoldsMoreThanTheBody_isNotFinished() {
+        let head = Fixtures.head(204, [("Upload-Offset", "150")])
+
+        // Left to whoever drives the upload to refuse, rather than ended as a success.
+        #expect(dialect.outcome(of: head, offset: 40, length: 100) == .partial(offset: 150))
+    }
+
+    @Test
     func outcome_whenTheServerDoesNotSayWhatItHolds_isOther() {
         #expect(dialect.outcome(of: Fixtures.head(204), offset: 40, length: 100) == .other)
     }

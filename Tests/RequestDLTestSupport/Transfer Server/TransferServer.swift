@@ -263,6 +263,20 @@ package final class TransferServer: @unchecked Sendable {
         set { lock.withLock { _headOverstatesOffsetBy = newValue } }
     }
 
+    /// The `Upload-Length` every `HEAD` of an upload states, in place of the length the upload was
+    /// created with, as a server that is wrong about what it was asked for would.
+    package var headStatesLength: Int? {
+        get { lock.withLock { _headStatesLength } }
+        set { lock.withLock { _headStatesLength = newValue } }
+    }
+
+    /// Bytes added to the offset every `PATCH` of a tus upload answers with, as a server that is
+    /// wrong about what it holds would.
+    package var patchOverstatesOffsetBy: Int {
+        get { lock.withLock { _patchOverstatesOffsetBy } }
+        set { lock.withLock { _patchOverstatesOffsetBy = newValue } }
+    }
+
     /// Answer the next `HEAD` of an upload without an offset.
     package var headOmitsOffset: Bool {
         get { lock.withLock { _headOmitsOffset } }
@@ -363,6 +377,8 @@ package final class TransferServer: @unchecked Sendable {
     private var _headStatuses: [Int] = []
     private var _patchStatuses: [Int] = []
     private var _headOverstatesOffsetBy = 0
+    private var _headStatesLength: Int?
+    private var _patchOverstatesOffsetBy = 0
     private var _headOmitsOffset = false
     private var _rejectsEveryPatchWithConflict = false
     private var _keepsAtMostPerPatch: Int?
@@ -953,7 +969,7 @@ package final class TransferServer: @unchecked Sendable {
                 headers.append(("Upload-Offset", String(held.data.count + overstated)))
             }
 
-            if let length = held.length {
+            if let length = lock.withLock({ _headStatesLength }) ?? held.length {
                 headers.append(("Upload-Length", String(length)))
             }
 
@@ -1091,10 +1107,11 @@ package final class TransferServer: @unchecked Sendable {
             status = 204
             response = Self.head(status: 204, headers: [("Upload-Offset", String(held.data.count))])
         case .tus:
+            let overstated = lock.withLock { _patchOverstatesOffsetBy }
             status = 204
             response = Self.head(
                 status: 204,
-                headers: [("Upload-Offset", String(held.data.count)), ("Tus-Resumable", "1.0.0")]
+                headers: [("Upload-Offset", String(held.data.count + overstated)), ("Tus-Resumable", "1.0.0")]
             )
         }
 
