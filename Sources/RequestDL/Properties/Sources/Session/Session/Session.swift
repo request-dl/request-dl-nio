@@ -341,9 +341,8 @@ public struct Session: Property {
     }
 
     ///
-    /// Caps how many requests may be in flight at once through the sessions that share a provider
-    /// (see the note below), across every host, from the moment a request is asked to execute
-    /// until it completes.
+    /// Caps how many requests may be in flight at once, across every host, from the moment a
+    /// request is asked to execute until it completes.
     ///
     /// Unlike ``maximumConnectionsPerHost(_:)``, which is a per-host soft limit that AsyncHTTPClient
     /// may exceed, this is an exact cap: once it is reached, further requests wait in line for a
@@ -352,31 +351,52 @@ public struct Session: Property {
     /// ``Timeout`` of a request starts when it leaves the line, and not before. A
     /// ``Timeout/Source/resource`` timeout covers the whole execution, the wait included.
     ///
-    /// - Important: The cap is shared by every request made through the same session provider
-    /// that declares the same limit: the default one (`Session()`), one with the same identifier
-    /// and the same `numberOfThreads` (`Session("name")`; the same identifier with another number of
-    /// threads is another provider, with a cap of its own), or the same custom event loop group.
-    /// It does not matter what else their sessions are configured with, or whether they can share a
-    /// client. A session with a ``redirectStrategy(_:)`` or an ``onRedirect(_:)`` handler, which
-    /// gets a client for every request, is held to the same cap as any other. Everything that uses `Session()` and the
-    /// same limit therefore counts against one cap, so a session that wants a cap of its own
-    /// needs a provider of its own.
+    /// ## What shares a cap
+    ///
+    /// A cap belongs to a session provider and to the limit it is declared with, not to the
+    /// `Session` value you wrote: a `Session` is built again for every request, so there is no
+    /// object for a cap to belong to. Every request of the process that goes through the same
+    /// provider and declares the same limit counts against one cap. Two providers are the same
+    /// when they are:
+    ///
+    /// - the default one (`Session()`);
+    /// - one with the same identifier and the same `numberOfThreads` (`Session("name")`; the same
+    ///   identifier with another number of threads is another provider, with a cap of its own);
+    /// - one on the same custom event loop group.
+    ///
+    /// Nothing else about the sessions matters: not how they are configured, and not whether they
+    /// can share a client. A session with a ``redirectStrategy(_:)`` or an ``onRedirect(_:)``
+    /// handler, which gets a client for every request, is held to the same cap as any other.
+    ///
+    /// That is what makes `Session().maximumConcurrentConnections(4)` a cap on every request of an
+    /// app that uses it. It also means two things to keep in mind:
+    ///
+    /// - Code you do not own that uses `Session()` with the same limit, a library for instance,
+    ///   waits in the same line.
+    /// - A request that stays in flight for a long time (a stream, a long poll) holds its slot the
+    ///   whole time, and the others that share the cap wait behind it.
+    ///
+    /// When either is a problem, give the requests that need a cap of their own a provider of their
+    /// own (`Session("name")`), or declare a limit nothing else uses.
     ///
     /// Background downloads (`BackgroundDownloads`) are not held to the cap: they are run by a
     /// session of their own, outside of the providers, and neither count against it nor wait for it.
     ///
+    /// ## Different limits
+    ///
     /// Requests of one provider that declare *different* limits are held to the limit each of
-    /// them declares, counted separately: `maximumConcurrentConnections(2)` and
-    /// `maximumConcurrentConnections(5)` allow two and five in flight, not two and not seven. A
-    /// request that declares no limit is never held back, and does not count against one that does.
-    /// The cap lives for as long as some request of the session is using it, and is dropped with the
+    /// them declares, and the limits do not count against each other: with
+    /// `maximumConcurrentConnections(2)` on some requests and `maximumConcurrentConnections(5)` on
+    /// others, up to two of the first and up to five of the second are in flight at once, seven
+    /// together. A request that declares no limit is never held back, and does not count against
+    /// one that does. A cap lives for as long as some request is using it, and is dropped with the
     /// last one.
     ///
     /// A resumable download that loses its connection while it is suspended gives its slot back
     /// until it is resumed, and waits for one again before it reconnects.
     ///
-    /// - Parameter maximum: The maximum number of requests this session may have in flight at once.
-    /// A value of zero or less means no limit.
+    /// - Parameter maximum: The maximum number of requests that may be in flight at once among the
+    /// ones that share this cap (see "What shares a cap"). A value of zero or less means no limit.
     /// - Returns: The modified `Session` instance with the concurrency limit configured.
     ///
     public func maximumConcurrentConnections(_ maximum: Int) -> Self {
