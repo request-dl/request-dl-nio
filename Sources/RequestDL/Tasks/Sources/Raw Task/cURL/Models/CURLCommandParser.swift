@@ -444,10 +444,10 @@ enum CURLCommandParser {
     /// Defaults to `.http` when no scheme is given, and to port 1080 when no port is given,
     /// matching curl's own defaults.
     ///
-    /// The user name and the password of a SOCKS proxy are percent-decoded, as curl does for the
-    /// credentials in a proxy URL (`socks5://us%40er:p%3Ass@host`), and a missing password is an
-    /// empty one (`socks5://user@host`), which SOCKS5 allows. The credentials of an HTTP proxy are
-    /// taken as written, as they always were.
+    /// The user name and the password of a proxy are percent-decoded, as curl does for the
+    /// credentials in a proxy URL (`socks5://us%40er:p%3Ass@host`, `http://us%40er:p%3Ass@host`),
+    /// and a missing password is an empty one (`user@host`), which both SOCKS5 and Basic allow.
+    /// Credentials that do not decode (`%zz`, bytes that are not UTF-8) are an error.
     ///
     /// Every error names `flag` (the one the user typed) and never `value`, which can hold the
     /// credentials.
@@ -489,25 +489,19 @@ enum CURLCommandParser {
                 password = ""
             }
 
-            switch connectionProtocol {
-            case .http:
-                authorization = .basic(username: username, password: password)
-
-            case .socks:
-                guard
-                    let decodedUsername = username.removingPercentEscapes,
-                    let decodedPassword = password.removingPercentEscapes
-                else {
-                    throw CURLParsingError(.malformedArgument, token: flag)
-                }
-
-                authorization = try proxyAuthorization(
-                    username: decodedUsername,
-                    password: decodedPassword,
-                    connection: .socks,
-                    token: flag
-                )
+            guard
+                let decodedUsername = username.removingPercentEscapes,
+                let decodedPassword = password.removingPercentEscapes
+            else {
+                throw CURLParsingError(.malformedArgument, token: flag)
             }
+
+            authorization = try proxyAuthorization(
+                username: decodedUsername,
+                password: decodedPassword,
+                connection: connectionProtocol,
+                token: flag
+            )
         }
 
         guard !remainder.isEmpty else {

@@ -45,6 +45,15 @@ import class Foundation.JSONSerialization
 /// reported (``RequestMonitor``, or the ``UploadStep`` of ``UploadTask``) with the size of the
 /// body: the upload reached its total only if the whole body was sent.
 ///
+/// The same goes for a server that answers early with a `2xx` and does *not* close the
+/// connection, which goes on waiting for the rest of the body. The task can then complete
+/// successfully with only part of the body sent: a 16 MiB upload returned `200` after the upload
+/// had reported 32768 of 16777216 bytes, and the connection stayed open, held by that request
+/// until the server gave up on the body. Whether that happens or the whole body is sent depends
+/// on how the answer reaches the client, so the same answer from the same server can follow a
+/// whole upload or a cut one. A `2xx` never confirms that the whole body was sent: compare the
+/// upload progress with the size of the body.
+///
 /// ## Topics
 ///
 /// ### Sending raw bytes

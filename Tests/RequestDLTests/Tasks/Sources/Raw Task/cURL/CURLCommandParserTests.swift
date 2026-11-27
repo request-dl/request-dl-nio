@@ -670,10 +670,35 @@ struct CURLCommandParserTests {
     }
 
     @Test
-    func httpProxyURLCredentialsAreStillTakenAsWritten() async throws {
-        let proxy = try await proxy("curl -x http://us%40er:p%3Ass@proxy.example.com https://example.com")
+    func httpProxyURLCredentialsArePercentDecoded() async throws {
+        let proxy = try await proxy("curl -x http://us%40er:p%3Ass%C3%A9%25@proxy.example.com https://example.com")
 
-        #expect(proxy.authorization == .basic(username: "us%40er", password: "p%3Ass"))
+        #expect(proxy.authorization == .basic(username: "us@er", password: "p:ssé%"))
+    }
+
+    @Test
+    func httpProxyURLWithoutAPasswordHasAnEmptyPassword() async throws {
+        let colon = try await proxy("curl -x http://us%40er:@proxy.example.com https://example.com")
+        let bare = try await proxy("curl -x http://us%40er@proxy.example.com https://example.com")
+        let schemeless = try await proxy("curl -x user@proxy.example.com https://example.com")
+
+        #expect(colon.authorization == .basic(username: "us@er", password: ""))
+        #expect(bare.authorization == .basic(username: "us@er", password: ""))
+        #expect(schemeless.authorization == .basic(username: "user", password: ""))
+    }
+
+    @Test(arguments: [
+        "curl -x http://john:%zzsecret@proxy.example.com https://example.com",
+        "curl -x http://john:%FFsecret@proxy.example.com https://example.com",
+        "curl -x http://%FFjohn:secret@proxy.example.com https://example.com",
+    ])
+    func invalidHTTPProxyURLCredentialsThrowWithoutTheSecret(_ command: String) async throws {
+        let error = await #expect(throws: CURLParsingError.self) {
+            try await CURLCommandParser.parse(command)
+        }
+
+        #expect(error?.context == .malformedArgument)
+        #expect(error?.token == "-x")
     }
 
     @Test

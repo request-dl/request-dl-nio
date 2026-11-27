@@ -72,10 +72,9 @@ struct SecureConnectionTests {
     // Every public modifier this block's tests call
     // (`signingSignatureAlgorithms(_:)`/`verifySignatureAlgorithms(_:)`/
     // `sendCANameListDisabled(_:)`/`renegotiationSupport(_:)`/`shutdownTimeout(_:)`/
-    // `applicationProtocols(_:)`/`version(maximum:)`/`version(_:Range)`/`version(_:ClosedRange)`)
-    // only exists under `canImport(NIOCore)`: each is a NIOSSL-specific handshake detail, or has
-    // no Network.framework/URLSession equivalent to ever take effect through (see each method's
-    // own doc comment in `SecureConnection.swift`).
+    // `applicationProtocols(_:)`) only exists under `canImport(NIOCore)`: each is a NIOSSL-specific
+    // handshake detail, or has no Network.framework/URLSession equivalent to ever take effect
+    // through (see each method's own doc comment in `SecureConnection.swift`).
     #if canImport(NIOCore)
     @Test
     func secure_whenUpdatesSigningSignatureAlgorithms_shouldBeValid() async throws {
@@ -271,7 +270,9 @@ struct SecureConnectionTests {
         // Then
         #expect(sut?.applicationProtocols == [protocol1, protocol2])
     }
+    #endif
 
+    // The TLS version range is declared in every build: `.urlSession` applies both ends.
     @Test
     func secure_whenSetClosedRangeOfTLSVersions_shouldBeValid() async throws {
         // Given
@@ -332,7 +333,6 @@ struct SecureConnectionTests {
         // Then
         #expect(sut?.maximumTLSVersion == maxVersion.build())
     }
-    #endif
 
     @Test
     func secure_whenSetMinTLSVersion_shouldBeValid() async throws {
@@ -353,8 +353,6 @@ struct SecureConnectionTests {
         #expect(sut?.minimumTLSVersion == minVersion.build())
     }
 
-    // `version(minimum:maximum:)`/`cipherSuites(_:)` only exist under `canImport(NIOCore)`.
-    #if canImport(NIOCore)
     @Test
     func secure_whenUpdatesTLSVersions_shouldBeValid() async throws {
         // Given
@@ -376,6 +374,8 @@ struct SecureConnectionTests {
         #expect(sut?.maximumTLSVersion == maxVersion.build())
     }
 
+    // `cipherSuites(_:)` only exists under `canImport(NIOCore)`.
+    #if canImport(NIOCore)
     @Test
     func secure_whenUpdatesCipherSuites_shouldBeValid() async throws {
         // Given

@@ -223,14 +223,11 @@ public struct SecureConnection<Content: Property>: Property {
         return configure { $0.minimumTLSVersion = version }
     }
 
-    #if canImport(NIOCore)
     /// Sets the maximum TLS version for the secure connection.
     ///
     /// Under ``Session/Executor/urlSession`` this sets `tlsMaximumSupportedProtocolVersion`, so it
     /// is enforced there too and does not move the session to another executor. App Transport
     /// Security has no key for a maximum, and needs none.
-    ///
-    /// - Important: Not declared in a build without NIO.
     ///
     /// - Parameter maximum: The maximum TLS version to use.
     /// - Returns: A modified `SecureConnection` with the maximum TLS version set.
@@ -241,9 +238,6 @@ public struct SecureConnection<Content: Property>: Property {
 
     /// Sets the minimum and maximum TLS versions for the secure connection.
     ///
-    /// - Important: Not declared in a build without NIO, like ``version(maximum:)``. Use
-    /// ``version(minimum:)`` alone there instead.
-    ///
     /// - Parameters:
     ///   - minimum: The minimum TLS version to use.
     ///   - maximum: The maximum TLS version to use.
@@ -253,9 +247,6 @@ public struct SecureConnection<Content: Property>: Property {
     }
 
     /// Sets the TLS version range for the secure connection.
-    ///
-    /// - Important: Not declared in a build without NIO, like ``version(maximum:)``. Use
-    /// ``version(minimum:)`` alone there instead.
     ///
     /// - Parameter range: The range of TLS versions to use.
     /// - Returns: A modified `SecureConnection` with the TLS version range set.
@@ -268,9 +259,6 @@ public struct SecureConnection<Content: Property>: Property {
 
     /// Sets the TLS version range for the secure connection, inclusive of both ends.
     ///
-    /// - Important: Not declared in a build without NIO, like ``version(maximum:)``. Use
-    /// ``version(minimum:)`` alone there instead.
-    ///
     /// - Parameter range: The closed range of TLS versions to use.
     /// - Returns: A modified `SecureConnection` with the TLS version range set.
     public func version(_ range: ClosedRange<TLSVersion>) -> Self {
@@ -280,6 +268,7 @@ public struct SecureConnection<Content: Property>: Property {
         )
     }
 
+    #if canImport(NIOCore)
     /// Sets the key log object for the secure connection.
     ///
     /// - Important: Reachable under ``Session/Executor/nio`` only. This is a **permanent**

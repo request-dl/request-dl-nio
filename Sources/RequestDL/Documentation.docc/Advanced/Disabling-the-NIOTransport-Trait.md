@@ -44,7 +44,8 @@ If your own package depends on RequestDL, disable its default traits from your `
 ## What changes
 
 - ``Session/Executor/nioTransportServices``/`.nio` no longer exist as cases: ``Session/Executor`` only has `.urlSession` to offer, so ``Session/preferredExecutor(_:)``/``Session/requiredExecutor(_:)`` can't be called with anything else. This is enforced at compile time, not by a runtime error.
-- `SecureConnection`'s TLS-version and ALPN modifiers that only take effect on a NIO-based executor have nothing left to fall back to. See <doc:Configuring-App-Transport-Security-for-URLSession> for what that already means under `.urlSession` even with `NIOTransport` enabled.
+- `SecureConnection`'s modifiers that only take effect on a NIO-based executor are not declared: `keyLogger(_:)`, `shutdownTimeout(_:)`, `renegotiationSupport(_:)`, the signature-algorithm modifiers, `applicationProtocols(_:)`, `sendCANameListDisabled(_:)` and `cipherSuites(_:)`, and so is `SSLKeyLogger`, because `.urlSession` has no equivalent for them.
+- `SecureConnection`'s TLS version range is still declared: `version(minimum:)`, `version(maximum:)`, `version(minimum:maximum:)` and the `Range`/`ClosedRange` variants. `.urlSession` applies both ends through `tlsMinimumSupportedProtocolVersion` and `tlsMaximumSupportedProtocolVersion`. App Transport Security still has the last word on the floor, see <doc:Configuring-App-Transport-Security-for-URLSession>.
 - ``DataCache``'s on-disk storage goes through `FileManager`/`FileHandle` instead of `NIOFileSystem`, with the same public behavior.
 
 ## Topics

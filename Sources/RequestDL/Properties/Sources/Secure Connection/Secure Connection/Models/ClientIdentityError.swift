@@ -24,7 +24,9 @@ import protocol Foundation.LocalizedError
 /// ``Reason/keychainOperationFailed(operation:status:)`` and
 /// ``Reason/identityLookupReturnedWrongType`` were thrown by versions that stored the identity in
 /// the Keychain. They are deprecated: they are kept so existing code that switches over ``Reason``
-/// keeps compiling, but nothing throws them any more, and a `switch` can drop them.
+/// keeps compiling, but nothing throws them any more. A `switch` with a `default` can drop them;
+/// an exhaustive one cannot, because it stops compiling without them ("switch must be
+/// exhaustive"), so it keeps them until it gets a `default`.
 ///
 /// `RequestDLInternals`'s raw `Internals.RawBytesIdentityBuilder.Error`/
 /// `Internals.URLSessionIdentityPolicy.ConfigurationError` (the internal, package-visible errors)
@@ -62,7 +64,7 @@ public struct ClientIdentityError: Error, Sendable {
             *,
             deprecated,
             message:
-                "The client identity is now built in memory and never stored in the Keychain, so this is never thrown. Remove it from your switch."
+                "The client identity is now built in memory and never stored in the Keychain, so this is never thrown. Add a `default` to your switch to drop it."
         )
         case missingKeychainSharingEntitlement(operation: String)
 
@@ -73,7 +75,7 @@ public struct ClientIdentityError: Error, Sendable {
             *,
             deprecated,
             message:
-                "The client identity is now built in memory and never stored in the Keychain, so this is never thrown. Remove it from your switch."
+                "The client identity is now built in memory and never stored in the Keychain, so this is never thrown. Add a `default` to your switch to drop it."
         )
         case keychainOperationFailed(operation: String, status: OSStatus)
 
@@ -84,7 +86,7 @@ public struct ClientIdentityError: Error, Sendable {
             *,
             deprecated,
             message:
-                "The client identity is now built in memory and never queried from the Keychain, so this is never thrown. Remove it from your switch."
+                "The client identity is now built in memory and never queried from the Keychain, so this is never thrown. Add a `default` to your switch to drop it."
         )
         case identityLookupReturnedWrongType
 
