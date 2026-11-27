@@ -107,6 +107,8 @@ struct IETFResumableUploadDialect: ResumableUploadDialect {
             return .gone
         case 200..<300:
             return .finished
+        case let status where ResumableUploadTransientResponse.isTransient(status: status):
+            return .transient
         default:
             return .other
         }

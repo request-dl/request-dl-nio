@@ -31,7 +31,8 @@ public enum UploadAppendOutcome: Sendable, Hashable {
     /// The server has the whole body. The response is the response of the upload as a whole.
     case finished
 
-    /// The server took part of the body and holds `offset` bytes now: more is still to be sent.
+    /// The server took part of the body and holds `offset` bytes now: more is still to be sent. An
+    /// `offset` past the end of the body is reported as well, for the driver to refuse.
     case partial(offset: Int64)
 
     /// The server holds another number of bytes than the offset that was sent from. The offset is
@@ -40,6 +41,11 @@ public enum UploadAppendOutcome: Sendable, Hashable {
 
     /// The server no longer has the upload, so there is nothing to continue.
     case gone
+
+    /// The server says "not now" (a `408`, `425`, `429` or a `5xx`) instead of saying what it holds,
+    /// so the request has to be sent again, from where the server says it is once it is asked.
+    /// What the server kept of the body before it failed is not known from this answer.
+    case transient
 
     /// Anything else. A response that is not about resuming at all, so it goes to the caller as
     /// the response of the request.

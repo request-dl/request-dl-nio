@@ -27,6 +27,11 @@ public struct UploadResumptionError: Error, Sendable, Hashable, CustomStringConv
         /// The server says it holds more of the upload than the body has.
         case offsetBeyondLength(offset: Int64, length: Int64)
 
+        /// The server says the upload is `declared` bytes long, and the body is `length`: it holds
+        /// another upload than the one that was created, or it is not honoring what it was told.
+        /// Carried on, it could report an upload complete that has most of its bytes missing.
+        case lengthMismatch(declared: Int64, length: Int64)
+
         /// The server holds the whole body, but the response to the request that completed it never
         /// arrived, and the protocol has no way to get it again. The IETF draft's response is the
         /// application's, so nothing else the server says takes its place; tus's carries nothing
@@ -36,9 +41,9 @@ public struct UploadResumptionError: Error, Sendable, Hashable, CustomStringConv
         /// The server keeps disagreeing about where to continue from.
         case conflictingOffsets
 
-        /// The server kept answering "not now" (a `5xx`, `408`, `425` or `429`) every time it was
-        /// asked how much of the upload it holds, until the attempts ran out. The status is the
-        /// last one it answered with.
+        /// The server kept answering "not now" (a `5xx`, `408`, `425` or `429`), to the request that
+        /// sends the body or to the one that asks how much of the upload it holds, until the
+        /// attempts ran out. The status is the last one it answered with.
         case serverUnavailable(status: UInt)
 
         /// The body is sent with a `Content-Encoding` (it was compressed, or the request says so),

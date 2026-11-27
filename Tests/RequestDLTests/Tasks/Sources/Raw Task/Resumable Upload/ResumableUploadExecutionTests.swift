@@ -201,6 +201,70 @@ struct ResumableUploadExecutionTests {
         }
     }
 
+    /// A `PATCH` the server answers with "not now" is a lost connection that was announced: the
+    /// server is asked what it holds, and sent the rest from there.
+    @Test(arguments: cases, [408, 425, 429, 500, 503])
+    private func aPatchAnsweredNotNow_isContinuedFromTheOffsetTheServerHolds(
+        _ scenario: Case,
+        _ status: Int
+    ) async throws {
+        try await Self.withUploadServer(scenario) { server in
+            // Given: the first `PATCH` is answered with a failure, and nothing of it is kept.
+            server.patchStatuses = [status]
+
+            // When
+            let result = try await Self.upload(to: server, scenario).result()
+
+            // Then: what the caller gets is the answer that completed the upload.
+            #expect([200, 204].contains(result.head.status.code))
+            #expect(server.heldUploads[1]?.data == Self.body())
+            try await Self.waitForRequests("PATCH", in: server, atLeast: 2)
+
+            let requests = server.requests
+            #expect(requests.map(\.method).suffix(3) == ["PATCH", "HEAD", "PATCH"])
+            #expect(requests.suffix(3).map(\.status).first == status)
+            #expect(requests.last?.header("Upload-Offset") == "0")
+            #expect(requests.last?.bodyLength == Self.size)
+        }
+    }
+
+    /// A `4xx` that is not "not now" is the answer of the server to the upload, as it is for the
+    /// request that creates it: sending the same bytes again would only be refused again.
+    @Test(arguments: cases)
+    private func aPatchRefusedWithAClientError_isTheResponseOfTheUpload(_ scenario: Case) async throws {
+        try await Self.withUploadServer(scenario) { server in
+            // Given
+            server.patchStatuses = [413]
+
+            // When
+            let result = try await Self.upload(to: server, scenario).result()
+
+            // Then: handed over, with no second attempt.
+            #expect(result.head.status.code == 413)
+            #expect(server.requests.filter { $0.method == "PATCH" }.count == 1)
+            #expect(server.requests.filter { $0.method == "HEAD" }.isEmpty)
+        }
+    }
+
+    @Test(arguments: cases)
+    private func aServerThatAlwaysFailsThePatch_endsInTheFailureOfTheLastAttempt(_ scenario: Case) async throws {
+        try await Self.withUploadServer(scenario) { server in
+            // Given
+            server.patchStatuses = Array(repeating: 500, count: 20)
+
+            // Then: the first `PATCH` and the two that follow it, which is what was allowed.
+            await #expect(throws: UploadResumptionError(.serverUnavailable(status: 500))) {
+                _ = try await Self.upload(to: server, scenario, attempts: 2).result()
+            }
+
+            try await Self.waitForRequests("PATCH", in: server, atLeast: 3)
+
+            #expect(server.requests.filter { $0.method == "PATCH" }.count == 3)
+            #expect(server.requests.filter { $0.method == "HEAD" }.count == 2)
+            #expect(server.heldUploads[1]?.data.isEmpty == true)
+        }
+    }
+
     @Test(arguments: cases)
     private func aServerThatNeverAnswersTheOffsetQuery_endsInTheFailureOfTheLastAttempt(_ scenario: Case) async throws {
         try await Self.withUploadServer(scenario) { server in
@@ -216,6 +280,44 @@ struct ResumableUploadExecutionTests {
             try await Self.waitForRequests("HEAD", in: server, atLeast: 2)
 
             #expect(server.requests.filter { $0.method == "HEAD" }.count == 2)
+        }
+    }
+
+    /// A server that says the upload is as long as what it holds, for a body that is longer, is
+    /// not to be believed: `Upload-Offset: 100000, Upload-Length: 100000` would end the upload.
+    @Test(arguments: cases)
+    private func aServerThatStatesAnotherLength_isAnError(_ scenario: Case) async throws {
+        try await Self.withUploadServer(scenario) { server in
+            // Given
+            server.uploadDropPlan = [100_000]
+            server.headStatesLength = 100_000
+
+            // Then
+            await #expect(throws: UploadResumptionError(.lengthMismatch(declared: 100_000, length: Int64(Self.size)))) {
+                _ = try await Self.upload(to: server, scenario).result()
+            }
+
+            try await Self.waitForRequests("PATCH", in: server, atLeast: 1)
+
+            #expect(server.requests.filter { $0.method == "PATCH" }.count == 1)
+        }
+    }
+
+    @Test(arguments: Executor.allCases)
+    private func aPatchThatAnswersAnOffsetPastTheBody_isAnError(_ executor: Executor) async throws {
+        let scenario = Case(executor: executor, kind: .tus)
+
+        try await Self.withUploadServer(scenario) { server in
+            // Given: the server answers that it holds more than the body has.
+            server.patchOverstatesOffsetBy = 1_000
+
+            // Then
+            let offset = Int64(Self.size + 1_000)
+
+            await #expect(throws: UploadResumptionError(.offsetBeyondLength(offset: offset, length: Int64(Self.size))))
+            {
+                _ = try await Self.upload(to: server, scenario).result()
+            }
         }
     }
 

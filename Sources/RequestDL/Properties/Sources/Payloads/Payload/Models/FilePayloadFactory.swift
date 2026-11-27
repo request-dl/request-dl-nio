@@ -58,13 +58,26 @@ struct FilePayloadFactory: PayloadFactory {
 
     // MARK: - Private methods
 
+    /// Refuses a file that cannot be counted in an `Int`: its body would be sent empty, with a
+    /// length of zero, since nothing past what an `Int` holds can be addressed.
+    ///
+    /// - Parameter limit: The largest size that is representable; only a test sets it, to stand in
+    ///   for a 32-bit `Int` without a file of 2 GiB.
+    static func validate(size: Int64, of url: URL, limit: Int = .max) throws {
+        guard size <= Int64(limit) else {
+            throw FilePayloadError(url: url, context: .tooLarge(size: size))
+        }
+    }
+
     /// Confirms `url` can actually be read before handing it to `Internals.FileBuffer`, which
     /// silently treats a missing or unreadable file as an empty one (see `Internals.Buffer`).
     private func validateFileExists() async throws {
         do {
-            guard try await Internals.fileSystem.info(forFileAt: url.filePath) != nil else {
+            guard let info = try await Internals.fileSystem.info(forFileAt: url.filePath) else {
                 throw FilePayloadError(url: url, context: .notFound)
             }
+
+            try Self.validate(size: info.size, of: url)
         } catch let error as FilePayloadError {
             throw error
         } catch {

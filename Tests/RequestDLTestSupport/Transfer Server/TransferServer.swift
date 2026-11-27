@@ -248,11 +248,33 @@ package final class TransferServer: @unchecked Sendable {
         set { lock.withLock { _headStatuses = newValue } }
     }
 
+    /// Per `PATCH` of an upload, the status to answer with after reading its body and keeping none of
+    /// it, as a server that fails in the middle of the upload would (consumed in order; once empty
+    /// the server answers properly again).
+    package var patchStatuses: [Int] {
+        get { lock.withLock { _patchStatuses } }
+        set { lock.withLock { _patchStatuses = newValue } }
+    }
+
     /// Bytes added to the offset every `HEAD` of an upload states, as a server that is wrong about
     /// what it holds would.
     package var headOverstatesOffsetBy: Int {
         get { lock.withLock { _headOverstatesOffsetBy } }
         set { lock.withLock { _headOverstatesOffsetBy = newValue } }
+    }
+
+    /// The `Upload-Length` every `HEAD` of an upload states, in place of the length the upload was
+    /// created with, as a server that is wrong about what it was asked for would.
+    package var headStatesLength: Int? {
+        get { lock.withLock { _headStatesLength } }
+        set { lock.withLock { _headStatesLength = newValue } }
+    }
+
+    /// Bytes added to the offset every `PATCH` of a tus upload answers with, as a server that is
+    /// wrong about what it holds would.
+    package var patchOverstatesOffsetBy: Int {
+        get { lock.withLock { _patchOverstatesOffsetBy } }
+        set { lock.withLock { _patchOverstatesOffsetBy = newValue } }
     }
 
     /// Answer the next `HEAD` of an upload without an offset.
@@ -353,7 +375,10 @@ package final class TransferServer: @unchecked Sendable {
     private var _answersCreationWithRelativeLocation = false
     private var _dropsFinalResponse = false
     private var _headStatuses: [Int] = []
+    private var _patchStatuses: [Int] = []
     private var _headOverstatesOffsetBy = 0
+    private var _headStatesLength: Int?
+    private var _patchOverstatesOffsetBy = 0
     private var _headOmitsOffset = false
     private var _rejectsEveryPatchWithConflict = false
     private var _keepsAtMostPerPatch: Int?
@@ -944,7 +969,7 @@ package final class TransferServer: @unchecked Sendable {
                 headers.append(("Upload-Offset", String(held.data.count + overstated)))
             }
 
-            if let length = held.length {
+            if let length = lock.withLock({ _headStatesLength }) ?? held.length {
                 headers.append(("Upload-Length", String(length)))
             }
 
@@ -979,6 +1004,15 @@ package final class TransferServer: @unchecked Sendable {
         dialect: ResumableProtocol,
         io: inout TransferServerIO
     ) -> Bool {
+        if let scriptedStatus = lock.withLock({ _patchStatuses.isEmpty ? nil : _patchStatuses.removeFirst() }) {
+            let isRead = io.readBody(head, dropAfter: nil, sink: { _ in }).isComplete
+
+            // Recorded before it is sent, like every answer.
+            record(head, bodyLength: 0, isIntact: true, isComplete: isRead, status: scriptedStatus)
+            let answer = Self.head(status: scriptedStatus, headers: [("Content-Length", "0")])
+            return isRead && io.send(answer, counted: false)
+        }
+
         let (dropAfter, offsetHeld) = lock.withLock { () -> (Int?, Int) in
             if _forgetsBytesBeforeNextPatch > 0, var held = _heldUploads[id], !held.data.isEmpty {
                 held.data.removeLast(min(_forgetsBytesBeforeNextPatch, held.data.count))
@@ -1073,10 +1107,11 @@ package final class TransferServer: @unchecked Sendable {
             status = 204
             response = Self.head(status: 204, headers: [("Upload-Offset", String(held.data.count))])
         case .tus:
+            let overstated = lock.withLock { _patchOverstatesOffsetBy }
             status = 204
             response = Self.head(
                 status: 204,
-                headers: [("Upload-Offset", String(held.data.count)), ("Tus-Resumable", "1.0.0")]
+                headers: [("Upload-Offset", String(held.data.count + overstated)), ("Tus-Resumable", "1.0.0")]
             )
         }
 
