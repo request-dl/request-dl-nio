@@ -190,6 +190,7 @@ Only the file path is persisted alongside `id`/`destination` — never the key m
 
 ## What's not supported yet
 
+- **`hiddenOnRedirect(_:)`.** The system follows the redirects of a background download on its own, without asking the app, so a header marked to be removed from a redirect would still be sent to whichever host the redirect names. ``BackgroundDownloadTask/result()`` refuses the request with ``BackgroundDownloadUnsupportedConfigurationError`` (``BackgroundDownloadUnsupportedConfigurationError/Reason/hiddenOnRedirectHeaders``) instead of ignoring the marker. Authenticate with `Authorization`, which the system removes on every redirect, or a signed URL, or use ``DownloadTask`` in the foreground.
 - **Modifiers and interceptors.** ``BackgroundDownloadTask`` does not conform to ``RequestTask`` — its result doesn't arrive in-process the way every modifier/interceptor assumes.
 
 ## Topics

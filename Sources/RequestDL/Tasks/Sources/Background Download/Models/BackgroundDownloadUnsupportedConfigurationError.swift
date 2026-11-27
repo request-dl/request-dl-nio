@@ -13,9 +13,10 @@ import protocol Foundation.LocalizedError
 #endif
 
 /// An error thrown when a ``BackgroundDownloadTask``'s content configures a client certificate
-/// (mTLS) or SPKI pinning in a shape that can't survive a relaunch, or lists decompression
+/// (mTLS) or SPKI pinning in a shape that can't survive a relaunch, lists decompression
 /// algorithms in a combination it can't decode (see
-/// ``Reason/nativeAlgorithmNextToCustomAlgorithm``).
+/// ``Reason/nativeAlgorithmNextToCustomAlgorithm``), or asks for a header to be removed from a
+/// redirect (see ``Reason/hiddenOnRedirectHeaders``).
 ///
 /// A background download can outlive the process that started it: the delegate answering a
 /// challenge after the app relaunches has no `Property` tree left to resolve
@@ -66,6 +67,13 @@ public struct BackgroundDownloadUnsupportedConfigurationError: Error, Sendable {
         /// did not write is not something this package builds on, so the list is refused when the
         /// download is scheduled instead. A foreground `.urlSession` request accepts it.
         case nativeAlgorithmNextToCustomAlgorithm
+
+        /// A header was marked with `hiddenOnRedirect(_:)`. The system follows the redirects of a
+        /// background download on its own, without asking the app, so there is no point where the
+        /// header could be removed: it would be sent to whichever host the redirect names, the
+        /// opposite of what the marker asks for. The download is refused when it is scheduled
+        /// instead of ignoring the marker. A foreground task honors it.
+        case hiddenOnRedirectHeaders
 
         // MARK: - Inits
 
@@ -124,6 +132,8 @@ extension BackgroundDownloadUnsupportedConfigurationError: CustomStringConvertib
         switch reason {
         case .nativeAlgorithmNextToCustomAlgorithm:
             return "BackgroundDownloadTask can't use this decompression configuration: \(reason.description)"
+        case .hiddenOnRedirectHeaders:
+            return "BackgroundDownloadTask can't use this redirect configuration: \(reason.description)"
         default:
             return "BackgroundDownloadTask can't use this client certificate configuration: \(reason.description)"
         }
@@ -160,6 +170,14 @@ extension BackgroundDownloadUnsupportedConfigurationError.Reason: CustomStringCo
                 to an algorithm of your own -- they only stand for the system's decoding, which \
                 this request does not ask for. Leave them out of .decompressionAlgorithms(_:limit:) and \
                 the server is asked for yours alone.
+                """
+        case .hiddenOnRedirectHeaders:
+            return
+                """
+                hiddenOnRedirect(_:) can't be used here -- the system follows the redirects of a \
+                background download on its own, without asking the app, so the header would still \
+                be sent to whichever host a redirect names. Remove hiddenOnRedirect(_:), or use \
+                DownloadTask in the foreground, which removes the header from the redirect.
                 """
         case .spkiPinningAlgorithmNotSupported:
             return

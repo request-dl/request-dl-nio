@@ -45,6 +45,13 @@ extension Property {
     /// executor, with a ``RedirectStrategy`` included, which is handed the request already without
     /// the header and cannot add it back for a redirect that must not carry it.
     ///
+    /// There are two exceptions. A ``BackgroundDownloadTask`` refuses a request with a marked
+    /// header (``BackgroundDownloadUnsupportedConfigurationError``), since the system follows the
+    /// redirects of a background download on its own and the header would reach whichever host
+    /// they name. And ``DigestAuthentication`` writes its `Authorization` header on its own, not
+    /// as a header of the property, so the marker has no effect on it; a redirect to another
+    /// origin removes it all the same, as it does for any `Authorization`.
+    ///
     /// - Parameter scope: Which redirects remove the header. Defaults to
     /// ``RedirectHeaderScope/otherOrigins``.
     /// - Returns: A modified version of the property whose headers are removed from the redirects
