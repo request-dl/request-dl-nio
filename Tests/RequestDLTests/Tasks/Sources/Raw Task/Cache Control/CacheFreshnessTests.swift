@@ -94,9 +94,13 @@ struct CacheFreshnessTests {
         return configuration
     }
 
-    private func head(status: UInt = 200, _ headers: [(String, String)]) -> Internals.ResponseHead {
+    private func head(
+        status: UInt = 200,
+        url: String = "https://example.com",
+        _ headers: [(String, String)]
+    ) -> Internals.ResponseHead {
         .init(
-            url: "https://example.com",
+            url: url,
             status: .init(code: status, reason: ""),
             version: .init(minor: 1, major: 1),
             headers: headers.map { .init(name: $0.0, value: $0.1) },
@@ -472,7 +476,9 @@ struct CacheFreshnessTests {
         }
 
         // When
-        let stream = writer?(head(status: status, headers))
+        // The head says the URL that was requested: a response that answered another one is a
+        // redirect's, and is not stored under this one.
+        let stream = writer?(head(status: status, url: configuration.url, headers))
         stream?.close()
         await dataCache.waitUntilIdle()
 

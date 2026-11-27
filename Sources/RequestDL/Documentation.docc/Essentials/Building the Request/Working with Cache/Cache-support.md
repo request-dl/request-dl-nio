@@ -63,7 +63,7 @@ An error response (`404`, `405`, `410`, `414`, `501`) is stored, and reused, onl
 
 A stale response is not removed for its age. It stays until a newer response for the URL replaces it, or the disk tier needs the room, so that ``RequestDL/CacheStrategy/useCachedDataOnly`` can still give it to a caller that is offline. The exception is one that must be validated before it is used (`must-revalidate`, or `no-cache`, which a `304` can add): it is not given while stale, and it is kept for a request that revalidates.
 
-A `304 Not Modified` updates the stored response with the `Cache-Control` directives it carries and keeps the ones it does not mention, so one that only says `public` does not take the `max-age` away. A `304` that says `no-store` removes the entry and the request goes to the network; one that says `no-cache` is used for the request that validated it and must be validated again before every later use.
+A `304 Not Modified` updates the stored response with the `Cache-Control` directives it carries and keeps the freshness ones it does not mention (`max-age`, `immutable`...), so one that only says `public` does not take the `max-age` away. What the stored response said about revalidation (`no-cache`, `must-revalidate`, `proxy-revalidate`) is the `304`'s to say: when it carries a `Cache-Control` that does not repeat them, the entry no longer has them, so a requirement the server stopped sending does not outlive it. A `304` that says `no-store` removes the entry and the request goes to the network; one that says `no-cache` is used for the request that validated it and must be validated again before every later use.
 
 ### Large responses and a slow cache
 
@@ -119,9 +119,17 @@ The probe only runs when the response advertised `Accept-Ranges: bytes`, which k
 
 > Important: The probe says the body is as long as the server says it is. It does not check the bytes themselves.
 
+### Responses that came through a redirect
+
+An entry is stored under the URL that was requested, and a response that was reached through a redirect is not the answer of that URL: `/latest` can be a `302` to `/v1` today and to `/v2` tomorrow. A response that was answered by another URL than the one requested (the session followed a redirect, whatever its status) is therefore **not cached under the URL that redirected**, and the next request for it goes out and meets the redirect again.
+
+The URL that answered it is cached when it is requested directly: `GET /v1` stores `/v1`, and serves it. To have a redirect's target cached, ask for the target. A redirect that the session does not follow (its own `3xx` is the response) is stored as any other response.
+
 ### Responses to requests with credentials
 
 A cache is keyed by URL, and a ``RequestDL/DataCache`` is often one store for the whole process, so a response fetched with one account's credentials must not be given to another. A request that sends `Authorization`, `Cookie` or `Proxy-Authorization` (a `Cookie` the session's cookie jar adds counts) has its response stored with a SHA-256 digest of each of the three, never their values, and the response is only served to a request that sends the same: not to another account, and not to a request with none. A response stored for a request with none of them is public and is served to every request.
+
+Those three are the only headers that separate accounts. An `X-API-Key`, or any other header or token of your own, does not, and neither does the client identity of a mutual TLS connection: two accounts that differ only by those share what is cached under a URL, and the second is served the first's response. When the account is told by one of them, declare it with ``RequestDL/CacheIdentity`` (below), or have the server say `Vary: X-API-Key` so that the header is compared.
 
 That is right for a credential that does not change, and wrong for one that does. An OAuth token that is refreshed, or a session cookie that the server re-issues with every response, is a new value for the same account, so the stored response is never found again after the refresh. Declare the account yourself with ``RequestDL/CacheIdentity`` and the cache compares that instead:
 
@@ -138,12 +146,12 @@ DataTask {
 
 With an identity:
 
-- The response is stored with a digest of the identity and none of the credentials, and is served to a request that declares the same identity, whatever `Authorization` or `Cookie` it sends. The identity itself is not written to the disk.
+- The response is stored with a digest of the identity and none of the credentials, and is served to a request that declares the same identity, whatever `Authorization` or `Cookie` it sends. The identity itself is not written to the disk, but its digest is, and **the digest is not a secret unless the cache has an ``RequestDL/DataCache/EncryptionKey``**: with one it is an HMAC-SHA256 under a key derived from it, which cannot be computed or tested against a guess without the key; without one it is a plain SHA-256, and whoever can read the cache directory (a backup, another process of the same user) can recover a user ID or an email address by trying candidates. Declare an opaque identifier, one that means nothing outside the app, or set an encryption key.
 - It is not served to another identity, nor to a request that declares none; a response stored with no identity (for credentials, or a public one) is not an identity's own, so only the public one is served to it.
 - A `Vary` of `Authorization`, `Cookie` or `Proxy-Authorization` is satisfied by the identity. Any other field in `Vary` is compared as usual.
 - An empty identity, or one that is only whitespace, is ignored: the request is cached by its credentials.
 
-The identity is a claim by the app: the cache does not check that the credentials belong to it, and two accounts given the same identity share what they cache. It is not part of the cache key, which stays the URL, and nothing is sent to the server. Records written before ``RequestDL/CacheIdentity`` existed keep matching as they did.
+The identity is a claim by the app: the cache does not check that the credentials belong to it, and two accounts given the same identity share what they cache. It is not part of the cache key, which stays the URL, and nothing is sent to the server. Records written before ``RequestDL/CacheIdentity`` existed keep matching as they did. A record whose identity was stored with the other kind of digest, or under another key, is not matched (the next request is a miss, and its response replaces the record), so setting or rotating the encryption key starts the identities over.
 
 ### Encrypting the disk tier
 

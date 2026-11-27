@@ -27,8 +27,13 @@
 ///
 /// - The response is stored for that identity and for no other, and the credentials the request
 ///   sent are not looked at: a request with the same identity is served it whatever
-///   `Authorization` or `Cookie` it carries. The identity is stored as a SHA-256 digest, never as
-///   written, so a user ID or an email address does not reach the disk.
+///   `Authorization` or `Cookie` it carries. The identity is not stored as written but as a
+///   digest. With an ``DataCache/EncryptionKey`` on the cache it is an HMAC-SHA256 under a key
+///   derived from it, which cannot be computed, or checked against a guess, without the key.
+///   Without one it is a plain SHA-256 and **is not a secret**: it hides nothing that can be
+///   guessed (a numeric user ID, an email address), and whoever can read the cache directory can
+///   test candidates against it. Declare an opaque identifier (a random account ID that means
+///   nothing outside the app) or set an encryption key.
 /// - A response whose `Vary` lists `Authorization`, `Cookie` or `Proxy-Authorization` is still
 ///   served to the same identity: the identity stands in for those fields. Any other field in
 ///   `Vary` is compared as usual.
